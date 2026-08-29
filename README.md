@@ -9,7 +9,10 @@ on the same network: a browser remote, an app launcher, and live device state.
 docker compose up --build
 ```
 
-Then open `http://<host>:8080`.
+Then open `http://<host>:8080`. Set `SERVER_PORT` to listen elsewhere — under
+the bundled host-networking setup that is the only change required. In the
+commented bridge-mode alternative you must update the `ports:` mapping to match,
+or the container will publish 8080 while the app listens on your chosen port.
 
 ## Running a prebuilt image
 
@@ -44,6 +47,7 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 
 | Property | Default | Meaning |
 |---|---|---|
+| `SERVER_PORT` | `8080` | Port the web UI listens on |
 | `shield.data-dir` | `/data` in Docker | Where the keystore, registry and app catalog live |
 | `SHIELD_KEYSTORE_PASSWORD` | `shield` | Keystore password |
 | `shield.discovery-enabled` | `true` | Turn mDNS off entirely |

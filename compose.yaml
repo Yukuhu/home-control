@@ -12,6 +12,9 @@ services:
       - ./data:/data
     environment:
       SHIELD_KEYSTORE_PASSWORD: change-me
+      # The app listens on 8080 by default. Spring Boot reads SERVER_PORT, so
+      # uncommenting this is all that is needed under host networking:
+      # SERVER_PORT: 9090
     restart: unless-stopped
 
 # Bridge-mode alternative (no discovery, manual address entry only):
