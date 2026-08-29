@@ -66,4 +66,50 @@ class AppCatalogTest {
         assertThat(catalog.byPackage("com.netflix.ninja")).get()
                 .extracting(AppEntry::name).isEqualTo("Netflix");
     }
+
+    @Test
+    void handlesEmptyAppsYamlWithoutThrowingOrNpe() throws Exception {
+        Path file = dir.resolve("apps.yaml");
+        Files.writeString(file, "# This is just a comment");
+
+        AppCatalog catalog = new AppCatalog(file);
+
+        assertThat(catalog.entries()).isEmpty();
+    }
+
+    @Test
+    void handlesFileWithNoAppsKeyByReturningEmptyCatalog() throws Exception {
+        Path file = dir.resolve("apps.yaml");
+        Files.writeString(file, """
+                other:
+                  - key: value
+                """);
+
+        AppCatalog catalog = new AppCatalog(file);
+
+        assertThat(catalog.entries()).isEmpty();
+    }
+
+    @Test
+    void skipsMalformedRowsAndKeepsValidOnes() throws Exception {
+        Path file = dir.resolve("apps.yaml");
+        Files.writeString(file, """
+                apps:
+                  - id: kodi
+                    name: Kodi
+                    package: org.xbmc.kodi
+                  - id: missing-name
+                    package: com.example.app
+                  - id: plex
+                    name: Plex
+                    package: com.plexapp.android
+                """);
+
+        AppCatalog catalog = new AppCatalog(file);
+
+        assertThat(catalog.entries()).hasSize(2);
+        assertThat(catalog.byId("kodi")).isPresent();
+        assertThat(catalog.byId("plex")).isPresent();
+        assertThat(catalog.byId("missing-name")).isEmpty();
+    }
 }

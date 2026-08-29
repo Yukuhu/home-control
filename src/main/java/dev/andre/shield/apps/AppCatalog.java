@@ -1,6 +1,8 @@
 package dev.andre.shield.apps;
 
 import dev.andre.shield.ShieldProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
@@ -18,6 +20,7 @@ import java.util.Optional;
 @Component
 public class AppCatalog {
 
+    private static final Logger log = LoggerFactory.getLogger(AppCatalog.class);
     private static final String BUNDLED = "/default-apps.yaml";
 
     private final List<AppEntry> entries;
@@ -49,6 +52,9 @@ public class AppCatalog {
             if (!Files.exists(file)) {
                 Files.createDirectories(file.toAbsolutePath().getParent());
                 try (InputStream bundled = AppCatalog.class.getResourceAsStream(BUNDLED)) {
+                    if (bundled == null) {
+                        throw new IllegalStateException("Bundled catalog resource not found: " + BUNDLED);
+                    }
                     Files.write(file, bundled.readAllBytes());
                 }
             }
@@ -63,14 +69,33 @@ public class AppCatalog {
     @SuppressWarnings("unchecked")
     private static List<AppEntry> parse(InputStream in) {
         Map<String, Object> document = new Yaml().load(in);
+        if (document == null) {
+            return List.of();
+        }
+
         List<Map<String, String>> apps =
                 (List<Map<String, String>>) document.getOrDefault("apps", List.of());
 
         List<AppEntry> entries = new ArrayList<>();
         for (Map<String, String> app : apps) {
-            entries.add(new AppEntry(
-                    app.get("id"), app.get("name"), app.get("package"), app.get("deepLink")));
+            String id = app.get("id");
+            String name = app.get("name");
+            String appPackage = app.get("package");
+
+            if (isBlankString(id) || isBlankString(name) || isBlankString(appPackage)) {
+                log.warn("Skipping malformed app entry (missing or blank id, name, or package): {}", app);
+                continue;
+            }
+
+            entries.add(new AppEntry(id, name, appPackage, app.get("deepLink")));
         }
         return List.copyOf(entries);
+    }
+
+    private static boolean isBlankString(Object value) {
+        if (!(value instanceof String)) {
+            return true;
+        }
+        return ((String) value).isBlank();
     }
 }
