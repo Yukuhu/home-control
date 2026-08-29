@@ -26,6 +26,16 @@ public class DeviceStateBroadcaster {
         return emitter;
     }
 
+    /**
+     * Undoes a {@link #subscribe()} whose caller never got to hand the emitter back to
+     * Spring — e.g. the initial state send failed. Without this, that emitter's
+     * onCompletion/onTimeout/onError never fire (Spring never adopted it), so it would
+     * otherwise sit in this list forever.
+     */
+    void unsubscribe(SseEmitter emitter) {
+        emitters.remove(emitter);
+    }
+
     @EventListener
     public void onStateChanged(DeviceStateChangedEvent event) {
         for (SseEmitter emitter : emitters) {

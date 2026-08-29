@@ -22,8 +22,15 @@ public class StateController {
     @GetMapping(path = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter events() throws IOException {
         SseEmitter emitter = broadcaster.subscribe();
-        // Send the current state immediately so a new tab is not blank until something changes.
-        emitter.send(SseEmitter.event().name("state").data(sessions.state()));
+        try {
+            // Send the current state immediately so a new tab is not blank until something changes.
+            emitter.send(SseEmitter.event().name("state").data(sessions.state()));
+        } catch (IOException e) {
+            // The emitter never reached Spring, so its onCompletion/onTimeout/onError
+            // will never fire; undo the subscribe ourselves or it leaks forever.
+            broadcaster.unsubscribe(emitter);
+            throw e;
+        }
         return emitter;
     }
 }

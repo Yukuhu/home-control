@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,9 +42,14 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
         return findAll().stream().filter(device -> device.id().equals(id)).findFirst();
     }
 
+    /**
+     * The most recently paired device, by {@link Device#lastSeen}, not file order.
+     * A re-pair at a changed address gets a new id (spec §6) and so a new entry
+     * alongside the stale one; the freshly paired device must win.
+     */
     @Override
     public Optional<Device> first() {
-        return findAll().stream().findFirst();
+        return findAll().stream().max(Comparator.comparing(Device::lastSeen));
     }
 
     @Override

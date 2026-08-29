@@ -10,9 +10,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class PairingServiceTest {
@@ -71,5 +73,27 @@ class PairingServiceTest {
     @Test
     void reportsWhenNoPairingIsInFlight() {
         assertThat(service.submit("70B2C3")).isInstanceOf(PairingResult.Failed.class);
+    }
+
+    @Test
+    void derivesTheDeviceIdFromTheHostSoRenamingDoesNotDuplicateTheEntry() throws Exception {
+        service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
+        service.submit(fakeDevice.awaitDisplayedCode());
+
+        try (FakePairingServer rePairedDevice = new FakePairingServer()) {
+            // Same host, a different display name, a different in-process fake server —
+            // the id must come out identical because it is derived from the host alone.
+            service.begin("127.0.0.1", rePairedDevice.port(), "Bedroom Shield");
+            service.submit(rePairedDevice.awaitDisplayedCode());
+        }
+
+        org.mockito.ArgumentCaptor<Device> captor = org.mockito.ArgumentCaptor.forClass(Device.class);
+        verify(sessions, times(2)).adopt(captor.capture());
+        List<Device> adopted = captor.getAllValues();
+
+        assertThat(adopted.get(1).id())
+                .as("re-pairing the same host under a new name must replace the existing entry, not duplicate it")
+                .isEqualTo(adopted.get(0).id());
+        assertThat(adopted.get(1).name()).isEqualTo("Bedroom Shield");
     }
 }

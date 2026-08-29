@@ -41,6 +41,21 @@ class JsonFileDeviceRegistryTest {
     }
 
     @Test
+    void firstReturnsTheMostRecentlyPairedDeviceNotTheFirstOneOnFile() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        // Saved first (so it is first in file order) but has the OLDER lastSeen —
+        // if first() just returned file order, this would win, incorrectly.
+        registry.save(new Device("shield-stale", "Old Address", "192.168.1.50", 6466,
+                "AA:BB:CC", Instant.parse("2026-08-29T18:00:00Z")));
+        // Saved second but has the MORE RECENT lastSeen — the freshly paired device,
+        // e.g. after the physical device's address changed and it got a new id.
+        registry.save(new Device("shield-fresh", "New Address", "192.168.1.60", 6466,
+                "DD:EE:FF", Instant.parse("2026-08-29T19:00:00Z")));
+
+        assertThat(registry.first()).get().extracting(Device::id).isEqualTo("shield-fresh");
+    }
+
+    @Test
     void deletesADevice() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
         registry.save(shield());

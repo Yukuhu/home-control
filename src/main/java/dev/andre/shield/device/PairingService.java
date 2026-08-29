@@ -30,10 +30,14 @@ public class PairingService {
     private final CertificateStore certificates;
     private final DeviceSessionManager sessions;
 
-    private volatile PairingSession session;
-    private volatile ClientCertificate credential;
-    private volatile String host;
-    private volatile String name;
+    /**
+     * One in-flight attempt's state, captured atomically. {@code submit()} reads this
+     * field exactly once into a local, so a concurrent {@code begin()} — which replaces
+     * the field with a brand new {@code Attempt} rather than mutating fields in place —
+     * can never leave {@code submit()} working off a mix of the old attempt's session and
+     * the new attempt's credential/host/name.
+     */
+    private volatile Attempt attempt;
 
     public PairingService(CertificateStore certificates, DeviceSessionManager sessions) {
         this.certificates = certificates;
@@ -47,52 +51,60 @@ public class PairingService {
     /** Port is a parameter only so tests can point at an in-process fake device. */
     public void begin(String host, int port, String name) throws IOException {
         cancel();
-        this.host = host;
-        this.name = (name == null || name.isBlank()) ? host : name;
-        this.credential = certificates.loadOrCreate(deviceId());
+        String resolvedName = (name == null || name.isBlank()) ? host : name;
+        String deviceId = deviceId(host);
+        ClientCertificate credential = certificates.loadOrCreate(deviceId);
 
         PairingSession starting = new PairingSession(host, port, credential);
         starting.start();
-        this.session = starting;
+        this.attempt = new Attempt(starting, credential, host, resolvedName, deviceId);
     }
 
     public boolean inProgress() {
-        return session != null;
+        return attempt != null;
     }
 
     public PairingResult submit(String code) {
-        PairingSession current = session;
+        Attempt current = attempt;
         if (current == null) {
             return new PairingResult.Failed("No pairing is in progress; start again from the device list");
         }
 
-        PairingResult result = current.submitCode(code);
+        PairingResult result = current.session().submitCode(code);
         if (result instanceof PairingResult.Paired paired) {
-            certificates.save(deviceId(), credential);
+            certificates.save(current.deviceId(), current.credential());
             sessions.adopt(new Device(
-                    deviceId(),
-                    name,
-                    host,
+                    current.deviceId(),
+                    current.name(),
+                    current.host(),
                     REMOTE_PORT,
                     ClientCertificate.fingerprintOf(paired.serverCertificate()),
                     Instant.now()));
-            log.info("Paired with {} at {}", name, host);
+            log.info("Paired with {} at {}", current.name(), current.host());
         }
         cancel();
         return result;
     }
 
     public void cancel() {
-        PairingSession current = session;
-        session = null;
+        Attempt current = attempt;
+        attempt = null;
         if (current != null) {
-            current.close();
+            current.session().close();
         }
     }
 
-    /** Stable across re-pairings so the same certificate alias and registry entry are reused. */
-    private String deviceId() {
-        String base = (name == null || name.isBlank()) ? host : name;
-        return base.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+    /**
+     * Stable across re-pairings so the same certificate alias and registry entry are
+     * reused. Derived from the host alone — NOT the display name, which the user can
+     * change freely — so re-pairing the same physical device under a new name replaces
+     * its existing registry entry instead of creating a duplicate (spec §6).
+     */
+    private static String deviceId(String host) {
+        return host.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+    }
+
+    private record Attempt(PairingSession session, ClientCertificate credential,
+                           String host, String name, String deviceId) {
     }
 }

@@ -9,7 +9,7 @@ public interface DeviceRegistry {
 
     Optional<Device> findById(String id);
 
-    /** The single device the v1 UI controls. */
+    /** The single device the v1 UI controls: the most recently paired one. */
     Optional<Device> first();
 
     void save(Device device);
