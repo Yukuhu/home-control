@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>Shield Remote</title>
+    <link rel="stylesheet" th:href="@{/app.css}">
+    <script th:src="@{/vendor/htmx.min.js}" defer></script>
+    <script th:src="@{/app.js}" defer></script>
+</head>
+<body>
+<header>
+    <span id="status" class="badge" th:classappend="${state.connected()} ? 'ok' : 'off'"
+          th:text="${state.status()}">DISCONNECTED</span>
+    <span id="current-app" th:text="${state.currentApp()} ?: 'Nothing playing'">Nothing playing</span>
+    <span id="volume" th:text="${state.muted()} ? 'muted' : ('vol ' + ${state.volumeLevel()})">vol</span>
+    <a th:href="@{/setup}">Setup</a>
+</header>
+
+<main hx-swap="none">
+    <section class="dpad">
+        <button hx-post="/key/DPAD_UP" class="up">▲</button>
+        <button hx-post="/key/DPAD_LEFT" class="left">◀</button>
+        <button hx-post="/key/DPAD_CENTER" class="ok">OK</button>
+        <button hx-post="/key/DPAD_RIGHT" class="right">▶</button>
+        <button hx-post="/key/DPAD_DOWN" class="down">▼</button>
+    </section>
+
+    <section class="row">
+        <button hx-post="/key/BACK">Back</button>
+        <button hx-post="/key/HOME">Home</button>
+        <button hx-post="/key/MENU">Menu</button>
+        <button hx-post="/key/POWER">Power</button>
+    </section>
+
+    <section class="row">
+        <button hx-post="/key/MEDIA_PREVIOUS">⏮</button>
+        <button hx-post="/key/REWIND">⏪</button>
+        <button hx-post="/key/PLAY_PAUSE">⏯</button>
+        <button hx-post="/key/FAST_FORWARD">⏩</button>
+        <button hx-post="/key/MEDIA_NEXT">⏭</button>
+    </section>
+
+    <section class="row">
+        <button hx-post="/key/VOLUME_DOWN">Vol −</button>
+        <button hx-post="/key/VOLUME_MUTE">Mute</button>
+        <button hx-post="/key/VOLUME_UP">Vol +</button>
+    </section>
+
+    <section class="apps">
+        <button th:each="app : ${apps}"
+                th:hx-post="@{/apps/{id}/launch(id=${app.id()})}"
+                th:text="${app.name()}">App
+        </button>
+    </section>
+</main>
+
+<div id="toast" hidden></div>
+</body>
+</html>

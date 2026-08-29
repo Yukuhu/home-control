@@ -1,0 +1,27 @@
+:root { color-scheme: dark; --bg: #14161a; --fg: #e8e8ea; --btn: #23262d; --accent: #3d7dff; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+       font: 16px/1.4 system-ui, -apple-system, sans-serif; }
+header { display: flex; gap: 1rem; align-items: center; padding: .75rem 1rem;
+         border-bottom: 1px solid #2a2d34; }
+header a { color: var(--accent); margin-left: auto; }
+.badge { padding: .15rem .5rem; border-radius: 999px; font-size: .75rem; background: #3a2020; }
+.badge.ok { background: #1f3a24; }
+main { max-width: 30rem; margin: 0 auto; padding: 1rem; }
+button { background: var(--btn); color: var(--fg); border: 1px solid #313640;
+         border-radius: .6rem; padding: .9rem; font-size: 1rem; cursor: pointer;
+         touch-action: manipulation; }
+button:active { background: var(--accent); }
+.dpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin-bottom: 1rem; }
+.dpad .up { grid-area: 1 / 2; } .dpad .left { grid-area: 2 / 1; }
+.dpad .ok { grid-area: 2 / 2; } .dpad .right { grid-area: 2 / 3; }
+.dpad .down { grid-area: 3 / 2; }
+.row { display: flex; gap: .5rem; margin-bottom: .75rem; }
+.row button { flex: 1; }
+.apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: .5rem; }
+.setup form { display: flex; gap: .5rem; align-items: center; margin: .5rem 0; }
+.setup input { flex: 1; padding: .7rem; border-radius: .5rem; border: 1px solid #313640;
+               background: #1b1e24; color: var(--fg); }
+.error { background: #3a2020; padding: .75rem; border-radius: .5rem; }
+#toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+         background: #3a2020; padding: .75rem 1rem; border-radius: .5rem; }

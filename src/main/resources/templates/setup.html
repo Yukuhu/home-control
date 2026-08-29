@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shield Remote · Setup</title>
+    <link rel="stylesheet" th:href="@{/app.css}">
+</head>
+<body>
+<header>
+    <a th:href="@{/}">← Remote</a>
+</header>
+
+<main class="setup">
+    <p class="error" th:if="${error}" th:text="${error}">Something went wrong</p>
+
+    <section th:if="${awaitingCode}">
+        <h2>Enter the code shown on your TV</h2>
+        <form method="post" th:action="@{/setup/code}">
+            <input name="code" maxlength="6" minlength="6" autocomplete="off"
+                   autofocus placeholder="A1B2C3" required>
+            <button type="submit">Pair</button>
+        </form>
+    </section>
+
+    <section th:unless="${awaitingCode}">
+        <h2>Devices on this network</h2>
+        <p th:if="${#lists.isEmpty(discovered)}">
+            Nothing found. If this app runs in Docker, mDNS needs
+            <code>network_mode: host</code> — otherwise enter the address below.
+        </p>
+        <ul>
+            <li th:each="device : ${discovered}">
+                <form method="post" th:action="@{/setup/pair}">
+                    <input type="hidden" name="host" th:value="${device.host()}">
+                    <input type="hidden" name="name" th:value="${device.name()}">
+                    <span th:text="${device.name()} + ' (' + ${device.host()} + ')'">Shield</span>
+                    <button type="submit">Pair</button>
+                </form>
+            </li>
+        </ul>
+
+        <h2>Or enter an address</h2>
+        <form method="post" th:action="@{/setup/pair}">
+            <input name="host" placeholder="192.168.1.50" required>
+            <input name="name" placeholder="Living Room Shield">
+            <button type="submit">Pair</button>
+        </form>
+    </section>
+
+    <section th:if="${paired}">
+        <h2>Paired device</h2>
+        <p th:text="${paired.name()} + ' at ' + ${paired.host()}">Shield</p>
+        <form method="post" th:action="@{/setup/forget}">
+            <input type="hidden" name="id" th:value="${paired.id()}">
+            <button type="submit">Forget this device</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>
