@@ -2233,9 +2233,9 @@ public interface DeviceRegistry {
 ```java
 package dev.andre.shield.device;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -2248,7 +2248,9 @@ import java.util.Optional;
 /** Registry backed by a small JSON file, written atomically via a temp file and rename. */
 public class JsonFileDeviceRegistry implements DeviceRegistry {
 
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    // Spring Boot 4.1 ships Jackson 3 (tools.jackson), where Java 8 date/time
+    // support is built into databind -- there is no JavaTimeModule to register.
+    private final JsonMapper mapper = JsonMapper.builder().build();
     private final Path file;
 
     public JsonFileDeviceRegistry(Path file) {
@@ -2263,7 +2265,8 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
         try {
             return mapper.readValue(Files.readAllBytes(file), new TypeReference<List<Device>>() {
             });
-        } catch (IOException e) {
+        } catch (IOException | JacksonException e) {
+            // Jackson 3 parse failures are unchecked, so they need naming explicitly.
             throw new IllegalStateException("Could not read " + file, e);
         }
     }
@@ -2301,7 +2304,7 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
             Files.write(temp, mapper.writeValueAsBytes(devices));
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException e) {
+        } catch (IOException | JacksonException e) {
             throw new IllegalStateException("Could not write " + file, e);
         }
     }
