@@ -50,6 +50,10 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 | `shield.stale-timeout-seconds` | `10` | No inbound message for this long means the connection is dead |
 | `shield.reconnect-max-delay-seconds` | `60` | Upper bound on reconnect backoff |
 
+## License
+
+MIT. See [LICENSE](LICENSE).
+
 ## Security
 
 There is no authentication: anyone who can reach the port can control the TV. This is
