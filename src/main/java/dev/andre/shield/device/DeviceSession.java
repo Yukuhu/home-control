@@ -25,6 +25,15 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(DeviceSession.class);
 
+    /**
+     * A single UNPAIRED verdict is ambiguous: it fires both for a genuinely de-paired
+     * device and for a connection that drops before the app-level handshake finishes
+     * (indistinguishable from here — see {@code RemoteConnection.classify}). Requiring
+     * this many in a row before latching still converges on a real re-pair within a
+     * few seconds, while giving a transient early drop room to recover.
+     */
+    private static final int UNPAIRED_CONFIRMATION_THRESHOLD = 3;
+
     private final Device device;
     private final ClientCertificate credential;
     private final ShieldProperties properties;
@@ -34,6 +43,7 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
     private volatile RemoteConnection connection;
     private volatile DeviceState state = DeviceState.initial();
     private volatile Duration backoff;
+    private volatile int consecutiveUnpaired;
     private volatile boolean closed;
 
     public DeviceSession(Device device, ClientCertificate credential,
@@ -106,10 +116,10 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
 
             connection = opened;
             backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
+            consecutiveUnpaired = 0;
             update(state.withStatus(DeviceStatus.CONNECTED));
         } catch (RemoteConnection.UnpairedException e) {
-            log.warn("Device {} rejected our certificate; it must be paired again", device.id());
-            update(state.withStatus(DeviceStatus.UNPAIRED));
+            handleAmbiguousUnpaired();
         } catch (IOException e) {
             log.debug("Could not reach {}: {}", device.host(), e.getMessage());
             update(state.withStatus(DeviceStatus.DISCONNECTED));
@@ -122,6 +132,27 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
         String pinned = device.certificateFingerprint();
         return pinned == null
                 || pinned.equals(ClientCertificate.fingerprintOf(opened.serverCertificate()));
+    }
+
+    /**
+     * Handles an ambiguous UNPAIRED verdict — from either {@link RemoteConnection.UnpairedException}
+     * or {@link DisconnectCause#UNPAIRED} — by retrying like an ordinary drop until it has
+     * happened {@value #UNPAIRED_CONFIRMATION_THRESHOLD} times in a row, then latching.
+     * A certificate fingerprint MISMATCH is not ambiguous and does not go through here —
+     * it latches immediately, on the first occurrence (see {@code presentsThePinnedCertificate}).
+     */
+    private void handleAmbiguousUnpaired() {
+        consecutiveUnpaired++;
+        if (consecutiveUnpaired < UNPAIRED_CONFIRMATION_THRESHOLD) {
+            log.info("Device {} looked unpaired ({}/{}); retrying before giving up",
+                    device.id(), consecutiveUnpaired, UNPAIRED_CONFIRMATION_THRESHOLD);
+            update(state.withStatus(DeviceStatus.DISCONNECTED));
+            scheduleReconnect();
+        } else {
+            log.warn("Device {} rejected our certificate {} times in a row; it must be paired again",
+                    device.id(), consecutiveUnpaired);
+            update(state.withStatus(DeviceStatus.UNPAIRED));
+        }
     }
 
     private void scheduleReconnect() {
@@ -156,8 +187,7 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
         }
         connection = null;
         if (cause == DisconnectCause.UNPAIRED) {
-            log.warn("Device {} rejected our certificate; not retrying", device.id());
-            update(state.withStatus(DeviceStatus.UNPAIRED));
+            handleAmbiguousUnpaired();
             return;
         }
         log.info("Lost the connection to {} ({}); reconnecting", device.id(), cause);
