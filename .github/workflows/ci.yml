@@ -78,11 +78,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # A context holding only the jar and the runtime Dockerfile. The repository
+      # .dockerignore excludes `build`, which the self-contained Dockerfile needs
+      # it to, so the dist image gets its own minimal context instead.
+      - name: Assemble the dist build context
+        run: mkdir -p dist && cp Dockerfile.dist dist/Dockerfile
+
       - name: Fetch the jar built natively by the test job
         uses: actions/download-artifact@v8
         with:
           name: jar
-          path: build/libs
+          path: dist
 
       - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
@@ -106,8 +112,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
-          context: .
-          file: Dockerfile.dist
+          context: dist
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
