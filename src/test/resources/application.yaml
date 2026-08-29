@@ -1,0 +1,10 @@
+server:
+  port: 8080
+
+shield:
+  data-dir: build/test-data
+  keystore-password: shield
+  discovery-enabled: false
+  stale-timeout-seconds: 10
+  reconnect-initial-delay-seconds: 1
+  reconnect-max-delay-seconds: 60
