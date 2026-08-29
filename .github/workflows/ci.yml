@@ -175,8 +175,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
+          # Passed as an environment variable rather than interpolated into the
+          # script: commit messages are untrusted input, and a stray quote would
+          # otherwise break the shell or worse.
+          CHANGELOG: ${{ steps.version.outputs.clean_changelog }}
         run: |
-          printf '%s\n' "${{ steps.version.outputs.clean_changelog }}" > notes.md
+          printf '%s\n' "$CHANGELOG" > notes.md
           git tag -a "$TAG" -m "$TAG"
           git push origin "$TAG"
           gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md
