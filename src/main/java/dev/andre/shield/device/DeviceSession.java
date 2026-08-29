@@ -166,49 +166,41 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
         scheduler.schedule(this::connect, delay.toSeconds(), TimeUnit.SECONDS);
     }
 
+    /*
+     * Every RemoteListener callback below arrives on the protocol reader thread.
+     * RemoteConnection's constructor starts that thread before its connect() factory
+     * even returns, so any of these can fire while connect() — running on this
+     * session's own scheduler thread — is still executing its success path for the
+     * very same connection. Each of these does a read-modify-write on `state` (and
+     * onDisconnected additionally writes connection/backoff/consecutiveUnpaired); left
+     * unserialized, connect()'s own writes could interleave with one of these and get
+     * silently clobbered, or clobber one of these in turn. So none of them touch that
+     * state directly — each hands its work off to runOnScheduler(), the same
+     * single-threaded scheduler connect() already runs on, making every mutation of
+     * connection/state/backoff/consecutiveUnpaired happen on exactly one thread.
+     */
+
     @Override
     public void onPower(boolean on) {
-        update(state.withPower(on));
+        runOnScheduler(() -> update(state.withPower(on)));
     }
 
     @Override
     public void onCurrentApp(String appPackage) {
-        update(state.withCurrentApp(appPackage));
+        runOnScheduler(() -> update(state.withCurrentApp(appPackage)));
     }
 
     @Override
     public void onVolume(int level, int max, boolean isMuted) {
-        update(state.withVolume(level, max, isMuted));
+        runOnScheduler(() -> update(state.withVolume(level, max, isMuted)));
     }
 
-    /**
-     * Arrives on the protocol reader thread — {@link RemoteConnection}'s constructor starts
-     * that thread before its {@code connect()} factory returns, so this can fire while
-     * {@link #connect()} is still running its own success path for the very same connection.
-     * Without serializing them, {@code connect()}'s later writes to {@code connection},
-     * {@code backoff}, {@code consecutiveUnpaired} and {@code state} would clobber whatever
-     * this call had just recorded — and since {@code RemoteConnection.finish()} is idempotent,
-     * no later callback would ever correct it. Hand off to the session's single-threaded
-     * scheduler — the same thread {@link #connect()} already runs on — so every mutation of
-     * that state happens on exactly one thread and the interleaving cannot occur.
-     */
     @Override
     public void onDisconnected(DisconnectCause cause) {
-        if (closed) {
-            return;
-        }
-        try {
-            scheduler.execute(() -> handleDisconnect(cause));
-        } catch (RejectedExecutionException e) {
-            // close() shut the scheduler down between the check above and this handoff;
-            // the session is going away, so there is nothing left to update.
-        }
+        runOnScheduler(() -> handleDisconnect(cause));
     }
 
     private void handleDisconnect(DisconnectCause cause) {
-        if (closed) {
-            return;
-        }
         connection = null;
         if (cause == DisconnectCause.UNPAIRED) {
             handleAmbiguousUnpaired();
@@ -217,6 +209,29 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
         log.info("Lost the connection to {} ({}); reconnecting", device.id(), cause);
         update(state.withStatus(DeviceStatus.DISCONNECTED));
         scheduleReconnect();
+    }
+
+    /**
+     * Hands one {@link RemoteListener} callback's work off to the scheduler, guarded against
+     * a session that is already closing — checked once here before scheduling, and again
+     * (inside the scheduled task itself) in case {@link #close()} shuts the scheduler down
+     * between that check and the task actually running. A single guard, used by every
+     * callback above, so the guard cannot drift out of sync between them.
+     */
+    private void runOnScheduler(Runnable task) {
+        if (closed) {
+            return;
+        }
+        try {
+            scheduler.execute(() -> {
+                if (!closed) {
+                    task.run();
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            // close() shut the scheduler down between the check above and this handoff;
+            // the session is going away, so there is nothing left to update.
+        }
     }
 
     private void update(DeviceState updated) {
