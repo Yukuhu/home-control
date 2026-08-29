@@ -56,7 +56,14 @@ public class PairingService {
         ClientCertificate credential = certificates.loadOrCreate(deviceId);
 
         PairingSession starting = new PairingSession(host, port, credential);
-        starting.start();
+        try {
+            starting.start();
+        } catch (IOException | RuntimeException e) {
+            // Nothing has taken ownership of the session yet, so nothing else will ever
+            // close it — and this is the most-exercised error path in the app.
+            starting.close();
+            throw e;
+        }
         this.attempt = new Attempt(starting, credential, host, resolvedName, deviceId);
     }
 
@@ -70,20 +77,27 @@ public class PairingService {
             return new PairingResult.Failed("No pairing is in progress; start again from the device list");
         }
 
-        PairingResult result = current.session().submitCode(code);
-        if (result instanceof PairingResult.Paired paired) {
-            certificates.save(current.deviceId(), current.credential());
-            sessions.adopt(new Device(
-                    current.deviceId(),
-                    current.name(),
-                    current.host(),
-                    REMOTE_PORT,
-                    ClientCertificate.fingerprintOf(paired.serverCertificate()),
-                    Instant.now()));
-            log.info("Paired with {} at {}", current.name(), current.host());
+        try {
+            PairingResult result = current.session().submitCode(code);
+            if (result instanceof PairingResult.Paired paired) {
+                certificates.save(current.deviceId(), current.credential());
+                sessions.adopt(new Device(
+                        current.deviceId(),
+                        current.name(),
+                        current.host(),
+                        REMOTE_PORT,
+                        ClientCertificate.fingerprintOf(paired.serverCertificate()),
+                        Instant.now()));
+                log.info("Paired with {} at {}", current.name(), current.host());
+            }
+            return result;
+        } finally {
+            // The device shows a brand new code next time whatever happened here, so the
+            // attempt is over either way. In a finally because an exception out of adopt()
+            // would otherwise strand inProgress() at true forever, leaving the setup page
+            // showing a code form for a session that is already dead.
+            cancel();
         }
-        cancel();
-        return result;
     }
 
     public void cancel() {

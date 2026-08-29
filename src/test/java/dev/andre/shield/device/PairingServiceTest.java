@@ -4,15 +4,20 @@ import dev.andre.shield.ShieldProperties;
 import dev.andre.shield.protocol.CertificateStore;
 import dev.andre.shield.protocol.FakePairingServer;
 import dev.andre.shield.protocol.PairingResult;
+import dev.andre.shield.protocol.RefusingPairingServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -95,5 +100,30 @@ class PairingServiceTest {
                 .as("re-pairing the same host under a new name must replace the existing entry, not duplicate it")
                 .isEqualTo(adopted.get(0).id());
         assertThat(adopted.get(1).name()).isEqualTo("Bedroom Shield");
+    }
+
+    @Test
+    void endsTheAttemptEvenWhenAdoptingTheDeviceFails() throws Exception {
+        doThrow(new IllegalStateException("the registry is unwritable")).when(sessions).adopt(any());
+        service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
+        String code = fakeDevice.awaitDisplayedCode();
+
+        assertThatThrownBy(() -> service.submit(code)).isInstanceOf(IllegalStateException.class);
+
+        assertThat(service.inProgress())
+                .as("a failure after the code was accepted must not strand the setup page on a dead session")
+                .isFalse();
+    }
+
+    @Test
+    void closesThePairingSocketWhenTheHandshakeFails() throws Exception {
+        try (RefusingPairingServer rudeDevice = new RefusingPairingServer()) {
+            assertThatThrownBy(() -> service.begin("127.0.0.1", rudeDevice.port(), "Rude Shield"))
+                    .isInstanceOf(IOException.class);
+
+            assertThat(rudeDevice.clientHungUp(5))
+                    .as("a pairing attempt that fails to start must close its TLS socket, not leak it")
+                    .isTrue();
+        }
     }
 }
