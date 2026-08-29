@@ -1,6 +1,7 @@
 package dev.andre.shield.device;
 
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.core.JacksonException;
 
@@ -15,7 +16,7 @@ import java.util.Optional;
 /** Registry backed by a small JSON file, written atomically via a temp file and rename. */
 public class JsonFileDeviceRegistry implements DeviceRegistry {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = JsonMapper.builder().build();
     private final Path file;
 
     public JsonFileDeviceRegistry(Path file) {
@@ -61,14 +62,22 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
     }
 
     private void writeAll(List<Device> devices) {
+        Path parent = file.toAbsolutePath().getParent();
+        Path temp = null;
         try {
-            Path parent = file.toAbsolutePath().getParent();
             Files.createDirectories(parent);
-            Path temp = Files.createTempFile(parent, "devices", ".json");
+            temp = Files.createTempFile(parent, "devices", ".json");
             Files.write(temp, mapper.writeValueAsBytes(devices));
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException | JacksonException e) {
+            if (temp != null) {
+                try {
+                    Files.deleteIfExists(temp);
+                } catch (IOException ignored) {
+                    // Cleanup error; let the original exception propagate
+                }
+            }
             throw new IllegalStateException("Could not write " + file, e);
         }
     }
