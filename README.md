@@ -25,8 +25,14 @@ docker pull ghcr.io/yukuhu/home-control:latest
 ```
 
 Swap `build: .` for `image: ghcr.io/yukuhu/home-control:latest` in
-`compose.yaml` to use it. Images are also tagged with the full commit SHA if you
-want to pin one.
+`compose.yaml` to use it.
+
+| Tag | Points at |
+|---|---|
+| `latest` | The newest release |
+| `0.1.0`, `0.1` | A specific release |
+| `main` | The newest commit on `main`, released or not |
+| `sha-<commit>` | One exact commit |
 
 ## Pairing
 
