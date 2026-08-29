@@ -44,15 +44,14 @@ public class RemoteConnection implements AutoCloseable {
         SSLSocket socket;
         try {
             socket = TlsSockets.connect(host, port, credential, staleTimeoutMillis);
-        } catch (SSLException | SocketException e) {
-            // A certificate rejection can surface either way: as an SSLException (e.g.
-            // SSLHandshakeException) if the device sends a TLS alert before closing, or as a
-            // SocketException ("broken pipe" / connection reset) if it just resets the
-            // connection mid-handshake instead. Verified against a real JSSE server configured
-            // to reject the client certificate: the client observed SocketException, not
-            // SSLException, because the server's TrustManager rejection closed the accepted
-            // socket before the alert was flushed. Both mean the same thing here — retrying
-            // with the same certificate is pointless — so both map to UnpairedException.
+        } catch (TlsSockets.HandshakeRejectedException e) {
+            // Only the HANDSHAKE phase means "the device refused our certificate"; retrying
+            // with the same certificate is pointless, so it maps to UnpairedException.
+            // TlsSockets decides which phase a failure came from and is the only place that
+            // can: a connect-phase ConnectException is itself a SocketException, so catching
+            // SSLException/SocketException here would classify an unreachable or rebooting
+            // device as unpaired and stop it from ever being retried (spec §8 class 1).
+            // Every other IOException from connect() is a network failure and passes through.
             throw new UnpairedException("the device refused our certificate", e);
         }
         return new RemoteConnection(socket, listener);

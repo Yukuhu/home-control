@@ -8,8 +8,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.net.ServerSocket;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -22,6 +26,10 @@ class DeviceSessionTest {
 
     private static final ShieldProperties PROPERTIES = new ShieldProperties(
             Path.of("./build/test-data"), "shield", false, 10, 1, 4);
+
+    /** A flat 1s retry ramp, so tests that need several attempts do not take a minute. */
+    private static final ShieldProperties FAST_RETRY = new ShieldProperties(
+            Path.of("./build/test-data"), "shield", false, 10, 1, 1);
 
     @BeforeEach
     void startSession() throws Exception {
@@ -114,6 +122,40 @@ class DeviceSessionTest {
         session.start();
 
         await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+    }
+
+    @Test
+    void keepsRetryingWhenNothingIsListeningOnThePort() throws Exception {
+        // Spec section 8 class 1: an unreachable device (asleep, rebooting, moved) is a
+        // NETWORK failure, so the session retries with backoff indefinitely. It must never
+        // be mistaken for class 2, a certificate rejection, which latches UNPAIRED and
+        // never schedules another attempt.
+        int deadPort;
+        try (ServerSocket probe = new ServerSocket(0)) {
+            deadPort = probe.getLocalPort();
+        }
+        Device unreachable = new Device("shield-unreachable", "Unreachable", "127.0.0.1",
+                deadPort, null, Instant.now());
+        AtomicInteger attempts = new AtomicInteger();
+        AtomicBoolean everUnpaired = new AtomicBoolean();
+
+        try (DeviceSession dead = new DeviceSession(unreachable,
+                ClientCertificate.generate("shield-remote"), FAST_RETRY, state -> {
+                    if (state.status() == DeviceStatus.CONNECTING) {
+                        attempts.incrementAndGet();
+                    } else if (state.status() == DeviceStatus.UNPAIRED) {
+                        everUnpaired.set(true);
+                    }
+                })) {
+            dead.start();
+
+            // Comfortably more attempts than the ambiguous-verdict latch threshold, so a
+            // session that miscounts connect failures as ambiguous verdicts has latched by now.
+            await().atMost(Duration.ofSeconds(30)).until(() -> attempts.get() >= 7);
+
+            assertThat(everUnpaired).isFalse();
+            assertThat(dead.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+        }
     }
 
     @Test
