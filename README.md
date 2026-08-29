@@ -31,8 +31,10 @@ Swap `build: .` for `image: ghcr.io/yukuhu/home-control:latest` in
 |---|---|
 | `latest` | The newest release |
 | `0.1.0`, `0.1` | A specific release |
-| `main` | The newest commit on `main`, released or not |
 | `sha-<commit>` | One exact commit |
+
+Every releasable commit on `main` is released immediately, so `latest` is both
+the newest release and the newest code.
 
 ## Pairing
 
@@ -59,6 +61,23 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 | `shield.discovery-enabled` | `true` | Turn mDNS off entirely |
 | `shield.stale-timeout-seconds` | `10` | No inbound message for this long means the connection is dead |
 | `shield.reconnect-max-delay-seconds` | `60` | Upper bound on reconnect backoff |
+
+## Releases
+
+Versions are derived from [conventional commit](https://www.conventionalcommits.org)
+messages, and a push to `main` releases automatically:
+
+| Commit type | Effect |
+|---|---|
+| `feat:` | Minor bump |
+| `fix:`, `perf:` | Patch bump |
+| `feat!:` or `BREAKING CHANGE:` | Minor bump, because this project is still pre-1.0 |
+| `docs:`, `ci:`, `chore:`, `test:`, `refactor:` | No release |
+
+A release builds the jar with that version, publishes the multi-arch image, then
+creates the tag and the GitHub release from the generated changelog — in that
+order, so a failed build never leaves a tag pointing at an image that was never
+pushed.
 
 ## License
 

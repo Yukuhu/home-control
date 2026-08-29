@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
 
 permissions:
@@ -68,56 +67,97 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  publish:
-    name: Publish to GHCR
-    if: >-
-      github.event_name == 'push'
-      && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+  release:
+    name: Release
+    # Conventional commits decide whether there is anything to release at all:
+    # feat -> minor, fix/perf -> patch, breaking -> minor while still pre-1.0.
+    # A push of only docs/ci/chore/test/refactor commits releases nothing.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [test, image]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v7
-
-      # A context holding only the jar and the runtime Dockerfile. The repository
-      # .dockerignore excludes `build`, which the self-contained Dockerfile needs
-      # it to, so the dist image gets its own minimal context instead.
-      - name: Assemble the dist build context
-        run: mkdir -p dist && cp Dockerfile.dist dist/Dockerfile
-
-      - name: Fetch the jar built natively by the test job
-        uses: actions/download-artifact@v8
         with:
-          name: jar
-          path: dist
+          # Version computation reads the whole history and every existing tag.
+          fetch-depth: 0
+
+      - name: Work out the next version
+        id: version
+        uses: TriPSs/conventional-changelog-action@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          preset: conventionalcommits
+          # Compute only. This job creates the tag and release itself, further
+          # down, so that the image is published in the same run.
+          skip-commit: true
+          skip-tag: true
+          skip-on-empty: true
+          output-file: false
+
+      # Below 1.0 a breaking change bumps the minor; it must not promote the
+      # project to 1.0.0. Fail loudly rather than cut a release nobody intended.
+      - name: Check the pre-1.0 rule held
+        if: steps.version.outputs.skipped == 'false'
+        run: |
+          previous=$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
+          next="${{ steps.version.outputs.version }}"
+          if [[ "$previous" == v0.* && "$next" != 0.* ]]; then
+            echo "::error::Refusing to promote $previous to $next. This project stays pre-1.0:"
+            echo "::error::a breaking change should bump the minor. Adjust deliberately if 1.0 is intended."
+            exit 1
+          fi
+          echo "$previous -> $next"
+          echo "majorminor=$(echo "$next" | cut -d. -f1,2)" >> "$GITHUB_OUTPUT"
+        id: guard
+
+      - uses: actions/setup-java@v6
+        if: steps.version.outputs.skipped == 'false'
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@v6
+        if: steps.version.outputs.skipped == 'false'
+
+      # Rebuilt here rather than reused from the test job, because the version is
+      # only known once the commits have been analysed.
+      - name: Build the release jar
+        if: steps.version.outputs.skipped == 'false'
+        run: ./gradlew bootJar -PreleaseVersion=${{ steps.version.outputs.version }}
+
+      - name: Assemble the dist build context
+        if: steps.version.outputs.skipped == 'false'
+        run: mkdir -p dist && cp Dockerfile.dist dist/Dockerfile && cp build/libs/*.jar dist/
 
       - uses: docker/setup-qemu-action@v4
+        if: steps.version.outputs.skipped == 'false'
       - uses: docker/setup-buildx-action@v4
+        if: steps.version.outputs.skipped == 'false'
 
       - uses: docker/login-action@v4
+        if: steps.version.outputs.skipped == 'false'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - id: meta
+        if: steps.version.outputs.skipped == 'false'
         uses: docker/metadata-action@v6
         with:
+          # metadata-action lowercases the image name, which GHCR requires.
           images: ghcr.io/${{ github.repository }}
-          # metadata-action's default flavor (latest=auto) applies `latest` only
-          # to semver tag pushes, so it tracks releases rather than whatever last
-          # landed on main. Main pushes are reachable as `main` or by SHA.
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=branch
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ steps.guard.outputs.majorminor }}
+            type=raw,value=latest
             type=sha,format=long
 
-      # Multi-arch is cheap here because only the JRE base layer differs per
-      # platform -- the jar was already built once, natively, in the test job.
       - name: Build and push
+        if: steps.version.outputs.skipped == 'false'
         uses: docker/build-push-action@v7
         with:
           context: dist
@@ -127,3 +167,24 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Tag and release last, so a failed build never leaves a tag pointing at a
+      # release that was never published.
+      - name: Tag and release
+        if: steps.version.outputs.skipped == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          printf '%s\n' "${{ steps.version.outputs.clean_changelog }}" > notes.md
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md
+
+      - name: Report
+        run: |
+          if [ "${{ steps.version.outputs.skipped }}" = "true" ]; then
+            echo "No releasable commits since the last tag - nothing published." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Released ${{ steps.version.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          fi

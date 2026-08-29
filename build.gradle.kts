@@ -5,7 +5,9 @@ plugins {
 }
 
 group = "dev.andre"
-version = "0.1.0"
+// CI passes the version computed from conventional commits; local builds get an
+// honest SNAPSHOT rather than claiming to be a release.
+version = (findProperty("releaseVersion") as String? ?: "0.0.0-SNAPSHOT")
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(25) }
