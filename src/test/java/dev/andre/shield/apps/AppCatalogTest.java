@@ -112,4 +112,14 @@ class AppCatalogTest {
         assertThat(catalog.byId("plex")).isPresent();
         assertThat(catalog.byId("missing-name")).isEmpty();
     }
+
+    @Test
+    void handlesAppsKeyWithScalarValueInsteadOfList() throws Exception {
+        Path file = dir.resolve("apps.yaml");
+        Files.writeString(file, "apps: netflix");
+
+        AppCatalog catalog = new AppCatalog(file);
+
+        assertThat(catalog.entries()).isEmpty();
+    }
 }

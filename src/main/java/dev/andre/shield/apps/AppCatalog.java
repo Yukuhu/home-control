@@ -73,8 +73,17 @@ public class AppCatalog {
             return List.of();
         }
 
-        List<Map<String, String>> apps =
-                (List<Map<String, String>>) document.getOrDefault("apps", List.of());
+        Object appsValue = document.get("apps");
+        if (appsValue == null) {
+            return List.of();
+        }
+
+        if (!(appsValue instanceof List)) {
+            log.warn("The 'apps' key must contain a list, not {}", appsValue.getClass().getSimpleName());
+            return List.of();
+        }
+
+        List<Map<String, String>> apps = (List<Map<String, String>>) appsValue;
 
         List<AppEntry> entries = new ArrayList<>();
         for (Map<String, String> app : apps) {
