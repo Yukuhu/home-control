@@ -102,4 +102,28 @@ class DeviceSessionTest {
         await().until(() -> fakeDevice.connections() >= 2
                 && session.state().status() == DeviceStatus.CONNECTED);
     }
+
+    @Test
+    void recoversWhenTheDeviceHangsUpBeforeTheHandshakeCompletesTwice() {
+        // Deterministic stand-in for the pre-configure race: the first two connections
+        // are torn down before any app-level exchange, exactly the ambiguous verdict a
+        // real device could produce by rebooting mid-handshake. The third one goes
+        // through normally, so the session must recover rather than latch UNPAIRED.
+        fakeDevice.closeNextConnections(2);
+
+        session.start();
+
+        await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+    }
+
+    @Test
+    void latchesUnpairedAfterThreeConsecutiveAmbiguousVerdicts() {
+        // Pins the other half of the rule: a third consecutive ambiguous verdict in a
+        // row (never a real fingerprint mismatch here) must still give up and latch.
+        fakeDevice.closeNextConnections(3);
+
+        session.start();
+
+        await().until(() -> session.state().status() == DeviceStatus.UNPAIRED);
+    }
 }

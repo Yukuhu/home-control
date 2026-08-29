@@ -36,6 +36,7 @@ public class FakeRemoteServer implements AutoCloseable {
     private final BlockingQueue<Integer> pongs = new LinkedBlockingQueue<>();
 
     private final AtomicInteger connections = new AtomicInteger();
+    private final AtomicInteger connectionsToReject = new AtomicInteger();
 
     private volatile SSLSocket socket;
     private volatile MessageStream stream;
@@ -85,6 +86,17 @@ public class FakeRemoteServer implements AutoCloseable {
         socket.close();
     }
 
+    /**
+     * For each of the next {@code n} connections accepted, closes the socket immediately
+     * without performing the app-level (RemoteConfigure/SetActive) exchange, then serves
+     * connection {@code n + 1} onward normally. Deterministic stand-in for a device that
+     * drops the connection before the handshake completes — no timing window to hit,
+     * unlike racing {@link #hangUp()} against the real exchange.
+     */
+    public void closeNextConnections(int n) {
+        connectionsToReject.set(n);
+    }
+
     /** How many times a client has connected; used to observe reconnects. */
     public int connections() {
         return connections.get();
@@ -108,11 +120,20 @@ public class FakeRemoteServer implements AutoCloseable {
             try {
                 socket = (SSLSocket) serverSocket.accept();
                 connections.incrementAndGet();
+                if (shouldRejectThisConnection()) {
+                    socket.close();
+                    continue;
+                }
                 handle(socket);
             } catch (Exception e) {
                 // This connection ended; wait for the next one.
             }
         }
+    }
+
+    /** Atomically consumes one unit of the {@link #closeNextConnections(int)} budget, if any is left. */
+    private boolean shouldRejectThisConnection() {
+        return connectionsToReject.getAndUpdate(remaining -> Math.max(0, remaining - 1)) > 0;
     }
 
     private void handle(SSLSocket connection) throws Exception {
