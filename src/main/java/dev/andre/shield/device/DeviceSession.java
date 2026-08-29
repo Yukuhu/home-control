@@ -236,7 +236,15 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
 
     private void update(DeviceState updated) {
         state = updated;
-        onChange.accept(updated);
+        try {
+            onChange.accept(updated);
+        } catch (Throwable t) {
+            // The listener publishes a Spring event, delivered synchronously on this thread
+            // to subscribers this class knows nothing about. Whatever they do, the transition
+            // has already happened and the caller must get to its scheduleReconnect() — a
+            // listener that throws must never be able to wedge the session.
+            log.warn("A device state listener failed for {}", device.id(), t);
+        }
     }
 
     @Override

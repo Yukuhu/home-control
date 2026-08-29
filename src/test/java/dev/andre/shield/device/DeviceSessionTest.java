@@ -130,12 +130,8 @@ class DeviceSessionTest {
         // NETWORK failure, so the session retries with backoff indefinitely. It must never
         // be mistaken for class 2, a certificate rejection, which latches UNPAIRED and
         // never schedules another attempt.
-        int deadPort;
-        try (ServerSocket probe = new ServerSocket(0)) {
-            deadPort = probe.getLocalPort();
-        }
         Device unreachable = new Device("shield-unreachable", "Unreachable", "127.0.0.1",
-                deadPort, null, Instant.now());
+                closedPort(), null, Instant.now());
         AtomicInteger attempts = new AtomicInteger();
         AtomicBoolean everUnpaired = new AtomicBoolean();
 
@@ -155,6 +151,36 @@ class DeviceSessionTest {
 
             assertThat(everUnpaired).isFalse();
             assertThat(dead.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+        }
+    }
+
+    @Test
+    void keepsReconnectingWhenAStateListenerThrows() throws Exception {
+        // In production onChange publishes a Spring event, which is delivered synchronously
+        // on this session's own control thread. A subscriber's unchecked exception must not
+        // abort the transition it was told about: scheduleReconnect() still has to run, or
+        // the session wedges permanently and silently.
+        Device unreachable = new Device("shield-listener-throws", "Unreachable", "127.0.0.1",
+                closedPort(), null, Instant.now());
+        AtomicInteger attempts = new AtomicInteger();
+
+        try (DeviceSession wedged = new DeviceSession(unreachable,
+                ClientCertificate.generate("shield-remote"), FAST_RETRY, state -> {
+                    if (state.status() == DeviceStatus.CONNECTING) {
+                        attempts.incrementAndGet();
+                    }
+                    throw new IllegalStateException("a wedged subscriber");
+                })) {
+            wedged.start();
+
+            await().atMost(Duration.ofSeconds(20)).until(() -> attempts.get() >= 3);
+        }
+    }
+
+    /** A port that was bound and released, so connecting to it is refused immediately. */
+    private static int closedPort() throws Exception {
+        try (ServerSocket probe = new ServerSocket(0)) {
+            return probe.getLocalPort();
         }
     }
 
