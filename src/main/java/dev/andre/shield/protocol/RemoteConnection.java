@@ -102,29 +102,31 @@ public class RemoteConnection implements AutoCloseable {
             // successfully from startHandshake()'s point of view, and the resulting
             // SSLHandshakeException (certificate_unknown) only surfaces here, on the first
             // post-handshake read - not from TlsSockets.connect() the way UnpairedException
-            // in connect() above assumes. Classify off the unwrapped cause using the same
-            // rules as a direct throw below, so this is reported correctly instead of a bogus
+            // in connect() above assumes. Unwrap and classify the real cause through the same
+            // rule classify() applies below, so this is reported correctly instead of a bogus
             // corrupt-message ERROR.
             finish(classify(e.getCause()));
-        } catch (SocketTimeoutException e) {
-            finish(DisconnectCause.STALE);
-        } catch (SSLException e) {
-            finish(DisconnectCause.UNPAIRED);
-        } catch (SocketException e) {
-            // A reset before the device ever configured us means it rejected the certificate.
-            finish(configured ? DisconnectCause.ERROR : DisconnectCause.UNPAIRED);
         } catch (IOException e) {
-            finish(DisconnectCause.ERROR);
+            // Reached directly for a write-side failure too (e.g. MessageStream.write() failing
+            // to answer a ping after the peer has already closed), not just a read failure -
+            // both paths must resolve to the same DisconnectCause for the same underlying cause.
+            finish(classify(e));
         }
     }
 
-    /** The same read-failure-to-cause mapping the catch clauses above apply directly. */
+    /**
+     * The one place that decides "retry forever" (STALE/ERROR) versus "tell the user to
+     * re-pair" (UNPAIRED) for a read/write failure on this connection. Shared by both the
+     * exception thrown directly and the one unwrapped from InvalidProtocolBufferException above,
+     * so the rule is defined exactly once.
+     */
     private DisconnectCause classify(Throwable cause) {
         if (cause instanceof SocketTimeoutException) {
             return DisconnectCause.STALE;
         } else if (cause instanceof SSLException) {
             return DisconnectCause.UNPAIRED;
         } else if (cause instanceof SocketException) {
+            // A reset before the device ever configured us means it rejected the certificate.
             return configured ? DisconnectCause.ERROR : DisconnectCause.UNPAIRED;
         }
         return DisconnectCause.ERROR;

@@ -200,6 +200,12 @@ class RemoteConnectionTest {
         };
 
         try (FakeRemoteServer silentDevice = new FakeRemoteServer()) {
+            // staleTimeoutMillis also bounds every individual read during the TLS handshake and
+            // the configure/active exchange, because TlsSockets.connect() calls setSoTimeout()
+            // before startHandshake(). 300ms must stay comfortably larger than a localhost
+            // handshake round trip; if this is ever tightened enough to violate that, the test
+            // fails loudly with a SocketTimeoutException escaping connect() itself, rather than
+            // silently mis-asserting.
             try (RemoteConnection staleConnection = RemoteConnection.connect("127.0.0.1", silentDevice.port(),
                     ClientCertificate.generate("shield-remote"), 300, staleListener)) {
                 silentDevice.awaitHandshake();
