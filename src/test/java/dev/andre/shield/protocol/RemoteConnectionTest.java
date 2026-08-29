@@ -4,6 +4,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import java.security.SecureRandom;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -42,6 +51,23 @@ class RemoteConnectionTest {
         @Override
         public void onDisconnected(DisconnectCause cause) {
             disconnect.set(cause);
+        }
+    };
+
+    /** Mimics a device that has forgotten the pairing: it rejects the client certificate outright. */
+    private static final X509TrustManager REJECT_CLIENT_CERTIFICATE = new X509TrustManager() {
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+            throw new CertificateException("rejected for test: simulating an unpaired device");
+        }
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType) {
+        }
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
         }
     };
 
@@ -111,6 +137,75 @@ class RemoteConnectionTest {
     void reportsWhenTheDeviceHangsUp() throws Exception {
         device.hangUp();
 
-        await().untilAtomic(disconnect, org.hamcrest.Matchers.notNullValue());
+        await().untilAtomic(disconnect, org.hamcrest.Matchers.is(DisconnectCause.CLOSED));
+    }
+
+    @Test
+    void reportsUnpairedWhenTheDeviceRejectsOurCertificate() throws Exception {
+        ClientCertificate rejectingDeviceIdentity = ClientCertificate.generate("rejecting-fake-shield");
+        SSLContext context = SSLContext.getInstance("TLS");
+        context.init(TlsSockets.keyManagers(rejectingDeviceIdentity),
+                new TrustManager[]{REJECT_CLIENT_CERTIFICATE}, new SecureRandom());
+
+        try (SSLServerSocket rejectingServer =
+                     (SSLServerSocket) context.getServerSocketFactory().createServerSocket(0)) {
+            rejectingServer.setNeedClientAuth(true);
+            Thread.ofVirtual().name("rejecting-fake-shield").start(() -> {
+                try (SSLSocket accepted = (SSLSocket) rejectingServer.accept()) {
+                    // Driving the handshake from the server side is what makes the
+                    // TrustManager actually run and reject the client's certificate.
+                    accepted.startHandshake();
+                } catch (Exception e) {
+                    // The handshake is expected to fail on this side too.
+                }
+            });
+
+            AtomicReference<DisconnectCause> rejectedDisconnect = new AtomicReference<>();
+            RemoteListener rejectingListener = new RemoteListener() {
+                @Override
+                public void onDisconnected(DisconnectCause cause) {
+                    rejectedDisconnect.set(cause);
+                }
+            };
+
+            // The rejection reaches the client one of two ways, depending on TLS handshake
+            // timing (verified empirically, not just in theory: run head-to-head against this
+            // same fake rejecting server many times, connect() itself throws UnpairedException
+            // only a minority of the time). Either the TLS layer fails before startHandshake()
+            // returns, so connect() throws UnpairedException directly - or startHandshake()
+            // looks like it succeeded from the client's side, and the certificate_unknown alert
+            // only arrives on the connection's first post-handshake read, reported through the
+            // listener as DisconnectCause.UNPAIRED instead. Both are the same "you must re-pair"
+            // signal to the caller, so both are accepted outcomes here.
+            try {
+                RemoteConnection rejected = RemoteConnection.connect("127.0.0.1",
+                        rejectingServer.getLocalPort(), ClientCertificate.generate("shield-remote"),
+                        10_000, rejectingListener);
+                await().untilAtomic(rejectedDisconnect, org.hamcrest.Matchers.is(DisconnectCause.UNPAIRED));
+                rejected.close();
+            } catch (RemoteConnection.UnpairedException expected) {
+                // Also an acceptable outcome - see comment above.
+            }
+        }
+    }
+
+    @Test
+    void reportsStaleWhenNothingArrivesWithinTheTimeout() throws Exception {
+        AtomicReference<DisconnectCause> staleDisconnect = new AtomicReference<>();
+        RemoteListener staleListener = new RemoteListener() {
+            @Override
+            public void onDisconnected(DisconnectCause cause) {
+                staleDisconnect.set(cause);
+            }
+        };
+
+        try (FakeRemoteServer silentDevice = new FakeRemoteServer()) {
+            try (RemoteConnection staleConnection = RemoteConnection.connect("127.0.0.1", silentDevice.port(),
+                    ClientCertificate.generate("shield-remote"), 300, staleListener)) {
+                silentDevice.awaitHandshake();
+
+                await().untilAtomic(staleDisconnect, org.hamcrest.Matchers.is(DisconnectCause.STALE));
+            }
+        }
     }
 }

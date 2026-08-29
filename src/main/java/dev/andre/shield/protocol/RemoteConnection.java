@@ -1,5 +1,6 @@
 package dev.andre.shield.protocol;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import dev.andre.shield.protocol.remote.RemoteAppLinkLaunchRequest;
 import dev.andre.shield.protocol.remote.RemoteConfigure;
 import dev.andre.shield.protocol.remote.RemoteDeviceInfo;
@@ -43,7 +44,15 @@ public class RemoteConnection implements AutoCloseable {
         SSLSocket socket;
         try {
             socket = TlsSockets.connect(host, port, credential, staleTimeoutMillis);
-        } catch (SSLException e) {
+        } catch (SSLException | SocketException e) {
+            // A certificate rejection can surface either way: as an SSLException (e.g.
+            // SSLHandshakeException) if the device sends a TLS alert before closing, or as a
+            // SocketException ("broken pipe" / connection reset) if it just resets the
+            // connection mid-handshake instead. Verified against a real JSSE server configured
+            // to reject the client certificate: the client observed SocketException, not
+            // SSLException, because the server's TrustManager rejection closed the accepted
+            // socket before the alert was flushed. Both mean the same thing here — retrying
+            // with the same certificate is pointless — so both map to UnpairedException.
             throw new UnpairedException("the device refused our certificate", e);
         }
         return new RemoteConnection(socket, listener);
@@ -83,6 +92,20 @@ public class RemoteConnection implements AutoCloseable {
                 dispatch(message);
             }
             finish(DisconnectCause.CLOSED);
+        } catch (InvalidProtocolBufferException e) {
+            // protobuf's delimited-parsing helpers catch ANY IOException raised while reading
+            // the length prefix or the message body and rewrap it as InvalidProtocolBufferException
+            // (their catch-all for "the stream didn't hold a valid message"), with the real
+            // exception underneath as the cause. That applies just as much to a certificate
+            // rejection as to a plain read timeout: verified empirically that when the device
+            // rejects our certificate, the client's TLS handshake most often completes
+            // successfully from startHandshake()'s point of view, and the resulting
+            // SSLHandshakeException (certificate_unknown) only surfaces here, on the first
+            // post-handshake read - not from TlsSockets.connect() the way UnpairedException
+            // in connect() above assumes. Classify off the unwrapped cause using the same
+            // rules as a direct throw below, so this is reported correctly instead of a bogus
+            // corrupt-message ERROR.
+            finish(classify(e.getCause()));
         } catch (SocketTimeoutException e) {
             finish(DisconnectCause.STALE);
         } catch (SSLException e) {
@@ -93,6 +116,18 @@ public class RemoteConnection implements AutoCloseable {
         } catch (IOException e) {
             finish(DisconnectCause.ERROR);
         }
+    }
+
+    /** The same read-failure-to-cause mapping the catch clauses above apply directly. */
+    private DisconnectCause classify(Throwable cause) {
+        if (cause instanceof SocketTimeoutException) {
+            return DisconnectCause.STALE;
+        } else if (cause instanceof SSLException) {
+            return DisconnectCause.UNPAIRED;
+        } else if (cause instanceof SocketException) {
+            return configured ? DisconnectCause.ERROR : DisconnectCause.UNPAIRED;
+        }
+        return DisconnectCause.ERROR;
     }
 
     private void dispatch(RemoteMessage message) throws IOException {
