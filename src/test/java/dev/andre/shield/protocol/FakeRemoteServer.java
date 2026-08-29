@@ -15,7 +15,9 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 
 import java.security.SecureRandom;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +38,24 @@ public class FakeRemoteServer implements AutoCloseable {
     private final BlockingQueue<Integer> pongs = new LinkedBlockingQueue<>();
 
     private final AtomicInteger connections = new AtomicInteger();
-    private final AtomicInteger connectionsToReject = new AtomicInteger();
+
+    /**
+     * What to do with each of the next connections, in order; anything past the end of the
+     * script is served normally. A script rather than a counter so a test can interleave
+     * different failures — which is the only way to tell a rule about CONSECUTIVE verdicts
+     * from one about a running total.
+     */
+    private final Queue<Reaction> script = new ConcurrentLinkedQueue<>();
+
+    private enum Reaction {
+        /** Close the connection immediately, before any app-level exchange. */
+        CLOSE,
+        /** Accept it and then say nothing at all, so the client's TLS handshake times out. */
+        STALL
+    }
+
+    /** Comfortably longer than the stale timeout any test using {@link #stallNextConnection()} sets. */
+    private static final long STALL_MILLIS = 1_500;
 
     private volatile SSLSocket socket;
     private volatile MessageStream stream;
@@ -94,7 +113,18 @@ public class FakeRemoteServer implements AutoCloseable {
      * unlike racing {@link #hangUp()} against the real exchange.
      */
     public void closeNextConnections(int n) {
-        connectionsToReject.set(n);
+        for (int i = 0; i < n; i++) {
+            script.add(Reaction.CLOSE);
+        }
+    }
+
+    /**
+     * Accepts the next connection and then never speaks, so the client's TLS handshake fails
+     * with a {@link java.net.SocketTimeoutException} — a NETWORK-class failure (spec §8 class 1),
+     * not the handshake rejection {@link #closeNextConnections(int)} produces.
+     */
+    public void stallNextConnection() {
+        script.add(Reaction.STALL);
     }
 
     /** How many times a client has connected; used to observe reconnects. */
@@ -120,7 +150,13 @@ public class FakeRemoteServer implements AutoCloseable {
             try {
                 socket = (SSLSocket) serverSocket.accept();
                 connections.incrementAndGet();
-                if (shouldRejectThisConnection()) {
+                Reaction reaction = script.poll();
+                if (reaction == Reaction.STALL) {
+                    Thread.sleep(STALL_MILLIS);
+                    socket.close();
+                    continue;
+                }
+                if (reaction == Reaction.CLOSE) {
                     socket.close();
                     continue;
                 }
@@ -129,11 +165,6 @@ public class FakeRemoteServer implements AutoCloseable {
                 // This connection ended; wait for the next one.
             }
         }
-    }
-
-    /** Atomically consumes one unit of the {@link #closeNextConnections(int)} budget, if any is left. */
-    private boolean shouldRejectThisConnection() {
-        return connectionsToReject.getAndUpdate(remaining -> Math.max(0, remaining - 1)) > 0;
     }
 
     private void handle(SSLSocket connection) throws Exception {

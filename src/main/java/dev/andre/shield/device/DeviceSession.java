@@ -122,12 +122,13 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
 
             connection = opened;
             backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
-            consecutiveUnpaired = 0;
+            forgetAmbiguousVerdicts();
             update(state.withStatus(DeviceStatus.CONNECTED));
         } catch (RemoteConnection.UnpairedException e) {
             handleAmbiguousUnpaired();
         } catch (IOException e) {
             log.debug("Could not reach {}: {}", device.host(), e.getMessage());
+            forgetAmbiguousVerdicts();
             update(state.withStatus(DeviceStatus.DISCONNECTED));
             scheduleReconnect();
         }
@@ -160,6 +161,19 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
                     device.id(), consecutiveUnpaired);
             update(state.withStatus(DeviceStatus.UNPAIRED));
         }
+    }
+
+    /**
+     * Clears the ambiguous-verdict count after any outcome that was NOT ambiguous — a
+     * successful connection, or a network-class failure (spec §8 class 1), or a drop the
+     * device explained some other way. The latch is a rule about CONSECUTIVE verdicts: a
+     * device that could not be reached at all is positive evidence that the verdicts before
+     * it were not a rejected certificate, so counting them together would let a merely flaky
+     * device accumulate a latch over days and tell the user to re-pair when nothing is wrong.
+     * A fingerprint MISMATCH does not come through here at all; it still latches at once.
+     */
+    private void forgetAmbiguousVerdicts() {
+        consecutiveUnpaired = 0;
     }
 
     private void scheduleReconnect() {
@@ -213,6 +227,7 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
             return;
         }
         log.info("Lost the connection to {} ({}); reconnecting", device.id(), cause);
+        forgetAmbiguousVerdicts();
         update(state.withStatus(DeviceStatus.DISCONNECTED));
         scheduleReconnect();
     }

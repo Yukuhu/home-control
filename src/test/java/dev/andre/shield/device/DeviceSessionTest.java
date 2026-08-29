@@ -31,6 +31,10 @@ class DeviceSessionTest {
     private static final ShieldProperties FAST_RETRY = new ShieldProperties(
             Path.of("./build/test-data"), "shield", false, 10, 1, 1);
 
+    /** As {@link #FAST_RETRY}, but with the 1s stale timeout a stalled handshake needs. */
+    private static final ShieldProperties SHORT_TIMEOUT = new ShieldProperties(
+            Path.of("./build/test-data"), "shield", false, 1, 1, 1);
+
     @BeforeEach
     void startSession() throws Exception {
         fakeDevice = new FakeRemoteServer();
@@ -202,11 +206,35 @@ class DeviceSessionTest {
         }
     }
 
+    @Test
+    void doesNotLatchWhenANetworkFailureSeparatesTheAmbiguousVerdicts() {
+        // Two ambiguous verdicts, a network-class failure (the device accepts the connection
+        // but never speaks, so the TLS handshake times out), then three more ambiguous
+        // verdicts: five in total, but never five in a row. The network failure is positive
+        // evidence that the device was not refusing our certificate — it was not answering
+        // at all — so the count starts over and a merely flaky device is never told to
+        // re-pair. The seventh connection is served normally.
+        fakeDevice.closeNextConnections(2);
+        fakeDevice.stallNextConnection();
+        fakeDevice.closeNextConnections(3);
+
+        try (DeviceSession retrying = sessionWith(SHORT_TIMEOUT)) {
+            retrying.start();
+
+            await().atMost(Duration.ofSeconds(40))
+                    .until(() -> retrying.state().status() == DeviceStatus.CONNECTED);
+        }
+    }
+
     /** The same device as {@link #session}, on a flat 1s ramp so the latch tests stay quick. */
     private DeviceSession fastRetryingSession() {
+        return sessionWith(FAST_RETRY);
+    }
+
+    private DeviceSession sessionWith(ShieldProperties properties) {
         return new DeviceSession(
                 new Device("shield-1", "Test Shield", "127.0.0.1", fakeDevice.port(), null, Instant.now()),
-                ClientCertificate.generate("shield-remote"), FAST_RETRY, state -> {
+                ClientCertificate.generate("shield-remote"), properties, state -> {
         });
     }
 }

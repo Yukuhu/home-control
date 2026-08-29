@@ -54,7 +54,23 @@ public class RemoteConnection implements AutoCloseable {
             // Every other IOException from connect() is a network failure and passes through.
             throw new UnpairedException("the device refused our certificate", e);
         }
-        return new RemoteConnection(socket, listener);
+        try {
+            return new RemoteConnection(socket, listener);
+        } catch (IOException | RuntimeException e) {
+            // The constructor reads the streams and the peer's certificate, either of which
+            // can still fail with the socket open and nobody yet holding it. The reader thread
+            // starts last, so nothing else is running to clean up after us.
+            closeQuietly(socket);
+            throw e;
+        }
+    }
+
+    private static void closeQuietly(SSLSocket socket) {
+        try {
+            socket.close();
+        } catch (IOException ignored) {
+            // Already gone.
+        }
     }
 
     private RemoteConnection(SSLSocket socket, RemoteListener listener) throws IOException {
