@@ -1,0 +1,33 @@
+# Edit the copy of this file in your data directory (apps.yaml) to change the launcher.
+# "package" is enough: without a deepLink the app is opened with market://launch?id=<package>.
+apps:
+  - id: netflix
+    name: Netflix
+    package: com.netflix.ninja
+  - id: youtube
+    name: YouTube
+    package: com.google.android.youtube.tv
+  - id: prime-video
+    name: Prime Video
+    package: com.amazon.amazonvideo.livingroom
+  - id: disney-plus
+    name: Disney+
+    package: com.disney.disneyplus
+  - id: plex
+    name: Plex
+    package: com.plexapp.android
+  - id: kodi
+    name: Kodi
+    package: org.xbmc.kodi
+  - id: spotify
+    name: Spotify
+    package: com.spotify.tv.android
+  - id: twitch
+    name: Twitch
+    package: tv.twitch.android.app
+  - id: ard-mediathek
+    name: ARD Mediathek
+    package: de.swr.ard.avp.mobile.android
+  - id: zdf-mediathek
+    name: ZDF Mediathek
+    package: com.zdf.android.mediathek
