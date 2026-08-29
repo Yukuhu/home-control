@@ -92,11 +92,11 @@ interface PairingSession extends AutoCloseable {
 }
 
 interface RemoteConnection extends AutoCloseable {
-    void sendKey(KeyCode key, KeyDirection direction);
-    void launchAppLink(URI appLink);
-    void adjustVolume(VolumeDirection direction);
-    void addListener(RemoteListener listener);   // onState(DeviceState), onDisconnected(Cause)
+    void sendKey(RemoteKey key);            // includes VOLUME_UP / VOLUME_DOWN / VOLUME_MUTE
+    void launchAppLink(String appLink);
+    X509Certificate serverCertificate();    // compared against the recorded pin
 }
+// The listener (onPower / onCurrentApp / onVolume / onDisconnected) is supplied at connect time.
 ```
 
 `DeviceSession` sits between protocol and web: it owns one `RemoteConnection`,
@@ -105,11 +105,11 @@ only collaborator the controllers know.
 
 ## 5. Protocol reference
 
-> The wire details below are recorded from knowledge of the public Android TV
-> Remote v2 protocol and the open-source clients that implement it
-> (`androidtvremote2`, `androidtv-remote`). **Every byte-level detail marked (V)
-> must be verified against a reference implementation during implementation and
-> pinned by a test vector before it is trusted.**
+> The wire details below were **verified on 2026-08-29** against the reference
+> implementation `louis49/androidtv-remote` — `src/pairing/pairingmessage.proto`,
+> `src/remote/remotemessage.proto`, `PairingManager.js`, `RemoteManager.js`.
+> Everything previously marked (V) is now confirmed. Two points were **corrections**
+> to earlier assumptions and are flagged inline below.
 
 ### 5.1 Discovery
 
@@ -122,33 +122,41 @@ only collaborator the controllers know.
 
 The client presents a self-signed certificate; the server's certificate is also
 self-signed, so the pairing connection trusts it unconditionally and records its
-fingerprint. Messages are protobuf, each prefixed with a varint length (V) —
-`writeDelimitedTo` / `parseDelimitedFrom` semantics.
+fingerprint.
+
+Every exchange is a `PairingMessage` envelope carrying `protocol_version = 2`,
+`status = STATUS_OK`, and exactly one populated payload field. **A reply whose
+`status` is not `STATUS_OK` aborts the pairing.** Each message is prefixed with a
+**single-byte length** — pairing and remote messages are always shorter than 128
+bytes, which makes this byte-identical to protobuf's varint delimiting, so Java's
+`writeDelimitedTo` / `parseDelimitedFrom` is wire-compatible and is what this
+project uses.
 
 | Step | Direction | Message |
 |---|---|---|
 | 1 | → | `PairingRequest { service_name, client_name }` |
 | 2 | ← | `PairingRequestAck { server_name }` |
 | 3 | → | `PairingOption { input_encodings: [{ HEXADECIMAL, symbol_length: 6 }], preferred_role: INPUT }` |
-| 4 | ← | `PairingOptionAck` |
+| 4 | ← | `PairingOption` — **correction:** no `PairingOptionAck` message exists; the server replies with its own `pairing_option` |
 | 5 | → | `PairingConfiguration { client_role: INPUT, encoding: { HEXADECIMAL, 6 } }` |
 | 6 | ← | `PairingConfigurationAck` — **the TV now displays the code** |
 | 7 | → | `PairingSecret { secret: digest }` |
-| 8 | ← | `PairingSecretAck` — the client certificate is now authorized |
+| 8 | ← | `PairingSecretAck { secret }` — the client certificate is now authorized; the returned secret is not verified by this client |
 
 The digest at step 7:
 
 ```
-nonce  = hexBytes(code.substring(2))          // last 4 hex chars → 2 bytes   (V)
+nonce  = hexBytes(code.substring(2))          // last 4 hex chars → 2 bytes
 digest = SHA-256( clientModulus ‖ clientExponent ‖ serverModulus ‖ serverExponent ‖ nonce )
-assert digest[0] == hexByte(code.substring(0, 2))    // the check digit       (V)
+assert digest[0] == hexByte(code.substring(0, 2))    // the check digit
 ```
 
-Modulus and exponent are the big-endian unsigned bytes of the RSA public key.
+Modulus and exponent are the big-endian **unsigned** bytes of each RSA public key.
 In Java, `BigInteger.toByteArray()` prepends a `0x00` sign byte whenever the high
-bit is set; **that byte must be stripped** (V). This single detail is the most
-likely cause of a pairing that fails with a correctly typed code, and it is why
-the test suite pins the digest with fixed certificates.
+bit is set; **that byte must be stripped**. For a 2048-bit key the modulus is
+therefore exactly 256 bytes, and the standard exponent 65537 is the three bytes
+`01 00 01`. This is the single most likely cause of a pairing that fails despite a
+correctly typed code, so the test suite pins it with a fixed digest vector.
 
 A wrong code causes the device to close the connection. The next attempt causes
 the TV to display a **new** code, so the UI restarts the flow rather than
@@ -156,27 +164,39 @@ re-prompting into a dead session.
 
 ### 5.3 Command channel (port 6466, TLS with the paired certificate)
 
-Handshake: `RemoteConfigure` (exchange device info) → `RemoteSetActive` →
-`RemoteStart`, after which a reader thread runs for the life of the connection.
+**Correction:** the device drives the handshake, not the client. On connect, the
+device sends `RemoteConfigure`; the client answers with its own
+`RemoteConfigure { code1: 622, device_info }`. The device then sends
+`RemoteSetActive`, which the client answers with `RemoteSetActive { active: 622 }`.
+A reader thread then runs for the life of the connection.
+
+`RemoteStart { started }` reports **power state** — a second correction: the
+protocol does expose it, so `DeviceState` carries `powerOn` rather than inferring
+it from connectivity.
 
 Inbound, unsolicited:
-- foreground app package — carried on `RemoteImeKeyInject.app_info` (V)
+- foreground app package — `RemoteImeKeyInject.app_info.app_package`
+- `RemoteStart { started }` — power state
 - `RemoteSetVolumeLevel { volume_max, volume_level, volume_muted }`
 - `RemotePingRequest` — **must be answered** with `RemotePingResponse` or the device disconnects
 - `RemoteError`
 
 Outbound:
 - `RemoteKeyInject { key_code: KEYCODE_*, direction: SHORT }`
-- `RemoteAdjustVolumeLevel`
+- volume is sent as ordinary key presses: `RemoteAdjustVolumeLevel` carries no direction
+  field, so `KEYCODE_VOLUME_UP` / `KEYCODE_VOLUME_DOWN` / `KEYCODE_VOLUME_MUTE` are used
 - `RemoteAppLinkLaunchRequest { app_link: <uri> }`
 
 ## 6. Data model and persistence
 
 ```java
 record Device(String id, String name, String host, int port,
-              String certAlias, String serverCertFingerprint, Instant lastSeen) {}
+              String certificateFingerprint, Instant lastSeen) {}
+// The keystore alias is derived from the id, so it is not stored separately.
 
-record DeviceState(boolean connected, String currentAppPackage,
+enum DeviceStatus { DISCONNECTED, CONNECTING, CONNECTED, UNPAIRED }
+
+record DeviceState(DeviceStatus status, boolean powerOn, String currentApp,
                    int volumeLevel, int volumeMax, boolean muted, Instant updatedAt) {}
 ```
 
@@ -185,14 +205,17 @@ record DeviceState(boolean connected, String currentAppPackage,
   `SHIELD_KEYSTORE_PASSWORD`, defaulted for convenience.
 - `/data/devices.json` — the registry, written atomically (temp file + rename).
 
-`serverCertFingerprint` is recorded during pairing and **pinned**: the command
+A status enum rather than a `connected` flag, because §8 requires "certificate
+rejected" to be distinguishable from "network down".
+
+`certificateFingerprint` is recorded during pairing and **pinned**: the command
 channel accepts only a server certificate matching it. A device presenting a
 different certificate is treated as failure class 2 (§8), not as a device to
 trust silently — a factory-reset Shield must be re-paired deliberately.
 
-The protocol reports no explicit power state, so `DeviceState.connected` is the
-proxy: the Shield remains reachable in standby, and a device that has genuinely
-powered off simply drops the connection.
+Power state comes from `RemoteStart { started }` on the command channel. The
+Shield stays reachable in standby, so `connected` and `powerOn` are independent:
+connected-but-off is a normal, displayable state.
 
 `DeviceRegistry` is an interface (`findAll`, `findById`, `save`, `delete`) with a
 JSON-file implementation. `DeviceSessionManager` maps device id → `DeviceSession`;
@@ -208,7 +231,7 @@ in v1 the UI resolves "the active device" as the single registered one.
 | `POST /setup/code` | Submit the displayed code |
 | `POST /key/{keyCode}` | Single key press (`hx-swap="none"`) |
 | `POST /apps/{id}/launch` | Launch a catalog entry |
-| `POST /volume/{up\|down\|mute}` | Up/down go through `adjustVolume`; mute is `KEYCODE_MUTE` via `sendKey` |
+| `POST /key/VOLUME_UP\|VOLUME_DOWN\|VOLUME_MUTE` | Volume, sent as ordinary key presses |
 | `GET /events` | SSE stream of `DeviceState` |
 
 Key presses are htmx posts with no swap; on a LAN this is comfortably sub-100ms.
@@ -247,13 +270,16 @@ Three failure classes that look alike but need different responses:
    `DeviceSession` marks disconnected, broadcasts state, reconnects with exponential
    backoff (1s doubling to a 60s cap, indefinitely). Key presses during this window
    are rejected with a toast, not queued.
-2. **TLS handshake rejected** on 6466 — the device no longer trusts our certificate
+2. **Certificate rejected** on 6466 — surfaces either as an `SSLException` during the
+   handshake or as a connection reset immediately after it (the reference implementation
+   keys on `ECONNRESET` for exactly this case) — the device no longer trusts our certificate
    (factory reset, pairing cleared). This must **not** enter the retry loop; it surfaces
    as "this device no longer accepts the pairing" with a link to `/setup`.
 3. **Pairing failures** — wrong code, no code appearing before timeout, connection
    refused — each with its own message; a wrong code restarts the flow from step 1.
 
-A staleness watchdog treats "no inbound message for 30 seconds" (configurable) as a dead connection
+The device sends a ping roughly every 5 seconds, so a staleness watchdog treats
+"no inbound message for 10 seconds" (configurable) as a dead connection
 even when the socket has not reported an error, and triggers reconnect.
 `RemoteError` messages are logged without dropping the connection.
 
@@ -296,8 +322,8 @@ where it surfaces.
 
 | Risk | Mitigation |
 |---|---|
-| Byte-level pairing details wrong → correct code still fails | Every (V) detail verified against a reference implementation and pinned by a digest test vector before the first hardware attempt |
-| Protobuf schemas incomplete or field numbers wrong | Schemas taken from open-source implementations; unknown fields tolerated by protobuf |
+| ~~Byte-level pairing details wrong~~ | **Retired 2026-08-29** — schemas, framing, digest algorithm, and handshake order verified against `louis49/androidtv-remote`; the digest is pinned by a test vector |
+| Schemas drift from the device's actual build | Protobuf tolerates unknown fields; `RemoteError` is logged rather than fatal |
 | mDNS silently absent in Docker | Manual host entry is a first-class UI path, and the compose file documents the requirement |
 | Pure-Java protocol proves unworkable | The `protocol` boundary is designed so a Python-sidecar implementation can replace it without touching the Spring layer |
 
