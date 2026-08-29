@@ -1,6 +1,9 @@
 services:
   shield-remote:
     build: .
+    # Or skip building and pull the multi-arch image CI publishes (amd64/arm64)
+    # by commenting out `build` above and using:
+    # image: ghcr.io/yukuhu/home-control:latest
     # Host networking is REQUIRED for mDNS discovery: multicast does not cross a
     # bridge network. On bridge networking the app still works, but the device must
     # be added by address on the setup page.

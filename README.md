@@ -11,6 +11,20 @@ docker compose up --build
 
 Then open `http://<host>:8080`.
 
+## Running a prebuilt image
+
+CI publishes a multi-arch image (`linux/amd64` and `linux/arm64`) to
+`ghcr.io/yukuhu/home-control:latest` on every push to `main`, so you can skip
+building from source:
+
+```bash
+docker pull ghcr.io/yukuhu/home-control:latest
+```
+
+Swap `build: .` for `image: ghcr.io/yukuhu/home-control:latest` in
+`compose.yaml` to use it. Images are also tagged with the full commit SHA if you
+want to pin one.
+
 ## Pairing
 
 1. Open `/setup`.
