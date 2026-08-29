@@ -46,6 +46,7 @@ class CertificateStoreTest {
 
         assertThat(ClientCertificate.fingerprintOf(cert.certificate()))
                 .hasSize(64)
+                .matches("[0-9A-F]{64}")
                 .isEqualTo(ClientCertificate.fingerprintOf(cert.certificate()))
                 .isNotEqualTo(ClientCertificate.fingerprintOf(other.certificate()));
     }
