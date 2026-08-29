@@ -75,4 +75,13 @@ class PairingDigestTest {
                 CLIENT_MODULUS, EXPONENT, SERVER_MODULUS, EXPONENT, "12345"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void rejectsASixCharacterCodeThatIsNotHexadecimal() {
+        // The right length but not hex: a user typing letters into the code form must land
+        // on the same "wrong code" path as any other mistyped code, not on a stack trace.
+        assertThatThrownBy(() -> PairingDigest.digest(
+                CLIENT_MODULUS, EXPONENT, SERVER_MODULUS, EXPONENT, "ZZZZZZ"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

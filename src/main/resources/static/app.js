@@ -15,13 +15,16 @@ source.addEventListener("state", (event) => {
         state.muted ? "muted" : "vol " + state.volumeLevel;
 });
 
-// A rejected command means the device is offline; htmx fires this on any non-2xx.
-document.body.addEventListener("htmx:responseError", () => {
+// A rejected command means the device is offline. Shared by the button path (htmx fires
+// this on any non-2xx) and the keyboard path below, so both report a refused key the same way.
+function showOfflineToast() {
     const toast = document.getElementById("toast");
     toast.textContent = "The device is not connected";
     toast.hidden = false;
     setTimeout(() => (toast.hidden = true), 2000);
-});
+}
+
+document.body.addEventListener("htmx:responseError", showOfflineToast);
 
 // Keyboard control for desktop use.
 const KEYS = {
@@ -35,5 +38,9 @@ document.addEventListener("keydown", (event) => {
     const key = KEYS[event.key];
     if (!key) return;
     event.preventDefault();
-    fetch("/key/" + key, { method: "POST" });
+    fetch("/key/" + key, { method: "POST" })
+        .then((response) => {
+            if (!response.ok) showOfflineToast();
+        })
+        .catch(showOfflineToast);
 });
