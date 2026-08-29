@@ -112,16 +112,19 @@ class DeviceSessionTest {
     }
 
     @Test
-    void recoversWhenTheDeviceHangsUpBeforeTheHandshakeCompletesTwice() {
-        // Deterministic stand-in for the pre-configure race: the first two connections
+    void recoversWhenTheDeviceHangsUpBeforeTheHandshakeCompletesRepeatedly() {
+        // Deterministic stand-in for the pre-configure race: the first four connections
         // are torn down before any app-level exchange, exactly the ambiguous verdict a
-        // real device could produce by rebooting mid-handshake. The third one goes
-        // through normally, so the session must recover rather than latch UNPAIRED.
-        fakeDevice.closeNextConnections(2);
+        // real device could produce while rebooting. The fifth goes through normally, so
+        // the session must recover rather than latch UNPAIRED.
+        fakeDevice.closeNextConnections(4);
 
-        session.start();
+        try (DeviceSession retrying = fastRetryingSession()) {
+            retrying.start();
 
-        await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+            await().atMost(Duration.ofSeconds(30))
+                    .until(() -> retrying.state().status() == DeviceStatus.CONNECTED);
+        }
     }
 
     @Test
@@ -185,13 +188,25 @@ class DeviceSessionTest {
     }
 
     @Test
-    void latchesUnpairedAfterThreeConsecutiveAmbiguousVerdicts() {
-        // Pins the other half of the rule: a third consecutive ambiguous verdict in a
-        // row (never a real fingerprint mismatch here) must still give up and latch.
-        fakeDevice.closeNextConnections(3);
+    void latchesUnpairedAfterFiveConsecutiveAmbiguousVerdicts() {
+        // Pins the other half of the rule: once the ambiguous verdicts have spanned a
+        // reboot-sized window (never a real fingerprint mismatch here), the session gives
+        // up and latches.
+        fakeDevice.closeNextConnections(5);
 
-        session.start();
+        try (DeviceSession retrying = fastRetryingSession()) {
+            retrying.start();
 
-        await().until(() -> session.state().status() == DeviceStatus.UNPAIRED);
+            await().atMost(Duration.ofSeconds(30))
+                    .until(() -> retrying.state().status() == DeviceStatus.UNPAIRED);
+        }
+    }
+
+    /** The same device as {@link #session}, on a flat 1s ramp so the latch tests stay quick. */
+    private DeviceSession fastRetryingSession() {
+        return new DeviceSession(
+                new Device("shield-1", "Test Shield", "127.0.0.1", fakeDevice.port(), null, Instant.now()),
+                ClientCertificate.generate("shield-remote"), FAST_RETRY, state -> {
+        });
     }
 }

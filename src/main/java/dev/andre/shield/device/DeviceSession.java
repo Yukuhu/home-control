@@ -30,10 +30,15 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
      * A single UNPAIRED verdict is ambiguous: it fires both for a genuinely de-paired
      * device and for a connection that drops before the app-level handshake finishes
      * (indistinguishable from here — see {@code RemoteConnection.classify}). Requiring
-     * this many in a row before latching still converges on a real re-pair within a
-     * few seconds, while giving a transient early drop room to recover.
+     * this many in a row before latching keeps an ordinary reboot from being mistaken
+     * for a de-pairing: on the default 1s-doubling ramp the fifth verdict lands about
+     * half a minute after the first, past the window in which a rebooting device is
+     * accepting TLS connections but tearing them down again. Latching earlier is the
+     * damaging mistake, because UNPAIRED never schedules another attempt — while a real
+     * re-pair only has to be noticed eventually, and a fingerprint MISMATCH, which is
+     * not ambiguous at all, still latches on the first occurrence.
      */
-    private static final int UNPAIRED_CONFIRMATION_THRESHOLD = 3;
+    private static final int UNPAIRED_CONFIRMATION_THRESHOLD = 5;
 
     private final Device device;
     private final ClientCertificate credential;
@@ -138,7 +143,8 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
     /**
      * Handles an ambiguous UNPAIRED verdict — from either {@link RemoteConnection.UnpairedException}
      * or {@link DisconnectCause#UNPAIRED} — by retrying like an ordinary drop until it has
-     * happened {@value #UNPAIRED_CONFIRMATION_THRESHOLD} times in a row, then latching.
+     * happened {@value #UNPAIRED_CONFIRMATION_THRESHOLD} times in a row, spanning a plausible
+     * device reboot, then latching.
      * A certificate fingerprint MISMATCH is not ambiguous and does not go through here —
      * it latches immediately, on the first occurrence (see {@code presentsThePinnedCertificate}).
      */
