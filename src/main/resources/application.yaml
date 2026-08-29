@@ -1,0 +1,11 @@
+server:
+  port: 8080
+
+shield:
+  data-dir: ./data
+  keystore-password: ${SHIELD_KEYSTORE_PASSWORD:shield}
+  discovery-enabled: true
+  # The device pings roughly every 5s; 10s without any inbound message means dead.
+  stale-timeout-seconds: 10
+  reconnect-initial-delay-seconds: 1
+  reconnect-max-delay-seconds: 60
