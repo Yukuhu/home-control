@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -180,8 +181,31 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
         update(state.withVolume(level, max, isMuted));
     }
 
+    /**
+     * Arrives on the protocol reader thread — {@link RemoteConnection}'s constructor starts
+     * that thread before its {@code connect()} factory returns, so this can fire while
+     * {@link #connect()} is still running its own success path for the very same connection.
+     * Without serializing them, {@code connect()}'s later writes to {@code connection},
+     * {@code backoff}, {@code consecutiveUnpaired} and {@code state} would clobber whatever
+     * this call had just recorded — and since {@code RemoteConnection.finish()} is idempotent,
+     * no later callback would ever correct it. Hand off to the session's single-threaded
+     * scheduler — the same thread {@link #connect()} already runs on — so every mutation of
+     * that state happens on exactly one thread and the interleaving cannot occur.
+     */
     @Override
     public void onDisconnected(DisconnectCause cause) {
+        if (closed) {
+            return;
+        }
+        try {
+            scheduler.execute(() -> handleDisconnect(cause));
+        } catch (RejectedExecutionException e) {
+            // close() shut the scheduler down between the check above and this handoff;
+            // the session is going away, so there is nothing left to update.
+        }
+    }
+
+    private void handleDisconnect(DisconnectCause cause) {
         if (closed) {
             return;
         }
