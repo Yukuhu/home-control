@@ -1,0 +1,21 @@
+services:
+  shield-remote:
+    build: .
+    # Host networking is REQUIRED for mDNS discovery: multicast does not cross a
+    # bridge network. On bridge networking the app still works, but the device must
+    # be added by address on the setup page.
+    network_mode: host
+    volumes:
+      - ./data:/data
+    environment:
+      SHIELD_KEYSTORE_PASSWORD: change-me
+    restart: unless-stopped
+
+# Bridge-mode alternative (no discovery, manual address entry only):
+#
+#  shield-remote:
+#    build: .
+#    ports:
+#      - "8080:8080"
+#    volumes:
+#      - ./data:/data
