@@ -36,7 +36,12 @@ public class DeviceSessionManager implements AutoCloseable {
 
     @PostConstruct
     public void startRegisteredDevices() {
-        registry.findAll().forEach(this::startSession);
+        // Only the active device, not every entry. A re-pair at a changed address leaves a
+        // stale entry behind (the id is derived from the host, spec §6), and since
+        // DeviceStateChangedEvent carries no device id, a second session's DISCONNECTED
+        // events would reach every tab and overwrite the live device's badge. The v1 UI
+        // drives first() and nothing else.
+        registry.first().ifPresent(this::startSession);
     }
 
     public Optional<DeviceSession> active() {
