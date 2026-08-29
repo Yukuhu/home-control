@@ -1,0 +1,17 @@
+# Runtime-only image, used by CI to publish multi-arch builds.
+#
+# The jar is built once, natively, by the CI test job and copied in here. Java
+# bytecode is architecture-independent, so only this JRE base layer differs
+# between linux/amd64 and linux/arm64 -- which is what keeps the multi-arch
+# build to seconds instead of emulating a whole Gradle build under QEMU.
+#
+# The self-contained Dockerfile beside this one is still the path for
+# `docker compose up --build` from a clean checkout. CI builds both, so the two
+# runtime stages cannot drift apart silently.
+FROM eclipse-temurin:25-jre
+WORKDIR /app
+COPY build/libs/*.jar app.jar
+VOLUME /data
+ENV SHIELD_DATA_DIR=/data
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/app.jar", "--shield.data-dir=/data"]

@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Superseded PR pushes are worth cancelling; an in-flight publish on main is not.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Also validates the Gradle wrapper checksums, which is on by default.
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build and run the full suite
+        run: ./gradlew build
+
+      # Java bytecode is architecture-independent, so this one jar serves both
+      # platforms the publish job builds for.
+      - name: Upload the jar
+        uses: actions/upload-artifact@v7
+        with:
+          name: jar
+          path: build/libs/*.jar
+          if-no-files-found: error
+
+      - name: Upload the test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-report
+          path: build/reports/tests/test
+
+  image:
+    name: Build the self-contained image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Proves `docker compose up --build` works from a clean checkout, and keeps
+      # this Dockerfile's runtime stage from drifting away from Dockerfile.dist.
+      # amd64 only: this job is a correctness check, not a release artifact.
+      - name: Build Dockerfile
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish:
+    name: Publish to GHCR
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fetch the jar built natively by the test job
+        uses: actions/download-artifact@v8
+        with:
+          name: jar
+          path: build/libs
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      # Multi-arch is cheap here because only the JRE base layer differs per
+      # platform -- the jar was already built once, natively, in the test job.
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.dist
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

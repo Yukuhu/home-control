@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Every dependency in this project is pinned to an exact version, so without
+  # these PRs it rots silently.
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
