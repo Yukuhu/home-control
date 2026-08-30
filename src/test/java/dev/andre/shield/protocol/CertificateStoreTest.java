@@ -1,5 +1,6 @@
 package dev.andre.shield.protocol;
 
+import dev.andre.shield.storage.StorageException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -8,6 +9,7 @@ import java.nio.file.Path;
 import java.security.interfaces.RSAPublicKey;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CertificateStoreTest {
 
@@ -55,5 +57,16 @@ class CertificateStoreTest {
     void loadReturnsEmptyForAnUnknownAlias() {
         CertificateStore store = new CertificateStore(dir.resolve("keystore.p12"), "secret".toCharArray());
         assertThat(store.load("never-paired")).isEmpty();
+    }
+
+    @Test
+    void aWrongPasswordIsAStorageFailureNotAMissingAlias() {
+        Path file = dir.resolve("keystore.p12");
+        new CertificateStore(file, "correct".toCharArray()).loadOrCreate("shield");
+
+        assertThatThrownBy(() -> new CertificateStore(file, "wrong".toCharArray()).load("shield"))
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining(file.toString())
+                .hasMessageContaining("password");
     }
 }

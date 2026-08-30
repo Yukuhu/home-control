@@ -5,12 +5,15 @@ import dev.andre.shield.protocol.CertificateStore;
 import dev.andre.shield.protocol.FakePairingServer;
 import dev.andre.shield.protocol.PairingResult;
 import dev.andre.shield.protocol.RefusingPairingServer;
+import dev.andre.shield.storage.DataDirectory;
+import dev.andre.shield.storage.StorageException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -30,15 +33,15 @@ class PairingServiceTest {
     private FakePairingServer fakeDevice;
     private PairingService service;
     private DeviceSessionManager sessions;
+    private CertificateStore certificates;
 
     @BeforeEach
     void setUp() throws Exception {
         fakeDevice = new FakePairingServer();
         ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
         sessions = mock(DeviceSessionManager.class);
-        service = new PairingService(
-                new CertificateStore(properties.keystoreFile(), "shield".toCharArray()),
-                sessions);
+        certificates = new CertificateStore(properties.keystoreFile(), "shield".toCharArray());
+        service = new PairingService(certificates, sessions, new DataDirectory(dir));
     }
 
     @AfterEach
@@ -125,5 +128,25 @@ class PairingServiceTest {
                     .as("a pairing attempt that fails to start must close its TLS socket, not leak it")
                     .isTrue();
         }
+    }
+
+    @Test
+    void blocksPairingBeforeCreatingACredentialWhenDataDirectoryIsUnwritable() throws Exception {
+        Path blocked = dir.resolve("blocked");
+        Files.writeString(blocked, "occupied");
+        Path keystore = blocked.resolve("keystore.p12");
+        PairingService blockedService = new PairingService(
+                new CertificateStore(keystore, "shield".toCharArray()),
+                sessions,
+                new DataDirectory(blocked));
+
+        assertThatThrownBy(() -> blockedService.begin(
+                "127.0.0.1", fakeDevice.port(), "Living Room Shield"))
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining(blocked.toString());
+
+        assertThat(Files.exists(keystore)).isFalse();
+        assertThat(blockedService.inProgress()).isFalse();
+        assertThat(fakeDevice.connections()).isZero();
     }
 }

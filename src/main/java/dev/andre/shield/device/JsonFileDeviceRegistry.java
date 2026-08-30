@@ -1,5 +1,6 @@
 package dev.andre.shield.device;
 
+import dev.andre.shield.storage.StorageException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.core.type.TypeReference;
@@ -33,7 +34,10 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
             return mapper.readValue(Files.readAllBytes(file), new TypeReference<List<Device>>() {
             });
         } catch (IOException | JacksonException e) {
-            throw new IllegalStateException("Could not read " + file, e);
+            throw new StorageException(
+                    "Could not read device registry " + file
+                            + "; check file permissions and JSON integrity",
+                    e);
         }
     }
 
@@ -84,7 +88,9 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
                     // Cleanup error; let the original exception propagate
                 }
             }
-            throw new IllegalStateException("Could not write " + file, e);
+            throw new StorageException(
+                    "Could not write device registry " + file + "; check file permissions",
+                    e);
         }
     }
 }

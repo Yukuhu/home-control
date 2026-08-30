@@ -1,5 +1,6 @@
 package dev.andre.shield.device;
 
+import dev.andre.shield.storage.StorageException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -7,6 +8,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JsonFileDeviceRegistryTest {
 
@@ -68,5 +70,16 @@ class JsonFileDeviceRegistryTest {
     @Test
     void startsEmptyWhenTheFileDoesNotExist() {
         assertThat(new JsonFileDeviceRegistry(dir.resolve("missing.json")).findAll()).isEmpty();
+    }
+
+    @Test
+    void malformedRegistryIsAStorageFailureNotAnEmptyRegistry() throws Exception {
+        Path file = dir.resolve("devices.json");
+        java.nio.file.Files.writeString(file, "{not-json");
+
+        assertThatThrownBy(() -> new JsonFileDeviceRegistry(file).findAll())
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining(file.toString())
+                .hasMessageContaining("permissions");
     }
 }

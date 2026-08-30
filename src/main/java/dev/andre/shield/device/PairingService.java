@@ -4,6 +4,7 @@ import dev.andre.shield.protocol.CertificateStore;
 import dev.andre.shield.protocol.ClientCertificate;
 import dev.andre.shield.protocol.PairingResult;
 import dev.andre.shield.protocol.PairingSession;
+import dev.andre.shield.storage.DataDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class PairingService {
 
     private final CertificateStore certificates;
     private final DeviceSessionManager sessions;
+    private final DataDirectory dataDirectory;
 
     /**
      * One in-flight attempt's state, captured atomically. {@code submit()} reads this
@@ -39,9 +41,11 @@ public class PairingService {
      */
     private volatile Attempt attempt;
 
-    public PairingService(CertificateStore certificates, DeviceSessionManager sessions) {
+    public PairingService(CertificateStore certificates, DeviceSessionManager sessions,
+                          DataDirectory dataDirectory) {
         this.certificates = certificates;
         this.sessions = sessions;
+        this.dataDirectory = dataDirectory;
     }
 
     public void begin(String host, String name) throws IOException {
@@ -51,6 +55,7 @@ public class PairingService {
     /** Port is a parameter only so tests can point at an in-process fake device. */
     public void begin(String host, int port, String name) throws IOException {
         cancel();
+        dataDirectory.verifyWritable();
         String resolvedName = (name == null || name.isBlank()) ? host : name;
         String deviceId = deviceId(host);
         ClientCertificate credential = certificates.loadOrCreate(deviceId);

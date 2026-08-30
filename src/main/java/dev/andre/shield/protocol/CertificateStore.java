@@ -1,5 +1,6 @@
 package dev.andre.shield.protocol;
 
+import dev.andre.shield.storage.StorageException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
@@ -33,7 +34,10 @@ public class CertificateStore {
             KeyPair keyPair = new KeyPair(certificate.getPublicKey(), privateKey);
             return Optional.of(new ClientCertificate(keyPair, (X509Certificate) certificate));
         } catch (Exception e) {
-            throw new IllegalStateException("Could not read keystore " + file, e);
+            throw new StorageException(
+                    "Could not read keystore " + file
+                            + "; check the keystore password and file permissions",
+                    e);
         }
     }
 
@@ -55,7 +59,9 @@ public class CertificateStore {
                 keyStore.store(out, password);
             }
         } catch (Exception e) {
-            throw new IllegalStateException("Could not write keystore " + file, e);
+            throw new StorageException(
+                    "Could not write keystore " + file + "; check file permissions",
+                    e);
         }
     }
 

@@ -4,6 +4,7 @@ import dev.andre.shield.device.DeviceSessionManager;
 import dev.andre.shield.device.PairingService;
 import dev.andre.shield.discovery.MdnsDiscovery;
 import dev.andre.shield.protocol.PairingResult;
+import dev.andre.shield.storage.StorageException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,9 +29,7 @@ public class SetupController {
 
     @GetMapping("/setup")
     public String setup(Model model) {
-        model.addAttribute("discovered", discovery.devices());
-        model.addAttribute("paired", sessions.activeDevice().orElse(null));
-        model.addAttribute("awaitingCode", pairing.inProgress());
+        populateSetupModel(model, pairing.inProgress());
         return "setup";
     }
 
@@ -39,20 +38,27 @@ public class SetupController {
                        Model model) {
         try {
             pairing.begin(host, name);
-            model.addAttribute("awaitingCode", true);
+            populateSetupModel(model, true);
+        } catch (StorageException e) {
+            model.addAttribute("error", e.getMessage());
+            populateSetupModel(model, false);
         } catch (IOException e) {
-            model.addAttribute("error",
-                    "Could not reach " + host + ": " + e.getMessage());
-            model.addAttribute("awaitingCode", false);
+            model.addAttribute("error", "Could not reach " + host + ": " + e.getMessage());
+            populateSetupModel(model, false);
         }
-        model.addAttribute("discovered", discovery.devices());
-        model.addAttribute("paired", sessions.activeDevice().orElse(null));
         return "setup";
     }
 
     @PostMapping("/setup/code")
     public String code(@RequestParam String code, Model model) {
-        PairingResult result = pairing.submit(code);
+        PairingResult result;
+        try {
+            result = pairing.submit(code);
+        } catch (StorageException e) {
+            model.addAttribute("error", e.getMessage());
+            populateSetupModel(model, false);
+            return "setup";
+        }
 
         switch (result) {
             case PairingResult.Paired ignored -> {
@@ -63,10 +69,14 @@ public class SetupController {
             case PairingResult.Failed failed -> model.addAttribute("error", failed.reason());
         }
 
-        model.addAttribute("awaitingCode", false);
+        populateSetupModel(model, false);
+        return "setup";
+    }
+
+    private void populateSetupModel(Model model, boolean awaitingCode) {
+        model.addAttribute("awaitingCode", awaitingCode);
         model.addAttribute("discovered", discovery.devices());
         model.addAttribute("paired", sessions.activeDevice().orElse(null));
-        return "setup";
     }
 
     @PostMapping("/setup/forget")

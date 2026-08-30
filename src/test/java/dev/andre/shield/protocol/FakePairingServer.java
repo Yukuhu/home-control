@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** An in-process stand-in for the Shield's pairing port. */
 public class FakePairingServer implements AutoCloseable {
@@ -31,6 +32,7 @@ public class FakePairingServer implements AutoCloseable {
     private final ClientCertificate identity = ClientCertificate.generate("fake-shield");
     private final SSLServerSocket serverSocket;
     private final CountDownLatch codeDisplayed = new CountDownLatch(1);
+    private final AtomicInteger connections = new AtomicInteger();
 
     private volatile String displayedCode;
     private volatile byte[] expectedSecret;
@@ -47,6 +49,10 @@ public class FakePairingServer implements AutoCloseable {
 
     public int port() {
         return serverSocket.getLocalPort();
+    }
+
+    public int connections() {
+        return connections.get();
     }
 
     public X509Certificate certificate() {
@@ -67,6 +73,7 @@ public class FakePairingServer implements AutoCloseable {
 
     private void serve() {
         try (SSLSocket socket = (SSLSocket) serverSocket.accept()) {
+            connections.incrementAndGet();
             MessageStream stream = new MessageStream(socket.getInputStream(), socket.getOutputStream());
             X509Certificate clientCertificate =
                     (X509Certificate) socket.getSession().getPeerCertificates()[0];
