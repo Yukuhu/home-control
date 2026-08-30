@@ -1,7 +1,7 @@
 # Shield Web Remote
 
 A small Spring Boot web app that controls an NVIDIA Shield (or any Android TV device)
-on the same network: a browser remote, an app launcher, and live device state.
+on the same network: a browser remote with live device state.
 
 ## Running
 
@@ -42,15 +42,14 @@ the newest release and the newest code.
 2. Pick your Shield from the discovered list, or type its IP address.
 3. The TV displays a six character code. Type it in and submit.
 
-The app stores a client certificate in `data/keystore.p12`. **That certificate is the
-pairing credential** — delete it and you must pair again. `data/devices.json` holds the
-device list and `data/apps.yaml` the launcher entries, which you can edit freely.
+The app stores its Remote v2 client certificate in `data/keystore.p12` and its
+paired-device registry in `data/devices.json`. **The certificate is the pairing
+credential** — losing it means the Shield must be paired again. Keep the whole
+data directory mounted persistently and keep any custom keystore password stable.
 
-While an app is open on the TV, **Add current app** adds its reported package to
-the launcher immediately and persists it in `data/apps.yaml`. Android TV reports
-only the package identifier, so that is also the initial button label; edit the
-entry's `name` if you want a friendlier one, then restart the application to
-reload external edits.
+The current foreground package remains visible in the remote header as connection
+context. Remote v2 does not expose a reliable way to derive a launchable deep link
+from that package, so the remote intentionally does not offer app shortcuts.
 
 ## Discovery does not work
 
@@ -62,7 +61,7 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 | Property | Default | Meaning |
 |---|---|---|
 | `SERVER_PORT` | `8080` | Port the web UI listens on |
-| `shield.data-dir` | `/data` in Docker | Where the keystore, registry and app catalog live |
+| `shield.data-dir` | `/data` in Docker | Where the keystore and device registry live |
 | `SHIELD_KEYSTORE_PASSWORD` | `shield` | Keystore password |
 | `shield.discovery-enabled` | `true` | Turn mDNS off entirely |
 | `shield.stale-timeout-seconds` | `10` | No inbound message for this long means the connection is dead |

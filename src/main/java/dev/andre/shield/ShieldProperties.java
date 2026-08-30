@@ -20,7 +20,4 @@ public record ShieldProperties(Path dataDir,
         return dataDir.resolve("devices.json");
     }
 
-    public Path appsFile() {
-        return dataDir.resolve("apps.yaml");
-    }
 }

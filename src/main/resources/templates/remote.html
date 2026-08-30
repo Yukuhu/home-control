@@ -12,12 +12,7 @@
 <header>
     <span id="status" class="badge" th:classappend="${state.connected()} ? 'ok' : 'off'"
           th:text="${state.status()}">DISCONNECTED</span>
-    <span id="current-app" th:text="${state.currentApp()} ?: 'Nothing playing'"
-          th:attr="data-app-package=${state.currentApp()}">Nothing playing</span>
-    <button id="add-current-app" class="add-current-app"
-            hx-post="/apps/current" hx-target="#app-list" hx-swap="outerHTML"
-            th:disabled="${!state.connected() or state.currentApp() == null or currentAppSaved}"
-            th:text="${currentAppSaved} ? 'App added' : 'Add current app'">Add current app</button>
+    <span id="current-app" th:text="${state.currentApp()} ?: 'Nothing playing'">Nothing playing</span>
     <span id="volume" th:text="${state.muted()} ? 'muted' : ('vol ' + ${state.volumeLevel()})">vol</span>
     <a th:href="@{/setup}">Setup</a>
 </header>
@@ -52,13 +47,6 @@
         <button hx-post="/key/VOLUME_UP">Vol +</button>
     </section>
 
-    <section id="app-list" class="apps" th:fragment="app-list">
-        <button th:each="app : ${apps}"
-                th:hx-post="@{/apps/{id}/launch(id=${app.id()})}"
-                th:attr="data-app-package=${app.appPackage()}"
-                th:text="${app.name()}">App
-        </button>
-    </section>
 </main>
 
 <div id="toast" hidden></div>

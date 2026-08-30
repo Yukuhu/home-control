@@ -7,7 +7,6 @@ header { display: flex; gap: .5rem; align-items: center; padding: .75rem 1rem;
 header a { color: var(--accent); margin-left: auto; }
 #current-app { flex: 1; min-width: 4rem; overflow: hidden; text-overflow: ellipsis;
                white-space: nowrap; }
-.add-current-app { padding: .35rem .6rem; font-size: .8rem; white-space: nowrap; }
 button:disabled { cursor: default; opacity: .55; }
 .badge { padding: .15rem .5rem; border-radius: 999px; font-size: .75rem; background: #3a2020; }
 .badge.ok { background: #1f3a24; }
@@ -22,7 +21,6 @@ button:active { background: var(--accent); }
 .dpad .down { grid-area: 3 / 2; }
 .row { display: flex; gap: .5rem; margin-bottom: .75rem; }
 .row button { flex: 1; }
-.apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: .5rem; }
 .setup form { display: flex; gap: .5rem; align-items: center; margin: .5rem 0; }
 .setup input { flex: 1; padding: .7rem; border-radius: .5rem; border: 1px solid #313640;
                background: #1b1e24; color: var(--fg); }
