@@ -34,10 +34,11 @@ public class FakeRemoteServer implements AutoCloseable {
     private final CountDownLatch handshakeComplete = new CountDownLatch(1);
 
     private final BlockingQueue<Integer> keyPresses = new LinkedBlockingQueue<>();
-    private final BlockingQueue<String> appLinks = new LinkedBlockingQueue<>();
     private final BlockingQueue<Integer> pongs = new LinkedBlockingQueue<>();
 
     private final AtomicInteger connections = new AtomicInteger();
+    private final AtomicInteger clientConfigureFeatures = new AtomicInteger(-1);
+    private final AtomicInteger clientActiveFeatures = new AtomicInteger(-1);
 
     /**
      * What to do with each of the next connections, in order; anything past the end of the
@@ -132,12 +133,16 @@ public class FakeRemoteServer implements AutoCloseable {
         return connections.get();
     }
 
-    public Integer nextKeyPress() throws InterruptedException {
-        return keyPresses.poll(5, TimeUnit.SECONDS);
+    public int clientConfigureFeatures() {
+        return clientConfigureFeatures.get();
     }
 
-    public String nextAppLink() throws InterruptedException {
-        return appLinks.poll(5, TimeUnit.SECONDS);
+    public int clientActiveFeatures() {
+        return clientActiveFeatures.get();
+    }
+
+    public Integer nextKeyPress() throws InterruptedException {
+        return keyPresses.poll(5, TimeUnit.SECONDS);
     }
 
     public Integer nextPong() throws InterruptedException {
@@ -177,17 +182,17 @@ public class FakeRemoteServer implements AutoCloseable {
         RemoteMessage message;
         while ((message = stream.read(RemoteMessage.parser())) != null) {
             if (message.hasRemoteConfigure()) {
+                clientConfigureFeatures.set(message.getRemoteConfigure().getCode1());
                 stream.write(RemoteMessage.newBuilder()
                         .setRemoteSetActive(RemoteSetActive.newBuilder().setActive(622)).build());
             } else if (message.hasRemoteSetActive()) {
+                clientActiveFeatures.set(message.getRemoteSetActive().getActive());
                 handshakeComplete.countDown();
             } else if (message.hasRemoteKeyInject()) {
                 if (message.getRemoteKeyInject().getDirectionValue() != 3) {
                     throw new IllegalStateException("expected SHORT direction");
                 }
                 keyPresses.add(message.getRemoteKeyInject().getKeyCodeValue());
-            } else if (message.hasRemoteAppLinkLaunchRequest()) {
-                appLinks.add(message.getRemoteAppLinkLaunchRequest().getAppLink());
             } else if (message.hasRemotePingResponse()) {
                 pongs.add(message.getRemotePingResponse().getVal1());
             }

@@ -87,15 +87,6 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
         }
     }
 
-    public void launchAppLink(String uri) {
-        RemoteConnection current = requireConnected();
-        try {
-            current.launchAppLink(uri);
-        } catch (IOException e) {
-            throw new DeviceOfflineException("The device dropped the connection while launching " + uri);
-        }
-    }
-
     private RemoteConnection requireConnected() {
         RemoteConnection current = connection;
         if (current == null || state.status() != DeviceStatus.CONNECTED) {

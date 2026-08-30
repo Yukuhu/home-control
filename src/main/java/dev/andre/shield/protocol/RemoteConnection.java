@@ -1,7 +1,6 @@
 package dev.andre.shield.protocol;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import dev.andre.shield.protocol.remote.RemoteAppLinkLaunchRequest;
 import dev.andre.shield.protocol.remote.RemoteConfigure;
 import dev.andre.shield.protocol.remote.RemoteDeviceInfo;
 import dev.andre.shield.protocol.remote.RemoteDirection;
@@ -27,8 +26,14 @@ import java.security.cert.X509Certificate;
  */
 public class RemoteConnection implements AutoCloseable {
 
-    /** The magic number the reference implementation sends for configure and set-active. */
-    private static final int ACTIVE_CODE = 622;
+    private static final int FEATURE_KEY = 1 << 1;      // 2
+    private static final int FEATURE_IME_RECEIVE = 1 << 2; // 4, supplies current-app events
+    private static final int FEATURE_POWER = 1 << 5;    // 32
+    private static final int FEATURE_VOLUME = 1 << 6;   // 64
+    private static final int CLIENT_FEATURES = FEATURE_KEY
+            | FEATURE_IME_RECEIVE
+            | FEATURE_POWER
+            | FEATURE_VOLUME;
 
     private final SSLSocket socket;
     private final MessageStream stream;
@@ -94,12 +99,6 @@ public class RemoteConnection implements AutoCloseable {
                 .build());
     }
 
-    public void launchAppLink(String uri) throws IOException {
-        stream.write(RemoteMessage.newBuilder()
-                .setRemoteAppLinkLaunchRequest(RemoteAppLinkLaunchRequest.newBuilder().setAppLink(uri))
-                .build());
-    }
-
     private void readLoop() {
         try {
             RemoteMessage message;
@@ -151,7 +150,7 @@ public class RemoteConnection implements AutoCloseable {
         if (message.hasRemoteConfigure()) {
             stream.write(RemoteMessage.newBuilder()
                     .setRemoteConfigure(RemoteConfigure.newBuilder()
-                            .setCode1(ACTIVE_CODE)
+                            .setCode1(CLIENT_FEATURES)
                             .setDeviceInfo(RemoteDeviceInfo.newBuilder()
                                     .setModel("shield-remote")
                                     .setVendor("dev.andre")
@@ -163,7 +162,7 @@ public class RemoteConnection implements AutoCloseable {
             configured = true;
         } else if (message.hasRemoteSetActive()) {
             stream.write(RemoteMessage.newBuilder()
-                    .setRemoteSetActive(RemoteSetActive.newBuilder().setActive(ACTIVE_CODE))
+                    .setRemoteSetActive(RemoteSetActive.newBuilder().setActive(CLIENT_FEATURES))
                     .build());
         } else if (message.hasRemotePingRequest()) {
             stream.write(RemoteMessage.newBuilder()

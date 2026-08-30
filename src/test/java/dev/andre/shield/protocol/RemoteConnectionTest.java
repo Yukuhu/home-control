@@ -92,6 +92,12 @@ class RemoteConnectionTest {
     }
 
     @Test
+    void advertisesOnlyImplementedV03Features() {
+        assertThat(device.clientConfigureFeatures()).isEqualTo(102);
+        assertThat(device.clientActiveFeatures()).isEqualTo(102);
+    }
+
+    @Test
     void reportsPowerState() throws Exception {
         device.pushPower(true);
 
@@ -124,13 +130,6 @@ class RemoteConnectionTest {
         connection.sendKey(RemoteKey.DPAD_UP);
 
         assertThat(device.nextKeyPress()).isEqualTo(19);
-    }
-
-    @Test
-    void launchesAppLinks() throws Exception {
-        connection.launchAppLink("market://launch?id=com.netflix.ninja");
-
-        assertThat(device.nextAppLink()).isEqualTo("market://launch?id=com.netflix.ninja");
     }
 
     @Test
