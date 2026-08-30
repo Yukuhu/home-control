@@ -2,3 +2,5 @@
 build/
 /data/
 *.p12
+.worktrees/
+.superpowers/
