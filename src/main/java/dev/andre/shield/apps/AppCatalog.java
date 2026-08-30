@@ -9,9 +9,12 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,7 +26,8 @@ public class AppCatalog {
     private static final Logger log = LoggerFactory.getLogger(AppCatalog.class);
     private static final String BUNDLED = "/default-apps.yaml";
 
-    private final List<AppEntry> entries;
+    private final Path file;
+    private volatile List<AppEntry> entries;
 
     /** Two constructors, so Spring needs to be told which one to use. */
     @Autowired
@@ -32,6 +36,7 @@ public class AppCatalog {
     }
 
     public AppCatalog(Path file) {
+        this.file = file;
         this.entries = load(file);
     }
 
@@ -45,6 +50,34 @@ public class AppCatalog {
 
     public Optional<AppEntry> byPackage(String appPackage) {
         return entries.stream().filter(entry -> entry.appPackage().equals(appPackage)).findFirst();
+    }
+
+    /** Adds a package reported by the device and persists it for future starts. */
+    public synchronized AppEntry addPackage(String appPackage) {
+        if (appPackage == null || appPackage.isBlank()) {
+            throw new IllegalArgumentException("The app package must not be blank");
+        }
+
+        Optional<AppEntry> existing = byPackage(appPackage);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        AppEntry added = new AppEntry(uniqueId(appPackage), appPackage, appPackage, null);
+        List<AppEntry> updated = new ArrayList<>(entries);
+        updated.add(added);
+        writeAll(file, updated);
+        entries = List.copyOf(updated);
+        return added;
+    }
+
+    private String uniqueId(String appPackage) {
+        String candidate = appPackage;
+        int suffix = 2;
+        while (byId(candidate).isPresent()) {
+            candidate = appPackage + "-" + suffix++;
+        }
+        return candidate;
     }
 
     private static List<AppEntry> load(Path file) {
@@ -99,6 +132,40 @@ public class AppCatalog {
             entries.add(new AppEntry(id, name, appPackage, app.get("deepLink")));
         }
         return List.copyOf(entries);
+    }
+
+    private static void writeAll(Path file, List<AppEntry> entries) {
+        List<Map<String, String>> apps = new ArrayList<>();
+        for (AppEntry entry : entries) {
+            Map<String, String> app = new LinkedHashMap<>();
+            app.put("id", entry.id());
+            app.put("name", entry.name());
+            app.put("package", entry.appPackage());
+            if (entry.deepLink() != null && !entry.deepLink().isBlank()) {
+                app.put("deepLink", entry.deepLink());
+            }
+            apps.add(app);
+        }
+
+        Path parent = file.toAbsolutePath().getParent();
+        Path temp = null;
+        try {
+            Files.createDirectories(parent);
+            temp = Files.createTempFile(parent, "apps", ".yaml");
+            String yaml = new Yaml().dump(Map.of("apps", apps));
+            Files.writeString(temp, yaml, StandardCharsets.UTF_8);
+            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException e) {
+            if (temp != null) {
+                try {
+                    Files.deleteIfExists(temp);
+                } catch (IOException ignored) {
+                    // Cleanup error; let the original exception propagate.
+                }
+            }
+            throw new IllegalStateException("Could not write the app catalog " + file, e);
+        }
     }
 
     private static boolean isBlankString(Object value) {

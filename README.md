@@ -46,6 +46,12 @@ The app stores a client certificate in `data/keystore.p12`. **That certificate i
 pairing credential** — delete it and you must pair again. `data/devices.json` holds the
 device list and `data/apps.yaml` the launcher entries, which you can edit freely.
 
+While an app is open on the TV, **Add current app** adds its reported package to
+the launcher immediately and persists it in `data/apps.yaml`. Android TV reports
+only the package identifier, so that is also the initial button label; edit the
+entry's `name` if you want a friendlier one, then restart the application to
+reload external edits.
+
 ## Discovery does not work
 
 mDNS is multicast and does not cross a Docker bridge network. Either run with

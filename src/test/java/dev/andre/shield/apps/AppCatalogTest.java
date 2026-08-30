@@ -28,6 +28,39 @@ class AppCatalogTest {
     }
 
     @Test
+    void addsAndPersistsAnAppPackageReportedByTheDevice() throws Exception {
+        Path file = dir.resolve("apps.yaml");
+        Files.writeString(file, """
+                apps:
+                  - id: plex
+                    name: Plex
+                    package: com.plexapp.android
+                    deepLink: "plex://"
+                """);
+        AppCatalog catalog = new AppCatalog(file);
+
+        AppEntry added = catalog.addPackage("com.example.player");
+
+        assertThat(added).isEqualTo(new AppEntry(
+                "com.example.player", "com.example.player", "com.example.player", null));
+        assertThat(new AppCatalog(file).entries()).containsExactly(
+                new AppEntry("plex", "Plex", "com.plexapp.android", "plex://"), added);
+    }
+
+    @Test
+    void addingTheSamePackageTwiceKeepsOneCatalogEntry() throws Exception {
+        Path file = dir.resolve("apps.yaml");
+        Files.writeString(file, "apps: []\n");
+        AppCatalog catalog = new AppCatalog(file);
+
+        AppEntry first = catalog.addPackage("com.example.player");
+        AppEntry second = catalog.addPackage("com.example.player");
+
+        assertThat(second).isEqualTo(first);
+        assertThat(new AppCatalog(file).entries()).containsExactly(first);
+    }
+
+    @Test
     void writesTheBundledCatalogOnFirstRun() {
         Path file = dir.resolve("apps.yaml");
 

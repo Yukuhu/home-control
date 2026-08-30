@@ -5,17 +5,19 @@ import dev.andre.shield.apps.AppEntry;
 import dev.andre.shield.device.DeviceOfflineException;
 import dev.andre.shield.device.DeviceSession;
 import dev.andre.shield.device.DeviceSessionManager;
+import dev.andre.shield.device.DeviceState;
 import dev.andre.shield.protocol.RemoteKey;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.stereotype.Controller;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -32,9 +34,13 @@ public class RemoteController {
 
     @GetMapping("/")
     public String remote(Model model) {
-        model.addAttribute("state", sessions.state());
+        DeviceState state = sessions.state();
+        List<AppEntry> entries = apps.entries();
+        model.addAttribute("state", state);
         model.addAttribute("device", sessions.activeDevice().orElse(null));
-        model.addAttribute("apps", apps.entries());
+        model.addAttribute("apps", entries);
+        model.addAttribute("currentAppSaved", state.currentApp() != null
+                && entries.stream().anyMatch(entry -> entry.appPackage().equals(state.currentApp())));
         return "remote";
     }
 
@@ -58,6 +64,17 @@ public class RemoteController {
         }
         session().launchAppLink(entry.get().launchUri());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/apps/current")
+    public String addCurrentApp(Model model) {
+        DeviceState state = sessions.state();
+        if (!state.connected() || state.currentApp() == null || state.currentApp().isBlank()) {
+            throw new DeviceOfflineException("No current app is available");
+        }
+        apps.addPackage(state.currentApp());
+        model.addAttribute("apps", apps.entries());
+        return "remote :: app-list";
     }
 
     private DeviceSession session() {

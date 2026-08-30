@@ -55,6 +55,8 @@ class RemotePageTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("/key/DPAD_UP")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("/apps/netflix/launch")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("hx-post=\"/apps/current\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"app-list\"")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Netflix")));
     }
 
