@@ -54,14 +54,34 @@ public class CertificateStore {
             KeyStore keyStore = openOrEmpty();
             keyStore.setKeyEntry(alias, credential.keyPair().getPrivate(), password,
                     new Certificate[]{credential.certificate()});
-            Files.createDirectories(file.toAbsolutePath().getParent());
-            try (OutputStream out = Files.newOutputStream(file)) {
-                keyStore.store(out, password);
-            }
+            write(keyStore);
         } catch (Exception e) {
             throw new StorageException(
                     "Could not write keystore " + file + "; check file permissions",
                     e);
+        }
+    }
+
+    public synchronized void delete(String alias) {
+        try {
+            KeyStore keyStore = openOrEmpty();
+            if (!keyStore.containsAlias(alias)) {
+                return;
+            }
+            keyStore.deleteEntry(alias);
+            write(keyStore);
+        } catch (Exception e) {
+            throw new StorageException(
+                    "Could not delete credential " + alias + " from keystore " + file
+                            + "; check the keystore password and file permissions",
+                    e);
+        }
+    }
+
+    private void write(KeyStore keyStore) throws Exception {
+        Files.createDirectories(file.toAbsolutePath().getParent());
+        try (OutputStream out = Files.newOutputStream(file)) {
+            keyStore.store(out, password);
         }
     }
 

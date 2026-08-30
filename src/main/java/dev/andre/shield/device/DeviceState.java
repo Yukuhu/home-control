@@ -9,6 +9,10 @@ public record DeviceState(DeviceStatus status, boolean powerOn, String currentAp
         return new DeviceState(DeviceStatus.DISCONNECTED, false, null, 0, 0, false, Instant.now());
     }
 
+    public static DeviceState unpaired() {
+        return new DeviceState(DeviceStatus.UNPAIRED, false, null, 0, 0, false, Instant.now());
+    }
+
     public boolean connected() {
         return status == DeviceStatus.CONNECTED;
     }

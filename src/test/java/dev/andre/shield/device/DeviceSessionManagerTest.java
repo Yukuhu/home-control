@@ -6,6 +6,7 @@ import dev.andre.shield.protocol.FakeRemoteServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 
@@ -35,8 +36,11 @@ class DeviceSessionManagerTest {
                     null, Instant.parse("2026-08-29T19:00:00Z")));
 
             ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+            CertificateStore certificates = new CertificateStore(
+                    properties.keystoreFile(), "shield".toCharArray());
+            certificates.loadOrCreate("shield-current");
             try (DeviceSessionManager manager = new DeviceSessionManager(registry,
-                    new CertificateStore(properties.keystoreFile(), "shield".toCharArray()),
+                    certificates,
                     properties, event -> {
             })) {
                 manager.startRegisteredDevices();
@@ -50,5 +54,49 @@ class DeviceSessionManagerTest {
                         .isZero();
             }
         }
+    }
+
+    @Test
+    void registryOnlyDeviceIsUnpairedWithoutConnectionOrCredentialCreation() throws Exception {
+        try (FakeRemoteServer remote = new FakeRemoteServer()) {
+            DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+            registry.save(new Device("shield-missing-key", "Shield", "127.0.0.1", remote.port(),
+                    null, Instant.now()));
+            ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+            CertificateStore certificates = new CertificateStore(
+                    properties.keystoreFile(), "shield".toCharArray());
+
+            try (DeviceSessionManager manager = new DeviceSessionManager(
+                    registry, certificates, properties, event -> { })) {
+                manager.startRegisteredDevices();
+
+                assertThat(manager.state().status()).isEqualTo(DeviceStatus.UNPAIRED);
+                assertThat(remote.connections()).isZero();
+                assertThat(certificates.load("shield-missing-key")).isEmpty();
+                assertThat(Files.exists(properties.keystoreFile())).isFalse();
+            }
+        }
+    }
+
+    @Test
+    void forgetDeletesTheRegistryRecordAndOnlyItsCredential() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        Device forgotten = new Device("shield-forgotten", "Shield", "127.0.0.1", 6466,
+                null, Instant.now());
+        registry.save(forgotten);
+        ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+        CertificateStore certificates = new CertificateStore(
+                properties.keystoreFile(), "shield".toCharArray());
+        certificates.loadOrCreate(forgotten.certificateAlias());
+        certificates.loadOrCreate("keep-this-alias");
+
+        try (DeviceSessionManager manager = new DeviceSessionManager(
+                registry, certificates, properties, event -> { })) {
+            manager.forget(forgotten.id());
+        }
+
+        assertThat(registry.findById(forgotten.id())).isEmpty();
+        assertThat(certificates.load(forgotten.certificateAlias())).isEmpty();
+        assertThat(certificates.load("keep-this-alias")).isPresent();
     }
 }

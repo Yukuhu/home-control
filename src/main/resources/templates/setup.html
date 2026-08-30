@@ -51,9 +51,13 @@
     <section th:if="${paired}">
         <h2>Paired device</h2>
         <p th:text="${paired.name()} + ' at ' + ${paired.host()}">Shield</p>
+        <p class="hint">
+            Forgetting removes the stored pairing credential. You will need to pair again
+            before this device can be controlled.
+        </p>
         <form method="post" th:action="@{/setup/forget}">
             <input type="hidden" name="id" th:value="${paired.id()}">
-            <button type="submit">Forget this device</button>
+            <button type="submit">Forget and require re-pairing</button>
         </form>
     </section>
 </main>

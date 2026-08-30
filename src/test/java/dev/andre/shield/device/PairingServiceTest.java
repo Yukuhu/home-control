@@ -1,6 +1,7 @@
 package dev.andre.shield.device;
 
 import dev.andre.shield.ShieldProperties;
+import dev.andre.shield.protocol.ClientCertificate;
 import dev.andre.shield.protocol.CertificateStore;
 import dev.andre.shield.protocol.FakePairingServer;
 import dev.andre.shield.protocol.PairingResult;
@@ -103,6 +104,19 @@ class PairingServiceTest {
                 .as("re-pairing the same host under a new name must replace the existing entry, not duplicate it")
                 .isEqualTo(adopted.get(0).id());
         assertThat(adopted.get(1).name()).isEqualTo("Bedroom Shield");
+    }
+
+    @Test
+    void deliberateRepairReusesAnOrphanedCredentialForTheSameHost() throws Exception {
+        ClientCertificate orphaned = certificates.loadOrCreate("127-0-0-1");
+
+        service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
+        PairingResult result = service.submit(fakeDevice.awaitDisplayedCode());
+
+        assertThat(result).isInstanceOf(PairingResult.Paired.class);
+        assertThat(certificates.load("127-0-0-1")).get()
+                .extracting(ClientCertificate::certificate)
+                .isEqualTo(orphaned.certificate());
     }
 
     @Test

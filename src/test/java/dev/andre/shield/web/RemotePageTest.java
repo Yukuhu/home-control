@@ -1,8 +1,9 @@
 package dev.andre.shield.web;
 
-import dev.andre.shield.device.DeviceSessionManager;
+import dev.andre.shield.device.Device;
 import dev.andre.shield.device.DeviceState;
 import dev.andre.shield.device.DeviceStatus;
+import dev.andre.shield.device.DeviceSessionManager;
 import dev.andre.shield.device.PairingService;
 import dev.andre.shield.discovery.MdnsDiscovery;
 import org.junit.jupiter.api.Test;
@@ -59,12 +60,16 @@ class RemotePageTest {
     void rendersTheSetupPageWithDiscoveredDevicesAndManualEntry() throws Exception {
         given(discovery.devices()).willReturn(List.of(
                 new dev.andre.shield.discovery.DiscoveredDevice("Living Room Shield", "192.168.1.50", 6466)));
-        given(sessions.activeDevice()).willReturn(Optional.empty());
+        given(sessions.activeDevice()).willReturn(Optional.of(new Device(
+                "living-room", "Living Room Shield", "192.168.1.50", 6466,
+                null, Instant.now())));
         given(pairing.inProgress()).willReturn(false);
 
         mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Living Room Shield")))
+                .andExpect(content().string(containsString("removes the stored pairing credential")))
+                .andExpect(content().string(containsString("pair again")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"host\"")));
     }
 }

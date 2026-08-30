@@ -1,6 +1,7 @@
 package dev.andre.shield.device;
 
 import dev.andre.shield.ShieldProperties;
+import dev.andre.shield.protocol.ClientCertificate;
 import dev.andre.shield.protocol.CertificateStore;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -49,7 +50,12 @@ public class DeviceSessionManager implements AutoCloseable {
     }
 
     public DeviceState state() {
-        return active().map(DeviceSession::state).orElseGet(DeviceState::initial);
+        Optional<Device> device = registry.first();
+        if (device.isEmpty()) {
+            return DeviceState.initial();
+        }
+        DeviceSession session = sessions.get(device.get().id());
+        return session == null ? DeviceState.unpaired() : session.state();
     }
 
     public Optional<Device> activeDevice() {
@@ -68,6 +74,7 @@ public class DeviceSessionManager implements AutoCloseable {
             session.close();
         }
         registry.delete(id);
+        certificates.delete(id);
     }
 
     private void startSession(Device device) {
@@ -75,8 +82,15 @@ public class DeviceSessionManager implements AutoCloseable {
         if (existing != null) {
             existing.close();
         }
+
+        Optional<ClientCertificate> credential = certificates.load(device.certificateAlias());
+        if (credential.isEmpty()) {
+            events.publishEvent(new DeviceStateChangedEvent(DeviceState.unpaired()));
+            return;
+        }
+
         DeviceSession session = new DeviceSession(device,
-                certificates.loadOrCreate(device.certificateAlias()),
+                credential.get(),
                 properties,
                 state -> events.publishEvent(new DeviceStateChangedEvent(state)));
         sessions.put(device.id(), session);

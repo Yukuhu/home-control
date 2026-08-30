@@ -3,6 +3,7 @@ package dev.andre.shield.web;
 import dev.andre.shield.device.Device;
 import dev.andre.shield.device.DeviceSessionManager;
 import dev.andre.shield.device.DeviceStatus;
+import dev.andre.shield.protocol.CertificateStore;
 import dev.andre.shield.protocol.FakeRemoteServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,10 +50,14 @@ class DeviceStateStreamEndToEndTest {
     @Autowired
     DeviceSessionManager sessions;
 
+    @Autowired
+    CertificateStore certificates;
+
     @Test
     void streamsAnInboundVolumeMessageOutAsAnSseEvent() throws Exception {
         HttpClient http = HttpClient.newHttpClient();
         try (FakeRemoteServer fakeDevice = new FakeRemoteServer()) {
+            certificates.loadOrCreate("shield-sse");
             sessions.adopt(new Device("shield-sse", "Test Shield", "127.0.0.1", fakeDevice.port(),
                     null, Instant.now()));
             await().until(() -> sessions.state().status() == DeviceStatus.CONNECTED);

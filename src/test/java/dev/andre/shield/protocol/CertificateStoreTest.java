@@ -60,6 +60,22 @@ class CertificateStoreTest {
     }
 
     @Test
+    void deletesOnlyTheRequestedAlias() {
+        Path file = dir.resolve("keystore.p12");
+        CertificateStore store = new CertificateStore(file, "secret".toCharArray());
+        store.loadOrCreate("living-room");
+        ClientCertificate bedroom = store.loadOrCreate("bedroom");
+
+        store.delete("living-room");
+
+        CertificateStore reopened = new CertificateStore(file, "secret".toCharArray());
+        assertThat(reopened.load("living-room")).isEmpty();
+        assertThat(reopened.load("bedroom")).get()
+                .extracting(ClientCertificate::certificate)
+                .isEqualTo(bedroom.certificate());
+    }
+
+    @Test
     void aWrongPasswordIsAStorageFailureNotAMissingAlias() {
         Path file = dir.resolve("keystore.p12");
         new CertificateStore(file, "correct".toCharArray()).loadOrCreate("shield");
