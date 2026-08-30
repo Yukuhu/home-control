@@ -1,7 +1,7 @@
 # Shield Remote vNext — Staged Feature Roadmap
 
 **Date:** 2026-08-30
-**Status:** Approved in conversation; pending written-spec review
+**Status:** Approved; v0.3 implementation plan ready
 
 ## 1. Overview
 
