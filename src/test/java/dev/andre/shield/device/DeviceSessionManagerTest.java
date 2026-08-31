@@ -3,14 +3,19 @@ package dev.andre.shield.device;
 import dev.andre.shield.ShieldProperties;
 import dev.andre.shield.protocol.CertificateStore;
 import dev.andre.shield.protocol.FakeRemoteServer;
+import dev.andre.shield.storage.StorageException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 class DeviceSessionManagerTest {
@@ -79,6 +84,24 @@ class DeviceSessionManagerTest {
     }
 
     @Test
+    void emptyRegistryStillRejectsAnUnreadableKeystore() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+        new CertificateStore(properties.keystoreFile(), "correct".toCharArray())
+                .loadOrCreate("orphaned-alias");
+        CertificateStore wrongPasswordStore = new CertificateStore(
+                properties.keystoreFile(), "wrong".toCharArray());
+
+        try (DeviceSessionManager manager = new DeviceSessionManager(
+                registry, wrongPasswordStore, properties, event -> { })) {
+            assertThatThrownBy(manager::startRegisteredDevices)
+                    .isInstanceOf(StorageException.class)
+                    .hasMessageContaining(properties.keystoreFile().toString())
+                    .hasMessageContaining("password");
+        }
+    }
+
+    @Test
     void forgetDeletesTheRegistryRecordAndOnlyItsCredential() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
         Device forgotten = new Device("shield-forgotten", "Shield", "127.0.0.1", 6466,
@@ -98,5 +121,55 @@ class DeviceSessionManagerTest {
         assertThat(registry.findById(forgotten.id())).isEmpty();
         assertThat(certificates.load(forgotten.certificateAlias())).isEmpty();
         assertThat(certificates.load("keep-this-alias")).isPresent();
+    }
+
+    @Test
+    void forgetUnknownDevicePreservesItsOrphanedCredential() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+        CertificateStore certificates = new CertificateStore(
+                properties.keystoreFile(), "shield".toCharArray());
+        certificates.loadOrCreate("orphaned-alias");
+
+        try (DeviceSessionManager manager = new DeviceSessionManager(
+                registry, certificates, properties, event -> { })) {
+            manager.forget("orphaned-alias");
+        }
+
+        assertThat(certificates.load("orphaned-alias")).isPresent();
+    }
+
+    @Test
+    void forgetPublishesTheReplacementState() throws Exception {
+        try (FakeRemoteServer remote = new FakeRemoteServer()) {
+            DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+            Device forgotten = new Device("shield-forgotten", "Shield", "127.0.0.1",
+                    remote.port(), null, Instant.now());
+            registry.save(forgotten);
+            ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+            CertificateStore certificates = new CertificateStore(
+                    properties.keystoreFile(), "shield".toCharArray());
+            certificates.loadOrCreate(forgotten.certificateAlias());
+            List<Object> published = new CopyOnWriteArrayList<>();
+            ApplicationEventPublisher publisher = published::add;
+
+            try (DeviceSessionManager manager = new DeviceSessionManager(
+                    registry, certificates, properties, publisher)) {
+                manager.startRegisteredDevices();
+                await().until(() -> manager.state().status() == DeviceStatus.CONNECTED);
+                remote.pushCurrentApp("com.netflix.ninja");
+                await().untilAsserted(() -> assertThat(manager.state().currentApp())
+                        .isEqualTo("com.netflix.ninja"));
+                published.clear();
+
+                manager.forget(forgotten.id());
+            }
+
+            assertThat(published).singleElement()
+                    .isInstanceOfSatisfying(DeviceStateChangedEvent.class, event -> {
+                        assertThat(event.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+                        assertThat(event.state().currentApp()).isNull();
+                    });
+        }
     }
 }

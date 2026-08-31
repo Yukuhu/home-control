@@ -82,4 +82,34 @@ class JsonFileDeviceRegistryTest {
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("permissions");
     }
+
+    @Test
+    void nullRegistryDocumentIsAPathBearingStorageFailure() throws Exception {
+        Path file = dir.resolve("devices.json");
+        java.nio.file.Files.writeString(file, "null");
+
+        assertThatThrownBy(() -> new JsonFileDeviceRegistry(file).findAll())
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining(file.toString())
+                .hasMessageContaining("integrity");
+    }
+
+    @Test
+    void incompleteDeviceRecordIsAPathBearingStorageFailure() throws Exception {
+        Path file = dir.resolve("devices.json");
+        java.nio.file.Files.writeString(file, """
+                [{
+                  "name": "Living Room Shield",
+                  "host": "192.168.1.50",
+                  "port": 6466,
+                  "certificateFingerprint": "AA:BB:CC",
+                  "lastSeen": "2026-08-29T18:00:00Z"
+                }]
+                """);
+
+        assertThatThrownBy(() -> new JsonFileDeviceRegistry(file).findAll())
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining(file.toString())
+                .hasMessageContaining("integrity");
+    }
 }

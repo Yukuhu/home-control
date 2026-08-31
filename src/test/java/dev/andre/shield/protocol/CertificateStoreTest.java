@@ -85,4 +85,13 @@ class CertificateStoreTest {
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("password");
     }
+
+    @Test
+    void verifyReadableAcceptsAMissingKeystoreWithoutCreatingIt() {
+        Path file = dir.resolve("keystore.p12");
+
+        new CertificateStore(file, "secret".toCharArray()).verifyReadable();
+
+        assertThat(file).doesNotExist();
+    }
 }

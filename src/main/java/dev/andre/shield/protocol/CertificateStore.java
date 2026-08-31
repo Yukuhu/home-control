@@ -23,6 +23,20 @@ public class CertificateStore {
         this.password = password;
     }
 
+    public synchronized void verifyReadable() {
+        if (Files.notExists(file)) {
+            return;
+        }
+        try {
+            openOrEmpty();
+        } catch (Exception e) {
+            throw new StorageException(
+                    "Could not read keystore " + file
+                            + "; check the keystore password and file permissions",
+                    e);
+        }
+    }
+
     public synchronized Optional<ClientCertificate> load(String alias) {
         try {
             KeyStore keyStore = openOrEmpty();

@@ -37,6 +37,7 @@ public class DeviceSessionManager implements AutoCloseable {
 
     @PostConstruct
     public void startRegisteredDevices() {
+        certificates.verifyReadable();
         // Only the active device, not every entry. A re-pair at a changed address leaves a
         // stale entry behind (the id is derived from the host, spec §6), and since
         // DeviceStateChangedEvent carries no device id, a second session's DISCONNECTED
@@ -69,12 +70,18 @@ public class DeviceSessionManager implements AutoCloseable {
     }
 
     public void forget(String id) {
-        DeviceSession session = sessions.remove(id);
+        Optional<Device> registered = registry.findById(id);
+        if (registered.isEmpty()) {
+            return;
+        }
+        Device device = registered.get();
+        DeviceSession session = sessions.remove(device.id());
         if (session != null) {
             session.close();
         }
-        registry.delete(id);
-        certificates.delete(id);
+        registry.delete(device.id());
+        certificates.delete(device.certificateAlias());
+        events.publishEvent(new DeviceStateChangedEvent(state()));
     }
 
     private void startSession(Device device) {

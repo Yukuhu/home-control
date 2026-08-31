@@ -31,14 +31,48 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
             return List.of();
         }
         try {
-            return mapper.readValue(Files.readAllBytes(file), new TypeReference<List<Device>>() {
+            List<Device> devices = mapper.readValue(
+                    Files.readAllBytes(file), new TypeReference<List<Device>>() {
             });
-        } catch (IOException | JacksonException e) {
+            if (devices == null) {
+                throw new IllegalArgumentException("registry document must be a JSON array");
+            }
+            validateDevices(devices);
+            return devices;
+        } catch (IOException | JacksonException | IllegalArgumentException e) {
             throw new StorageException(
                     "Could not read device registry " + file
                             + "; check file permissions and JSON integrity",
                     e);
         }
+    }
+
+    private static void validateDevices(List<Device> devices) {
+        for (int index = 0; index < devices.size(); index++) {
+            Device device = devices.get(index);
+            if (device == null) {
+                throw invalidDevice(index, "record is null");
+            }
+            if (device.id() == null || device.id().isBlank()) {
+                throw invalidDevice(index, "id is required");
+            }
+            if (device.name() == null || device.name().isBlank()) {
+                throw invalidDevice(index, "name is required");
+            }
+            if (device.host() == null || device.host().isBlank()) {
+                throw invalidDevice(index, "host is required");
+            }
+            if (device.port() < 1 || device.port() > 65_535) {
+                throw invalidDevice(index, "port must be between 1 and 65535");
+            }
+            if (device.lastSeen() == null) {
+                throw invalidDevice(index, "lastSeen is required");
+            }
+        }
+    }
+
+    private static IllegalArgumentException invalidDevice(int index, String reason) {
+        return new IllegalArgumentException("invalid device record at index " + index + ": " + reason);
     }
 
     @Override
