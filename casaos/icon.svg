@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Shield Remote</title>
+  <rect width="512" height="512" rx="112" fill="#14161a"/>
+  <path d="M256 72 400 124v112c0 96-58 164-144 204-86-40-144-108-144-204V124Z" fill="#3d7dff"/>
+  <circle cx="256" cy="252" r="100" fill="#23262d"/>
+  <path d="M236 176h40v56h56v40h-56v56h-40v-56h-56v-40h56Z" fill="#e8e8ea"/>
+</svg>

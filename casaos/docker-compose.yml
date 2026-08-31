@@ -1,0 +1,43 @@
+name: shield-remote
+
+services:
+  shield-remote:
+    image: ghcr.io/yukuhu/home-control:latest
+    container_name: shield-remote
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/data
+        target: /data
+    x-casaos:
+      ports:
+        - container: "8080"
+          description:
+            en_US: Shield Remote web interface
+      volumes:
+        - container: /data
+          description:
+            en_US: Pairing credential and paired-device registry
+
+x-casaos:
+  id: dev.andre.shield-remote
+  main: shield-remote
+  index: /
+  port_map: "8080"
+  scheme: http
+  icon: https://raw.githubusercontent.com/Yukuhu/home-control/main/casaos/icon.svg
+  title:
+    en_US: Shield Remote
+  category: Home
+  tagline:
+    en_US: A local web remote for NVIDIA Shield and Android TV
+  description:
+    en_US: Pair once through Remote v2 and control an NVIDIA Shield from any browser on the LAN.
+  author: Yukuhu
+  developer: Yukuhu
+  architectures:
+    - amd64
+    - arm64
+  version: "0.3.0"
+  repo: https://github.com/Yukuhu/home-control

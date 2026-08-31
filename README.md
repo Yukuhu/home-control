@@ -9,6 +9,10 @@ on the same network: a browser remote with live device state.
 docker compose up --build
 ```
 
+The bundled `compose.yaml` stores persistent state in `./data` beside the Compose
+file. Preserve that directory when updating or recreating the ordinary Docker
+deployment.
+
 Then open `http://<host>:8080`. Set `SERVER_PORT` to listen elsewhere — under
 the bundled host-networking setup that is the only change required. In the
 commented bridge-mode alternative you must update the `ports:` mapping to match,
@@ -35,6 +39,29 @@ Swap `build: .` for `image: ghcr.io/yukuhu/home-control:latest` in
 
 Every releasable commit on `main` is released immediately, so `latest` is both
 the newest release and the newest code.
+
+## CasaOS
+
+Import the CasaOS manifest directly from:
+
+```text
+https://raw.githubusercontent.com/Yukuhu/home-control/main/casaos/docker-compose.yml
+```
+
+The manifest uses host networking so mDNS discovery works and persists `/data` at
+`/DATA/AppData/$AppID/data` on the CasaOS host. The important files are:
+
+- `/DATA/AppData/$AppID/data/keystore.p12` — the Remote v2 client credential;
+- `/DATA/AppData/$AppID/data/devices.json` — the paired-device registry.
+
+An older CasaOS deployment that had no volume mapping cannot recover data from an
+already discarded anonymous container. Pair once after installing this manifest;
+future container replacements and image updates will reuse the bind-mounted pairing.
+
+The default keystore password is stable and intentionally omitted from the CasaOS
+manifest. It protects the local PKCS12 file; it is not a web login or network
+authentication. If you set `SHIELD_KEYSTORE_PASSWORD` yourself, keep the same value
+for every redeployment.
 
 ## Pairing
 
