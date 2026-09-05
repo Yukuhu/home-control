@@ -19,7 +19,7 @@ dependencies {
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
-    implementation("com.google.protobuf:protobuf-java:4.36.0")
+    implementation("com.google.protobuf:protobuf-java:4.36.1")
     implementation("org.jmdns:jmdns:3.6.3")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
 
@@ -29,7 +29,7 @@ dependencies {
 }
 
 protobuf {
-    protoc { artifact = "com.google.protobuf:protoc:4.36.0" }
+    protoc { artifact = "com.google.protobuf:protoc:4.36.1" }
 }
 
 tasks.withType<Test> {
