@@ -4,7 +4,7 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.PairingResult;
 import dev.andre.homecontrol.adapters.androidtv.protocol.PairingSession;
-import dev.andre.homecontrol.device.DeviceSessionManager;
+import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.storage.DataDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +30,7 @@ public class PairingService {
     private static final Logger log = LoggerFactory.getLogger(PairingService.class);
 
     private final CertificateStore certificates;
-    private final DeviceSessionManager sessions;
+    private final DeviceManager sessions;
     private final DataDirectory dataDirectory;
 
     /**
@@ -42,7 +42,7 @@ public class PairingService {
      */
     private volatile Attempt attempt;
 
-    public PairingService(CertificateStore certificates, DeviceSessionManager sessions,
+    public PairingService(CertificateStore certificates, DeviceManager sessions,
                           DataDirectory dataDirectory) {
         this.certificates = certificates;
         this.sessions = sessions;

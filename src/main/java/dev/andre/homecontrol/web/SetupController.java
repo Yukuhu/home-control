@@ -1,8 +1,7 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.device.DeviceSessionManager;
+import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.adapters.androidtv.PairingService;
-import dev.andre.homecontrol.adapters.androidtv.MdnsDiscovery;
 import dev.andre.homecontrol.adapters.androidtv.PairingOutcome;
 import dev.andre.homecontrol.storage.StorageException;
 import org.springframework.stereotype.Controller;
@@ -16,13 +15,10 @@ import java.io.IOException;
 @Controller
 public class SetupController {
 
-    private final MdnsDiscovery discovery;
     private final PairingService pairing;
-    private final DeviceSessionManager sessions;
+    private final DeviceManager sessions;
 
-    public SetupController(MdnsDiscovery discovery, PairingService pairing,
-                           DeviceSessionManager sessions) {
-        this.discovery = discovery;
+    public SetupController(PairingService pairing, DeviceManager sessions) {
         this.pairing = pairing;
         this.sessions = sessions;
     }
@@ -75,8 +71,8 @@ public class SetupController {
 
     private void populateSetupModel(Model model, boolean awaitingCode) {
         model.addAttribute("awaitingCode", awaitingCode);
-        model.addAttribute("discovered", discovery.devices());
-        model.addAttribute("paired", sessions.activeDevice().orElse(null));
+        model.addAttribute("discovered", sessions.discovered());
+        model.addAttribute("paired", sessions.defaultDevice().orElse(null));
     }
 
     @PostMapping("/setup/forget")

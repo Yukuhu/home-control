@@ -1,7 +1,7 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
-import dev.andre.homecontrol.device.DeviceSessionManager;
+import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
@@ -48,7 +48,7 @@ class DeviceStateStreamEndToEndTest {
     int port;
 
     @Autowired
-    DeviceSessionManager sessions;
+    DeviceManager sessions;
 
     @Autowired
     CertificateStore certificates;
@@ -60,7 +60,7 @@ class DeviceStateStreamEndToEndTest {
             certificates.loadOrCreate("shield-sse");
             sessions.adopt(AndroidTvSettings.device("shield-sse", "Test Shield", "127.0.0.1", fakeDevice.port(),
                     null, Instant.now()));
-            await().until(() -> sessions.state().status() == DeviceStatus.CONNECTED);
+            await().until(() -> sessions.state("shield-sse").status() == DeviceStatus.CONNECTED);
 
             List<String> lines = new CopyOnWriteArrayList<>();
             HttpResponse<Stream<String>> response = http.send(
