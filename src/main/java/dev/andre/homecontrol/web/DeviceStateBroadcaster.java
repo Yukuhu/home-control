@@ -8,6 +8,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -71,7 +72,7 @@ public class DeviceStateBroadcaster {
     private void broadcast(DeviceStateChangedEvent event) {
         for (SseEmitter emitter : emitters) {
             try {
-                emitter.send(SseEmitter.event().name("state").data(event));
+                sendData(emitter, event);
             } catch (Throwable t) {
                 // Not just IOException: send throws an unchecked IllegalStateException when the
                 // emitter completed after this loop took its snapshot of the list, which happens
@@ -82,6 +83,11 @@ public class DeviceStateBroadcaster {
                 completeQuietly(emitter, t);
             }
         }
+    }
+
+    /** The one place an event becomes an SSE frame; package-private so a test can observe the object. */
+    void sendData(SseEmitter emitter, DeviceStateChangedEvent event) throws IOException {
+        emitter.send(SseEmitter.event().name("state").data(event));
     }
 
     /** {@code completeWithError} throws in turn on an emitter that has already completed. */

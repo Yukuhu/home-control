@@ -2,10 +2,13 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
+import dev.andre.homecontrol.core.DeviceStatus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +50,25 @@ class DeviceStateBroadcasterTest {
         broadcaster.onStateChanged(event());
         await().until(() -> healthy.count().get() == 2);
         assertThat(broken.count()).hasValue(1);
+    }
+
+    @Test
+    void forwardsTheDeviceIdWithTheState() {
+        List<DeviceStateChangedEvent> sent = new CopyOnWriteArrayList<>();
+        DeviceStateBroadcaster recording = new DeviceStateBroadcaster() {
+            @Override
+            void sendData(SseEmitter emitter, DeviceStateChangedEvent event) {
+                sent.add(event);
+            }
+        };
+        recording.register(new SseEmitter(0L));
+
+        recording.onStateChanged(new DeviceStateChangedEvent("bedroom", DeviceState.unpaired()));
+
+        await().until(() -> !sent.isEmpty());
+        assertThat(sent.getFirst().deviceId()).isEqualTo("bedroom");
+        assertThat(sent.getFirst().state().status()).isEqualTo(DeviceStatus.UNPAIRED);
+        recording.shutdown();
     }
 
     private static DeviceStateChangedEvent event() {
