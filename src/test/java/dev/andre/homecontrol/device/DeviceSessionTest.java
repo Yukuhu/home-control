@@ -3,7 +3,7 @@ package dev.andre.homecontrol.device;
 import dev.andre.homecontrol.ShieldProperties;
 import dev.andre.homecontrol.protocol.ClientCertificate;
 import dev.andre.homecontrol.protocol.FakeRemoteServer;
-import dev.andre.homecontrol.protocol.RemoteKey;
+import dev.andre.homecontrol.core.RemoteKey;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

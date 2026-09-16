@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.protocol;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.protocol.remote.RemoteConfigure;
 import dev.andre.homecontrol.protocol.remote.RemoteDeviceInfo;
 import dev.andre.homecontrol.protocol.remote.RemoteDirection;

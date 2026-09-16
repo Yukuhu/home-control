@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.protocol;
 
+import dev.andre.homecontrol.core.RemoteKey;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

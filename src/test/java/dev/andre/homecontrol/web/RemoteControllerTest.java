@@ -5,7 +5,7 @@ import dev.andre.homecontrol.device.DeviceSession;
 import dev.andre.homecontrol.device.DeviceSessionManager;
 import dev.andre.homecontrol.device.PairingService;
 import dev.andre.homecontrol.discovery.MdnsDiscovery;
-import dev.andre.homecontrol.protocol.RemoteKey;
+import dev.andre.homecontrol.core.RemoteKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

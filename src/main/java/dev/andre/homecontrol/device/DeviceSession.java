@@ -4,7 +4,7 @@ import dev.andre.homecontrol.ShieldProperties;
 import dev.andre.homecontrol.protocol.ClientCertificate;
 import dev.andre.homecontrol.protocol.DisconnectCause;
 import dev.andre.homecontrol.protocol.RemoteConnection;
-import dev.andre.homecontrol.protocol.RemoteKey;
+import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.protocol.RemoteListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
