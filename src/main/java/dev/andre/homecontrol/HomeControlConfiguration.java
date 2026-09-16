@@ -2,11 +2,15 @@ package dev.andre.homecontrol;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.playback.AppLinkStrategy;
+import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.storage.DataDirectory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.List;
 
 @Configuration
 public class HomeControlConfiguration {
@@ -14,6 +18,12 @@ public class HomeControlConfiguration {
     @Bean
     public DeviceRegistry deviceRegistry(AndroidTvProperties properties) {
         return new JsonFileDeviceRegistry(properties.devicesFile());
+    }
+
+    @Bean
+    public PlaybackPlanner playbackPlanner() {
+        // Strategy order is the preference order of spec §5.3; later sub-projects insert theirs.
+        return new PlaybackPlanner(List.of(new AppLinkStrategy()));
     }
 
     @Bean
