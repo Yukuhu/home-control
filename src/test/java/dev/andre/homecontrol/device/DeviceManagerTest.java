@@ -304,6 +304,11 @@ class DeviceManagerTest {
         }
 
         @Override
+        public DeviceKind kind() {
+            return DeviceKind.UPNP;
+        }
+
+        @Override
         public Set<Capability> capabilities(Device device) {
             return capabilities;
         }

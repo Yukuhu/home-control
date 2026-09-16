@@ -7,6 +7,7 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceHandle;
+import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DiscoveredDevice;
@@ -45,6 +46,17 @@ public class AndroidTvAdapter implements DeviceAdapter {
     @Override
     public String id() {
         return ID;
+    }
+
+    @Override
+    public DeviceKind kind() {
+        return DeviceKind.ANDROID_TV;
+    }
+
+    /** The keystore alias is the device id; moving the entry would orphan the pairing. */
+    @Override
+    public boolean credentialsBoundToDeviceId() {
+        return true;
     }
 
     @Override
