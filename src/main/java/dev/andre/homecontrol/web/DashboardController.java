@@ -9,6 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,6 +49,9 @@ public class DashboardController {
 
     @GetMapping("/remote/{id}")
     public String remote(@PathVariable String id) {
-        return "redirect:/?device={id}";
+        // Built rather than interpolated so a device id containing "&" or "=" cannot smuggle
+        // an extra query parameter into the redirect.
+        String target = UriComponentsBuilder.fromPath("/").queryParam("device", id).encode().build().toUriString();
+        return "redirect:" + target;
     }
 }
