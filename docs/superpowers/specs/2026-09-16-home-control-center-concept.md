@@ -148,7 +148,7 @@ ContentItem { id, sourceId, kind (MOVIE|EPISODE|VIDEO|LIVE_EVENT|TRACK|APP),
               playables: List<PlayableRef> }
 
 PlayableRef =
-  AppLink(uri, preferredPackages[])              // https://www.youtube.com/watch?v=..
+  AppLink(uri, service)                          // https://www.youtube.com/watch?v=..; the device picks the app that claims the URI
   CastLoad(receiverAppId, payload)               // Jellyfin receiver, DMR, YouTube
   JellyfinItem(serverId, itemId, resumeTicks)    // resolved at play time to a session command, a CastLoad, or a StreamUrl
   StreamUrl(url, mime, headers?)                 // DLNA, Sonos, DMR, local audio
@@ -165,7 +165,7 @@ plan(item, device) -> Route | Unroutable(reason)
 
 Preference order (first match wins):
  1. JELLYFIN_CLIENT session on device is live         -> session PlayNow
- 2. APP_LINK and item has AppLink for a package on it -> app-link launch
+ 2. APP_LINK and item has an AppLink                   -> app-link launch
  3. CAST_RECEIVER and item has CastLoad               -> cast
  4. MEDIA_RENDERER and item has StreamUrl             -> DLNA / Sonos / DMR
  5. LOCAL_AUDIO_SINK and item is audio with StreamUrl -> server player
@@ -176,6 +176,11 @@ Rules:
 - Order 1 before 2 because the native app already open resumes with the
   user's own profile and subtitles; relaunching it through an app link can
   drop the resume position on some apps.
+- The server cannot enumerate installed apps (Remote v2 has no such call, see
+  v0.3). An app-link route is therefore *optimistic*: the device opens whatever
+  app claims the URI, or nothing. The foreground-app event that follows tells
+  the UI whether the launch took; if the foreground app does not change within
+  a few seconds the play sheet reports "the app may not be installed".
 - The route and its reason are shown in the UI *before* the user confirms
   ("Play on Shield via YouTube app"). Failure toasts name the route that failed
   and the next one, if any, so the user can retry differently.
