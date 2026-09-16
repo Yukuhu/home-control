@@ -1,8 +1,8 @@
 package dev.andre.homecontrol.core.playback;
 
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,8 +54,39 @@ public final class AppLinks {
                 : Optional.ofNullable(MEDIA_TYPES.get(name.substring(dot + 1).toLowerCase(Locale.ROOT)));
     }
 
-    private static String fileName(String rawPath) {
-        return URLDecoder.decode(rawPath.substring(rawPath.lastIndexOf('/') + 1), StandardCharsets.UTF_8);
+    static String fileName(String rawPath) {
+        return decodeSegment(rawPath.substring(rawPath.lastIndexOf('/') + 1));
+    }
+
+    /**
+     * URI path-segment decoding: only {@code %XX} triples become characters. Unlike
+     * {@link java.net.URLDecoder} (form/query decoding), a literal {@code +} stays a {@code +}
+     * rather than becoming a space — a path segment has no such convention. A literal character
+     * is re-encoded as its own UTF-8 bytes (not truncated to one byte), so non-ASCII characters
+     * that reached us unescaped (java.net.URI allows them) survive intact. A malformed escape
+     * (not two hex digits, or truncated at the end) is kept as-is rather than rejected: the
+     * title is cosmetic, so a bad guess here is not worth a 400 or a leaked stack trace.
+     */
+    private static String decodeSegment(String segment) {
+        ByteArrayOutputStream decoded = new ByteArrayOutputStream(segment.length());
+        int i = 0;
+        while (i < segment.length()) {
+            char c = segment.charAt(i);
+            if (c == '%' && i + 2 < segment.length()
+                    && isHexDigit(segment.charAt(i + 1)) && isHexDigit(segment.charAt(i + 2))) {
+                decoded.write(Integer.parseInt(segment.substring(i + 1, i + 3), 16));
+                i += 3;
+            } else {
+                int codePoint = segment.codePointAt(i);
+                decoded.writeBytes(new String(Character.toChars(codePoint)).getBytes(StandardCharsets.UTF_8));
+                i += Character.charCount(codePoint);
+            }
+        }
+        return decoded.toString(StandardCharsets.UTF_8);
+    }
+
+    private static boolean isHexDigit(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
     }
 
     private static URI parse(String url) {

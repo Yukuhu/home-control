@@ -103,14 +103,17 @@ no pairing.
   entries. An Android TV pairing always stays with its own entry: merge the Cast entry into
   the TV, not the other way round.
 - A Cast device's drawer has a volume slider, **Mute**, **Unmute** and **Stop casting**.
-- Paste a direct media link (`.mp4`, `.mkv`, `.webm`, `.m3u8`, `.mpd`, `.mp3`, `.m4a`, `.aac`,
-  `.flac`, `.ogg`, `.wav`) into **Open a link on this device** to play it with Google's Default
-  Media Receiver. The receiver downloads the URL itself, so it must be reachable from the TV or
-  speaker. On a device that can also open app links (an Android TV) the app link is tried
-  first; split off its Cast entry if you want to cast such links instead.
+- Paste a direct media link (`.mp4`, `.m4v`, `.mkv`, `.webm`, `.m3u8`, `.mpd`, `.mp3`, `.m4a`,
+  `.aac`, `.flac`, `.ogg`, `.wav`) into **Open a link on this device** to play it with Google's
+  Default Media Receiver. The receiver downloads the URL itself, so it must be reachable from
+  the TV or speaker. On a device that can also open app links (an Android TV) the app link is
+  tried first; split off its Cast entry if you want to cast such links instead.
 - The device strip shows what a Cast device is playing, including casts started from a phone.
 - Cast discovery needs `network_mode: host`, like Android TV discovery. Cast groups are not
   shown yet.
+- A receiver whose address changed (DHCP renewal, a new access point) is picked up
+  automatically the next time it announces itself over mDNS: the paired device is reconnected
+  at the new address, with nothing to redo in Setup.
 - Switch the whole Cast module off with `HOME_CONTROL_CAST_ENABLED=false`. Timings live under
   `home-control.cast.*` in `application.yaml`.
 
@@ -129,6 +132,8 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 | `shield.discovery-enabled` | `true` | Turn mDNS off entirely |
 | `shield.stale-timeout-seconds` | `10` | No inbound message for this long means the connection is dead |
 | `shield.reconnect-max-delay-seconds` | `60` | Upper bound on reconnect backoff |
+| `HOME_CONTROL_CAST_ENABLED` | `true` | Turn the Cast module off entirely; Android TV devices keep working |
+| `home-control.cast.*` | see `CastProperties` | Cast receiver heartbeat interval, stale timeout, reconnect backoff, and command/load timeouts |
 
 An older `devices.json` (from before multi-device support) is upgraded in place on
 first start; the upgrade keeps existing pairings, so no re-pairing is needed after

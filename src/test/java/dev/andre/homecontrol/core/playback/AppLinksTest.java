@@ -75,6 +75,51 @@ class AppLinksTest {
     }
 
     @Test
+    void aFileNameWithALiteralPlusKeepsItInsteadOfTurningItIntoASpace() {
+        String url = "https://media.example.org/films/Big+Buck+Bunny.mp4";
+
+        ContentItem item = AppLinks.fromUrl(url);
+
+        assertThat(item.title()).isEqualTo("Big+Buck+Bunny.mp4");
+    }
+
+    @Test
+    void aLiteralNonAsciiFileNameKeepsItsCharactersInsteadOfMojibake() {
+        String url = "https://media.example.org/films/Bücherei.mp4";
+
+        ContentItem item = AppLinks.fromUrl(url);
+
+        assertThat(item.title()).isEqualTo("Bücherei.mp4");
+    }
+
+    @Test
+    void aPercentEncodedNonAsciiFileNameDecodesAsUtf8() {
+        String url = "https://media.example.org/films/%C3%BCber.mp4";
+
+        ContentItem item = AppLinks.fromUrl(url);
+
+        assertThat(item.title()).isEqualTo("über.mp4");
+    }
+
+    @Test
+    void aMalformedPercentEscapeInAUrlIsRejectedWithAGenericMessage() {
+        // java.net.URI's own parser already refuses a raw "%" that is not a valid escape pair,
+        // so fromUrl never even reaches fileName() with one — and the message stays generic
+        // rather than leaking java.net.URI's "Malformed escape pair at index …" detail.
+        assertThatThrownBy(() -> AppLinks.fromUrl("https://media.example.org/films/100%GG.mp4"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("That is not a valid link");
+    }
+
+    @Test
+    void aMalformedPercentEscapeInAFileNameIsKeptLiterallyInsteadOfThrowing() {
+        // fileName() is package-visible (like mediaTypeOf/serviceOf) precisely so this — a
+        // defensive case java.net.URI already forecloses when the path comes from a pasted
+        // URL — stays covered for any other caller that hands it a raw path directly.
+        assertThat(AppLinks.fileName("100%GG.mp4")).isEqualTo("100%GG.mp4");
+    }
+
+    @Test
     void anAudioLinkIsATrack() {
         ContentItem item = AppLinks.fromUrl("http://nas.local/music/song.flac");
 
