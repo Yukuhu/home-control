@@ -10,10 +10,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.BooleanSupplier;
 
 /** Fans device state changes out to every open browser tab. */
 @Component
@@ -24,6 +27,8 @@ public class DeviceStateBroadcaster {
     private static final long NO_TIMEOUT = 0L;
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
+    /** Whether each subscriber may still receive state; checked before every send and on {@link #revalidate()}. */
+    private final Map<SseEmitter, BooleanSupplier> allowed = new ConcurrentHashMap<>();
 
     /**
      * The fan-out's own thread. {@code publishEvent} is synchronous, so without this the
@@ -37,27 +42,57 @@ public class DeviceStateBroadcaster {
         return thread;
     });
 
-    public SseEmitter subscribe() {
-        return register(new SseEmitter(NO_TIMEOUT));
+    /** @param stillAllowed false once this subscriber's browser logged out or lost its login */
+    public SseEmitter subscribe(BooleanSupplier stillAllowed) {
+        return register(new SseEmitter(NO_TIMEOUT), stillAllowed);
+    }
+
+    SseEmitter register(SseEmitter emitter) {
+        return register(emitter, () -> true);
     }
 
     /** Wires one emitter's lifecycle callbacks and adds it to the fan-out. */
-    SseEmitter register(SseEmitter emitter) {
-        emitter.onCompletion(() -> emitters.remove(emitter));
-        emitter.onTimeout(() -> emitters.remove(emitter));
-        emitter.onError(error -> emitters.remove(emitter));
+    SseEmitter register(SseEmitter emitter, BooleanSupplier stillAllowed) {
+        emitter.onCompletion(() -> drop(emitter));
+        emitter.onTimeout(() -> drop(emitter));
+        emitter.onError(error -> drop(emitter));
+        allowed.put(emitter, stillAllowed);
         emitters.add(emitter);
         return emitter;
     }
 
+    /** Ends every stream whose subscriber may no longer see device state (after a login change). */
+    public void revalidate() {
+        for (SseEmitter emitter : emitters) {
+            if (!isAllowed(emitter)) {
+                drop(emitter);
+                completeQuietly(emitter);
+            }
+        }
+    }
+
+    private boolean isAllowed(SseEmitter emitter) {
+        BooleanSupplier check = allowed.get(emitter);
+        try {
+            return check != null && check.getAsBoolean();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    private void drop(SseEmitter emitter) {
+        emitters.remove(emitter);
+        allowed.remove(emitter);
+    }
+
     /**
-     * Undoes a {@link #subscribe()} whose caller never got to hand the emitter back to
+     * Undoes a {@link #subscribe(BooleanSupplier)} whose caller never got to hand the emitter back to
      * Spring — e.g. the initial state send failed. Without this, that emitter's
      * onCompletion/onTimeout/onError never fire (Spring never adopted it), so it would
      * otherwise sit in this list forever.
      */
     void unsubscribe(SseEmitter emitter) {
-        emitters.remove(emitter);
+        drop(emitter);
     }
 
     @EventListener
@@ -71,6 +106,11 @@ public class DeviceStateBroadcaster {
 
     private void broadcast(DeviceStateChangedEvent event) {
         for (SseEmitter emitter : emitters) {
+            if (!isAllowed(emitter)) {
+                drop(emitter);
+                completeQuietly(emitter);
+                continue;
+            }
             try {
                 sendData(emitter, event);
             } catch (Throwable t) {
@@ -79,7 +119,7 @@ public class DeviceStateBroadcaster {
                 // routinely on tab close. Either way this subscriber is finished — drop it, and
                 // never let it stop the event reaching the remaining tabs.
                 log.debug("Dropping an SSE subscriber after a failed send", t);
-                emitters.remove(emitter);
+                drop(emitter);
                 completeQuietly(emitter, t);
             }
         }
@@ -88,6 +128,14 @@ public class DeviceStateBroadcaster {
     /** The one place an event becomes an SSE frame; package-private so a test can observe the object. */
     void sendData(SseEmitter emitter, DeviceStateChangedEvent event) throws IOException {
         emitter.send(SseEmitter.event().name("state").data(event));
+    }
+
+    private void completeQuietly(SseEmitter emitter) {
+        try {
+            emitter.complete();
+        } catch (Throwable ignored) {
+            // Already gone; the emitter is off the list either way.
+        }
     }
 
     /** {@code completeWithError} throws in turn on an emitter that has already completed. */

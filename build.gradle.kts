@@ -23,6 +23,8 @@ dependencies {
     implementation("com.google.protobuf:protobuf-java:4.36.1")
     implementation("org.jmdns:jmdns:3.6.3")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
+    // Argon2id for the login hash and the HOME_CONTROL_SECRET key (already transitive via bcpkix; used directly now).
+    implementation("org.bouncycastle:bcprov-jdk18on:1.85")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-webmvc-test")

@@ -106,6 +106,21 @@
             <button type="submit">Merge</button>
         </form>
     </section>
+
+    <section th:if="${loginRequired}">
+        <h2>Login password</h2>
+        <p class="error" th:if="${loginError}" th:text="${loginError}">Wrong password</p>
+        <p class="hint" th:if="${loginMessage}" th:text="${loginMessage}">Password changed</p>
+        <form method="post" th:action="@{/setup/password}">
+            <input type="password" name="current" autocomplete="current-password" placeholder="Current password" required>
+            <input type="password" name="password" autocomplete="new-password" minlength="10" placeholder="New password" required>
+            <input type="password" name="confirmation" autocomplete="new-password" minlength="10" placeholder="Repeat new password" required>
+            <button type="submit">Change password</button>
+        </form>
+        <form method="post" th:action="@{/logout}">
+            <button type="submit">Log out</button>
+        </form>
+    </section>
 </main>
 </body>
 </html>

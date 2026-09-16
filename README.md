@@ -134,6 +134,18 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 | `shield.reconnect-max-delay-seconds` | `60` | Upper bound on reconnect backoff |
 | `HOME_CONTROL_CAST_ENABLED` | `true` | Turn the Cast module off entirely; Android TV devices keep working |
 | `home-control.cast.*` | see `CastProperties` | Cast receiver heartbeat interval, stale timeout, reconnect backoff, and command/load timeouts |
+| `HOME_CONTROL_SECRET` | unset | Passphrase that encrypts `secrets.json`; without it a random `secret.key` is created next to it on first use |
+| `HOME_CONTROL_TRUSTED_ORIGINS` | empty | Comma-separated origins allowed to send changes, e.g. `https://home.example.org` behind a reverse proxy; their host names are also allowed |
+| `HOME_CONTROL_ALLOWED_HOSTS` | empty | Comma-separated extra host names the app answers to: exact names, or `*.example.org` for its subdomains |
+| `HOME_CONTROL_SECURE_COOKIE` | `false` | Mark the login cookie `Secure` when the app is only reached over HTTPS |
+
+The app only answers to host names that cannot be pointed at it by someone else's DNS
+(DNS rebinding): IP addresses, `localhost`, single-label names such as `nas`, and names
+ending in `.local`, `.lan`, `.home.arpa` or `.internal`. Any other name gets
+`421 Misdirected Request`. If you reach it under a real domain, for example through a
+reverse proxy, add that name to `HOME_CONTROL_ALLOWED_HOSTS` (or its origin to
+`HOME_CONTROL_TRUSTED_ORIGINS`). Changes (POST and other non-read requests) from another
+site's page are refused with `403`, whether or not a login exists.
 
 An older `devices.json` (from before multi-device support) is upgraded in place on
 first start; the upgrade keeps existing pairings, so no re-pairing is needed after
