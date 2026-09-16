@@ -1,6 +1,6 @@
 package dev.andre.homecontrol;
 
-import dev.andre.homecontrol.device.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.protocol.CertificateStore;
 import dev.andre.homecontrol.storage.DataDirectory;

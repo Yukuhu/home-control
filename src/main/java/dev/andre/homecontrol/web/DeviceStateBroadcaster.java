@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.device.DeviceStateChangedEvent;
+import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

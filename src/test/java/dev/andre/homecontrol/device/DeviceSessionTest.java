@@ -1,6 +1,10 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.ShieldProperties;
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.protocol.ClientCertificate;
 import dev.andre.homecontrol.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.core.RemoteKey;
@@ -39,7 +43,7 @@ class DeviceSessionTest {
     void startSession() throws Exception {
         fakeDevice = new FakeRemoteServer();
         // A null fingerprint means "not pinned yet"; pinning has its own test below.
-        Device device = new Device("shield-1", "Test Shield", "127.0.0.1", fakeDevice.port(),
+        Device device = AndroidTvSettings.device("shield-1", "Test Shield", "127.0.0.1", fakeDevice.port(),
                 null, Instant.now());
         session = new DeviceSession(device, ClientCertificate.generate("shield-remote"),
                 PROPERTIES, state -> {
@@ -92,7 +96,7 @@ class DeviceSessionTest {
 
     @Test
     void refusesADeviceWhoseCertificateDoesNotMatchThePin() {
-        Device impostor = new Device("shield-2", "Impostor", "127.0.0.1", fakeDevice.port(),
+        Device impostor = AndroidTvSettings.device("shield-2", "Impostor", "127.0.0.1", fakeDevice.port(),
                 "0000000000000000000000000000000000000000000000000000000000000000", Instant.now());
 
         try (DeviceSession pinned = new DeviceSession(impostor,
@@ -137,7 +141,7 @@ class DeviceSessionTest {
         // NETWORK failure, so the session retries with backoff indefinitely. It must never
         // be mistaken for class 2, a certificate rejection, which latches UNPAIRED and
         // never schedules another attempt.
-        Device unreachable = new Device("shield-unreachable", "Unreachable", "127.0.0.1",
+        Device unreachable = AndroidTvSettings.device("shield-unreachable", "Unreachable", "127.0.0.1",
                 closedPort(), null, Instant.now());
         AtomicInteger attempts = new AtomicInteger();
         AtomicBoolean everUnpaired = new AtomicBoolean();
@@ -167,7 +171,7 @@ class DeviceSessionTest {
         // on this session's own control thread. A subscriber's unchecked exception must not
         // abort the transition it was told about: scheduleReconnect() still has to run, or
         // the session wedges permanently and silently.
-        Device unreachable = new Device("shield-listener-throws", "Unreachable", "127.0.0.1",
+        Device unreachable = AndroidTvSettings.device("shield-listener-throws", "Unreachable", "127.0.0.1",
                 closedPort(), null, Instant.now());
         AtomicInteger attempts = new AtomicInteger();
 
@@ -233,7 +237,7 @@ class DeviceSessionTest {
 
     private DeviceSession sessionWith(ShieldProperties properties) {
         return new DeviceSession(
-                new Device("shield-1", "Test Shield", "127.0.0.1", fakeDevice.port(), null, Instant.now()),
+                AndroidTvSettings.device("shield-1", "Test Shield", "127.0.0.1", fakeDevice.port(), null, Instant.now()),
                 ClientCertificate.generate("shield-remote"), properties, state -> {
         });
     }

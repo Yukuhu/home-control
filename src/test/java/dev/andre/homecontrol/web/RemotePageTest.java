@@ -1,8 +1,9 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.device.Device;
-import dev.andre.homecontrol.device.DeviceState;
-import dev.andre.homecontrol.device.DeviceStatus;
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.core.DeviceState;
+import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.device.DeviceSessionManager;
 import dev.andre.homecontrol.device.PairingService;
 import dev.andre.homecontrol.discovery.MdnsDiscovery;
@@ -59,8 +60,8 @@ class RemotePageTest {
     @Test
     void rendersTheSetupPageWithDiscoveredDevicesAndManualEntry() throws Exception {
         given(discovery.devices()).willReturn(List.of(
-                new dev.andre.homecontrol.discovery.DiscoveredDevice("Living Room Shield", "192.168.1.50", 6466)));
-        given(sessions.activeDevice()).willReturn(Optional.of(new Device(
+                new DiscoveredDevice("androidtv", "Living Room Shield", "192.168.1.50", 6466)));
+        given(sessions.activeDevice()).willReturn(Optional.of(AndroidTvSettings.device(
                 "living-room", "Living Room Shield", "192.168.1.50", 6466,
                 null, Instant.now())));
         given(pairing.inProgress()).willReturn(false);

@@ -1,7 +1,7 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.device.DeviceState;
-import dev.andre.homecontrol.device.DeviceStateChangedEvent;
+import dev.andre.homecontrol.core.DeviceState;
+import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;

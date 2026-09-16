@@ -1,6 +1,11 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.ShieldProperties;
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceState;
+import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.protocol.ClientCertificate;
 import dev.andre.homecontrol.protocol.DisconnectCause;
 import dev.andre.homecontrol.protocol.RemoteConnection;
@@ -41,6 +46,7 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
     private static final int UNPAIRED_CONFIRMATION_THRESHOLD = 5;
 
     private final Device device;
+    private final AndroidTvSettings settings;
     private final ClientCertificate credential;
     private final ShieldProperties properties;
     private final Consumer<DeviceState> onChange;
@@ -55,6 +61,7 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
     public DeviceSession(Device device, ClientCertificate credential,
                          ShieldProperties properties, Consumer<DeviceState> onChange) {
         this.device = device;
+        this.settings = AndroidTvSettings.of(device);
         this.credential = credential;
         this.properties = properties;
         this.onChange = onChange;
@@ -101,7 +108,7 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
         }
         update(state.withStatus(DeviceStatus.CONNECTING));
         try {
-            RemoteConnection opened = RemoteConnection.connect(device.host(), device.port(),
+            RemoteConnection opened = RemoteConnection.connect(device.host(), settings.port(),
                     credential, properties.staleTimeoutSeconds() * 1000, this);
 
             if (!presentsThePinnedCertificate(opened)) {
@@ -127,7 +134,7 @@ public class DeviceSession implements RemoteListener, AutoCloseable {
 
     /** A device recorded without a fingerprint (paired before pinning) is accepted once. */
     private boolean presentsThePinnedCertificate(RemoteConnection opened) {
-        String pinned = device.certificateFingerprint();
+        String pinned = settings.certificateFingerprint();
         return pinned == null
                 || pinned.equals(ClientCertificate.fingerprintOf(opened.serverCertificate()));
     }
