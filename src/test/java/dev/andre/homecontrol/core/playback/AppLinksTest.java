@@ -46,6 +46,17 @@ class AppLinksTest {
     }
 
     @Test
+    void rejectsALinkLongerThan2048Characters() {
+        String prefix = "https://example.org/";
+        String atTheLimit = prefix + "a".repeat(2048 - prefix.length());
+
+        assertThat(AppLinks.fromUrl(atTheLimit).playables()).hasSize(1);
+        assertThatThrownBy(() -> AppLinks.fromUrl(atTheLimit + "a"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("That link is too long");
+    }
+
+    @Test
     void rejectsAMissingLink() {
         assertThatThrownBy(() -> AppLinks.fromUrl(null)).isInstanceOf(IllegalArgumentException.class);
     }
