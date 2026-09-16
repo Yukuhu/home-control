@@ -23,9 +23,8 @@ import java.util.Locale;
 @Service
 public class PairingService {
 
-    /** The pairing port. The command channel is 6466. */
+    /** The pairing port. The command channel is {@link AndroidTvSettings#DEFAULT_PORT}. */
     public static final int PAIRING_PORT = 6467;
-    public static final int REMOTE_PORT = 6466;
 
     private static final Logger log = LoggerFactory.getLogger(PairingService.class);
 
@@ -97,7 +96,7 @@ public class PairingService {
                             current.deviceId(),
                             current.name(),
                             current.host(),
-                            REMOTE_PORT,
+                            AndroidTvSettings.DEFAULT_PORT,
                             ClientCertificate.fingerprintOf(paired.serverCertificate()),
                             Instant.now()));
                     log.info("Paired with {} at {}", current.name(), current.host());

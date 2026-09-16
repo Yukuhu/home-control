@@ -4,10 +4,8 @@ body { margin: 0; background: var(--bg); color: var(--fg);
        font: 16px/1.4 system-ui, -apple-system, sans-serif; }
 header { display: flex; gap: .5rem; align-items: center; padding: .75rem 1rem;
          border-bottom: 1px solid #2a2d34; }
-header a { color: var(--accent); margin-left: auto; }
-#current-app { flex: 1; min-width: 4rem; overflow: hidden; text-overflow: ellipsis;
-               white-space: nowrap; }
-button:disabled { cursor: default; opacity: .55; }
+/* Only the header's own link (Setup, Home) is pushed right; the device chips are links too. */
+header > a { color: var(--accent); margin-left: auto; }
 .badge { padding: .15rem .5rem; border-radius: 999px; font-size: .75rem; background: #3a2020; }
 .badge.ok { background: #1f3a24; }
 main { max-width: 30rem; margin: 0 auto; padding: 1rem; }
