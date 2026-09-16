@@ -49,7 +49,7 @@ public class AndroidTvAdapter implements DeviceAdapter {
 
     @Override
     public Set<Capability> capabilities(Device device) {
-        return EnumSet.of(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME);
+        return EnumSet.of(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME, Capability.APP_LINK);
     }
 
     @Override

@@ -11,11 +11,11 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteListener;
-import dev.andre.homecontrol.core.UnsupportedActionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -95,12 +95,20 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         }
     }
 
+    public void openAppLink(URI uri) {
+        RemoteConnection current = requireConnected();
+        try {
+            current.sendAppLink(uri.toString());
+        } catch (IOException e) {
+            throw new DeviceOfflineException("The device dropped the connection while opening " + uri);
+        }
+    }
+
     @Override
     public void execute(Action action) {
         switch (action) {
             case Action.PressKey press -> sendKey(press.key());
-            case Action.OpenAppLink ignored -> throw new UnsupportedActionException(
-                    "App links arrive in the next task");
+            case Action.OpenAppLink open -> openAppLink(open.uri());
         }
     }
 

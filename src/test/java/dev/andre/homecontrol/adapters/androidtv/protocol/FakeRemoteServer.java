@@ -35,6 +35,7 @@ public class FakeRemoteServer implements AutoCloseable {
 
     private final BlockingQueue<Integer> keyPresses = new LinkedBlockingQueue<>();
     private final BlockingQueue<Integer> pongs = new LinkedBlockingQueue<>();
+    private final BlockingQueue<String> appLinks = new LinkedBlockingQueue<>();
 
     private final AtomicInteger connections = new AtomicInteger();
     private final AtomicInteger clientConfigureFeatures = new AtomicInteger(-1);
@@ -149,6 +150,10 @@ public class FakeRemoteServer implements AutoCloseable {
         return pongs.poll(5, TimeUnit.SECONDS);
     }
 
+    public String nextAppLink() throws InterruptedException {
+        return appLinks.poll(5, TimeUnit.SECONDS);
+    }
+
     /** Accepts connections in a loop so reconnect behaviour can be tested. */
     private void serve() {
         while (!serverSocket.isClosed()) {
@@ -193,6 +198,8 @@ public class FakeRemoteServer implements AutoCloseable {
                     throw new IllegalStateException("expected SHORT direction");
                 }
                 keyPresses.add(message.getRemoteKeyInject().getKeyCodeValue());
+            } else if (message.hasRemoteAppLinkLaunchRequest()) {
+                appLinks.add(message.getRemoteAppLinkLaunchRequest().getAppLink());
             } else if (message.hasRemotePingResponse()) {
                 pongs.add(message.getRemotePingResponse().getVal1());
             }

@@ -93,9 +93,9 @@ class RemoteConnectionTest {
     }
 
     @Test
-    void advertisesOnlyImplementedV03Features() {
-        assertThat(device.clientConfigureFeatures()).isEqualTo(102);
-        assertThat(device.clientActiveFeatures()).isEqualTo(102);
+    void advertisesKeyImePowerVolumeAndAppLink() {
+        assertThat(device.clientConfigureFeatures()).isEqualTo(614);
+        assertThat(device.clientActiveFeatures()).isEqualTo(614);
     }
 
     @Test
@@ -131,6 +131,13 @@ class RemoteConnectionTest {
         connection.sendKey(RemoteKey.DPAD_UP);
 
         assertThat(device.nextKeyPress()).isEqualTo(19);
+    }
+
+    @Test
+    void sendsAnAppLinkLaunchRequest() throws Exception {
+        connection.sendAppLink("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+
+        assertThat(device.nextAppLink()).isEqualTo("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
     }
 
     @Test
