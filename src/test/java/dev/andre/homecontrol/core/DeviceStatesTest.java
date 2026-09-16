@@ -52,4 +52,13 @@ class DeviceStatesTest {
         assertThat(composed.volumeLevel()).isEqualTo(12);
         assertThat(composed.muted()).isFalse();
     }
+
+    @Test
+    void nowPlayingComesFromWhicheverAdapterReportsIt() {
+        NowPlaying bunny = new NowPlaying("Big Buck Bunny", PlaybackState.PAUSED, 30.0, null);
+        DeviceState androidTv = new DeviceState(DeviceStatus.CONNECTED, true, "com.google.android.youtube.tv", 5, 100, false, EARLY);
+        DeviceState cast = new DeviceState(DeviceStatus.CONNECTED, true, "Default Media Receiver", 30, 100, false, EARLY, bunny);
+
+        assertThat(DeviceStates.compose(List.of(androidTv, cast)).nowPlaying()).isEqualTo(bunny);
+    }
 }

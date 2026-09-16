@@ -5,6 +5,8 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.NowPlaying;
+import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -139,9 +141,41 @@ class DashboardPageTest {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("/devices/cast-10-0-0-9/volume")))
+                .andExpect(content().string(containsString("id=\"volume-cast-10-0-0-9\"")))
                 .andExpect(content().string(containsString("/devices/cast-10-0-0-9/mute")))
                 .andExpect(content().string(containsString("/devices/cast-10-0-0-9/stop")))
-                .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/key/"))))
-                .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/play"))));
+                .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/key/"))));
+    }
+
+    @Test
+    void aCastOnlyDeviceOffersTheLinkForm() throws Exception {
+        Device kitchen = new Device("cast-10-0-0-9", "Kitchen", DeviceKind.CAST, "10.0.0.9",
+                Map.of("cast", Map.of("port", "8009")), Instant.now());
+        given(devices.devices()).willReturn(List.of(kitchen));
+        given(devices.defaultDevice()).willReturn(Optional.of(kitchen));
+        given(devices.device("cast-10-0-0-9")).willReturn(Optional.of(kitchen));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME));
+
+        mockMvc.perform(get("/"))
+                .andExpect(content().string(containsString("/devices/cast-10-0-0-9/play")))
+                .andExpect(content().string(containsString("Direct media links")));
+    }
+
+    @Test
+    void theChipShowsWhatIsPlaying() throws Exception {
+        Device kitchen = new Device("cast-10-0-0-9", "Kitchen", DeviceKind.CAST, "10.0.0.9",
+                Map.of("cast", Map.of()), Instant.now());
+        given(devices.devices()).willReturn(List.of(kitchen));
+        given(devices.defaultDevice()).willReturn(Optional.of(kitchen));
+        given(devices.device("cast-10-0-0-9")).willReturn(Optional.of(kitchen));
+        given(devices.state("cast-10-0-0-9")).willReturn(new DeviceState(DeviceStatus.CONNECTED, true,
+                "Default Media Receiver", 30, 100, false, Instant.now(),
+                new NowPlaying("Big Buck Bunny", PlaybackState.PLAYING, 12.5, 596.5)));
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME));
+
+        mockMvc.perform(get("/"))
+                .andExpect(content().string(containsString("Big Buck Bunny")))
+                .andExpect(content().string(not(containsString(">Default Media Receiver<"))));
     }
 }

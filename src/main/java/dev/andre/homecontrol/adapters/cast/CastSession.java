@@ -5,6 +5,7 @@ import dev.andre.homecontrol.adapters.cast.protocol.CastDisconnectCause;
 import dev.andre.homecontrol.adapters.cast.protocol.CastIncoming;
 import dev.andre.homecontrol.adapters.cast.protocol.CastPayloads;
 import dev.andre.homecontrol.adapters.cast.protocol.CastTimeoutException;
+import dev.andre.homecontrol.adapters.cast.protocol.MediaStatus;
 import dev.andre.homecontrol.adapters.cast.protocol.ReceiverStatus;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
@@ -13,6 +14,8 @@ import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.NowPlaying;
+import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +23,9 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -27,13 +33,17 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.CONNECTION;
+import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.MEDIA;
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.PLATFORM_RECEIVER_ID;
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.RECEIVER;
 
 /**
  * One Cast receiver's live connection, shaped like the Android TV session: every mutation of
  * connection and state happens on one scheduler thread; reconnects back off exponentially.
- * Cast has no pairing, so there is no UNPAIRED state.
+ * Commands run on the caller's thread and fail immediately when they cannot be sent (nothing is
+ * queued). The session follows the media channel of whichever app is in front, so casts started
+ * from a phone show up as now playing too. Cast has no pairing, so there is no UNPAIRED state.
  */
 public class CastSession implements DeviceHandle {
 
@@ -50,6 +60,10 @@ public class CastSession implements DeviceHandle {
     private volatile long generation;
     private volatile DeviceState state = DeviceState.initial();
     private volatile ReceiverStatus receiver;
+    /** Transport of the foreground app whose media channel we follow, or null. */
+    private volatile String mediaTransportId;
+    /** The last media status, so partial statuses (without {@code media}) keep their title. */
+    private volatile MediaStatus lastMedia;
     private volatile Duration backoff;
     private volatile boolean closed;
 
@@ -68,6 +82,8 @@ public class CastSession implements DeviceHandle {
 
     public void start() {
         scheduler.execute(this::connect);
+        long interval = properties.mediaStatusIntervalSeconds();
+        scheduler.scheduleWithFixedDelay(this::pollMediaPosition, interval, interval, TimeUnit.SECONDS);
     }
 
     @Override
@@ -85,6 +101,7 @@ public class CastSession implements DeviceHandle {
             case Action.SetVolume set -> receiverCommand(CastPayloads.setVolumeLevel(set.level() / 100.0), "set the volume");
             case Action.Mute mute -> receiverCommand(CastPayloads.setMuted(mute.muted()), mute.muted() ? "mute" : "unmute");
             case Action.Stop ignored -> stopForegroundApp();
+            case Action.CastLoad load -> load(load.receiverAppId(), load.load());
         }
     }
 
@@ -108,7 +125,57 @@ public class CastSession implements DeviceHandle {
         if (app.isEmpty()) {
             return; // nothing is casting, so it is already stopped
         }
-        receiverCommand(CastPayloads.stop(app.get().sessionId()), "stop " + app.get().displayName());
+        receiverCommand(CastPayloads.stop(app.get().sessionId()), "stop " + describe(app.get()));
+    }
+
+    /** Launch the receiver app unless it already runs, connect to its transport, LOAD. */
+    private void load(String appId, Map<String, Object> body) {
+        CastConnection current = requireConnected();
+        ReceiverStatus.ReceiverApp app = Optional.ofNullable(receiver)
+                .flatMap(status -> status.app(appId))
+                .orElseGet(() -> launch(current, appId));
+        call(() -> {
+            current.connect(app.transportId()); // harmless if the media follower already connected
+            return null;
+        }, "reach " + describe(app));
+        CastIncoming reply = call(() -> current.request(MEDIA, app.transportId(),
+                CastPayloads.load(app.sessionId(), body), loadTimeout()), "load the media");
+        if (!"MEDIA_STATUS".equals(reply.type())) {
+            throw new ActionFailedException(device.name() + " could not play it (" + reply.describeFailure() + ")");
+        }
+    }
+
+    private ReceiverStatus.ReceiverApp launch(CastConnection current, String appId) {
+        int requestId = current.nextRequestId();
+        ObjectNode launch = CastPayloads.launch(appId);
+        launch.put("requestId", requestId);
+        // The reply to LAUNCH can be a RECEIVER_STATUS still showing the previous app; wait for
+        // the status that lists ours, or for an error answering our request.
+        CastConnection.Waiter outcome = current.expect(message -> RECEIVER.equals(message.namespace())
+                && (("RECEIVER_STATUS".equals(message.type())
+                        && ReceiverStatus.parse(message.payload().path("status")).app(appId).isPresent())
+                    || (message.requestId() == requestId && !"RECEIVER_STATUS".equals(message.type()))));
+        CastIncoming reply = call(() -> {
+            try {
+                current.send(RECEIVER, PLATFORM_RECEIVER_ID, launch);
+                return outcome.await(loadTimeout());
+            } finally {
+                outcome.cancel();
+            }
+        }, "start receiver app " + appId);
+        if (!"RECEIVER_STATUS".equals(reply.type())) {
+            throw new ActionFailedException(device.name() + " could not start receiver app " + appId
+                    + " (" + reply.describeFailure() + ")");
+        }
+        return ReceiverStatus.parse(reply.payload().path("status")).app(appId).orElseThrow();
+    }
+
+    /** Receivers may send a blank display name; the app id still tells the user something. */
+    private static String describe(ReceiverStatus.ReceiverApp app) {
+        if (!app.displayName().isBlank()) {
+            return app.displayName();
+        }
+        return app.appId().isBlank() ? "the current app" : app.appId();
     }
 
     private CastConnection requireConnected() {
@@ -137,6 +204,10 @@ public class CastSession implements DeviceHandle {
 
     private Duration commandTimeout() {
         return Duration.ofSeconds(properties.commandTimeoutSeconds());
+    }
+
+    private Duration loadTimeout() {
+        return Duration.ofSeconds(properties.loadTimeoutSeconds());
     }
 
     private void connect() {
@@ -176,19 +247,94 @@ public class CastSession implements DeviceHandle {
 
     private void handle(CastIncoming message) {
         if (RECEIVER.equals(message.namespace()) && "RECEIVER_STATUS".equals(message.type())) {
-            ReceiverStatus status = ReceiverStatus.parse(message.payload().path("status"));
-            receiver = status;
-            update(state.withPower(!status.standBy())
-                    .withCurrentApp(status.foregroundApp().map(ReceiverStatus.ReceiverApp::displayName).orElse(null))
-                    .withVolume(status.volumePercent(), 100, status.muted()));
+            onReceiverStatus(ReceiverStatus.parse(message.payload().path("status")));
+        } else if (MEDIA.equals(message.namespace()) && "MEDIA_STATUS".equals(message.type())
+                && message.sourceId().equals(mediaTransportId)) {
+            onMediaStatus(MediaStatus.parse(message.payload().path("status")));
+        } else if (CONNECTION.equals(message.namespace()) && "CLOSE".equals(message.type())
+                && message.sourceId().equals(mediaTransportId)) {
+            // The app closed our virtual connection (it stopped); the next RECEIVER_STATUS says what replaced it.
+            mediaTransportId = null;
+            lastMedia = null;
+            update(state.withNowPlaying(null));
         }
+    }
+
+    private void onReceiverStatus(ReceiverStatus status) {
+        receiver = status;
+        Optional<ReceiverStatus.ReceiverApp> foreground = status.foregroundApp();
+        update(state.withPower(!status.standBy())
+                .withCurrentApp(foreground.map(ReceiverStatus.ReceiverApp::displayName).orElse(null))
+                .withVolume(status.volumePercent(), 100, status.muted()));
+        followMedia(foreground.filter(app -> app.speaks(MEDIA)).map(ReceiverStatus.ReceiverApp::transportId).orElse(null));
+    }
+
+    /** Subscribes to the media channel of whatever app is in front — including casts started from a phone. */
+    private void followMedia(String transportId) {
+        if (Objects.equals(transportId, mediaTransportId)) {
+            return;
+        }
+        mediaTransportId = transportId;
+        lastMedia = null;
+        if (transportId == null) {
+            update(state.withNowPlaying(null));
+            return;
+        }
+        CastConnection current = connection;
+        if (current == null) {
+            return;
+        }
+        try {
+            current.connect(transportId);
+            sendMediaGetStatus(current, transportId);
+        } catch (IOException e) {
+            log.debug("Could not follow media on {}: {}", device.id(), e.getMessage()); // the reader reports the drop
+        }
+    }
+
+    private void onMediaStatus(List<MediaStatus> statuses) {
+        if (statuses.isEmpty()) {
+            lastMedia = null;
+            update(state.withNowPlaying(null));
+            return;
+        }
+        MediaStatus latest = statuses.getFirst().fillFrom(lastMedia);
+        lastMedia = latest;
+        PlaybackState playback = latest.playbackState();
+        update(state.withNowPlaying(playback == PlaybackState.IDLE ? null
+                : new NowPlaying(latest.displayTitle(), playback, latest.currentTime(), latest.duration())));
+    }
+
+    /** Receivers only push on changes; ask while playing so the position moves. */
+    private void pollMediaPosition() {
+        try {
+            CastConnection current = connection;
+            String transport = mediaTransportId;
+            NowPlaying playing = state.nowPlaying();
+            if (!closed && current != null && transport != null && playing != null
+                    && playing.state() == PlaybackState.PLAYING) {
+                sendMediaGetStatus(current, transport);
+            }
+        } catch (IOException | RuntimeException e) {
+            // Never let it escape: a scheduled task that throws is silently never run again.
+            log.debug("Media status poll failed for {}: {}", device.id(), e.getMessage());
+        }
+    }
+
+    /** The reply arrives via Link like any other status; the id only keeps strict receivers happy. */
+    private static void sendMediaGetStatus(CastConnection current, String transportId) throws IOException {
+        ObjectNode getStatus = CastPayloads.getStatus();
+        getStatus.put("requestId", current.nextRequestId());
+        current.send(MEDIA, transportId, getStatus);
     }
 
     private void handleDisconnect(CastDisconnectCause cause) {
         connection = null;
         receiver = null;
+        mediaTransportId = null;
+        lastMedia = null;
         log.info("Lost the Cast connection to {} ({}); reconnecting", device.id(), cause);
-        update(state.withStatus(DeviceStatus.DISCONNECTED));
+        update(state.withStatus(DeviceStatus.DISCONNECTED).withNowPlaying(null));
         scheduleReconnect();
     }
 

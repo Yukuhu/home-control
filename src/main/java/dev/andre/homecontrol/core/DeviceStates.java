@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * One device, several adapters (a Shield is Android TV and Cast): the strip shows one state.
  * Status and power come from the primary (first) adapter so an unpaired Android TV still says
- * so; app and volume come from the first adapter, in order, that reports them.
+ * so; app, volume and now playing come from the first adapter, in order, that reports them.
  */
 public final class DeviceStates {
 
@@ -23,10 +23,14 @@ public final class DeviceStates {
         DeviceState primary = inAdapterOrder.getFirst();
         String currentApp = null;
         DeviceState volumeSource = null;
+        NowPlaying nowPlaying = null;
         Instant updatedAt = primary.updatedAt();
         for (DeviceState state : inAdapterOrder) {
             if (currentApp == null && state.currentApp() != null) {
                 currentApp = state.currentApp();
+            }
+            if (nowPlaying == null && state.nowPlaying() != null) {
+                nowPlaying = state.nowPlaying();
             }
             if (volumeSource == null && state.volumeMax() > 0) {
                 volumeSource = state;
@@ -39,6 +43,6 @@ public final class DeviceStates {
             volumeSource = primary;
         }
         return new DeviceState(primary.status(), primary.powerOn(), currentApp,
-                volumeSource.volumeLevel(), volumeSource.volumeMax(), volumeSource.muted(), updatedAt);
+                volumeSource.volumeLevel(), volumeSource.volumeMax(), volumeSource.muted(), updatedAt, nowPlaying);
     }
 }

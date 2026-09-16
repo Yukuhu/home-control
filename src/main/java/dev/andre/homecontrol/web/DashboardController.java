@@ -47,7 +47,8 @@ public class DashboardController {
         Set<Capability> capabilities = devices.capabilities(selected.id());
         model.addAttribute("remoteKeys", capabilities.contains(Capability.REMOTE_KEYS));
         model.addAttribute("castControls", capabilities.contains(Capability.CAST_RECEIVER));
-        model.addAttribute("canOpenLinks", capabilities.contains(Capability.APP_LINK));
+        model.addAttribute("canOpenLinks",
+                capabilities.contains(Capability.APP_LINK) || capabilities.contains(Capability.CAST_RECEIVER));
         return "dashboard";
     }
 

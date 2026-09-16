@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.cast;
 
+import dev.andre.homecontrol.adapters.cast.protocol.CastIncoming;
 import dev.andre.homecontrol.adapters.cast.protocol.FakeCastReceiver;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
@@ -8,8 +9,12 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.NowPlaying;
+import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
+import dev.andre.homecontrol.core.playback.CastLoads;
+import dev.andre.homecontrol.core.playback.PlayableRef;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.CONNECTION;
+import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.MEDIA;
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.RECEIVER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -262,5 +269,169 @@ class CastSessionTest {
         assertThatThrownBy(() -> session.execute(new Action.SetVolume(10)))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("not connected");
+    }
+
+    @Test
+    void aRefusalNamesTheAppIdWhenTheAppHasNoDisplayName() {
+        receiver.runApp(FakeCastReceiver.DEFAULT_MEDIA_RECEIVER, "");
+        start(receiver.port());
+        await().until(() -> session.state().connected() && session.state().currentApp() != null);
+        receiver.runApp("233637DE", "YouTube");
+
+        assertThatThrownBy(() -> session.execute(new Action.Stop()))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessage("Living Room TV refused to stop CC1AD845 (INVALID_REQUEST: INVALID_SESSION_ID)");
+    }
+
+    private static Action.CastLoad bunny() {
+        return new Action.CastLoad(CastLoads.DEFAULT_MEDIA_RECEIVER, CastLoads.defaultMediaReceiver(
+                new PlayableRef.StreamUrl(URI.create("http://nas.local/films/bunny.mp4"), "video/mp4"), "Big Buck Bunny"));
+    }
+
+    private void awaitFollowing(String title) {
+        await().until(() -> session.state().nowPlaying() != null && title.equals(session.state().nowPlaying().title()));
+    }
+
+    @Test
+    void launchesTheDefaultMediaReceiverAndLoadsTheStream() {
+        start(receiver.port());
+        awaitStatus();
+
+        session.execute(bunny());
+
+        assertThat(receiver.last(RECEIVER, "LAUNCH").orElseThrow().payload().path("appId").asString("")).isEqualTo("CC1AD845");
+        CastIncoming load = receiver.last(MEDIA, "LOAD").orElseThrow();
+        assertThat(load.destinationId()).isEqualTo("transport-1");
+        assertThat(load.payload().path("sessionId").asString("")).isEqualTo("session-1");
+        assertThat(load.payload().path("media").path("contentId").asString("")).isEqualTo("http://nas.local/films/bunny.mp4");
+        assertThat(load.payload().path("media").path("contentType").asString("")).isEqualTo("video/mp4");
+        assertThat(load.payload().path("autoplay").asBoolean(false)).isTrue();
+        assertThat(receiver.virtualConnections()).contains("transport-1");
+        awaitFollowing("Big Buck Bunny");
+        NowPlaying playing = session.state().nowPlaying();
+        assertThat(playing.state()).isEqualTo(PlaybackState.PLAYING);
+        assertThat(playing.durationSeconds()).isEqualTo(596.5);
+        assertThat(session.state().currentApp()).isEqualTo("Default Media Receiver");
+    }
+
+    @Test
+    void reusesTheReceiverAppWhenItIsAlreadyRunning() {
+        receiver.runApp(FakeCastReceiver.DEFAULT_MEDIA_RECEIVER, "Default Media Receiver");
+        start(receiver.port());
+        await().until(() -> "Default Media Receiver".equals(session.state().currentApp()));
+
+        session.execute(bunny());
+
+        assertThat(receiver.received(RECEIVER, "LAUNCH")).isEmpty();
+        assertThat(receiver.last(MEDIA, "LOAD").orElseThrow().destinationId()).isEqualTo("transport-1");
+    }
+
+    @Test
+    void aRefusedLaunchFailsWithTheReceiversReason() {
+        receiver.refuseLaunch(FakeCastReceiver.DEFAULT_MEDIA_RECEIVER);
+        start(receiver.port());
+        awaitStatus();
+
+        assertThatThrownBy(() -> session.execute(bunny()))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessageContaining("LAUNCH_ERROR: NOT_FOUND");
+        assertThat(receiver.received(MEDIA, "LOAD")).isEmpty();
+    }
+
+    @Test
+    void aFailedLoadFailsWithTheReceiversAnswer() {
+        receiver.failNextLoad();
+        start(receiver.port());
+        awaitStatus();
+
+        assertThatThrownBy(() -> session.execute(bunny()))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessageContaining("LOAD_FAILED");
+    }
+
+    @Test
+    void loadingWhileDisconnectedIsRejectedNotQueued() throws Exception {
+        int port;
+        try (ServerSocket probe = new ServerSocket(0)) {
+            port = probe.getLocalPort();
+        }
+        start(port);
+        await().until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
+
+        assertThatThrownBy(() -> session.execute(bunny())).isInstanceOf(DeviceOfflineException.class);
+    }
+
+    @Test
+    void followsMediaStartedByAnotherSender() throws Exception {
+        start(receiver.port());
+        awaitStatus();
+
+        receiver.runApp(FakeCastReceiver.DEFAULT_MEDIA_RECEIVER, "Default Media Receiver");
+        receiver.startMedia("Song", "PLAYING", 12.0);
+        receiver.pushReceiverStatus();
+
+        awaitFollowing("Song");
+        assertThat(session.state().nowPlaying().positionSeconds()).isGreaterThanOrEqualTo(12.0);
+        assertThat(receiver.last(CONNECTION, "CONNECT").orElseThrow().destinationId()).isEqualTo("transport-1");
+    }
+
+    @Test
+    void aPartialStatusKeepsTheTitleAndIdleClearsNowPlaying() throws Exception {
+        start(receiver.port());
+        awaitStatus();
+        receiver.runApp(FakeCastReceiver.DEFAULT_MEDIA_RECEIVER, "Default Media Receiver");
+        receiver.startMedia("Song", "PLAYING", 12.0);
+        receiver.pushReceiverStatus();
+        awaitFollowing("Song");
+
+        receiver.setMediaState("PAUSED", 30.0);
+        receiver.pushMediaStatus(false);
+
+        await().until(() -> session.state().nowPlaying().state() == PlaybackState.PAUSED);
+        assertThat(session.state().nowPlaying().title()).isEqualTo("Song");
+        assertThat(session.state().nowPlaying().positionSeconds()).isEqualTo(30.0);
+
+        receiver.setMediaState("IDLE", 0);
+        receiver.pushMediaStatus(false);
+
+        await().until(() -> session.state().nowPlaying() == null);
+    }
+
+    @Test
+    void pollsThePositionWhilePlaying() throws Exception {
+        start(receiver.port());
+        awaitStatus();
+        receiver.runApp(FakeCastReceiver.DEFAULT_MEDIA_RECEIVER, "Default Media Receiver");
+        receiver.startMedia("Song", "PLAYING", 12.0);
+        receiver.pushReceiverStatus();
+        awaitFollowing("Song");
+        int before = receiver.received(MEDIA, "GET_STATUS").size();
+
+        await().until(() -> receiver.received(MEDIA, "GET_STATUS").size() >= before + 2);
+    }
+
+    @Test
+    void stoppingTheAppClearsNowPlaying() {
+        start(receiver.port());
+        awaitStatus();
+        session.execute(bunny());
+        awaitFollowing("Big Buck Bunny");
+
+        session.execute(new Action.Stop());
+
+        await().until(() -> session.state().nowPlaying() == null && session.state().currentApp() == null);
+    }
+
+    @Test
+    void aDroppedConnectionClearsNowPlaying() throws Exception {
+        start(receiver.port());
+        awaitStatus();
+        session.execute(bunny());
+        awaitFollowing("Big Buck Bunny");
+
+        receiver.dropConnection();
+
+        await().until(() -> seen.stream().anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED
+                && state.nowPlaying() == null));
     }
 }

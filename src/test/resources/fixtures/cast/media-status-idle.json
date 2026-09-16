@@ -1,0 +1,15 @@
+{
+  "type": "MEDIA_STATUS",
+  "requestId": 0,
+  "status": [
+    {
+      "mediaSessionId": 1,
+      "playbackRate": 1,
+      "playerState": "IDLE",
+      "currentTime": 0,
+      "supportedMediaCommands": 274447,
+      "volume": {"level": 1, "muted": false},
+      "idleReason": "FINISHED"
+    }
+  ]
+}

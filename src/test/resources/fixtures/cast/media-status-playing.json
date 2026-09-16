@@ -1,0 +1,29 @@
+{
+  "type": "MEDIA_STATUS",
+  "requestId": 6,
+  "status": [
+    {
+      "mediaSessionId": 1,
+      "playbackRate": 1,
+      "playerState": "PLAYING",
+      "currentTime": 12.5,
+      "supportedMediaCommands": 274447,
+      "volume": {"level": 1, "muted": false},
+      "activeTrackIds": [],
+      "media": {
+        "contentId": "http://nas.local/films/bunny.mp4",
+        "contentUrl": "http://nas.local/films/bunny.mp4",
+        "streamType": "BUFFERED",
+        "contentType": "video/mp4",
+        "metadata": {"metadataType": 0, "title": "Big Buck Bunny"},
+        "duration": 596.474195,
+        "tracks": [],
+        "breakClips": [],
+        "breaks": []
+      },
+      "currentItemId": 1,
+      "items": [{"itemId": 1, "media": {"contentId": "http://nas.local/films/bunny.mp4"}, "orderId": 0}],
+      "repeatMode": "REPEAT_OFF"
+    }
+  ]
+}

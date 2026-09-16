@@ -1,6 +1,10 @@
 package dev.andre.homecontrol.core;
 
 import java.net.URI;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 
 /** A command for one device. Each action names the capability an adapter must declare to accept it. */
 public sealed interface Action {
@@ -45,6 +49,22 @@ public sealed interface Action {
 
     /** Stop whatever is being cast. */
     record Stop() implements Action {
+        @Override
+        public Capability requires() {
+            return Capability.CAST_RECEIVER;
+        }
+    }
+
+    /**
+     * Start receiver app {@code receiverAppId} if it is not running and send it a media LOAD
+     * whose body is {@code load} (without type, requestId, sessionId). Spec §5.2 {@code CastLoad}.
+     */
+    record CastLoad(String receiverAppId, Map<String, Object> load) implements Action {
+        public CastLoad {
+            Objects.requireNonNull(receiverAppId, "receiverAppId");
+            load = load == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(load));
+        }
+
         @Override
         public Capability requires() {
             return Capability.CAST_RECEIVER;

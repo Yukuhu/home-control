@@ -112,6 +112,8 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
                     "Android TV Remote v2 cannot set mute directly; use the mute key");
             case Action.Stop ignored -> throw new UnsupportedActionException(
                     "Android TV Remote v2 cannot stop a cast");
+            case Action.CastLoad ignored -> throw new UnsupportedActionException(
+                    "Android TV Remote v2 cannot load Cast media");
         }
     }
 
