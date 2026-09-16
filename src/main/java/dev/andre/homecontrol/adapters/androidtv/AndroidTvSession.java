@@ -78,10 +78,6 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         scheduler.execute(this::connect);
     }
 
-    public Device device() {
-        return device;
-    }
-
     public DeviceState state() {
         return state;
     }

@@ -72,7 +72,7 @@ public class MdnsDiscovery implements AutoCloseable {
         if (addresses == null || addresses.length == 0 || port <= 0) {
             return Optional.empty();
         }
-        return Optional.of(new DiscoveredDevice("androidtv", name, addresses[0].getHostAddress(), port));
+        return Optional.of(new DiscoveredDevice(AndroidTvSettings.ADAPTER_ID, name, addresses[0].getHostAddress(), port));
     }
 
     private class Listener implements ServiceListener {

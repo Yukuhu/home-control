@@ -79,8 +79,8 @@ paired-device registry in `data/devices.json`. **The certificate is the pairing
 credential** — losing it means the Shield must be paired again. Keep the whole
 data directory mounted persistently and keep any custom keystore password stable.
 
-The current foreground package remains visible in the remote header as connection
-context. Remote v2 does not expose a reliable way to derive a launchable deep link
+Each device's current foreground package is shown on its chip in the device strip as
+connection context. Remote v2 does not expose a reliable way to derive a launchable deep link
 from that package — see "Opening links on a device" below for how to start an app
 from the remote instead.
 
