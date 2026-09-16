@@ -1,8 +1,8 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.device.Device;
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
 import dev.andre.homecontrol.device.DeviceSessionManager;
-import dev.andre.homecontrol.device.DeviceStatus;
+import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.protocol.CertificateStore;
 import dev.andre.homecontrol.protocol.FakeRemoteServer;
 import org.junit.jupiter.api.Test;
@@ -58,7 +58,7 @@ class DeviceStateStreamEndToEndTest {
         HttpClient http = HttpClient.newHttpClient();
         try (FakeRemoteServer fakeDevice = new FakeRemoteServer()) {
             certificates.loadOrCreate("shield-sse");
-            sessions.adopt(new Device("shield-sse", "Test Shield", "127.0.0.1", fakeDevice.port(),
+            sessions.adopt(AndroidTvSettings.device("shield-sse", "Test Shield", "127.0.0.1", fakeDevice.port(),
                     null, Instant.now()));
             await().until(() -> sessions.state().status() == DeviceStatus.CONNECTED);
 

@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.discovery;
 
+import dev.andre.homecontrol.core.DiscoveredDevice;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
@@ -18,7 +19,7 @@ class MdnsDiscoveryTest {
         InetAddress address = InetAddress.getByName("192.168.1.50");
 
         assertThat(MdnsDiscovery.toDevice("Living Room Shield", new InetAddress[]{address}, 6466))
-                .contains(new DiscoveredDevice("Living Room Shield", "192.168.1.50", 6466));
+                .contains(new DiscoveredDevice("androidtv", "Living Room Shield", "192.168.1.50", 6466));
     }
 
     @Test

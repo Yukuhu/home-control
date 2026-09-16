@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.device;
+package dev.andre.homecontrol.core;
 
 import java.time.Instant;
 

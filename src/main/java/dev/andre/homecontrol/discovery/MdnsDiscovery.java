@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.discovery;
 
 import dev.andre.homecontrol.ShieldProperties;
+import dev.andre.homecontrol.core.DiscoveredDevice;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -72,7 +73,7 @@ public class MdnsDiscovery implements AutoCloseable {
         if (addresses == null || addresses.length == 0 || port <= 0) {
             return Optional.empty();
         }
-        return Optional.of(new DiscoveredDevice(name, addresses[0].getHostAddress(), port));
+        return Optional.of(new DiscoveredDevice("androidtv", name, addresses[0].getHostAddress(), port));
     }
 
     private class Listener implements ServiceListener {

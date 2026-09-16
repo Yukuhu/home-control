@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.device;
 
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
 import dev.andre.homecontrol.protocol.CertificateStore;
 import dev.andre.homecontrol.protocol.ClientCertificate;
 import dev.andre.homecontrol.protocol.PairingResult;
@@ -86,7 +87,7 @@ public class PairingService {
             PairingResult result = current.session().submitCode(code);
             if (result instanceof PairingResult.Paired paired) {
                 certificates.save(current.deviceId(), current.credential());
-                sessions.adopt(new Device(
+                sessions.adopt(AndroidTvSettings.device(
                         current.deviceId(),
                         current.name(),
                         current.host(),

@@ -1,9 +1,14 @@
 package dev.andre.homecontrol.device;
 
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.storage.StorageException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.core.JacksonException;
 
 import java.io.IOException;
@@ -31,13 +36,23 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
             return List.of();
         }
         try {
-            List<Device> devices = mapper.readValue(
-                    Files.readAllBytes(file), new TypeReference<List<Device>>() {
-            });
-            if (devices == null) {
+            JsonNode root = mapper.readTree(Files.readAllBytes(file));
+            if (root == null || !root.isArray()) {
                 throw new IllegalArgumentException("registry document must be a JSON array");
             }
+            List<Device> devices = new ArrayList<>();
+            boolean migrated = false;
+            for (JsonNode node : root) {
+                if (node.isObject() && !node.has("kind")) {
+                    node = migrateVersionOne((ObjectNode) node);
+                    migrated = true;
+                }
+                devices.add(mapper.treeToValue(node, Device.class));
+            }
             validateDevices(devices);
+            if (migrated) {
+                writeAll(devices);
+            }
             return devices;
         } catch (IOException | JacksonException | IllegalArgumentException e) {
             throw new StorageException(
@@ -45,6 +60,50 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
                             + "; check file permissions and JSON integrity",
                     e);
         }
+    }
+
+    /**
+     * v0.3 wrote {@code {id, name, host, port, certificateFingerprint, lastSeen}} for the one
+     * Android TV. v2 keeps id/name/host/lastSeen and moves the rest under
+     * {@code adapters.androidtv} — the certificate alias is still the id, so the keystore is
+     * untouched and nobody re-pairs (spec §8).
+     */
+    private ObjectNode migrateVersionOne(ObjectNode v1) {
+        ObjectNode androidtv = mapper.createObjectNode();
+        androidtv.put("port", String.valueOf(requireValidPort(v1.get("port"))));
+        JsonNode fingerprint = v1.get("certificateFingerprint");
+        if (fingerprint != null && !fingerprint.isNull()) {
+            androidtv.put("certificateFingerprint", fingerprint.asString());
+        }
+        ObjectNode adapters = mapper.createObjectNode();
+        adapters.set("androidtv", androidtv);
+
+        ObjectNode v2 = mapper.createObjectNode();
+        v2.set("id", v1.get("id"));
+        v2.set("name", v1.get("name"));
+        v2.put("kind", "ANDROID_TV");
+        v2.set("host", v1.get("host"));
+        v2.set("adapters", adapters);
+        v2.set("lastSeen", v1.get("lastSeen"));
+        return v2;
+    }
+
+    /**
+     * v0.3 never validated the port it wrote, so a hand-edited or corrupted file could carry
+     * a missing, non-numeric, or out-of-range value. Migrating it as-is would just move the
+     * bad value under {@code adapters.androidtv}, where nothing catches it until a connection
+     * attempt fails with a raw {@code NumberFormatException} — so it is rejected here instead,
+     * at the same point v0.3's own port-range check used to run.
+     */
+    private static int requireValidPort(JsonNode portNode) {
+        if (portNode == null || portNode.isNull() || !portNode.canConvertToInt()) {
+            throw new IllegalArgumentException("port must be an integer between 1 and 65535");
+        }
+        int port = portNode.asInt();
+        if (port < 1 || port > 65_535) {
+            throw new IllegalArgumentException("port must be an integer between 1 and 65535");
+        }
+        return port;
     }
 
     private static void validateDevices(List<Device> devices) {
@@ -62,11 +121,18 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
             if (device.host() == null || device.host().isBlank()) {
                 throw invalidDevice(index, "host is required");
             }
-            if (device.port() < 1 || device.port() > 65_535) {
-                throw invalidDevice(index, "port must be between 1 and 65535");
+            if (device.kind() == null) {
+                throw invalidDevice(index, "kind is required");
             }
             if (device.lastSeen() == null) {
                 throw invalidDevice(index, "lastSeen is required");
+            }
+            if (device.hasAdapter(AndroidTvSettings.ADAPTER_ID)) {
+                try {
+                    AndroidTvSettings.of(device);
+                } catch (IllegalArgumentException e) {
+                    throw invalidDevice(index, "androidtv port must be an integer between 1 and 65535");
+                }
             }
         }
     }

@@ -1,9 +1,9 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.device.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.device.DeviceSession;
 import dev.andre.homecontrol.device.DeviceSessionManager;
-import dev.andre.homecontrol.device.DeviceState;
+import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.RemoteKey;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

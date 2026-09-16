@@ -1,9 +1,5 @@
 package dev.andre.homecontrol.core;
 
-import dev.andre.homecontrol.device.Device;
-import dev.andre.homecontrol.device.DeviceState;
-import dev.andre.homecontrol.discovery.DiscoveredDevice;
-
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;

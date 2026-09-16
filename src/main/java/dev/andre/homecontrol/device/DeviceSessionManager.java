@@ -1,6 +1,11 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.ShieldProperties;
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceState;
+import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.protocol.ClientCertificate;
 import dev.andre.homecontrol.protocol.CertificateStore;
 import jakarta.annotation.PostConstruct;
@@ -80,7 +85,7 @@ public class DeviceSessionManager implements AutoCloseable {
             session.close();
         }
         registry.delete(device.id());
-        certificates.delete(device.certificateAlias());
+        certificates.delete(AndroidTvSettings.certificateAlias(device));
         events.publishEvent(new DeviceStateChangedEvent(state()));
     }
 
@@ -90,7 +95,7 @@ public class DeviceSessionManager implements AutoCloseable {
             existing.close();
         }
 
-        Optional<ClientCertificate> credential = certificates.load(device.certificateAlias());
+        Optional<ClientCertificate> credential = certificates.load(AndroidTvSettings.certificateAlias(device));
         if (credential.isEmpty()) {
             events.publishEvent(new DeviceStateChangedEvent(DeviceState.unpaired()));
             return;

@@ -1,6 +1,11 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.ShieldProperties;
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceStateChangedEvent;
+import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.protocol.CertificateStore;
 import dev.andre.homecontrol.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.storage.StorageException;
@@ -35,9 +40,9 @@ class DeviceSessionManagerTest {
              FakeRemoteServer currentAddress = new FakeRemoteServer()) {
 
             DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-            registry.save(new Device("shield-stale", "Shield", "127.0.0.1", staleAddress.port(),
+            registry.save(AndroidTvSettings.device("shield-stale", "Shield", "127.0.0.1", staleAddress.port(),
                     null, Instant.parse("2026-08-29T18:00:00Z")));
-            registry.save(new Device("shield-current", "Shield", "127.0.0.1", currentAddress.port(),
+            registry.save(AndroidTvSettings.device("shield-current", "Shield", "127.0.0.1", currentAddress.port(),
                     null, Instant.parse("2026-08-29T19:00:00Z")));
 
             ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
@@ -65,7 +70,7 @@ class DeviceSessionManagerTest {
     void registryOnlyDeviceIsUnpairedWithoutConnectionOrCredentialCreation() throws Exception {
         try (FakeRemoteServer remote = new FakeRemoteServer()) {
             DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-            registry.save(new Device("shield-missing-key", "Shield", "127.0.0.1", remote.port(),
+            registry.save(AndroidTvSettings.device("shield-missing-key", "Shield", "127.0.0.1", remote.port(),
                     null, Instant.now()));
             ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
             CertificateStore certificates = new CertificateStore(
@@ -104,13 +109,13 @@ class DeviceSessionManagerTest {
     @Test
     void forgetDeletesTheRegistryRecordAndOnlyItsCredential() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-        Device forgotten = new Device("shield-forgotten", "Shield", "127.0.0.1", 6466,
+        Device forgotten = AndroidTvSettings.device("shield-forgotten", "Shield", "127.0.0.1", 6466,
                 null, Instant.now());
         registry.save(forgotten);
         ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
         CertificateStore certificates = new CertificateStore(
                 properties.keystoreFile(), "shield".toCharArray());
-        certificates.loadOrCreate(forgotten.certificateAlias());
+        certificates.loadOrCreate(AndroidTvSettings.certificateAlias(forgotten));
         certificates.loadOrCreate("keep-this-alias");
 
         try (DeviceSessionManager manager = new DeviceSessionManager(
@@ -119,7 +124,7 @@ class DeviceSessionManagerTest {
         }
 
         assertThat(registry.findById(forgotten.id())).isEmpty();
-        assertThat(certificates.load(forgotten.certificateAlias())).isEmpty();
+        assertThat(certificates.load(AndroidTvSettings.certificateAlias(forgotten))).isEmpty();
         assertThat(certificates.load("keep-this-alias")).isPresent();
     }
 
@@ -143,13 +148,13 @@ class DeviceSessionManagerTest {
     void forgetPublishesTheReplacementState() throws Exception {
         try (FakeRemoteServer remote = new FakeRemoteServer()) {
             DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-            Device forgotten = new Device("shield-forgotten", "Shield", "127.0.0.1",
+            Device forgotten = AndroidTvSettings.device("shield-forgotten", "Shield", "127.0.0.1",
                     remote.port(), null, Instant.now());
             registry.save(forgotten);
             ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
             CertificateStore certificates = new CertificateStore(
                     properties.keystoreFile(), "shield".toCharArray());
-            certificates.loadOrCreate(forgotten.certificateAlias());
+            certificates.loadOrCreate(AndroidTvSettings.certificateAlias(forgotten));
             List<Object> published = new CopyOnWriteArrayList<>();
             ApplicationEventPublisher publisher = published::add;
 

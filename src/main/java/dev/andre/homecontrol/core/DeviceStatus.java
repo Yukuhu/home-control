@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.device;
+package dev.andre.homecontrol.core;
 
 public enum DeviceStatus {
     DISCONNECTED, CONNECTING, CONNECTED,

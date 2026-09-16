@@ -1,6 +1,8 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.ShieldProperties;
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.protocol.ClientCertificate;
 import dev.andre.homecontrol.protocol.CertificateStore;
 import dev.andre.homecontrol.protocol.FakePairingServer;
@@ -61,8 +63,8 @@ class PairingServiceTest {
         verify(sessions).adopt(org.mockito.ArgumentMatchers.argThat(device ->
                 device.name().equals("Living Room Shield")
                         && device.host().equals("127.0.0.1")
-                        && device.port() == 6466
-                        && device.certificateFingerprint() != null));
+                        && AndroidTvSettings.of(device).port() == 6466
+                        && AndroidTvSettings.of(device).certificateFingerprint() != null));
     }
 
     @Test

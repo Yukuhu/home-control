@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.device.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.device.DeviceSession;
 import dev.andre.homecontrol.device.DeviceSessionManager;
 import dev.andre.homecontrol.device.PairingService;
