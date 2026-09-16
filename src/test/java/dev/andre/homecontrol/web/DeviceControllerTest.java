@@ -98,6 +98,15 @@ class DeviceControllerTest {
     }
 
     @Test
+    void rejectsAnOverlongLinkWithoutPlayingIt() throws Exception {
+        mockMvc.perform(post("/devices/shield/play").param("uri", "https://example.org/" + "a".repeat(2048)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("That link is too long"));
+
+        verifyNoInteractions(playback);
+    }
+
+    @Test
     void anUnrelatedIllegalArgumentIsNotReportedAsABadLink() throws Exception {
         given(playback.play(any(), eq("shield"))).willThrow(new IllegalArgumentException("programming error"));
 

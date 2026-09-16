@@ -13,6 +13,9 @@ public final class AppLinks {
     private static final Pattern AMAZON_HOST =
             Pattern.compile("^(www\\.)?amazon\\.(com|[a-z]{2}|co\\.[a-z]{2}|com\\.[a-z]{2})$");
 
+    /** Far beyond any real share link; keeps a pasted blob from reaching the parser and the device. */
+    static final int MAX_LENGTH = 2048;
+
     private AppLinks() {
     }
 
@@ -26,6 +29,9 @@ public final class AppLinks {
     private static URI parse(String url) {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("Enter a link to open");
+        }
+        if (url.length() > MAX_LENGTH) {
+            throw new IllegalArgumentException("That link is too long");
         }
         URI uri;
         try {
