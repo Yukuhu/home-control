@@ -15,7 +15,12 @@ export function applyState(deviceId, state) {
     if (volume) volume.textContent = state.muted ? "muted" : `vol ${state.volumeLevel}`;
     const slider = document.getElementById(`volume-${deviceId}`);
     // Leave the thumb alone while the user is dragging it; their change event follows.
-    if (slider && !slider.matches(":active")) slider.value = state.volumeLevel;
+    // The slider is always 0-100 (what SetVolume takes); a merged device's composed volumeMax
+    // may be another adapter's own scale (Android TV's volume steps, say), so the level is
+    // rescaled onto that 0-100 range rather than shown as-is.
+    if (slider && !slider.matches(":active")) {
+        slider.value = state.volumeMax > 0 ? Math.round((state.volumeLevel * 100) / state.volumeMax) : 0;
+    }
 }
 
 // Media reported by the device (Cast) wins over the foreground app name (Android TV).

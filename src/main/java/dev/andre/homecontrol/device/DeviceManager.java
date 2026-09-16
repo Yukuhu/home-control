@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -255,7 +256,13 @@ public class DeviceManager implements AutoCloseable {
         }
     }
 
-    /** Automatic merge (spec §5.1): only into an existing device, never creating one. */
+    /**
+     * Automatic merge (spec §5.1): only into an existing device, never creating one. A receiver
+     * a registered device already carries by a stable identity (Cast's mDNS {@code id}) rather
+     * than its address is re-pointed and reconnected when it answers at a new one — an adapter
+     * matches {@link DeviceAdapter#carries} on identity alone, so without this the device would
+     * otherwise keep dialling the stale address forever and the receiver could never be re-added.
+     */
     @EventListener
     public void onDiscovered(DeviceDiscoveredEvent event) {
         DiscoveredDevice found = event.device();
@@ -269,7 +276,9 @@ public class DeviceManager implements AutoCloseable {
         }
         synchronized (lock) {
             List<Device> registered = registry.findAll();
-            if (isRegistered(registered, found)) {
+            Optional<Device> carrier = registered.stream().filter(device -> adapter.carries(device, found)).findFirst();
+            if (carrier.isPresent()) {
+                reconnectIfMoved(carrier.get(), found.adapterId(), settings.get());
                 return;
             }
             bestMatch(registered, found).ifPresent(target -> {
@@ -279,6 +288,24 @@ public class DeviceManager implements AutoCloseable {
                 log.info("Merged {} receiver {} into {}", found.adapterId(), found.name(), target.name());
             });
         }
+    }
+
+    /**
+     * Re-points a device's adapter entry to a receiver's new address once mDNS says it moved,
+     * and reconnects it there. A no-op when the host and port the adapter already stored still
+     * match, so a routine re-announcement at the same address never tears the connection down.
+     * Must run under {@link #lock}.
+     */
+    private void reconnectIfMoved(Device device, String adapterId, Map<String, String> newSettings) {
+        Map<String, String> current = device.adapterSettings(adapterId);
+        if (Objects.equals(current.get("host"), newSettings.get("host"))
+                && Objects.equals(current.get("port"), newSettings.get("port"))) {
+            return;
+        }
+        Device moved = device.withAdapter(adapterId, newSettings);
+        registry.save(moved);
+        connect(moved);
+        log.info("{} receiver for {} answered at a new address; reconnecting", adapterId, device.name());
     }
 
     /**

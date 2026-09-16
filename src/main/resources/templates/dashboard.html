@@ -67,7 +67,7 @@
         <h2>Cast</h2>
         <label class="volume">Volume
             <input type="range" name="level" min="0" max="100" step="1" th:id="'volume-' + ${id}"
-                   th:value="${selectedState.volumeLevel()}"
+                   th:value="${selectedState.volumeMax() > 0 ? T(java.lang.Math).round(selectedState.volumeLevel() * 100.0 / selectedState.volumeMax()) : 0}"
                    th:attr="hx-post=@{/devices/{id}/volume(id=${id})}" hx-trigger="change">
         </label>
         <div class="row">
@@ -85,7 +85,7 @@
         </form>
         <p id="open-result" class="hint" aria-live="polite"></p>
         <p class="hint">The device opens whichever app claims the link. If nothing happens, that app may not be installed.</p>
-        <p class="hint">Direct media links (.mp4, .mkv, .webm, .m3u8, .mp3, .flac …) play on Cast devices through the Default Media Receiver; the receiver must be able to reach the URL.</p>
+        <p class="hint">Direct media links (.mp4, .m4v, .mkv, .webm, .m3u8, .mp3, .flac …) play on Cast devices through the Default Media Receiver; the receiver must be able to reach the URL.</p>
     </section>
 </main>
 

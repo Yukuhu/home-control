@@ -286,6 +286,33 @@ class DeviceManagerMergeTest {
     }
 
     @Test
+    void aReceiverThatChangedAddressIsReconnectedAtItsNewAddress() {
+        registry.save(shield().withAdapter("cast", Map.of("host", "10.0.0.5", "port", "8009", "stableId", "abc")));
+        manager.start();
+        published.clear();
+
+        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.50")));
+
+        Device updated = registry.findById("10-0-0-5").orElseThrow();
+        assertThat(updated.adapterSettings("cast")).containsEntry("host", "10.0.0.50");
+        assertThat(registry.findAll()).hasSize(1);
+        assertThat(cast.handles).containsKey("10-0-0-5");
+        assertThat(published).anySatisfy(event -> assertThat(event).isInstanceOfSatisfying(
+                DeviceStateChangedEvent.class, e -> assertThat(e.deviceId()).isEqualTo("10-0-0-5")));
+    }
+
+    @Test
+    void aReceiverAtItsKnownAddressIsNotReconnectedAgain() {
+        registry.save(shield().withAdapter("cast", Map.of("host", "10.0.0.5", "port", "8009", "stableId", "abc")));
+        manager.start();
+        published.clear();
+
+        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.5")));
+
+        assertThat(published).isEmpty();
+    }
+
+    @Test
     void receiversResolvedBeforeTheApplicationWasReadyAreMergedOnceItIs() {
         registry.save(shield());
         cast.visible.add(receiver("SHIELD", "10.0.0.5"));
