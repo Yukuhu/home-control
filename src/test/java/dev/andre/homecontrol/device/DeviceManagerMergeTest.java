@@ -215,4 +215,84 @@ class DeviceManagerMergeTest {
             assertThat(event.state().status()).isEqualTo(DeviceStatus.CONNECTED);
         });
     }
+
+    @Test
+    void aReceiverMergedByNameKeepsItsOwnAddressAndIsNotOfferedAgain() {
+        registry.save(shield());
+        DiscoveredDevice elsewhere = receiver("living room tv", "10.0.0.77");
+        cast.visible.add(elsewhere);
+
+        manager.onDiscovered(new DeviceDiscoveredEvent(elsewhere));
+
+        assertThat(registry.findById("10-0-0-5").orElseThrow().adapterSettings("cast"))
+                .containsEntry("host", "10.0.0.77");
+        assertThat(manager.addable()).isEmpty();
+        assertThatThrownBy(() -> manager.addDiscovered("cast", "10.0.0.77", 8009))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already added");
+        manager.onDiscovered(new DeviceDiscoveredEvent(elsewhere));
+        assertThat(registry.findAll()).hasSize(1);
+    }
+
+    @Test
+    void splittingAReceiverMergedFromElsewhereGivesItItsOwnAddress() {
+        registry.save(shield().withAdapter("cast", Map.of("host", "10.0.0.77", "port", "8009")));
+
+        Device split = manager.split("10-0-0-5", "cast");
+
+        assertThat(split.id()).isEqualTo("cast-10-0-0-77");
+        assertThat(split.host()).isEqualTo("10.0.0.77");
+    }
+
+    @Test
+    void adoptingPrefersTheReceiverAtTheSameAddressOverOneWithTheSameName() {
+        cast.visible.add(receiver("Living Room TV", "10.0.0.99"));
+        cast.visible.add(receiver("SHIELD", "10.0.0.5"));
+
+        manager.adopt(shield());
+
+        assertThat(registry.findById("10-0-0-5").orElseThrow().adapterSettings("cast"))
+                .containsEntry("host", "10.0.0.5");
+    }
+
+    @Test
+    void adoptingAbsorbsAReceiverByNameOnlyWhenTheNameIsUnambiguous() {
+        cast.visible.add(receiver("Living Room TV", "10.0.0.98"));
+        cast.visible.add(receiver("living room tv", "10.0.0.99"));
+
+        manager.adopt(shield());
+
+        assertThat(registry.findById("10-0-0-5").orElseThrow().hasAdapter("cast"))
+                .as("two receivers share the name").isFalse();
+
+        cast.visible.clear();
+        cast.visible.add(receiver("Bedroom TV", "10.0.0.97"));
+        registry.save(new Device("10-0-0-6", "Bedroom TV", DeviceKind.ANDROID_TV, "10.0.0.6",
+                Map.of("androidtv", Map.of()), Instant.EPOCH));
+
+        manager.adopt(new Device("10-0-0-7", "Bedroom TV", DeviceKind.ANDROID_TV, "10.0.0.7",
+                Map.of("androidtv", Map.of()), Instant.EPOCH));
+
+        assertThat(registry.findById("10-0-0-7").orElseThrow().hasAdapter("cast"))
+                .as("another registered device has the name").isFalse();
+
+        cast.visible.clear();
+        cast.visible.add(receiver("Office TV", "10.0.0.96"));
+
+        manager.adopt(new Device("10-0-0-8", "Office TV", DeviceKind.ANDROID_TV, "10.0.0.8",
+                Map.of("androidtv", Map.of()), Instant.EPOCH));
+
+        assertThat(registry.findById("10-0-0-8").orElseThrow().adapterSettings("cast"))
+                .containsEntry("host", "10.0.0.96");
+    }
+
+    @Test
+    void receiversResolvedBeforeTheApplicationWasReadyAreMergedOnceItIs() {
+        registry.save(shield());
+        cast.visible.add(receiver("SHIELD", "10.0.0.5"));
+
+        manager.mergeVisibleReceivers();
+
+        assertThat(registry.findById("10-0-0-5").orElseThrow().hasAdapter("cast")).isTrue();
+        assertThat(manager.addable()).isEmpty();
+    }
 }

@@ -42,6 +42,19 @@ public interface DeviceAdapter {
     }
 
     /**
+     * The address this adapter reaches the device at. Default: the device's own address; an
+     * adapter whose entry can be merged in from another machine (Cast) remembers its own.
+     */
+    default String hostOf(Device device) {
+        return device.host();
+    }
+
+    /** True when {@code device} already carries the discovered {@code found} through this adapter. */
+    default boolean carries(Device device, DiscoveredDevice found) {
+        return device.hasAdapter(id()) && hostOf(device).equalsIgnoreCase(found.host());
+    }
+
+    /**
      * True when this adapter stores credentials under the device id (Android TV: the certificate
      * alias IS the id), so its entry must never move to a device with another id.
      */

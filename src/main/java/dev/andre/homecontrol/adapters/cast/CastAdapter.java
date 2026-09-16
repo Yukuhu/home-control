@@ -56,6 +56,22 @@ public class CastAdapter implements DeviceAdapter {
     }
 
     @Override
+    public String hostOf(Device device) {
+        return CastSettings.hostOf(device);
+    }
+
+    /** The mDNS {@code id} survives an address change; otherwise the receiver's own address decides. */
+    @Override
+    public boolean carries(Device device, DiscoveredDevice found) {
+        if (!device.hasAdapter(ID)) {
+            return false;
+        }
+        String castId = device.adapterSettings(ID).get(CastSettings.CAST_ID);
+        return (castId != null && castId.equals(found.attributes().get("id")))
+                || hostOf(device).equalsIgnoreCase(found.host());
+    }
+
+    @Override
     public Optional<Map<String, String>> settingsFor(DiscoveredDevice found) {
         return ID.equals(found.adapterId()) ? Optional.of(CastSettings.from(found).toMap()) : Optional.empty();
     }
