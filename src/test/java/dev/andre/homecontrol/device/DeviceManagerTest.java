@@ -12,6 +12,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
@@ -109,7 +110,7 @@ class DeviceManagerTest {
     }
 
     @Test
-    void anUnknownDeviceIsOfflineAndAnUnsupportedActionIsRejected() {
+    void anUnknownDeviceIsNotFoundAndAnUnsupportedActionIsRejected() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
         registry.save(new Device("speaker", "Speaker", DeviceKind.UPNP, "10.0.0.7",
                 Map.of("upnp", Map.of()), Instant.now()));
@@ -118,7 +119,7 @@ class DeviceManagerTest {
             manager.start();
 
             assertThatThrownBy(() -> manager.execute("nope", new Action.PressKey(RemoteKey.HOME)))
-                    .isInstanceOf(DeviceOfflineException.class);
+                    .isInstanceOf(DeviceNotFoundException.class);
             assertThatThrownBy(() -> manager.execute("speaker", new Action.PressKey(RemoteKey.HOME)))
                     .isInstanceOf(UnsupportedActionException.class);
             assertThat(manager.capabilities("speaker")).isEmpty();

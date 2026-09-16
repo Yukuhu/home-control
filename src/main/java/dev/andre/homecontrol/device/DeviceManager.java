@@ -5,6 +5,7 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceHandle;
+import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
@@ -116,7 +117,7 @@ public class DeviceManager implements AutoCloseable {
      */
     public void execute(String id, Action action) {
         Device device = registry.findById(id)
-                .orElseThrow(() -> new DeviceOfflineException("No device with id " + id));
+                .orElseThrow(() -> new DeviceNotFoundException("No device with id " + id));
         Map<String, DeviceHandle> deviceHandles = handles.getOrDefault(id, Map.of());
         boolean capabilityKnown = false;
         for (String adapterId : device.adapters().keySet()) {

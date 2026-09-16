@@ -8,7 +8,7 @@
 </head>
 <body>
 <header>
-    <a th:href="@{/}">← Remote</a>
+    <a th:href="@{/}">← Home</a>
 </header>
 
 <main class="setup">
@@ -48,17 +48,21 @@
         </form>
     </section>
 
-    <section th:if="${paired}">
-        <h2>Paired device</h2>
-        <p th:text="${paired.name()} + ' at ' + ${paired.host()}">Shield</p>
+    <section th:if="${!#lists.isEmpty(paired)}">
+        <h2>Paired devices</h2>
+        <ul>
+            <li th:each="device : ${paired}">
+                <form method="post" th:action="@{/setup/forget}">
+                    <input type="hidden" name="id" th:value="${device.id()}">
+                    <span th:text="${device.name()} + ' at ' + ${device.host()}">Shield</span>
+                    <button type="submit">Forget</button>
+                </form>
+            </li>
+        </ul>
         <p class="hint">
             Forgetting removes the stored pairing credential. You will need to pair again
-            before this device can be controlled.
+            before that device can be controlled.
         </p>
-        <form method="post" th:action="@{/setup/forget}">
-            <input type="hidden" name="id" th:value="${paired.id()}">
-            <button type="submit">Forget and require re-pairing</button>
-        </form>
     </section>
 </main>
 </body>

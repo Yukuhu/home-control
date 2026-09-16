@@ -16,11 +16,11 @@ import java.io.IOException;
 public class SetupController {
 
     private final PairingService pairing;
-    private final DeviceManager sessions;
+    private final DeviceManager devices;
 
-    public SetupController(PairingService pairing, DeviceManager sessions) {
+    public SetupController(PairingService pairing, DeviceManager devices) {
         this.pairing = pairing;
-        this.sessions = sessions;
+        this.devices = devices;
     }
 
     @GetMapping("/setup")
@@ -71,13 +71,13 @@ public class SetupController {
 
     private void populateSetupModel(Model model, boolean awaitingCode) {
         model.addAttribute("awaitingCode", awaitingCode);
-        model.addAttribute("discovered", sessions.discovered());
-        model.addAttribute("paired", sessions.defaultDevice().orElse(null));
+        model.addAttribute("discovered", devices.discovered());
+        model.addAttribute("paired", devices.devices());
     }
 
     @PostMapping("/setup/forget")
     public String forget(@RequestParam String id) {
-        sessions.forget(id);
+        devices.forget(id);
         return "redirect:/setup";
     }
 }
