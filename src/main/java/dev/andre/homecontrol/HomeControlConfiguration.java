@@ -5,6 +5,7 @@ import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.playback.AppLinkStrategy;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
+import dev.andre.homecontrol.discovery.MdnsBrowser;
 import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.storage.DataDirectory;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,12 @@ public class HomeControlConfiguration {
     public PlaybackPlanner playbackPlanner() {
         // Strategy order is the preference order of spec §5.3; later sub-projects insert theirs.
         return new PlaybackPlanner(List.of(new AppLinkStrategy()));
+    }
+
+    /** The one mDNS browser every adapter's discovery shares (spec §7). */
+    @Bean
+    public MdnsBrowser mdnsBrowser(AndroidTvProperties properties) {
+        return new MdnsBrowser(properties.discoveryEnabled());
     }
 
     @Bean

@@ -4,8 +4,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 import javax.jmdns.JmDNS;
 import javax.jmdns.ServiceEvent;
@@ -30,7 +28,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * <p>Multicast does not cross a Docker bridge network, so the UI always offers manual entry too.
  */
-@Component
 public class MdnsBrowser implements AutoCloseable {
 
     public interface Listener {
@@ -61,7 +58,8 @@ public class MdnsBrowser implements AutoCloseable {
 
     private JmDNS jmdns;
 
-    public MdnsBrowser(@Value("${shield.discovery-enabled:true}") boolean enabled) {
+    /** Created by {@code HomeControlConfiguration} from {@code shield.discovery-enabled}. */
+    public MdnsBrowser(boolean enabled) {
         this.enabled = enabled;
     }
 
