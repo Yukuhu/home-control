@@ -1,0 +1,29 @@
+{
+  "requestId": 0,
+  "status": {
+    "applications": [
+      {
+        "appId": "CC1AD845",
+        "appType": "WEB",
+        "displayName": "Default Media Receiver",
+        "iconUrl": "",
+        "isIdleScreen": false,
+        "launchedFromCloud": false,
+        "namespaces": [
+          {"name": "urn:x-cast:com.google.cast.debugoverlay"},
+          {"name": "urn:x-cast:com.google.cast.cac"},
+          {"name": "urn:x-cast:com.google.cast.media"}
+        ],
+        "sessionId": "b3f1b2a4-9c55-4d0e-8f5f-2f8d7e3c9a01",
+        "statusText": "Default Media Receiver",
+        "transportId": "b3f1b2a4-9c55-4d0e-8f5f-2f8d7e3c9a01",
+        "universalAppId": "CC1AD845"
+      }
+    ],
+    "isActiveInput": false,
+    "isStandBy": true,
+    "userEq": {},
+    "volume": {"controlType": "master", "level": 1.0, "muted": false, "stepInterval": 0.019999999552965164}
+  },
+  "type": "RECEIVER_STATUS"
+}

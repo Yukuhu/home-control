@@ -32,33 +32,49 @@
         <span th:id="'vol-' + ${id}" th:text="${selectedState.muted()} ? 'muted' : ('vol ' + ${selectedState.volumeLevel()})">vol</span>
     </p>
 
-    <section class="dpad">
-        <button th:attr="hx-post=@{/devices/{id}/key/DPAD_UP(id=${id})}" class="up" aria-label="Up">▲</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/DPAD_LEFT(id=${id})}" class="left" aria-label="Left">◀</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/DPAD_CENTER(id=${id})}" class="ok">OK</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/DPAD_RIGHT(id=${id})}" class="right" aria-label="Right">▶</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/DPAD_DOWN(id=${id})}" class="down" aria-label="Down">▼</button>
-    </section>
+    <th:block th:if="${remoteKeys}">
+        <section class="dpad">
+            <button th:attr="hx-post=@{/devices/{id}/key/DPAD_UP(id=${id})}" class="up" aria-label="Up">▲</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/DPAD_LEFT(id=${id})}" class="left" aria-label="Left">◀</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/DPAD_CENTER(id=${id})}" class="ok">OK</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/DPAD_RIGHT(id=${id})}" class="right" aria-label="Right">▶</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/DPAD_DOWN(id=${id})}" class="down" aria-label="Down">▼</button>
+        </section>
 
-    <section class="row">
-        <button th:attr="hx-post=@{/devices/{id}/key/BACK(id=${id})}">Back</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/HOME(id=${id})}">Home</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/MENU(id=${id})}">Menu</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/POWER(id=${id})}">Power</button>
-    </section>
+        <section class="row">
+            <button th:attr="hx-post=@{/devices/{id}/key/BACK(id=${id})}">Back</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/HOME(id=${id})}">Home</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/MENU(id=${id})}">Menu</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/POWER(id=${id})}">Power</button>
+        </section>
 
-    <section class="row">
-        <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_PREVIOUS(id=${id})}" aria-label="Previous">⏮</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/REWIND(id=${id})}" aria-label="Rewind">⏪</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/PLAY_PAUSE(id=${id})}" aria-label="Play or pause">⏯</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/FAST_FORWARD(id=${id})}" aria-label="Fast forward">⏩</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_NEXT(id=${id})}" aria-label="Next">⏭</button>
-    </section>
+        <section class="row">
+            <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_PREVIOUS(id=${id})}" aria-label="Previous">⏮</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/REWIND(id=${id})}" aria-label="Rewind">⏪</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/PLAY_PAUSE(id=${id})}" aria-label="Play or pause">⏯</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/FAST_FORWARD(id=${id})}" aria-label="Fast forward">⏩</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_NEXT(id=${id})}" aria-label="Next">⏭</button>
+        </section>
 
-    <section class="row">
-        <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_DOWN(id=${id})}">Vol −</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_MUTE(id=${id})}">Mute</button>
-        <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_UP(id=${id})}">Vol +</button>
+        <section class="row">
+            <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_DOWN(id=${id})}">Vol −</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_MUTE(id=${id})}">Mute</button>
+            <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_UP(id=${id})}">Vol +</button>
+        </section>
+    </th:block>
+
+    <section class="cast" th:if="${castControls}">
+        <h2>Cast</h2>
+        <label class="volume">Volume
+            <input type="range" name="level" min="0" max="100" step="1"
+                   th:value="${selectedState.volumeLevel()}"
+                   th:attr="hx-post=@{/devices/{id}/volume(id=${id})}" hx-trigger="change">
+        </label>
+        <div class="row">
+            <button th:attr="hx-post=@{/devices/{id}/mute(id=${id})}" hx-vals='{"muted": "true"}'>Mute</button>
+            <button th:attr="hx-post=@{/devices/{id}/mute(id=${id})}" hx-vals='{"muted": "false"}'>Unmute</button>
+            <button th:attr="hx-post=@{/devices/{id}/stop(id=${id})}">Stop casting</button>
+        </div>
     </section>
 
     <section class="open-link" th:if="${canOpenLinks}">

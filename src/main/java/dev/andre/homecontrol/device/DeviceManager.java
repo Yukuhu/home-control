@@ -129,30 +129,48 @@ public class DeviceManager implements AutoCloseable {
     }
 
     /**
-     * Sends through the first of the device's adapters that declares the needed capability.
-     * A capability the device's adapters declare but currently have no live handle for (not
-     * yet connected, or a failed connect) is offline, not unsupported — only a capability
-     * none of the device's adapters ever declare is rejected as unsupported.
+     * Tries the device's adapters that declare the needed capability, in order. An adapter that
+     * could not even send — unsupported, offline, or declaring the capability without a live
+     * handle (not yet connected, or a failed connect) — hands over to the next; an adapter whose
+     * device answered "no" ({@link dev.andre.homecontrol.core.ActionFailedException}) ends it.
+     * If nobody could send, the first offline reason wins over the last unsupported one; only a
+     * capability none of the device's adapters declare is plainly unsupported. Nothing is
+     * retried later (commands are ephemeral).
      */
     public void execute(String id, Action action) {
         Device device = registry.findById(id)
                 .orElseThrow(() -> new DeviceNotFoundException("No device with id " + id));
         Map<String, DeviceHandle> deviceHandles = handles.getOrDefault(id, Map.of());
-        boolean capabilityKnown = false;
+        DeviceOfflineException firstOffline = null;
+        UnsupportedActionException lastUnsupported = null;
         for (String adapterId : device.adapters().keySet()) {
             DeviceAdapter adapter = adapters.get(adapterId);
             if (adapter == null || !adapter.capabilities(device).contains(action.requires())) {
                 continue;
             }
-            capabilityKnown = true;
             DeviceHandle handle = deviceHandles.get(adapterId);
-            if (handle != null) {
+            if (handle == null) {
+                if (firstOffline == null) {
+                    firstOffline = new DeviceOfflineException(device.name() + " is not connected");
+                }
+                continue;
+            }
+            try {
                 handle.execute(action);
                 return;
+            } catch (DeviceOfflineException e) {
+                if (firstOffline == null) {
+                    firstOffline = e;
+                }
+            } catch (UnsupportedActionException e) {
+                lastUnsupported = e;
             }
         }
-        if (capabilityKnown) {
-            throw new DeviceOfflineException(device.name() + " is not connected");
+        if (firstOffline != null) {
+            throw firstOffline;
+        }
+        if (lastUnsupported != null) {
+            throw lastUnsupported;
         }
         throw new UnsupportedActionException(device.name() + " cannot perform " + action);
     }
