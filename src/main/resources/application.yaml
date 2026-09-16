@@ -9,3 +9,7 @@ shield:
   stale-timeout-seconds: 10
   reconnect-initial-delay-seconds: 1
   reconnect-max-delay-seconds: 60
+
+home-control:
+  cast:
+    enabled: true
