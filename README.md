@@ -91,6 +91,29 @@ device opens whichever app claims the link — for example a YouTube watch URL s
 YouTube app. The app cannot tell whether the target app is installed: if nothing happens on
 the TV, install the app or open the link another way.
 
+## Cast devices
+
+Chromecasts, TVs and speakers with Google Cast — including the Shield's built-in Cast — need
+no pairing.
+
+- Open **Setup**. Receivers found on the network appear under **Ready to add**; press **Add**.
+- A receiver at the same address, or with the same name, as a paired Android TV is added to
+  that TV automatically, so the Shield shows up once with remote keys *and* Cast volume.
+- If that guess is wrong, use **Split** on the device, or **Merge devices** to join two
+  entries. An Android TV pairing always stays with its own entry: merge the Cast entry into
+  the TV, not the other way round.
+- A Cast device's drawer has a volume slider, **Mute**, **Unmute** and **Stop casting**.
+- Paste a direct media link (`.mp4`, `.mkv`, `.webm`, `.m3u8`, `.mpd`, `.mp3`, `.m4a`, `.aac`,
+  `.flac`, `.ogg`, `.wav`) into **Open a link on this device** to play it with Google's Default
+  Media Receiver. The receiver downloads the URL itself, so it must be reachable from the TV or
+  speaker. On a device that can also open app links (an Android TV) the app link is tried
+  first; split off its Cast entry if you want to cast such links instead.
+- The device strip shows what a Cast device is playing, including casts started from a phone.
+- Cast discovery needs `network_mode: host`, like Android TV discovery. Cast groups are not
+  shown yet.
+- Switch the whole Cast module off with `HOME_CONTROL_CAST_ENABLED=false`. Timings live under
+  `home-control.cast.*` in `application.yaml`.
+
 ## Discovery does not work
 
 mDNS is multicast and does not cross a Docker bridge network. Either run with

@@ -11,6 +11,7 @@ import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -79,15 +80,37 @@ class StubAdapter implements DeviceAdapter {
 
     @Override
     public Optional<Map<String, String>> settingsFor(DiscoveredDevice found) {
-        return pairingFree && id.equals(found.adapterId())
-                ? Optional.of(Map.of("host", found.host(), "port", String.valueOf(found.port())))
-                : Optional.empty();
+        if (!pairingFree || !id.equals(found.adapterId())) {
+            return Optional.empty();
+        }
+        Map<String, String> settings = new LinkedHashMap<>();
+        settings.put("host", found.host());
+        settings.put("port", String.valueOf(found.port()));
+        String stableId = found.attributes().get("id");
+        if (stableId != null) {
+            settings.put("stableId", stableId);
+        }
+        return Optional.of(settings);
     }
 
     /** Like Cast: a pairing-free entry remembers its own address, which may differ from the device's. */
     @Override
     public String hostOf(Device device) {
         return device.adapterSettings(id).getOrDefault("host", device.host());
+    }
+
+    /**
+     * Like Cast: a stored {@code stableId} survives an address change, so a registered device
+     * keeps carrying the receiver even after it moves; otherwise falls back to the address.
+     */
+    @Override
+    public boolean carries(Device device, DiscoveredDevice found) {
+        if (!device.hasAdapter(id)) {
+            return false;
+        }
+        String storedId = device.adapterSettings(id).get("stableId");
+        String foundId = found.attributes().get("id");
+        return (storedId != null && storedId.equals(foundId)) || hostOf(device).equalsIgnoreCase(found.host());
     }
 
     @Override

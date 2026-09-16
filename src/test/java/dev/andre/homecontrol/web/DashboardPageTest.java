@@ -148,6 +148,42 @@ class DashboardPageTest {
     }
 
     @Test
+    void theVolumeSliderIsScaledToTheDevicesOwnVolumeRange() throws Exception {
+        // A Shield merged with its Cast entry: Android TV's own volume steps (max 15) are the
+        // composed volumeMax, but the slider is always 0-100 (what SetVolume takes).
+        Device shield = new Device("shield", "Shield", DeviceKind.ANDROID_TV, "10.0.0.5",
+                Map.of("androidtv", Map.of(), "cast", Map.of("port", "8009")), Instant.now());
+        given(devices.devices()).willReturn(List.of(shield));
+        given(devices.defaultDevice()).willReturn(Optional.of(shield));
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.state(any())).willReturn(
+                new DeviceState(DeviceStatus.CONNECTED, true, "app", 6, 15, false, Instant.now()));
+        given(devices.capabilities(any()))
+                .willReturn(EnumSet.of(Capability.REMOTE_KEYS, Capability.CAST_RECEIVER, Capability.VOLUME));
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"volume-shield\"")))
+                .andExpect(content().string(containsString("value=\"40\"")));
+    }
+
+    @Test
+    void aVolumeMaxOfZeroLeavesTheSliderAtZeroInsteadOfDividingByZero() throws Exception {
+        Device kitchen = new Device("cast-10-0-0-9", "Kitchen", DeviceKind.CAST, "10.0.0.9",
+                Map.of("cast", Map.of("port", "8009")), Instant.now());
+        given(devices.devices()).willReturn(List.of(kitchen));
+        given(devices.defaultDevice()).willReturn(Optional.of(kitchen));
+        given(devices.device("cast-10-0-0-9")).willReturn(Optional.of(kitchen));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME));
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"volume-cast-10-0-0-9\"")))
+                .andExpect(content().string(containsString("value=\"0\"")));
+    }
+
+    @Test
     void aCastOnlyDeviceOffersTheLinkForm() throws Exception {
         Device kitchen = new Device("cast-10-0-0-9", "Kitchen", DeviceKind.CAST, "10.0.0.9",
                 Map.of("cast", Map.of("port", "8009")), Instant.now());
