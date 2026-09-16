@@ -1,9 +1,9 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.device.DeviceSessionManager;
-import dev.andre.homecontrol.device.PairingService;
-import dev.andre.homecontrol.discovery.MdnsDiscovery;
-import dev.andre.homecontrol.protocol.PairingResult;
+import dev.andre.homecontrol.adapters.androidtv.PairingService;
+import dev.andre.homecontrol.adapters.androidtv.MdnsDiscovery;
+import dev.andre.homecontrol.adapters.androidtv.PairingOutcome;
 import dev.andre.homecontrol.storage.StorageException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -51,7 +51,7 @@ public class SetupController {
 
     @PostMapping("/setup/code")
     public String code(@RequestParam String code, Model model) {
-        PairingResult result;
+        PairingOutcome result;
         try {
             result = pairing.submit(code);
         } catch (StorageException e) {
@@ -61,12 +61,12 @@ public class SetupController {
         }
 
         switch (result) {
-            case PairingResult.Paired ignored -> {
+            case PairingOutcome.Paired ignored -> {
                 return "redirect:/";
             }
-            case PairingResult.WrongCode ignored -> model.addAttribute("error",
+            case PairingOutcome.WrongCode ignored -> model.addAttribute("error",
                     "That code was not accepted. The device will show a new one — start again.");
-            case PairingResult.Failed failed -> model.addAttribute("error", failed.reason());
+            case PairingOutcome.Failed failed -> model.addAttribute("error", failed.reason());
         }
 
         populateSetupModel(model, false);

@@ -1,10 +1,11 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
-import dev.andre.homecontrol.device.DeviceSession;
 import dev.andre.homecontrol.device.DeviceSessionManager;
-import dev.andre.homecontrol.device.PairingService;
-import dev.andre.homecontrol.discovery.MdnsDiscovery;
+import dev.andre.homecontrol.adapters.androidtv.PairingService;
+import dev.andre.homecontrol.adapters.androidtv.MdnsDiscovery;
 import dev.andre.homecontrol.core.RemoteKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,11 +41,11 @@ class RemoteControllerTest {
     @MockitoBean
     DeviceStateBroadcaster broadcaster;
 
-    DeviceSession session;
+    DeviceHandle session;
 
     @BeforeEach
     void setUp() {
-        session = org.mockito.Mockito.mock(DeviceSession.class);
+        session = org.mockito.Mockito.mock(DeviceHandle.class);
         given(sessions.active()).willReturn(Optional.of(session));
     }
 
@@ -52,7 +53,7 @@ class RemoteControllerTest {
     void sendsAKeyPress() throws Exception {
         mockMvc.perform(post("/key/DPAD_UP")).andExpect(status().isNoContent());
 
-        verify(session).sendKey(RemoteKey.DPAD_UP);
+        verify(session).execute(new Action.PressKey(RemoteKey.DPAD_UP));
     }
 
     @Test
@@ -62,7 +63,7 @@ class RemoteControllerTest {
 
     @Test
     void reportsConflictWhenTheDeviceIsOffline() throws Exception {
-        willThrow(new DeviceOfflineException("offline")).given(session).sendKey(any());
+        willThrow(new DeviceOfflineException("offline")).given(session).execute(any());
 
         mockMvc.perform(post("/key/HOME")).andExpect(status().isConflict());
     }
