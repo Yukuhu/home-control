@@ -1,7 +1,9 @@
-# Shield Web Remote
+# Home Control
 
-A small Spring Boot web app that controls an NVIDIA Shield (or any Android TV device)
-on the same network: a browser remote with live device state.
+A small Spring Boot web app that controls the devices on your home network from one
+page. Today: NVIDIA Shield and other Android TV devices — a browser remote per device
+with live state, and an open-link form that starts a YouTube, Netflix or Prime Video
+link in the matching app on the TV.
 
 ## Running
 
@@ -69,6 +71,9 @@ for every redeployment.
 2. Pick your Shield from the discovered list, or type its IP address.
 3. The TV displays a six character code. Type it in and submit.
 
+Pairing can be repeated for several devices — each one appears as its own chip in the
+device strip on the dashboard.
+
 The app stores its Remote v2 client certificate in `data/keystore.p12` and its
 paired-device registry in `data/devices.json`. **The certificate is the pairing
 credential** — losing it means the Shield must be paired again. Keep the whole
@@ -76,7 +81,15 @@ data directory mounted persistently and keep any custom keystore password stable
 
 The current foreground package remains visible in the remote header as connection
 context. Remote v2 does not expose a reliable way to derive a launchable deep link
-from that package, so the remote intentionally does not offer app shortcuts.
+from that package — see "Opening links on a device" below for how to start an app
+from the remote instead.
+
+## Opening links on a device
+
+Paste an `https://` link into the **Open a link on this device** box and press Play. The
+device opens whichever app claims the link — for example a YouTube watch URL starts in the
+YouTube app. The app cannot tell whether the target app is installed: if nothing happens on
+the TV, install the app or open the link another way.
 
 ## Discovery does not work
 
@@ -93,6 +106,10 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 | `shield.discovery-enabled` | `true` | Turn mDNS off entirely |
 | `shield.stale-timeout-seconds` | `10` | No inbound message for this long means the connection is dead |
 | `shield.reconnect-max-delay-seconds` | `60` | Upper bound on reconnect backoff |
+
+An older `devices.json` (from before multi-device support) is upgraded in place on
+first start; the upgrade keeps existing pairings, so no re-pairing is needed after
+updating.
 
 ## Releases
 
