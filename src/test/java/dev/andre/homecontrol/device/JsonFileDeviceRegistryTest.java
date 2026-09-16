@@ -248,4 +248,24 @@ class JsonFileDeviceRegistryTest {
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("integrity");
     }
+
+    @Test
+    void aVersionTwoRecordWithAnInvalidCastPortIsAPathBearingStorageFailure() throws Exception {
+        Path file = dir.resolve("devices.json");
+        Files.writeString(file, """
+                [{
+                  "id": "cast-10-0-0-9",
+                  "name": "Kitchen",
+                  "kind": "CAST",
+                  "host": "10.0.0.9",
+                  "adapters": {"cast": {"port": "70000"}},
+                  "lastSeen": "2026-08-29T18:00:00Z"
+                }]
+                """);
+
+        assertThatThrownBy(() -> new JsonFileDeviceRegistry(file).findAll())
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining(file.toString())
+                .hasMessageContaining("integrity");
+    }
 }

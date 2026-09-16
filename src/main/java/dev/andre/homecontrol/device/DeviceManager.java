@@ -263,6 +263,15 @@ public class DeviceManager implements AutoCloseable {
         }
     }
 
+    /**
+     * Receivers resolved while the context was still starting were published before
+     * {@link #onDiscovered} was registered as a listener; {@link DiscoveryCatchUp} gives them the
+     * same automatic merge once the application is ready.
+     */
+    public void mergeVisibleReceivers() {
+        addable().forEach(found -> onDiscovered(new DeviceDiscoveredEvent(found)));
+    }
+
     /** Moves every adapter of {@code source} into {@code target} and removes {@code source}. */
     public Device merge(String targetId, String sourceId) {
         if (targetId.equals(sourceId)) {
@@ -316,9 +325,11 @@ public class DeviceManager implements AutoCloseable {
             Map<String, Map<String, String>> remaining = new LinkedHashMap<>(device.adapters());
             remaining.remove(adapterId);
             Device rest = new Device(device.id(), device.name(), device.kind(), device.host(), remaining, device.lastSeen());
-            Device split = new Device(uniqueId(registry.findAll(), adapterId, device.host()),
+            // A receiver merged in from another address takes that address with it.
+            String host = adapter != null ? adapter.hostOf(device) : device.host();
+            Device split = new Device(uniqueId(registry.findAll(), adapterId, host),
                     device.name() + " (" + adapterId + ")",
-                    adapter != null ? adapter.kind() : device.kind(), device.host(),
+                    adapter != null ? adapter.kind() : device.kind(), host,
                     Map.of(adapterId, device.adapterSettings(adapterId)), device.lastSeen());
             registry.save(rest);
             registry.save(split);
@@ -334,12 +345,14 @@ public class DeviceManager implements AutoCloseable {
     }
 
     /**
-     * Registered once any device carries that adapter at the found address — including a
-     * device split off earlier, which is why a split is never merged back automatically.
+     * Registered once any device carries it through its adapter — judged by the adapter, at
+     * the address (or identity) that adapter entry remembers, not the device's own address.
+     * That includes a device split off earlier, which is why a split is never merged back
+     * automatically.
      */
-    static boolean isRegistered(List<Device> registered, DiscoveredDevice found) {
-        return registered.stream().anyMatch(device ->
-                device.hasAdapter(found.adapterId()) && device.host().equalsIgnoreCase(found.host()));
+    private boolean isRegistered(List<Device> registered, DiscoveredDevice found) {
+        DeviceAdapter adapter = adapters.get(found.adapterId());
+        return adapter != null && registered.stream().anyMatch(device -> adapter.carries(device, found));
     }
 
     /** Same address first; otherwise the single device with the same name. Never one that already has the adapter. */
@@ -366,16 +379,49 @@ public class DeviceManager implements AutoCloseable {
         return new Device(adopted.id(), adopted.name(), existing.kind(), adopted.host(), merged, adopted.lastSeen());
     }
 
+    /**
+     * For each pairing-free adapter the adopted device lacks: the addable receiver at its
+     * address, or else the single receiver with its name — and only when no other registered
+     * device shares that name or that receiver's address, where it would belong instead.
+     */
     private Device absorbAddable(Device device) {
+        List<Device> others = registry.findAll().stream()
+                .filter(other -> !other.id().equals(device.id()))
+                .toList();
+        Map<String, List<DiscoveredDevice>> byAdapter = addable().stream()
+                .collect(Collectors.groupingBy(DiscoveredDevice::adapterId, LinkedHashMap::new, Collectors.toList()));
         Device result = device;
-        for (DiscoveredDevice found : addable()) {
-            boolean matches = found.host().equalsIgnoreCase(result.host()) || sameName(found.name(), result.name());
-            if (matches && !result.hasAdapter(found.adapterId())) {
-                result = result.withAdapter(found.adapterId(),
-                        adapters.get(found.adapterId()).settingsFor(found).orElseThrow());
+        for (Map.Entry<String, List<DiscoveredDevice>> entry : byAdapter.entrySet()) {
+            if (result.hasAdapter(entry.getKey())) {
+                continue;
+            }
+            Optional<DiscoveredDevice> match = absorbable(result, entry.getValue(), others);
+            if (match.isPresent()) {
+                result = result.withAdapter(entry.getKey(),
+                        adapters.get(entry.getKey()).settingsFor(match.get()).orElseThrow());
             }
         }
         return result;
+    }
+
+    private static Optional<DiscoveredDevice> absorbable(Device device, List<DiscoveredDevice> receivers,
+                                                         List<Device> others) {
+        Optional<DiscoveredDevice> byHost = receivers.stream()
+                .filter(found -> found.host().equalsIgnoreCase(device.host()))
+                .findFirst();
+        if (byHost.isPresent()) {
+            return byHost;
+        }
+        List<DiscoveredDevice> byName = receivers.stream()
+                .filter(found -> sameName(found.name(), device.name()))
+                .toList();
+        if (byName.size() != 1) {
+            return Optional.empty();
+        }
+        DiscoveredDevice only = byName.getFirst();
+        boolean belongsElsewhere = others.stream().anyMatch(other ->
+                sameName(other.name(), device.name()) || other.host().equalsIgnoreCase(only.host()));
+        return belongsElsewhere ? Optional.empty() : Optional.of(only);
     }
 
     static String uniqueId(List<Device> registered, String adapterId, String host) {

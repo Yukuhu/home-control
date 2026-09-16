@@ -32,7 +32,8 @@ class CastAdapterTest {
         DiscoveredDevice found = new DiscoveredDevice("cast", "Kitchen", "10.0.0.9", 8009,
                 Map.of("id", "abc123", "md", "Chromecast"));
 
-        assertThat(adapter.settingsFor(found)).contains(Map.of("port", "8009", "castId", "abc123", "model", "Chromecast"));
+        assertThat(adapter.settingsFor(found))
+                .contains(Map.of("host", "10.0.0.9", "port", "8009", "castId", "abc123", "model", "Chromecast"));
         assertThat(adapter.settingsFor(new DiscoveredDevice("androidtv", "TV", "10.0.0.5", 6466))).isEmpty();
     }
 
@@ -41,7 +42,31 @@ class CastAdapterTest {
         Device device = new Device("cast-10-0-0-9", "Kitchen", DeviceKind.CAST, "10.0.0.9",
                 Map.of("cast", Map.of("port", "8010", "castId", "abc123")), Instant.EPOCH);
 
-        assertThat(CastSettings.of(device)).isEqualTo(new CastSettings(8010, "abc123", null));
+        assertThat(CastSettings.of(device)).isEqualTo(new CastSettings(8010, "abc123", null, "10.0.0.9"));
+    }
+
+    @Test
+    void aReceiverMergedFromAnotherAddressIsReachedAtItsOwnAddress() {
+        // Merged into a TV by friendly name: the receiver is not at the TV's address.
+        Device tv = new Device("10-0-0-5", "Living Room TV", DeviceKind.ANDROID_TV, "10.0.0.5",
+                Map.of("androidtv", Map.of("port", "6466"),
+                        "cast", Map.of("host", "10.0.0.77", "port", "8009")), Instant.EPOCH);
+
+        assertThat(CastSettings.of(tv).host()).isEqualTo("10.0.0.77");
+        assertThat(adapter.hostOf(tv)).isEqualTo("10.0.0.77");
+    }
+
+    @Test
+    void recognisesItsReceiverByAddressOrCastIdNotByTheDevicesAddress() {
+        Device tv = new Device("10-0-0-5", "Living Room TV", DeviceKind.ANDROID_TV, "10.0.0.5",
+                Map.of("androidtv", Map.of("port", "6466"),
+                        "cast", Map.of("host", "10.0.0.77", "port", "8009", "castId", "abc123")), Instant.EPOCH);
+
+        assertThat(adapter.carries(tv, new DiscoveredDevice("cast", "TV", "10.0.0.77", 8009, Map.of()))).isTrue();
+        assertThat(adapter.carries(tv, new DiscoveredDevice("cast", "TV", "10.0.0.99", 8009, Map.of("id", "abc123"))))
+                .as("same receiver after a DHCP change").isTrue();
+        assertThat(adapter.carries(tv, new DiscoveredDevice("cast", "Other", "10.0.0.5", 8009, Map.of("id", "zzz"))))
+                .as("another receiver at the TV's own address").isFalse();
     }
 
     @Test

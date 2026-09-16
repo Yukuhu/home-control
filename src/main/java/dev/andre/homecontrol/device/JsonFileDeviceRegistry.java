@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.adapters.cast.CastSettings;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
@@ -145,6 +146,13 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
                     AndroidTvSettings.of(device);
                 } catch (IllegalArgumentException e) {
                     throw invalidDevice(index, "androidtv port must be an integer between 1 and 65535");
+                }
+            }
+            if (device.hasAdapter(CastSettings.ADAPTER_ID)) {
+                try {
+                    CastSettings.of(device);
+                } catch (IllegalArgumentException e) {
+                    throw invalidDevice(index, "cast port must be an integer between 1 and 65535");
                 }
             }
         }

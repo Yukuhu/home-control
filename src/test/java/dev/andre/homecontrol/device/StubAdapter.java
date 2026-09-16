@@ -80,8 +80,14 @@ class StubAdapter implements DeviceAdapter {
     @Override
     public Optional<Map<String, String>> settingsFor(DiscoveredDevice found) {
         return pairingFree && id.equals(found.adapterId())
-                ? Optional.of(Map.of("port", String.valueOf(found.port())))
+                ? Optional.of(Map.of("host", found.host(), "port", String.valueOf(found.port())))
                 : Optional.empty();
+    }
+
+    /** Like Cast: a pairing-free entry remembers its own address, which may differ from the device's. */
+    @Override
+    public String hostOf(Device device) {
+        return device.adapterSettings(id).getOrDefault("host", device.host());
     }
 
     @Override
