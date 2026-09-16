@@ -1,0 +1,18 @@
+package dev.andre.homecontrol.device;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface DeviceRegistry {
+
+    List<Device> findAll();
+
+    Optional<Device> findById(String id);
+
+    /** The single device the v1 UI controls: the most recently paired one. */
+    Optional<Device> first();
+
+    void save(Device device);
+
+    void delete(String id);
+}

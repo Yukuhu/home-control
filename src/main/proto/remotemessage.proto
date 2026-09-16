@@ -2,7 +2,7 @@
 syntax = "proto3";
 package remote;
 
-option java_package = "dev.andre.shield.protocol.remote";
+option java_package = "dev.andre.homecontrol.protocol.remote";
 option java_outer_classname = "RemoteProto";
 option java_multiple_files = true;
 
