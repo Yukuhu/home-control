@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.protocol;
+package dev.andre.homecontrol.core;
 
 /** The subset of Android key codes this remote exposes. */
 public enum RemoteKey {

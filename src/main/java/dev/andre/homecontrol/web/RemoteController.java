@@ -4,7 +4,7 @@ import dev.andre.homecontrol.device.DeviceOfflineException;
 import dev.andre.homecontrol.device.DeviceSession;
 import dev.andre.homecontrol.device.DeviceSessionManager;
 import dev.andre.homecontrol.device.DeviceState;
-import dev.andre.homecontrol.protocol.RemoteKey;
+import dev.andre.homecontrol.core.RemoteKey;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
