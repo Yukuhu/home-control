@@ -25,12 +25,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -105,6 +107,30 @@ class DeviceManagerTest {
 
                 assertThat(bedroom.nextKeyPress()).isEqualTo(RemoteKey.HOME.code());
                 assertThat(living.nextKeyPress()).isNull();
+            }
+        }
+    }
+
+    @Test
+    void aVersionOneRegistryAndItsExistingCredentialConnectWithoutRePairing() throws Exception {
+        // The upgrade path end to end: a v0.3 devices.json and the keystore entry pairing
+        // created under the device id. Nothing is re-paired — the migrated record finds the
+        // same credential, connects, and takes commands.
+        try (FakeRemoteServer remote = new FakeRemoteServer()) {
+            Path file = dir.resolve("devices.json");
+            Files.writeString(file, "[{\"id\":\"127-0-0-1\",\"name\":\"Living Room Shield\","
+                    + "\"host\":\"127.0.0.1\",\"port\":" + remote.port() + ","
+                    + "\"certificateFingerprint\":null,\"lastSeen\":\"2026-08-29T18:00:00Z\"}]");
+            CertificateStore certificates = certificates();
+            certificates.loadOrCreate("127-0-0-1");
+
+            try (DeviceManager manager = manager(new JsonFileDeviceRegistry(file), certificates)) {
+                manager.start();
+
+                await().until(() -> manager.state("127-0-0-1").status() == DeviceStatus.CONNECTED);
+                manager.execute("127-0-0-1", new Action.PressKey(RemoteKey.HOME));
+
+                assertThat(remote.nextKeyPress()).isEqualTo(RemoteKey.HOME.code());
             }
         }
     }
@@ -228,6 +254,34 @@ class DeviceManagerTest {
             assertThatCode(() -> manager.execute("good", new Action.PressKey(RemoteKey.HOME)))
                     .as("the failing device's adapter must not stop the other device from getting a handle")
                     .doesNotThrowAnyException();
+        }
+    }
+
+    @Test
+    void aFailedConnectPublishesDisconnectedSoNoTabKeepsAStaleBadge() {
+        // The device's previous handle is closed and silenced before the new connect, so
+        // whatever it last published (say CONNECTED) would otherwise stay on screen.
+        AtomicBoolean failNext = new AtomicBoolean();
+        DeviceAdapter adapter = new FakeAdapter("fake", Set.of(Capability.REMOTE_KEYS), device -> {
+            if (failNext.get()) {
+                throw new RuntimeException("boom");
+            }
+            return new RecordingHandle();
+        });
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        Device device = new Device("flaky", "Flaky", DeviceKind.UPNP, "10.0.0.1", Map.of("fake", Map.of()), Instant.now());
+
+        try (DeviceManager manager = new DeviceManager(registry, List.of(adapter), publisher)) {
+            manager.adopt(device);
+            published.clear();
+            failNext.set(true);
+
+            manager.adopt(device);
+
+            assertThat(published).last().isInstanceOfSatisfying(DeviceStateChangedEvent.class, event -> {
+                assertThat(event.deviceId()).isEqualTo("flaky");
+                assertThat(event.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+            });
         }
     }
 

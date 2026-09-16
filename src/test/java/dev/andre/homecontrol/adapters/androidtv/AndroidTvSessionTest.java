@@ -93,6 +93,21 @@ class AndroidTvSessionTest {
     }
 
     @Test
+    void closingWhileAConnectIsInFlightClosesTheConnectionItThenOpens() {
+        // close() can run while connect() is still blocked in the TLS handshake on the
+        // session's own thread. The connection that handshake produces afterwards belongs to
+        // nobody, so the session must close it rather than leave its socket and reader open.
+        fakeDevice.delayNextConnection();
+        session.start();
+        await().until(() -> fakeDevice.connections() == 1);
+
+        session.close();
+
+        // Well inside the 10s stale timeout, which would otherwise end the connection too.
+        await().atMost(Duration.ofSeconds(5)).until(() -> fakeDevice.connectionsEnded() == 1);
+    }
+
+    @Test
     void refusesADeviceWhoseCertificateDoesNotMatchThePin() {
         Device impostor = AndroidTvSettings.device("shield-2", "Impostor", "127.0.0.1", fakeDevice.port(),
                 "0000000000000000000000000000000000000000000000000000000000000000", Instant.now());
@@ -157,9 +172,14 @@ class AndroidTvSessionTest {
             // Comfortably more attempts than the ambiguous-verdict latch threshold, so a
             // session that miscounts connect failures as ambiguous verdicts has latched by now.
             await().atMost(Duration.ofSeconds(30)).until(() -> attempts.get() >= 7);
-
             assertThat(everUnpaired).isFalse();
-            assertThat(dead.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+
+            // The listener sees CONNECTING before the refused attempt resolves, so the state
+            // read right after the 7th attempt may still be CONNECTING; wait for it to settle
+            // rather than sampling it at a fixed instant.
+            await().atMost(Duration.ofSeconds(5))
+                    .until(() -> dead.state().status() == DeviceStatus.DISCONNECTED);
+            assertThat(everUnpaired).isFalse();
         }
     }
 

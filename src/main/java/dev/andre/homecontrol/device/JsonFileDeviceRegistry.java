@@ -51,6 +51,7 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
             }
             validateDevices(devices);
             if (migrated) {
+                backUpVersionOne();
                 writeAll(devices);
             }
             return devices;
@@ -86,6 +87,18 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
         v2.set("adapters", adapters);
         v2.set("lastSeen", v1.get("lastSeen"));
         return v2;
+    }
+
+    /**
+     * The migration is one-way — an older image cannot read the rewritten file — so the
+     * original is copied to {@code devices.v1.json} beside it first, for a rollback. Only once:
+     * an existing backup is the older, and so the more valuable, of the two.
+     */
+    private void backUpVersionOne() throws IOException {
+        Path backup = file.resolveSibling("devices.v1.json");
+        if (!Files.exists(backup)) {
+            Files.copy(file, backup);
+        }
     }
 
     /**

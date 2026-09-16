@@ -38,6 +38,7 @@ public class FakeRemoteServer implements AutoCloseable {
     private final BlockingQueue<String> appLinks = new LinkedBlockingQueue<>();
 
     private final AtomicInteger connections = new AtomicInteger();
+    private final AtomicInteger connectionsEnded = new AtomicInteger();
     private final AtomicInteger clientConfigureFeatures = new AtomicInteger(-1);
     private final AtomicInteger clientActiveFeatures = new AtomicInteger(-1);
 
@@ -53,11 +54,16 @@ public class FakeRemoteServer implements AutoCloseable {
         /** Close the connection immediately, before any app-level exchange. */
         CLOSE,
         /** Accept it and then say nothing at all, so the client's TLS handshake times out. */
-        STALL
+        STALL,
+        /** Hold off the TLS handshake for a moment, then serve the connection normally. */
+        DELAY
     }
 
     /** Comfortably longer than the stale timeout any test using {@link #stallNextConnection()} sets. */
     private static final long STALL_MILLIS = 1_500;
+
+    /** Long enough for a test to act while the client is blocked in the handshake, well under any stale timeout. */
+    private static final long DELAY_MILLIS = 1_000;
 
     private volatile SSLSocket socket;
     private volatile MessageStream stream;
@@ -129,6 +135,19 @@ public class FakeRemoteServer implements AutoCloseable {
         script.add(Reaction.STALL);
     }
 
+    /**
+     * Delays the handshake of the next connection by {@value #DELAY_MILLIS}ms and then serves it
+     * normally, so a test can act while the client is still blocked inside connect().
+     */
+    public void delayNextConnection() {
+        script.add(Reaction.DELAY);
+    }
+
+    /** How many normally served connections have since ended, from either side. */
+    public int connectionsEnded() {
+        return connectionsEnded.get();
+    }
+
     /** How many times a client has connected; used to observe reconnects. */
     public int connections() {
         return connections.get();
@@ -170,7 +189,14 @@ public class FakeRemoteServer implements AutoCloseable {
                     socket.close();
                     continue;
                 }
-                handle(socket);
+                if (reaction == Reaction.DELAY) {
+                    Thread.sleep(DELAY_MILLIS);
+                }
+                try {
+                    handle(socket);
+                } finally {
+                    connectionsEnded.incrementAndGet();
+                }
             } catch (Exception e) {
                 // This connection ended; wait for the next one.
             }

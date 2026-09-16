@@ -147,6 +147,41 @@ class JsonFileDeviceRegistryTest {
     }
 
     @Test
+    void keepsTheVersionOneFileAsABackupBeforeRewritingIt() throws Exception {
+        // The upgrade is one-way: an older image cannot read the rewritten file, so the
+        // original bytes must survive next to it for a rollback.
+        Path file = dir.resolve("devices.json");
+        Files.copy(Path.of("src/test/resources/devices-v1.json"), file);
+        byte[] original = Files.readAllBytes(file);
+
+        new JsonFileDeviceRegistry(file).findAll();
+
+        assertThat(dir.resolve("devices.v1.json")).exists().hasBinaryContent(original);
+    }
+
+    @Test
+    void neverOverwritesAnExistingVersionOneBackup() throws Exception {
+        Path file = dir.resolve("devices.json");
+        Files.copy(Path.of("src/test/resources/devices-v1.json"), file);
+        Path backup = dir.resolve("devices.v1.json");
+        Files.writeString(backup, "the first backup");
+
+        new JsonFileDeviceRegistry(file).findAll();
+
+        assertThat(backup).hasContent("the first backup");
+    }
+
+    @Test
+    void aVersionTwoFileIsNotBackedUp() {
+        Path file = dir.resolve("devices.json");
+        new JsonFileDeviceRegistry(file).save(shield());
+
+        new JsonFileDeviceRegistry(file).findAll();
+
+        assertThat(dir.resolve("devices.v1.json")).doesNotExist();
+    }
+
+    @Test
     void aVersionOneRecordWithoutAFingerprintMigratesWithoutOne() throws Exception {
         Path file = dir.resolve("devices.json");
         Files.writeString(file, "[{\"id\":\"x\",\"name\":\"X\",\"host\":\"10.0.0.9\",\"port\":6466,"
