@@ -4,3 +4,4 @@ build/
 *.p12
 .worktrees/
 .superpowers/
+.claude/worktrees/
