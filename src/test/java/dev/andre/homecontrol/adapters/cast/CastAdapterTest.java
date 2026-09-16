@@ -1,12 +1,11 @@
 package dev.andre.homecontrol.adapters.cast;
 
-import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.adapters.cast.protocol.FakeCastReceiver;
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DiscoveredDevice;
-import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.discovery.MdnsBrowser;
 import org.junit.jupiter.api.Test;
 
@@ -14,11 +13,12 @@ import java.time.Instant;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 class CastAdapterTest {
 
-    private final CastAdapter adapter = new CastAdapter(new CastDiscovery(new MdnsBrowser(false), event -> { }));
+    private final CastAdapter adapter = new CastAdapter(new CastDiscovery(new MdnsBrowser(false), event -> { }),
+            CastSessionTest.PROPERTIES);
 
     @Test
     void isThePairingFreeCastAdapter() {
@@ -70,13 +70,17 @@ class CastAdapterTest {
     }
 
     @Test
-    void untilTheConnectionExistsTheHandleIsOffline() {
-        Device device = new Device("cast-10-0-0-9", "Kitchen", DeviceKind.CAST, "10.0.0.9",
-                Map.of("cast", Map.of("port", "8009")), Instant.EPOCH);
-
-        try (DeviceHandle handle = adapter.connect(device, state -> { })) {
-            assertThatThrownBy(() -> handle.execute(new Action.PressKey(RemoteKey.HOME)))
-                    .isInstanceOf(DeviceOfflineException.class);
+    void connectStartsASessionThatReachesTheReceiver() throws Exception {
+        try (FakeCastReceiver receiver = new FakeCastReceiver();
+             DeviceHandle handle = adapter.connect(CastSessionTest.device(receiver.port()), state -> { })) {
+            await().until(() -> handle.state().connected());
+            assertThat(receiver.virtualConnections()).contains("receiver-0");
         }
+    }
+
+    @Test
+    void declaresCastReceiverAndVolume() {
+        assertThat(adapter.capabilities(CastSessionTest.device(8009)))
+                .containsExactlyInAnyOrder(Capability.CAST_RECEIVER, Capability.VOLUME);
     }
 }

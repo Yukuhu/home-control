@@ -68,7 +68,8 @@ class DashboardPageTest {
                 .andExpect(content().string(not(containsString("/devices/bedroom/key/"))))
                 .andExpect(content().string(containsString("com.netflix.ninja")))
                 .andExpect(content().string(containsString("/devices/living/play")))
-                .andExpect(content().string(containsString("<body data-device=\"living\"")));
+                .andExpect(content().string(containsString("<body data-device=\"living\"")))
+                .andExpect(content().string(not(containsString("/devices/living/volume"))));
     }
 
     @Test
@@ -123,5 +124,24 @@ class DashboardPageTest {
         mockMvc.perform(get("/remote/living"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/?device=living"));
+    }
+
+    @Test
+    void aCastOnlyDeviceGetsCastControlsInsteadOfTheRemote() throws Exception {
+        Device kitchen = new Device("cast-10-0-0-9", "Kitchen", DeviceKind.CAST, "10.0.0.9",
+                Map.of("cast", Map.of("port", "8009")), Instant.now());
+        given(devices.devices()).willReturn(List.of(kitchen));
+        given(devices.defaultDevice()).willReturn(Optional.of(kitchen));
+        given(devices.device("cast-10-0-0-9")).willReturn(Optional.of(kitchen));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME));
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/devices/cast-10-0-0-9/volume")))
+                .andExpect(content().string(containsString("/devices/cast-10-0-0-9/mute")))
+                .andExpect(content().string(containsString("/devices/cast-10-0-0-9/stop")))
+                .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/key/"))))
+                .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/play"))));
     }
 }

@@ -15,8 +15,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
-/** The device strip plus the remote drawer of the selected device (spec §6.1). Rails arrive in sub-project D. */
+/** The device strip plus the selected device's drawer: remote keys and/or Cast controls (spec §6.1). Rails arrive in sub-project D. */
 @Controller
 public class DashboardController {
 
@@ -43,7 +44,10 @@ public class DashboardController {
         model.addAttribute("states", states);
         model.addAttribute("selected", selected);
         model.addAttribute("selectedState", devices.state(selected.id()));
-        model.addAttribute("canOpenLinks", devices.capabilities(selected.id()).contains(Capability.APP_LINK));
+        Set<Capability> capabilities = devices.capabilities(selected.id());
+        model.addAttribute("remoteKeys", capabilities.contains(Capability.REMOTE_KEYS));
+        model.addAttribute("castControls", capabilities.contains(Capability.CAST_RECEIVER));
+        model.addAttribute("canOpenLinks", capabilities.contains(Capability.APP_LINK));
         return "dashboard";
     }
 

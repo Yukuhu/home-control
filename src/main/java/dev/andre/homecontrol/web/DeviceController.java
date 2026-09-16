@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.RemoteKey;
@@ -63,6 +64,34 @@ public class DeviceController {
         return text(HttpStatus.OK, route.describe());
     }
 
+    @PostMapping("/devices/{id}/volume")
+    public ResponseEntity<String> volume(@PathVariable String id, @RequestParam int level) {
+        Action.SetVolume action;
+        try {
+            action = new Action.SetVolume(level);
+        } catch (IllegalArgumentException e) {
+            // Only an out-of-range level is a 400; the device's own failures keep their status.
+            return text(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+        return command(id, action);
+    }
+
+    @PostMapping("/devices/{id}/mute")
+    public ResponseEntity<String> mute(@PathVariable String id, @RequestParam boolean muted) {
+        return command(id, new Action.Mute(muted));
+    }
+
+    @PostMapping("/devices/{id}/stop")
+    public ResponseEntity<String> stop(@PathVariable String id) {
+        return command(id, new Action.Stop());
+    }
+
+    /** Volume and stop go straight to the adapters, not through the planner (spec §5.3). */
+    private ResponseEntity<String> command(String id, Action action) {
+        devices.execute(id, action);
+        return ResponseEntity.noContent().build();
+    }
+
     @ExceptionHandler(DeviceNotFoundException.class)
     public ResponseEntity<String> notFound(DeviceNotFoundException e) {
         return text(HttpStatus.NOT_FOUND, e.getMessage());
@@ -76,6 +105,11 @@ public class DeviceController {
     @ExceptionHandler({UnsupportedActionException.class, UnroutableException.class})
     public ResponseEntity<String> cannot(RuntimeException e) {
         return text(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
+    }
+
+    @ExceptionHandler(ActionFailedException.class)
+    public ResponseEntity<String> failed(ActionFailedException e) {
+        return text(HttpStatus.BAD_GATEWAY, e.getMessage());
     }
 
     private static ResponseEntity<String> text(HttpStatus status, String body) {

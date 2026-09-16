@@ -11,6 +11,7 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteListener;
+import dev.andre.homecontrol.core.UnsupportedActionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,6 +106,12 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         switch (action) {
             case Action.PressKey press -> sendKey(press.key());
             case Action.OpenAppLink open -> openAppLink(open.uri());
+            case Action.SetVolume ignored -> throw new UnsupportedActionException(
+                    "Android TV Remote v2 has no absolute volume; use the volume keys");
+            case Action.Mute ignored -> throw new UnsupportedActionException(
+                    "Android TV Remote v2 cannot set mute directly; use the mute key");
+            case Action.Stop ignored -> throw new UnsupportedActionException(
+                    "Android TV Remote v2 cannot stop a cast");
         }
     }
 

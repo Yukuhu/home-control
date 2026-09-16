@@ -13,3 +13,11 @@ shield:
 home-control:
   cast:
     enabled: true
+    # A PING every 5 s; 15 s without any inbound frame means the receiver is gone.
+    heartbeat-interval-seconds: 5
+    stale-timeout-seconds: 15
+    reconnect-initial-delay-seconds: 1
+    reconnect-max-delay-seconds: 60
+    command-timeout-seconds: 5
+    load-timeout-seconds: 20
+    media-status-interval-seconds: 5

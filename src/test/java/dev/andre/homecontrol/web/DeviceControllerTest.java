@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.RemoteKey;
@@ -140,5 +141,71 @@ class DeviceControllerTest {
         mockMvc.perform(post("/devices/shield/play").param("uri", "https://example.org/a"))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(content().string("Shield: this device cannot open app links"));
+    }
+
+    @Test
+    void setsTheVolume() throws Exception {
+        mockMvc.perform(post("/devices/shield/volume").param("level", "40")).andExpect(status().isNoContent());
+
+        verify(devices).execute("shield", new Action.SetVolume(40));
+    }
+
+    @Test
+    void rejectsAVolumeOutsideZeroToHundred() throws Exception {
+        mockMvc.perform(post("/devices/shield/volume").param("level", "150"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Volume must be between 0 and 100"));
+
+        verifyNoInteractions(devices);
+    }
+
+    @Test
+    void mutesAndStops() throws Exception {
+        mockMvc.perform(post("/devices/shield/mute").param("muted", "true")).andExpect(status().isNoContent());
+        mockMvc.perform(post("/devices/shield/stop")).andExpect(status().isNoContent());
+
+        verify(devices).execute("shield", new Action.Mute(true));
+        verify(devices).execute("shield", new Action.Stop());
+    }
+
+    @Test
+    void volumeForAnUnknownDeviceIsNotFound() throws Exception {
+        willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
+
+        mockMvc.perform(post("/devices/ghost/volume").param("level", "10"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("No device with id ghost"));
+    }
+
+    @Test
+    void stoppingAnOfflineDeviceIsAConflict() throws Exception {
+        willThrow(new DeviceOfflineException("Kitchen is not connected")).given(devices).execute(eq("kitchen"), any());
+
+        mockMvc.perform(post("/devices/kitchen/stop")).andExpect(status().isConflict());
+    }
+
+    @Test
+    void mutingADeviceWithoutVolumeControlIsUnprocessable() throws Exception {
+        willThrow(new UnsupportedActionException("Bedroom cannot perform Mute")).given(devices).execute(eq("bedroom"), any());
+
+        mockMvc.perform(post("/devices/bedroom/mute").param("muted", "false")).andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void reportsBadGatewayWhenTheDeviceRefusesOrDoesNotAnswer() throws Exception {
+        willThrow(new ActionFailedException("Kitchen did not answer in time when asked to set the volume"))
+                .given(devices).execute(eq("shield"), any());
+
+        mockMvc.perform(post("/devices/shield/volume").param("level", "10"))
+                .andExpect(status().isBadGateway())
+                .andExpect(content().string("Kitchen did not answer in time when asked to set the volume"));
+    }
+
+    @Test
+    void anIllegalArgumentFromTheDeviceIsNotReportedAsABadVolume() throws Exception {
+        willThrow(new IllegalArgumentException("programming error")).given(devices).execute(eq("shield"), any());
+
+        assertThatThrownBy(() -> mockMvc.perform(post("/devices/shield/volume").param("level", "10")))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class);
     }
 }
