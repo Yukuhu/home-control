@@ -27,6 +27,7 @@ public class PlaybackService {
         Route route = planner.plan(item, devices.capabilities(deviceId));
         switch (route) {
             case Route.OpenAppLink open -> devices.execute(deviceId, open.action());
+            case Route.Cast cast -> devices.execute(deviceId, cast.action());
             case Route.Unroutable unroutable -> throw new UnroutableException(
                     device.name() + ": " + unroutable.reason());
         }

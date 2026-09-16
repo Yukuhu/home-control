@@ -42,12 +42,17 @@ public class PlaybackPlanner {
     private static List<String> explain(ContentItem item, Set<Capability> capabilities) {
         Set<String> reasons = new LinkedHashSet<>();
         for (PlayableRef ref : item.playables()) {
-            if (ref instanceof PlayableRef.AppLink) {
-                if (!capabilities.contains(Capability.APP_LINK)) {
-                    reasons.add("this device cannot open app links");
+            switch (ref) {
+                case PlayableRef.AppLink ignored -> {
+                    if (!capabilities.contains(Capability.APP_LINK)) {
+                        reasons.add("this device cannot open app links");
+                    }
                 }
-            } else {
-                reasons.add(ref.kindLabel() + " playback is not supported yet");
+                case PlayableRef.CastLoad ignored -> reasons.add(capabilities.contains(Capability.CAST_RECEIVER)
+                        ? "the cast was not accepted" : "this device is not a Cast receiver");
+                case PlayableRef.StreamUrl ignored -> reasons.add(capabilities.contains(Capability.CAST_RECEIVER)
+                        ? "the stream was not accepted" : "this device cannot play a direct stream");
+                case PlayableRef.JellyfinItem j -> reasons.add(j.kindLabel() + " playback is not supported yet");
             }
         }
         if (reasons.isEmpty()) {

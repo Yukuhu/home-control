@@ -3,6 +3,8 @@ package dev.andre.homecontrol.core;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,5 +37,15 @@ class ActionTest {
         assertThatThrownBy(() -> new Action.SetVolume(101))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Volume must be between 0 and 100");
+    }
+
+    @Test
+    void aCastLoadRequiresACastReceiverAndCopiesItsBody() {
+        Map<String, Object> body = new HashMap<>(Map.of("autoplay", true));
+        Action.CastLoad load = new Action.CastLoad("CC1AD845", body);
+        body.put("autoplay", false);
+
+        assertThat(load.requires()).isEqualTo(Capability.CAST_RECEIVER);
+        assertThat(load.load()).containsEntry("autoplay", true);
     }
 }

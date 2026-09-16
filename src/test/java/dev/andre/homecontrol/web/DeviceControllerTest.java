@@ -17,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.net.URI;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -89,6 +90,15 @@ class DeviceControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("text/plain"))
                 .andExpect(content().string("Open in the YouTube app"));
+    }
+
+    @Test
+    void describesACastRoute() throws Exception {
+        given(playback.play(any(), eq("shield"))).willReturn(new Route.Cast("CC1AD845", Map.of()));
+
+        mockMvc.perform(post("/devices/shield/play").param("uri", "http://nas.local/films/bunny.mp4"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Cast with the Default Media Receiver"));
     }
 
     @Test

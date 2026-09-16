@@ -7,6 +7,8 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.playback.AppLinkStrategy;
 import dev.andre.homecontrol.core.playback.AppLinks;
+import dev.andre.homecontrol.core.playback.CastLoadStrategy;
+import dev.andre.homecontrol.core.playback.CastStreamStrategy;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.UnroutableException;
@@ -66,5 +68,21 @@ class PlaybackServiceTest {
 
         assertThatThrownBy(() -> service.play(AppLinks.fromUrl("https://example.org/a"), "ghost"))
                 .isInstanceOf(DeviceNotFoundException.class);
+    }
+
+    @Test
+    void executesACastRoute() {
+        PlaybackService castService = new PlaybackService(devices,
+                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastLoadStrategy(), new CastStreamStrategy())));
+        Device kitchen = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9", Map.of("cast", Map.of()), Instant.now());
+        given(devices.device("kitchen")).willReturn(Optional.of(kitchen));
+        given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME));
+
+        Route route = castService.play(AppLinks.fromUrl("http://nas.local/films/bunny.mp4"), "kitchen");
+
+        assertThat(route).isInstanceOfSatisfying(Route.Cast.class, cast -> {
+            assertThat(cast.receiverAppId()).isEqualTo("CC1AD845");
+            verify(devices).execute("kitchen", cast.action());
+        });
     }
 }

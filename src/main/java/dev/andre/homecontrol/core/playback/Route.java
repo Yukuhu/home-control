@@ -3,6 +3,8 @@ package dev.andre.homecontrol.core.playback;
 import dev.andre.homecontrol.core.Action;
 
 import java.net.URI;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** The planner's answer: an executable route, or the reason there is none. Shown to the user before playing. */
@@ -24,6 +26,28 @@ public sealed interface Route {
         public String describe() {
             String name = SERVICE_NAMES.get(service);
             return name == null ? "Open " + uri.getHost() + " on the device" : "Open in the " + name + " app";
+        }
+    }
+
+    /** Run a Cast receiver app and send it a LOAD (spec §5.3 rung 3). */
+    record Cast(String receiverAppId, Map<String, Object> load) implements Route {
+
+        private static final Map<String, String> RECEIVER_NAMES = Map.of(
+                "CC1AD845", "the Default Media Receiver",
+                "F007D354", "the Jellyfin receiver");
+
+        public Cast {
+            load = load == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(load));
+        }
+
+        public Action action() {
+            return new Action.CastLoad(receiverAppId, load);
+        }
+
+        @Override
+        public String describe() {
+            String name = RECEIVER_NAMES.get(receiverAppId);
+            return name == null ? "Cast with receiver app " + receiverAppId : "Cast with " + name;
         }
     }
 

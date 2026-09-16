@@ -20,7 +20,7 @@
                   th:classappend="${state.connected()} ? 'ok' : 'off'"
                   th:text="${state.status()}">DISCONNECTED</span>
             <span class="app" th:id="'app-' + ${device.id()}"
-                  th:text="${state.currentApp()} ?: 'Nothing playing'">Nothing playing</span>
+                  th:text="${state.nowPlaying() != null ? state.nowPlaying().title() : (state.currentApp() ?: 'Nothing playing')}">Nothing playing</span>
         </a>
     </nav>
     <a th:href="@{/setup}">Setup</a>
@@ -66,7 +66,7 @@
     <section class="cast" th:if="${castControls}">
         <h2>Cast</h2>
         <label class="volume">Volume
-            <input type="range" name="level" min="0" max="100" step="1"
+            <input type="range" name="level" min="0" max="100" step="1" th:id="'volume-' + ${id}"
                    th:value="${selectedState.volumeLevel()}"
                    th:attr="hx-post=@{/devices/{id}/volume(id=${id})}" hx-trigger="change">
         </label>
@@ -85,6 +85,7 @@
         </form>
         <p id="open-result" class="hint" aria-live="polite"></p>
         <p class="hint">The device opens whichever app claims the link. If nothing happens, that app may not be installed.</p>
+        <p class="hint">Direct media links (.mp4, .mkv, .webm, .m3u8, .mp3, .flac …) play on Cast devices through the Default Media Receiver; the receiver must be able to reach the URL.</p>
     </section>
 </main>
 

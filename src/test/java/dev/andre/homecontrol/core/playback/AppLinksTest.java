@@ -60,4 +60,31 @@ class AppLinksTest {
     void rejectsAMissingLink() {
         assertThatThrownBy(() -> AppLinks.fromUrl(null)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void aDirectMediaLinkAlsoCarriesAStreamUrlAndItsFileNameAsTitle() {
+        String url = "https://media.example.org/films/Big%20Buck%20Bunny.MP4?token=1";
+
+        ContentItem item = AppLinks.fromUrl(url);
+
+        assertThat(item.playables()).containsExactly(
+                new PlayableRef.AppLink(URI.create(url), "web"),
+                new PlayableRef.StreamUrl(URI.create(url), "video/mp4"));
+        assertThat(item.title()).isEqualTo("Big Buck Bunny.MP4");
+        assertThat(item.kind()).isEqualTo(ContentKind.VIDEO);
+    }
+
+    @Test
+    void anAudioLinkIsATrack() {
+        ContentItem item = AppLinks.fromUrl("http://nas.local/music/song.flac");
+
+        assertThat(item.playables()).contains(new PlayableRef.StreamUrl(URI.create("http://nas.local/music/song.flac"), "audio/flac"));
+        assertThat(item.kind()).isEqualTo(ContentKind.TRACK);
+    }
+
+    @Test
+    void aPageLinkHasNoStream() {
+        assertThat(AppLinks.fromUrl("https://www.youtube.com/watch?v=abc").playables()).singleElement()
+                .isInstanceOf(PlayableRef.AppLink.class);
+    }
 }

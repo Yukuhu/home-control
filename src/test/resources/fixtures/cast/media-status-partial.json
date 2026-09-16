@@ -1,0 +1,16 @@
+{
+  "type": "MEDIA_STATUS",
+  "requestId": 0,
+  "status": [
+    {
+      "mediaSessionId": 1,
+      "playbackRate": 1,
+      "playerState": "PAUSED",
+      "currentTime": 30.2,
+      "supportedMediaCommands": 274447,
+      "volume": {"level": 1, "muted": false},
+      "currentItemId": 1,
+      "repeatMode": "REPEAT_OFF"
+    }
+  ]
+}
