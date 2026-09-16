@@ -71,7 +71,7 @@ public class DeviceStateBroadcaster {
     private void broadcast(DeviceStateChangedEvent event) {
         for (SseEmitter emitter : emitters) {
             try {
-                emitter.send(SseEmitter.event().name("state").data(event.state()));
+                emitter.send(SseEmitter.event().name("state").data(event));
             } catch (Throwable t) {
                 // Not just IOException: send throws an unchecked IllegalStateException when the
                 // emitter completed after this loop took its snapshot of the list, which happens

@@ -1,5 +1,5 @@
 package dev.andre.homecontrol.core;
 
-/** Published whenever a session's state changes, so the SSE layer can forward it. */
-public record DeviceStateChangedEvent(DeviceState state) {
+/** Published on every state transition of any device; the SSE layer forwards it as-is. */
+public record DeviceStateChangedEvent(String deviceId, DeviceState state) {
 }

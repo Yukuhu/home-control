@@ -50,7 +50,7 @@ class DeviceStateBroadcasterTest {
     }
 
     private static DeviceStateChangedEvent event() {
-        return new DeviceStateChangedEvent(DeviceState.initial());
+        return new DeviceStateChangedEvent("test", DeviceState.initial());
     }
 
     /** An emitter that records sends instead of writing to a response Spring never gave it. */

@@ -1,8 +1,7 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.device.DeviceSessionManager;
+import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.adapters.androidtv.PairingService;
-import dev.andre.homecontrol.adapters.androidtv.MdnsDiscovery;
 import dev.andre.homecontrol.storage.StorageException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,18 +28,15 @@ class SetupControllerTest {
     MockMvc mockMvc;
 
     @MockitoBean
-    MdnsDiscovery discovery;
-
-    @MockitoBean
     PairingService pairing;
 
     @MockitoBean
-    DeviceSessionManager sessions;
+    DeviceManager sessions;
 
     @Test
     void showsAnActionableStorageErrorBeforePairing() throws Exception {
-        given(discovery.devices()).willReturn(List.of());
-        given(sessions.activeDevice()).willReturn(Optional.empty());
+        given(sessions.discovered()).willReturn(List.of());
+        given(sessions.defaultDevice()).willReturn(Optional.empty());
         willThrow(new StorageException(
                 "Shield data directory is not writable: /data; check that /data is bind-mounted and writable",
                 new AccessDeniedException("/data")))

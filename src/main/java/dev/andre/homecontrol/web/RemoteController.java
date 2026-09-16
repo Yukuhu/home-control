@@ -1,9 +1,9 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.core.Action;
-import dev.andre.homecontrol.core.DeviceHandle;
+import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceOfflineException;
-import dev.andre.homecontrol.device.DeviceSessionManager;
+import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.RemoteKey;
 import org.springframework.http.HttpStatus;
@@ -21,17 +21,18 @@ import java.util.Locale;
 @Controller
 public class RemoteController {
 
-    private final DeviceSessionManager sessions;
+    private final DeviceManager sessions;
 
-    public RemoteController(DeviceSessionManager sessions) {
+    public RemoteController(DeviceManager sessions) {
         this.sessions = sessions;
     }
 
     @GetMapping("/")
     public String remote(Model model) {
-        DeviceState state = sessions.state();
+        Device device = sessions.defaultDevice().orElse(null);
+        DeviceState state = device == null ? DeviceState.initial() : sessions.state(device.id());
         model.addAttribute("state", state);
-        model.addAttribute("device", sessions.activeDevice().orElse(null));
+        model.addAttribute("device", device);
         return "remote";
     }
 
@@ -43,12 +44,12 @@ public class RemoteController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
-        session().execute(new Action.PressKey(remoteKey));
+        sessions.execute(defaultId(), new Action.PressKey(remoteKey));
         return ResponseEntity.noContent().build();
     }
 
-    private DeviceHandle session() {
-        return sessions.active()
+    private String defaultId() {
+        return sessions.defaultDevice().map(Device::id)
                 .orElseThrow(() -> new DeviceOfflineException("No device is paired"));
     }
 

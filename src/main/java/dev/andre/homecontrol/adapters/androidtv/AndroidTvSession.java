@@ -272,6 +272,13 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     }
 
     private void update(DeviceState updated) {
+        if (closed) {
+            // connect() runs on the scheduler thread and can still be mid-flight when
+            // close() flips this flag from another thread (e.g. a blocking connect() call
+            // returning just after forget() closed this session); without this guard it
+            // would publish a state — even CONNECTED — for a session nobody holds anymore.
+            return;
+        }
         state = updated;
         try {
             onChange.accept(updated);
