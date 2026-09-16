@@ -1,19 +1,12 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
 import dev.andre.homecontrol.core.DiscoveredDevice;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
+import dev.andre.homecontrol.discovery.MdnsBrowser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import javax.jmdns.JmDNS;
-import javax.jmdns.ServiceEvent;
-import javax.jmdns.ServiceInfo;
-import javax.jmdns.ServiceListener;
-
-import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +14,8 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Finds Android TV devices advertising the remote service.
+ * Finds Android TV devices advertising the remote service, through the shared
+ * {@link MdnsBrowser}.
  *
  * <p>Multicast does not cross a Docker bridge network, so the UI always offers manual
  * host entry alongside whatever this finds (spec §7).
@@ -34,33 +28,47 @@ public class MdnsDiscovery implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(MdnsDiscovery.class);
 
     private final Map<String, DiscoveredDevice> found = new ConcurrentHashMap<>();
-    private final boolean enabled;
+    private final MdnsBrowser browser;
+    /** True only when this instance built its own browser (outside Spring), so it must close it. */
+    private final boolean ownsBrowser;
 
-    private JmDNS jmdns;
-
-    /** Two constructors, so Spring needs to be told which one to use. */
+    /** Spring starts and closes the shared browser; this only registers the service type. */
     @Autowired
-    public MdnsDiscovery(AndroidTvProperties properties) {
-        this(properties.discoveryEnabled());
+    public MdnsDiscovery(MdnsBrowser browser) {
+        this(browser, false);
     }
 
+    /** Outside Spring: a private browser that nothing starts until {@link #start()} is called. */
     public MdnsDiscovery(boolean enabled) {
-        this.enabled = enabled;
+        this(new MdnsBrowser(enabled), true);
     }
 
-    @PostConstruct
+    private MdnsDiscovery(MdnsBrowser browser, boolean ownsBrowser) {
+        this.browser = browser;
+        this.ownsBrowser = ownsBrowser;
+        browser.browse(SERVICE_TYPE, new MdnsBrowser.Listener() {
+            @Override
+            public void resolved(MdnsBrowser.MdnsService service) {
+                toDevice(service.name(), service.addresses().toArray(InetAddress[]::new), service.port())
+                        .ifPresent(device -> {
+                            found.put(service.name(), device);
+                            log.info("Discovered {} at {}:{}", device.name(), device.host(), device.port());
+                        });
+            }
+
+            @Override
+            public void removed(String serviceType, String name) {
+                found.remove(name);
+            }
+        });
+    }
+
+    /**
+     * Starts the browser. Not a {@code @PostConstruct}: in the application the shared browser
+     * starts itself; this is for a standalone instance such as the opt-in multicast test.
+     */
     public void start() {
-        if (!enabled) {
-            log.info("mDNS discovery is disabled; add devices by host name or address");
-            return;
-        }
-        try {
-            jmdns = JmDNS.create(InetAddress.getLocalHost());
-            jmdns.addServiceListener(SERVICE_TYPE, new Listener());
-            log.info("Listening for {}", SERVICE_TYPE);
-        } catch (IOException e) {
-            log.warn("Could not start mDNS discovery ({}); use manual host entry", e.getMessage());
-        }
+        browser.start();
     }
 
     public List<DiscoveredDevice> devices() {
@@ -75,39 +83,10 @@ public class MdnsDiscovery implements AutoCloseable {
         return Optional.of(new DiscoveredDevice(AndroidTvSettings.ADAPTER_ID, name, addresses[0].getHostAddress(), port));
     }
 
-    private class Listener implements ServiceListener {
-
-        @Override
-        public void serviceAdded(ServiceEvent event) {
-            // Resolution arrives via serviceResolved; ask for it explicitly.
-            event.getDNS().requestServiceInfo(event.getType(), event.getName(), 1000);
-        }
-
-        @Override
-        public void serviceRemoved(ServiceEvent event) {
-            found.remove(event.getName());
-        }
-
-        @Override
-        public void serviceResolved(ServiceEvent event) {
-            ServiceInfo info = event.getInfo();
-            toDevice(info.getName(), info.getInetAddresses(), info.getPort())
-                    .ifPresent(device -> {
-                        found.put(event.getName(), device);
-                        log.info("Discovered {} at {}:{}", device.name(), device.host(), device.port());
-                    });
-        }
-    }
-
     @Override
-    @PreDestroy
     public void close() {
-        if (jmdns != null) {
-            try {
-                jmdns.close();
-            } catch (IOException ignored) {
-                // Shutting down anyway.
-            }
+        if (ownsBrowser) {
+            browser.close();
         }
     }
 }
