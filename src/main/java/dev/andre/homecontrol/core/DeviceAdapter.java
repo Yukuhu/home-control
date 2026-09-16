@@ -1,6 +1,8 @@
 package dev.andre.homecontrol.core;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -12,6 +14,9 @@ public interface DeviceAdapter {
 
     /** Stable key used in {@code Device.adapters} and in registry files, e.g. {@code androidtv}. */
     String id();
+
+    /** The family a device created by this adapter alone belongs to. */
+    DeviceKind kind();
 
     Set<Capability> capabilities(Device device);
 
@@ -27,4 +32,20 @@ public interface DeviceAdapter {
 
     /** Devices this adapter has seen on the network, paired or not. */
     List<DiscoveredDevice> discovered();
+
+    /**
+     * Settings for registering a discovered device without pairing, or empty when the device
+     * must be paired first. Cast returns settings; Android TV returns empty.
+     */
+    default Optional<Map<String, String>> settingsFor(DiscoveredDevice found) {
+        return Optional.empty();
+    }
+
+    /**
+     * True when this adapter stores credentials under the device id (Android TV: the certificate
+     * alias IS the id), so its entry must never move to a device with another id.
+     */
+    default boolean credentialsBoundToDeviceId() {
+        return false;
+    }
 }
