@@ -56,11 +56,15 @@ class DeviceStateStreamEndToEndTest {
     @Test
     void streamsAnInboundVolumeMessageOutAsAnSseEvent() throws Exception {
         HttpClient http = HttpClient.newHttpClient();
-        try (FakeRemoteServer fakeDevice = new FakeRemoteServer()) {
-            certificates.loadOrCreate("shield-sse");
-            sessions.adopt(AndroidTvSettings.device("shield-sse", "Test Shield", "127.0.0.1", fakeDevice.port(),
+        try (FakeRemoteServer fakeA = new FakeRemoteServer(); FakeRemoteServer fakeB = new FakeRemoteServer()) {
+            certificates.loadOrCreate("shield-a");
+            certificates.loadOrCreate("shield-b");
+            sessions.adopt(AndroidTvSettings.device("shield-a", "Shield A", "127.0.0.1", fakeA.port(),
                     null, Instant.now()));
-            await().until(() -> sessions.state("shield-sse").status() == DeviceStatus.CONNECTED);
+            sessions.adopt(AndroidTvSettings.device("shield-b", "Shield B", "127.0.0.1", fakeB.port(),
+                    null, Instant.now()));
+            await().until(() -> sessions.state("shield-a").status() == DeviceStatus.CONNECTED);
+            await().until(() -> sessions.state("shield-b").status() == DeviceStatus.CONNECTED);
 
             List<String> lines = new CopyOnWriteArrayList<>();
             HttpResponse<Stream<String>> response = http.send(
@@ -72,20 +76,25 @@ class DeviceStateStreamEndToEndTest {
             assertThat(response.statusCode()).isEqualTo(200);
             Thread.ofVirtual().name("sse-e2e-reader").start(() -> response.body().forEach(lines::add));
 
-            // The current state arrives immediately, which also proves the subscription is live
-            // before the device pushes anything.
-            await().until(() -> lines.stream().anyMatch(line -> line.startsWith("data:")));
+            // Each device's snapshot must show up somewhere in the stream, but not necessarily
+            // as the very first lines: a broadcast from either fake device's own connect can
+            // race the subscription's snapshot loop and land in between, so asserting on a
+            // fixed line position would be flaky.
+            await().until(() -> lines.stream().anyMatch(line -> line.contains("\"deviceId\":\"shield-a\"")));
+            await().until(() -> lines.stream().anyMatch(line -> line.contains("\"deviceId\":\"shield-b\"")));
 
-            fakeDevice.pushVolume(12, 100, true);
+            fakeB.pushVolume(12, 100, true);
 
             await().until(() -> lines.stream().anyMatch(line ->
-                    line.contains("\"volumeLevel\":12") && line.contains("\"muted\":true")));
+                    line.contains("\"deviceId\":\"shield-b\"") && line.contains("\"volumeLevel\":12")
+                            && line.contains("\"muted\":true")));
             assertThat(lines).contains("event:state");
         } finally {
             // shutdownNow, not close: an SSE stream never ends by itself, and close() would
             // block waiting for this one to.
             http.shutdownNow();
-            sessions.forget("shield-sse");
+            sessions.forget("shield-a");
+            sessions.forget("shield-b");
         }
     }
 }

@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.springframework.http.MediaType;
@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.Map;
 
 @RestController
 public class StateController {
@@ -25,13 +26,10 @@ public class StateController {
     public SseEmitter events() throws IOException {
         SseEmitter emitter = broadcaster.subscribe();
         try {
-            // Send the current state immediately so a new tab is not blank until something
-            // changes. Interim (Task 6): the default device only, and nothing at all when
-            // there is none to report — Task 7 sends every registered device.
-            Device device = sessions.defaultDevice().orElse(null);
-            if (device != null) {
+            // One snapshot per device so a new tab paints every chip before anything changes.
+            for (Map.Entry<String, DeviceState> entry : sessions.states().entrySet()) {
                 emitter.send(SseEmitter.event().name("state")
-                        .data(new DeviceStateChangedEvent(device.id(), sessions.state(device.id()))));
+                        .data(new DeviceStateChangedEvent(entry.getKey(), entry.getValue())));
             }
         } catch (IOException e) {
             // The emitter never reached Spring, so its onCompletion/onTimeout/onError
