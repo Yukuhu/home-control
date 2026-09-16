@@ -2,6 +2,7 @@ package dev.andre.homecontrol.adapters.androidtv.protocol;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import dev.andre.homecontrol.core.RemoteKey;
+import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteAppLinkLaunchRequest;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteConfigure;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteDeviceInfo;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteDirection;
@@ -31,10 +32,12 @@ public class RemoteConnection implements AutoCloseable {
     private static final int FEATURE_IME_RECEIVE = 1 << 2; // 4, supplies current-app events
     private static final int FEATURE_POWER = 1 << 5;    // 32
     private static final int FEATURE_VOLUME = 1 << 6;   // 64
+    private static final int FEATURE_APP_LINK = 1 << 9;  // 512, RemoteAppLinkLaunchRequest
     private static final int CLIENT_FEATURES = FEATURE_KEY
             | FEATURE_IME_RECEIVE
             | FEATURE_POWER
-            | FEATURE_VOLUME;
+            | FEATURE_VOLUME
+            | FEATURE_APP_LINK;
 
     private final SSLSocket socket;
     private final MessageStream stream;
@@ -97,6 +100,16 @@ public class RemoteConnection implements AutoCloseable {
                 .setRemoteKeyInject(RemoteKeyInject.newBuilder()
                         .setKeyCode(RemoteKeyCode.forNumber(key.code()))
                         .setDirection(RemoteDirection.SHORT))
+                .build());
+    }
+
+    /**
+     * Asks the device to open {@code uri} with whatever app claims it. There is no reply:
+     * success shows up, if at all, as a later current-app event (spec §5.3).
+     */
+    public void sendAppLink(String uri) throws IOException {
+        stream.write(RemoteMessage.newBuilder()
+                .setRemoteAppLinkLaunchRequest(RemoteAppLinkLaunchRequest.newBuilder().setAppLink(uri))
                 .build());
     }
 

@@ -14,6 +14,7 @@ import dev.andre.homecontrol.storage.StorageException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -38,12 +39,13 @@ class AndroidTvAdapterTest {
     }
 
     @Test
-    void declaresRemoteKeysPowerAndVolume() {
+    void declaresRemoteKeysPowerVolumeAndAppLink() {
         Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", 6466, null, Instant.now());
 
         assertThat(adapter(new CertificateStore(properties().keystoreFile(), "shield".toCharArray()))
                 .capabilities(device))
-                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME);
+                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME,
+                        Capability.APP_LINK);
     }
 
     @Test
@@ -83,13 +85,31 @@ class AndroidTvAdapterTest {
     }
 
     @Test
+    void opensAnAppLinkOnceConnected() throws Exception {
+        try (FakeRemoteServer remote = new FakeRemoteServer()) {
+            CertificateStore certificates = new CertificateStore(properties().keystoreFile(), "shield".toCharArray());
+            certificates.loadOrCreate("shield");
+            Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", remote.port(), null, Instant.now());
+
+            try (DeviceHandle handle = adapter(certificates).connect(device, state -> { })) {
+                await().until(() -> handle.state().status() == DeviceStatus.CONNECTED);
+
+                handle.execute(new Action.OpenAppLink(URI.create("https://www.netflix.com/title/80057281")));
+
+                assertThat(remote.nextAppLink()).isEqualTo("https://www.netflix.com/title/80057281");
+            }
+        }
+    }
+
+    @Test
     void anUnreadableKeystoreFailsAtAdapterStart() {
         new CertificateStore(properties().keystoreFile(), "correct".toCharArray()).loadOrCreate("x");
         AndroidTvAdapter adapter = adapter(new CertificateStore(properties().keystoreFile(), "wrong".toCharArray()));
 
         assertThatThrownBy(adapter::verifyCredentialStore)
                 .isInstanceOf(StorageException.class)
-                .hasMessageContaining("password");
+                .hasMessageContaining("password")
+                .hasMessageContaining(properties().keystoreFile().toString());
     }
 
     @Test

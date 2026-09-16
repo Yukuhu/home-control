@@ -17,6 +17,7 @@ public sealed interface PairingOutcome {
     record WrongCode() implements PairingOutcome {
     }
 
+    /** Pairing could not proceed at all — a transport or protocol failure, not a wrong code. */
     record Failed(String reason) implements PairingOutcome {
     }
 }
