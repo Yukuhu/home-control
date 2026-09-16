@@ -1,8 +1,8 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.device.DeviceSessionManager;
-import dev.andre.homecontrol.device.PairingService;
-import dev.andre.homecontrol.discovery.MdnsDiscovery;
+import dev.andre.homecontrol.adapters.androidtv.PairingService;
+import dev.andre.homecontrol.adapters.androidtv.MdnsDiscovery;
 import dev.andre.homecontrol.storage.StorageException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

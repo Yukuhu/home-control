@@ -1,7 +1,8 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
-import dev.andre.homecontrol.device.DeviceSession;
 import dev.andre.homecontrol.device.DeviceSessionManager;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.RemoteKey;
@@ -42,11 +43,11 @@ public class RemoteController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
-        session().sendKey(remoteKey);
+        session().execute(new Action.PressKey(remoteKey));
         return ResponseEntity.noContent().build();
     }
 
-    private DeviceSession session() {
+    private DeviceHandle session() {
         return sessions.active()
                 .orElseThrow(() -> new DeviceOfflineException("No device is paired"));
     }

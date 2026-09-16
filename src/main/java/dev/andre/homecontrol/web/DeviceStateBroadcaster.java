@@ -26,7 +26,7 @@ public class DeviceStateBroadcaster {
 
     /**
      * The fan-out's own thread. {@code publishEvent} is synchronous, so without this the
-     * loop below would run on the publishing {@code DeviceSession}'s single scheduler
+     * loop below would run on the publishing {@code AndroidTvSession}'s single scheduler
      * thread, and one wedged browser blocking in {@code send} would stall that device's
      * reconnects. Single-threaded, so events still reach each tab in the order published.
      */

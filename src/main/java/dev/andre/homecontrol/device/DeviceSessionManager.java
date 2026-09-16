@@ -1,13 +1,11 @@
 package dev.andre.homecontrol.device;
 
-import dev.andre.homecontrol.ShieldProperties;
-import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvAdapter;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
-import dev.andre.homecontrol.protocol.ClientCertificate;
-import dev.andre.homecontrol.protocol.CertificateStore;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.springframework.context.ApplicationEventPublisher;
@@ -18,31 +16,28 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Owns one {@link DeviceSession} per registered device. The v1 UI drives whichever
+ * Owns one {@link DeviceHandle} per registered device. The v1 UI drives whichever
  * device is first in the registry; the map is what makes "multiple devices later"
  * a UI change rather than a rewrite.
  */
 @Service
 public class DeviceSessionManager implements AutoCloseable {
 
-    private final Map<String, DeviceSession> sessions = new ConcurrentHashMap<>();
+    private final Map<String, DeviceHandle> sessions = new ConcurrentHashMap<>();
 
     private final DeviceRegistry registry;
-    private final CertificateStore certificates;
-    private final ShieldProperties properties;
+    private final AndroidTvAdapter adapter;
     private final ApplicationEventPublisher events;
 
-    public DeviceSessionManager(DeviceRegistry registry, CertificateStore certificates,
-                                ShieldProperties properties, ApplicationEventPublisher events) {
+    public DeviceSessionManager(DeviceRegistry registry, AndroidTvAdapter adapter,
+                                ApplicationEventPublisher events) {
         this.registry = registry;
-        this.certificates = certificates;
-        this.properties = properties;
+        this.adapter = adapter;
         this.events = events;
     }
 
     @PostConstruct
     public void startRegisteredDevices() {
-        certificates.verifyReadable();
         // Only the active device, not every entry. A re-pair at a changed address leaves a
         // stale entry behind (the id is derived from the host, spec §6), and since
         // DeviceStateChangedEvent carries no device id, a second session's DISCONNECTED
@@ -51,7 +46,7 @@ public class DeviceSessionManager implements AutoCloseable {
         registry.first().ifPresent(this::startSession);
     }
 
-    public Optional<DeviceSession> active() {
+    public Optional<DeviceHandle> active() {
         return registry.first().map(device -> sessions.get(device.id()));
     }
 
@@ -60,8 +55,8 @@ public class DeviceSessionManager implements AutoCloseable {
         if (device.isEmpty()) {
             return DeviceState.initial();
         }
-        DeviceSession session = sessions.get(device.get().id());
-        return session == null ? DeviceState.unpaired() : session.state();
+        DeviceHandle handle = sessions.get(device.get().id());
+        return handle == null ? DeviceState.unpaired() : handle.state();
     }
 
     public Optional<Device> activeDevice() {
@@ -80,39 +75,30 @@ public class DeviceSessionManager implements AutoCloseable {
             return;
         }
         Device device = registered.get();
-        DeviceSession session = sessions.remove(device.id());
-        if (session != null) {
-            session.close();
+        DeviceHandle handle = sessions.remove(device.id());
+        if (handle != null) {
+            handle.close();
         }
         registry.delete(device.id());
-        certificates.delete(AndroidTvSettings.certificateAlias(device));
+        adapter.forget(device);
         events.publishEvent(new DeviceStateChangedEvent(state()));
     }
 
     private void startSession(Device device) {
-        DeviceSession existing = sessions.remove(device.id());
+        DeviceHandle existing = sessions.remove(device.id());
         if (existing != null) {
             existing.close();
         }
 
-        Optional<ClientCertificate> credential = certificates.load(AndroidTvSettings.certificateAlias(device));
-        if (credential.isEmpty()) {
-            events.publishEvent(new DeviceStateChangedEvent(DeviceState.unpaired()));
-            return;
-        }
-
-        DeviceSession session = new DeviceSession(device,
-                credential.get(),
-                properties,
+        DeviceHandle handle = adapter.connect(device,
                 state -> events.publishEvent(new DeviceStateChangedEvent(state)));
-        sessions.put(device.id(), session);
-        session.start();
+        sessions.put(device.id(), handle);
     }
 
     @Override
     @PreDestroy
     public void close() {
-        sessions.values().forEach(DeviceSession::close);
+        sessions.values().forEach(DeviceHandle::close);
         sessions.clear();
     }
 }

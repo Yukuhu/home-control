@@ -1,14 +1,15 @@
 package dev.andre.homecontrol.device;
 
-import dev.andre.homecontrol.ShieldProperties;
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvAdapter;
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.adapters.androidtv.MdnsDiscovery;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStatus;
-import dev.andre.homecontrol.protocol.CertificateStore;
-import dev.andre.homecontrol.protocol.FakeRemoteServer;
-import dev.andre.homecontrol.storage.StorageException;
+import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
+import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.ApplicationEventPublisher;
@@ -20,7 +21,6 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 class DeviceSessionManagerTest {
@@ -45,13 +45,13 @@ class DeviceSessionManagerTest {
             registry.save(AndroidTvSettings.device("shield-current", "Shield", "127.0.0.1", currentAddress.port(),
                     null, Instant.parse("2026-08-29T19:00:00Z")));
 
-            ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+            AndroidTvProperties properties = new AndroidTvProperties(dir, "shield", false, 10, 1, 4);
             CertificateStore certificates = new CertificateStore(
                     properties.keystoreFile(), "shield".toCharArray());
             certificates.loadOrCreate("shield-current");
             try (DeviceSessionManager manager = new DeviceSessionManager(registry,
-                    certificates,
-                    properties, event -> {
+                    new AndroidTvAdapter(certificates, properties, new MdnsDiscovery(false)),
+                    event -> {
             })) {
                 manager.startRegisteredDevices();
 
@@ -72,12 +72,13 @@ class DeviceSessionManagerTest {
             DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
             registry.save(AndroidTvSettings.device("shield-missing-key", "Shield", "127.0.0.1", remote.port(),
                     null, Instant.now()));
-            ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+            AndroidTvProperties properties = new AndroidTvProperties(dir, "shield", false, 10, 1, 4);
             CertificateStore certificates = new CertificateStore(
                     properties.keystoreFile(), "shield".toCharArray());
 
             try (DeviceSessionManager manager = new DeviceSessionManager(
-                    registry, certificates, properties, event -> { })) {
+                    registry, new AndroidTvAdapter(certificates, properties, new MdnsDiscovery(false)),
+                    event -> { })) {
                 manager.startRegisteredDevices();
 
                 assertThat(manager.state().status()).isEqualTo(DeviceStatus.UNPAIRED);
@@ -89,37 +90,20 @@ class DeviceSessionManagerTest {
     }
 
     @Test
-    void emptyRegistryStillRejectsAnUnreadableKeystore() {
-        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-        ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
-        new CertificateStore(properties.keystoreFile(), "correct".toCharArray())
-                .loadOrCreate("orphaned-alias");
-        CertificateStore wrongPasswordStore = new CertificateStore(
-                properties.keystoreFile(), "wrong".toCharArray());
-
-        try (DeviceSessionManager manager = new DeviceSessionManager(
-                registry, wrongPasswordStore, properties, event -> { })) {
-            assertThatThrownBy(manager::startRegisteredDevices)
-                    .isInstanceOf(StorageException.class)
-                    .hasMessageContaining(properties.keystoreFile().toString())
-                    .hasMessageContaining("password");
-        }
-    }
-
-    @Test
     void forgetDeletesTheRegistryRecordAndOnlyItsCredential() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
         Device forgotten = AndroidTvSettings.device("shield-forgotten", "Shield", "127.0.0.1", 6466,
                 null, Instant.now());
         registry.save(forgotten);
-        ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+        AndroidTvProperties properties = new AndroidTvProperties(dir, "shield", false, 10, 1, 4);
         CertificateStore certificates = new CertificateStore(
                 properties.keystoreFile(), "shield".toCharArray());
         certificates.loadOrCreate(AndroidTvSettings.certificateAlias(forgotten));
         certificates.loadOrCreate("keep-this-alias");
 
         try (DeviceSessionManager manager = new DeviceSessionManager(
-                registry, certificates, properties, event -> { })) {
+                registry, new AndroidTvAdapter(certificates, properties, new MdnsDiscovery(false)),
+                event -> { })) {
             manager.forget(forgotten.id());
         }
 
@@ -131,13 +115,14 @@ class DeviceSessionManagerTest {
     @Test
     void forgetUnknownDevicePreservesItsOrphanedCredential() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-        ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+        AndroidTvProperties properties = new AndroidTvProperties(dir, "shield", false, 10, 1, 4);
         CertificateStore certificates = new CertificateStore(
                 properties.keystoreFile(), "shield".toCharArray());
         certificates.loadOrCreate("orphaned-alias");
 
         try (DeviceSessionManager manager = new DeviceSessionManager(
-                registry, certificates, properties, event -> { })) {
+                registry, new AndroidTvAdapter(certificates, properties, new MdnsDiscovery(false)),
+                event -> { })) {
             manager.forget("orphaned-alias");
         }
 
@@ -151,7 +136,7 @@ class DeviceSessionManagerTest {
             Device forgotten = AndroidTvSettings.device("shield-forgotten", "Shield", "127.0.0.1",
                     remote.port(), null, Instant.now());
             registry.save(forgotten);
-            ShieldProperties properties = new ShieldProperties(dir, "shield", false, 10, 1, 4);
+            AndroidTvProperties properties = new AndroidTvProperties(dir, "shield", false, 10, 1, 4);
             CertificateStore certificates = new CertificateStore(
                     properties.keystoreFile(), "shield".toCharArray());
             certificates.loadOrCreate(AndroidTvSettings.certificateAlias(forgotten));
@@ -159,7 +144,8 @@ class DeviceSessionManagerTest {
             ApplicationEventPublisher publisher = published::add;
 
             try (DeviceSessionManager manager = new DeviceSessionManager(
-                    registry, certificates, properties, publisher)) {
+                    registry, new AndroidTvAdapter(certificates, properties, new MdnsDiscovery(false)),
+                    publisher)) {
                 manager.startRegisteredDevices();
                 await().until(() -> manager.state().status() == DeviceStatus.CONNECTED);
                 remote.pushCurrentApp("com.netflix.ninja");

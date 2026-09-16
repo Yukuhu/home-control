@@ -3,8 +3,8 @@ package dev.andre.homecontrol.web;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
 import dev.andre.homecontrol.device.DeviceSessionManager;
 import dev.andre.homecontrol.core.DeviceStatus;
-import dev.andre.homecontrol.protocol.CertificateStore;
-import dev.andre.homecontrol.protocol.FakeRemoteServer;
+import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
+import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,7 +29,7 @@ import static org.awaitility.Awaitility.await;
 
 /**
  * Spec §9's named end-to-end case: an inbound volume message from the device propagating
- * all the way out as an SSE event. Wires the fake device server, a real {@code DeviceSession},
+ * all the way out as an SSE event. Wires the fake device server, a real {@code AndroidTvSession},
  * the Spring event publisher, the broadcaster's own fan-out thread and a real HTTP client on
  * {@code /events} — the one path where the protocol layer's threading meets the web layer's.
  */
