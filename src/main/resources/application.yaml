@@ -1,5 +1,15 @@
 server:
   port: 8080
+  servlet:
+    session:
+      timeout: 30d
+      tracking-modes: cookie
+      cookie:
+        name: HOME_CONTROL_SESSION
+        http-only: true
+        same-site: lax
+        max-age: 30d
+        secure: ${HOME_CONTROL_SECURE_COOKIE:false}
 
 shield:
   data-dir: ./data
@@ -21,3 +31,13 @@ home-control:
     command-timeout-seconds: 5
     load-timeout-seconds: 20
     media-status-interval-seconds: 5
+  security:
+    # Optional passphrase for secrets.json; without it a random /data/secret.key is created on first use.
+    secret: ${HOME_CONTROL_SECRET:}
+    # Extra origins allowed to POST, e.g. https://home.example.org when a proxy rewrites Host.
+    trusted-origins: ${HOME_CONTROL_TRUSTED_ORIGINS:}
+    # Extra host names (exact, or *.suffix) besides IP addresses, localhost, single-label and .local/.lan/.home.arpa/.internal names.
+    allowed-hosts: ${HOME_CONTROL_ALLOWED_HOSTS:}
+    login-attempts-per-address: 5
+    login-attempts-total: 50
+    login-window: 15m

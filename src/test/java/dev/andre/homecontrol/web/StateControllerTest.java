@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
@@ -39,7 +40,7 @@ class StateControllerTest {
         states.put("living", new DeviceState(DeviceStatus.CONNECTED, true, "com.netflix.ninja", 12, 100, false, Instant.EPOCH));
         states.put("bedroom", DeviceState.unpaired());
         given(devices.states()).willReturn(states);
-        given(broadcaster.subscribe()).willReturn(new SseEmitter(0L));
+        given(broadcaster.subscribe(any())).willReturn(new SseEmitter(0L));
 
         MvcResult result = mockMvc.perform(get("/events").accept("text/event-stream"))
                 .andExpect(status().isOk())

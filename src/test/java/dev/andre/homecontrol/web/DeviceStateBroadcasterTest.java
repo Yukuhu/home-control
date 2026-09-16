@@ -9,6 +9,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,6 +72,37 @@ class DeviceStateBroadcasterTest {
         recording.shutdown();
     }
 
+    /** After a logout or a password change a tab must not keep receiving state it may no longer see. */
+    @Test
+    void closesSubscribersThatAreNoLongerAllowedWhenAskedToRevalidate() {
+        AtomicBoolean allowed = new AtomicBoolean(true);
+        CountingEmitter revoked = (CountingEmitter) broadcaster.register(new CountingEmitter(), allowed::get);
+        CountingEmitter other = (CountingEmitter) broadcaster.register(new CountingEmitter());
+
+        allowed.set(false);
+        broadcaster.revalidate();
+
+        assertThat(revoked.completed()).isTrue();
+        assertThat(other.completed()).isFalse();
+        broadcaster.onStateChanged(event());
+        await().until(() -> other.count().get() == 1);
+        assertThat(revoked.count()).hasValue(0);
+    }
+
+    @Test
+    void neverSendsToASubscriberThatLostItsLoginBetweenRevalidations() {
+        AtomicBoolean allowed = new AtomicBoolean(true);
+        CountingEmitter revoked = (CountingEmitter) broadcaster.register(new CountingEmitter(), allowed::get);
+        CountingEmitter other = (CountingEmitter) broadcaster.register(new CountingEmitter());
+
+        allowed.set(false);
+        broadcaster.onStateChanged(event());
+
+        await().until(() -> other.count().get() == 1);
+        assertThat(revoked.count()).hasValue(0);
+        assertThat(revoked.completed()).isTrue();
+    }
+
     private static DeviceStateChangedEvent event() {
         return new DeviceStateChangedEvent("test", DeviceState.initial());
     }
@@ -79,9 +111,19 @@ class DeviceStateBroadcasterTest {
     private static class CountingEmitter extends SseEmitter {
 
         private final AtomicInteger sends = new AtomicInteger();
+        private final AtomicBoolean completed = new AtomicBoolean();
 
         AtomicInteger count() {
             return sends;
+        }
+
+        boolean completed() {
+            return completed.get();
+        }
+
+        @Override
+        public void complete() {
+            completed.set(true);
         }
 
         @Override
