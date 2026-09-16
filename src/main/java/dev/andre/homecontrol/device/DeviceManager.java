@@ -45,7 +45,7 @@ public class DeviceManager implements AutoCloseable {
     /** device id → (adapter id → handle), in the device's adapter order. */
     private final Map<String, Map<String, DeviceHandle>> handles = new ConcurrentHashMap<>();
     /**
-     * Guards every write to {@link #handles} (via {@link #connect}, {@link #closeHandles},
+     * Guards every write to {@link #handles} (via {@link #tryConnect}, {@link #closeHandles},
      * {@link #adopt}, {@link #forget} and {@link #close}) so that an adopt racing another
      * adopt, or an adopt racing a forget, can never leave two live handles for one device or
      * a live handle for a device that {@link #forget} just deleted from the registry.
@@ -171,14 +171,23 @@ public class DeviceManager implements AutoCloseable {
 
     /**
      * Connects every one of the device's adapters, under {@link #lock} so this can never
-     * interleave with another {@link #connect}/{@link #closeHandles} for the same or a
+     * interleave with another {@link #tryConnect}/{@link #closeHandles} for the same or a
      * different device. A failing adapter never leaves the device half-connected: its
      * {@link RuntimeException} is caught and logged, whatever handles this call already
      * opened for the device are closed, and the device is left with no handles at all —
      * {@link #state} then reads it as DISCONNECTED — rather than failing {@link #start} and
-     * leaking those handles, or every other device's connect along with it.
+     * leaking those handles, or every other device's connect along with it. A DISCONNECTED
+     * state is then published for the device: its previous handle was closed and silenced
+     * first, so whatever that handle last published would otherwise stay on every screen.
      */
     private void connect(Device device) {
+        if (!tryConnect(device)) {
+            events.publishEvent(new DeviceStateChangedEvent(device.id(), DeviceState.initial()));
+        }
+    }
+
+    /** {@link #connect}'s locked part; false when an adapter failed and the device has no handles. */
+    private boolean tryConnect(Device device) {
         synchronized (lock) {
             closeHandles(device.id());
             Map<String, DeviceHandle> deviceHandles = new LinkedHashMap<>();
@@ -194,10 +203,11 @@ public class DeviceManager implements AutoCloseable {
                     log.warn("Could not connect {} via the {} adapter; leaving it disconnected",
                             device.id(), adapterId, e);
                     deviceHandles.values().forEach(DeviceHandle::close);
-                    return;
+                    return false;
                 }
             }
             handles.put(device.id(), deviceHandles);
+            return true;
         }
     }
 

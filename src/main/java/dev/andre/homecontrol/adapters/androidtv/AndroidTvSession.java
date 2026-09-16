@@ -137,6 +137,15 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
             }
 
             connection = opened;
+            if (closed) {
+                // close() ran while the handshake above was blocking this thread and read
+                // connection before it was set, so nobody else will ever close this one.
+                // Both fields are volatile and close() sets closed before reading connection,
+                // so one of the two sides always sees the other.
+                opened.close();
+                connection = null;
+                return;
+            }
             backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
             forgetAmbiguousVerdicts();
             update(state.withStatus(DeviceStatus.CONNECTED));

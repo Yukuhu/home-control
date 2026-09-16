@@ -109,7 +109,9 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 
 An older `devices.json` (from before multi-device support) is upgraded in place on
 first start; the upgrade keeps existing pairings, so no re-pairing is needed after
-updating.
+updating. The upgrade is one-way: an older image cannot read the new file. The original
+is kept once as `devices.v1.json` in the same directory — to roll back, stop the app,
+restore that file as `devices.json`, and start the older image.
 
 ## Releases
 
