@@ -71,7 +71,8 @@ public class SetupController {
 
     private void populateSetupModel(Model model, boolean awaitingCode) {
         model.addAttribute("awaitingCode", awaitingCode);
-        model.addAttribute("discovered", devices.discovered());
+        model.addAttribute("discovered", devices.pairable());
+        model.addAttribute("addable", devices.addable());
         model.addAttribute("paired", devices.devices());
     }
 
@@ -79,5 +80,32 @@ public class SetupController {
     public String forget(@RequestParam String id) {
         devices.forget(id);
         return "redirect:/setup";
+    }
+
+    @PostMapping("/setup/add")
+    public String add(@RequestParam String adapter, @RequestParam String host, @RequestParam int port, Model model) {
+        return refusable(model, () -> devices.addDiscovered(adapter, host, port));
+    }
+
+    @PostMapping("/setup/merge")
+    public String merge(@RequestParam String target, @RequestParam String source, Model model) {
+        return refusable(model, () -> devices.merge(target, source));
+    }
+
+    @PostMapping("/setup/split")
+    public String split(@RequestParam String id, @RequestParam String adapter, Model model) {
+        return refusable(model, () -> devices.split(id, adapter));
+    }
+
+    /** A refusal is a sentence for the user, shown on the page; success goes back to setup. */
+    private String refusable(Model model, Runnable change) {
+        try {
+            change.run();
+            return "redirect:/setup";
+        } catch (IllegalArgumentException e) {
+            model.addAttribute("error", e.getMessage());
+            populateSetupModel(model, false);
+            return "setup";
+        }
     }
 }
