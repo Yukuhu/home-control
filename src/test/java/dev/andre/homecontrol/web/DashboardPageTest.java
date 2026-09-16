@@ -68,7 +68,7 @@ class DashboardPageTest {
                 .andExpect(content().string(not(containsString("/devices/bedroom/key/"))))
                 .andExpect(content().string(containsString("com.netflix.ninja")))
                 .andExpect(content().string(containsString("/devices/living/play")))
-                .andExpect(content().string(containsString("data-device=\"living\"")));
+                .andExpect(content().string(containsString("<body data-device=\"living\"")));
     }
 
     @Test
@@ -84,6 +84,24 @@ class DashboardPageTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("/devices/bedroom/key/HOME")))
                 .andExpect(content().string(not(containsString("/devices/bedroom/play"))));
+    }
+
+    @Test
+    void theDefaultDeviceIsPreferredOverTheFirstDeviceInTheList() throws Exception {
+        Device living = device("living", "Living Room", Instant.now());
+        Device bedroom = device("bedroom", "Bedroom", Instant.now());
+        // Living is first in the list DeviceManager returns, but the default is bedroom:
+        // the selection must come from defaultDevice(), not from all.getFirst().
+        given(devices.devices()).willReturn(List.of(living, bedroom));
+        given(devices.defaultDevice()).willReturn(Optional.of(bedroom));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.REMOTE_KEYS));
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<body data-device=\"bedroom\"")))
+                .andExpect(content().string(containsString("/devices/bedroom/key/HOME")))
+                .andExpect(content().string(not(containsString("/devices/living/key/"))));
     }
 
     @Test

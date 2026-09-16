@@ -63,7 +63,7 @@
 
     <section class="open-link" th:if="${canOpenLinks}">
         <h2>Open a link on this device</h2>
-        <form th:attr="hx-post=@{/devices/{id}/play(id=${id})}" hx-target="#open-result" hx-swap="innerHTML">
+        <form th:attr="hx-post=@{/devices/{id}/play(id=${id})}" hx-target="#open-result" hx-swap="textContent">
             <input name="uri" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" required>
             <button type="submit">Play</button>
         </form>

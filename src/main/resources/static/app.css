@@ -27,3 +27,18 @@ button:active { background: var(--accent); }
 .error { background: #3a2020; padding: .75rem; border-radius: .5rem; }
 #toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
          background: #3a2020; padding: .75rem 1rem; border-radius: .5rem; }
+.strip { flex-wrap: wrap; }
+.devices { display: flex; gap: .5rem; overflow-x: auto; flex: 1; }
+.chip { display: grid; grid-template-columns: auto auto; gap: .15rem .5rem; align-items: center;
+        padding: .5rem .75rem; border-radius: .75rem; background: var(--btn); color: var(--fg);
+        text-decoration: none; border: 1px solid #313640; white-space: nowrap; }
+.chip.selected { border-color: var(--accent); }
+.chip .name { font-weight: 600; }
+.chip .app { grid-column: 1 / -1; font-size: .8rem; opacity: .8; overflow: hidden;
+             text-overflow: ellipsis; max-width: 12rem; }
+main h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+.meta { margin: 0 0 1rem; opacity: .8; }
+.open-link form { display: flex; gap: .5rem; }
+.open-link input { flex: 1; padding: .7rem; border-radius: .5rem; border: 1px solid #313640;
+                   background: #1b1e24; color: var(--fg); }
+.hint { font-size: .85rem; opacity: .8; }
