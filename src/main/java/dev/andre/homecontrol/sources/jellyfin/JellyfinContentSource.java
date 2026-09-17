@@ -84,6 +84,26 @@ public class JellyfinContentSource implements ContentSource {
         }
     }
 
+    @Override
+    public boolean searchable() {
+        return true;
+    }
+
+    @Override
+    public List<ContentItem> search(String query, int limit) {
+        JellyfinConnection connection = connection();
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("userId", connection.userId());
+        params.put("searchTerm", query);
+        params.put("recursive", "true");
+        params.put("includeItemTypes", "Movie,Episode,Video,MusicVideo,Audio");
+        params.put("limit", String.valueOf(limit));
+        params.put("enableUserData", "true");
+        params.put("enableImageTypes", IMAGE_TYPES);
+        params.put("imageTypeLimit", "1");
+        return JellyfinItemMapper.toItems(client.get(connection, "/Items", params).path("Items"));
+    }
+
     JellyfinConnection connection() {
         return setup.connection().orElseThrow(() ->
                 new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Jellyfin is not connected"));

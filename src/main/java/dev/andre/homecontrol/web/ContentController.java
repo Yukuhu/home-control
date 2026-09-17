@@ -11,10 +11,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /** Content sources and their rails. Interim: fetches upstream on every call. Sub-project D1 puts a cache in front. */
@@ -56,6 +58,36 @@ public class ContentController {
 
     private RailView toRailView(RailDescriptor descriptor) {
         return new RailView(descriptor.id(), descriptor.title());
+    }
+
+    public record SearchResult(String sourceId, String sourceName, List<ContentItemView> items) {
+    }
+
+    public record SearchError(String sourceId, String message) {
+    }
+
+    public record SearchResponse(String query, List<SearchResult> results, List<SearchError> errors) {
+    }
+
+    /** Used by the unified search box (D5). Sequential for now; a slow source delays the answer. */
+    @GetMapping(path = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> search(@RequestParam(required = false) String q, @RequestParam(defaultValue = "20") int limit) {
+        String query = q == null ? "" : q.strip();
+        if (query.length() < 2 || query.length() > 100) {
+            return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body("Search for 2 to 100 characters");
+        }
+        int clamped = Math.max(1, Math.min(50, limit));
+        List<SearchResult> results = new ArrayList<>();
+        List<SearchError> errors = new ArrayList<>();
+        for (ContentSource source : sources.searchable()) {
+            try {
+                results.add(new SearchResult(source.id(), source.displayName(),
+                        source.search(query, clamped).stream().map(ContentItemView::of).toList()));
+            } catch (ContentSourceException e) {
+                errors.add(new SearchError(source.id(), e.getMessage()));
+            }
+        }
+        return ResponseEntity.ok(new SearchResponse(query, results, errors));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

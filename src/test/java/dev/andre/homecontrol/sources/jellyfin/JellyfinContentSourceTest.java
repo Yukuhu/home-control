@@ -140,4 +140,29 @@ class JellyfinContentSourceTest {
                 .isInstanceOf(ContentSourceException.class)
                 .hasMessageContaining("answered HTTP 500");
     }
+
+    @Test
+    void isSearchable() {
+        assertThat(source.searchable()).isTrue();
+    }
+
+    @Test
+    void searchesTheWholeLibraryWithTheDocumentedQuery() throws IOException {
+        connected();
+        fake.respond("GET", "/Items", 200, "search.json");
+
+        List<ContentItem> results = source.search("bunny hop", 10);
+
+        assertThat(results).extracting(ContentItem::title).containsExactly("Big Buck Bunny", "Meadow Tales", "Bunny Song");
+        assertThat(results).extracting(item -> item.kind().name()).containsExactly("MOVIE", "EPISODE", "TRACK");
+        assertThat(fake.last("GET", "/Items").query()).isEqualTo(Map.of(
+                "userId", FakeJellyfinServer.USER_ID,
+                "searchTerm", "bunny hop",
+                "recursive", "true",
+                "includeItemTypes", "Movie,Episode,Video,MusicVideo,Audio",
+                "limit", "10",
+                "enableUserData", "true",
+                "enableImageTypes", "Primary,Thumb,Backdrop",
+                "imageTypeLimit", "1"));
+    }
 }
