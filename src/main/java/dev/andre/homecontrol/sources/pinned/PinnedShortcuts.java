@@ -145,6 +145,9 @@ public class PinnedShortcuts implements PinnedLinks {
             throw new IllegalArgumentException("That link is too long to pin");
         }
         URI link = ServiceLinks.canonical(AppLinks.parseHttpUrl(trimmedUrl));
+        if (ServiceLinks.isAppHome(link)) {
+            throw new IllegalArgumentException("Paste a link to this title, not the app's home screen");
+        }
         String service = AppLinks.serviceOf(link.getHost().toLowerCase(Locale.ROOT), link.getPath());
         String subtitle = ServiceLinks.label(service, link);
         URI artwork = safeArtwork(item.artwork());
@@ -165,6 +168,9 @@ public class PinnedShortcuts implements PinnedLinks {
                 boolean duplicate = current.stream().anyMatch(existing -> existing.url().toString().equals(link.toString()));
                 if (duplicate) {
                     throw new IllegalArgumentException("That link is already pinned");
+                }
+                if (current.size() >= properties.maxPins()) {
+                    throw new IllegalArgumentException("You can pin up to " + properties.maxPins() + " links");
                 }
                 String id = newId(current);
                 pin = new Pin(id, link, service, item.title(), subtitle, artwork, item.kind(),
