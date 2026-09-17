@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0" xmlns:dlna="urn:schemas-dlna-org:device-1-0">
+  <specVersion><major>1</major><minor>0</minor></specVersion>
+  <device>
+    <deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
+    <dlna:X_DLNADOC>DMR-1.50</dlna:X_DLNADOC>
+    <friendlyName>Kitchen Speaker</friendlyName>
+    <manufacturer>Acme Audio</manufacturer>
+    <modelName>StreamBox 2</modelName>
+    <UDN>uuid:5f9ec1b3-ed59-4f00-a3c1-2d2b4a1e0001</UDN>
+    <serviceList>
+      <service>
+        <serviceType>urn:schemas-upnp-org:service:RenderingControl:1</serviceType>
+        <serviceId>urn:upnp-org:serviceId:RenderingControl</serviceId>
+        <SCPDURL>/scpd/RenderingControl1.xml</SCPDURL>
+        <controlURL>/upnp/control/RenderingControl1</controlURL>
+        <eventSubURL>/upnp/event/RenderingControl1</eventSubURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-upnp-org:service:ConnectionManager:1</serviceType>
+        <serviceId>urn:upnp-org:serviceId:ConnectionManager</serviceId>
+        <SCPDURL>/scpd/ConnectionManager1.xml</SCPDURL>
+        <controlURL>/upnp/control/ConnectionManager1</controlURL>
+        <eventSubURL>/upnp/event/ConnectionManager1</eventSubURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>
+        <serviceId>urn:upnp-org:serviceId:AVTransport</serviceId>
+        <SCPDURL>/scpd/AVTransport1.xml</SCPDURL>
+        <controlURL>/upnp/control/AVTransport1</controlURL>
+        <eventSubURL>/upnp/event/AVTransport1</eventSubURL>
+      </service>
+    </serviceList>
+  </device>
+</root>

@@ -1,0 +1,9 @@
+HTTP/1.1 200 OK
+CACHE-CONTROL: max-age=1800
+DATE: Wed, 16 Sep 2026 10:00:00 GMT
+EXT:
+LOCATION: http://{host}:{port}/description.xml
+SERVER: Linux/5.15 UPnP/1.0 StreamBox/2.4
+ST: urn:schemas-upnp-org:device:MediaRenderer:1
+USN: uuid:5f9ec1b3-ed59-4f00-a3c1-2d2b4a1e0001::urn:schemas-upnp-org:device:MediaRenderer:1
+

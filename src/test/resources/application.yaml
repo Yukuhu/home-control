@@ -22,6 +22,8 @@ shield:
 home-control:
   ssdp:
     enabled: false
+  upnp:
+    enabled: true
   cast:
     enabled: true
     # A PING every 5 s; 15 s without any inbound frame means the receiver is gone.
