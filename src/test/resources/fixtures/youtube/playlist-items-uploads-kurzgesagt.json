@@ -1,0 +1,50 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "cGxheWxpc3QtaXRlbXMta3Vyeg",
+  "nextPageToken": "EAAaBlBUOkNBVQ",
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "aXRlbS1rdXJ6LTE",
+      "id": "VVVzWFZrMzdibHRIeEQxckRQd3ROTThRLkt6MWFUNW5NM3BR",
+      "snippet": {
+        "publishedAt": "2026-09-15T14:00:12Z",
+        "channelId": "UCsXVk37bltHxD1rDPwtNM8Q",
+        "title": "What If the Moon Turned Into a Black Hole?",
+        "description": "The Moon is our constant companion…",
+        "thumbnails": {
+          "default": { "url": "https://i.ytimg.com/vi/Kz1aT5nM3pQ/default.jpg", "width": 120, "height": 90 },
+          "medium": { "url": "https://i.ytimg.com/vi/Kz1aT5nM3pQ/mqdefault.jpg", "width": 320, "height": 180 },
+          "high": { "url": "https://i.ytimg.com/vi/Kz1aT5nM3pQ/hqdefault.jpg", "width": 480, "height": 360 }
+        },
+        "channelTitle": "Kurzgesagt – In a Nutshell",
+        "playlistId": "UUsXVk37bltHxD1rDPwtNM8Q",
+        "position": 0,
+        "resourceId": { "kind": "youtube#video", "videoId": "Kz1aT5nM3pQ" },
+        "videoOwnerChannelTitle": "Kurzgesagt – In a Nutshell",
+        "videoOwnerChannelId": "UCsXVk37bltHxD1rDPwtNM8Q"
+      },
+      "contentDetails": { "videoId": "Kz1aT5nM3pQ", "videoPublishedAt": "2026-09-15T14:00:12Z" }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "aXRlbS1rdXJ6LTI",
+      "id": "VVVzWFZrMzdibHRIeEQxckRQd3ROTThRLkhoN0xxMld2OXNF",
+      "snippet": {
+        "publishedAt": "2026-09-01T14:00:00Z",
+        "channelId": "UCsXVk37bltHxD1rDPwtNM8Q",
+        "title": "The Largest Star in the Universe",
+        "description": "",
+        "thumbnails": { "medium": { "url": "https://i.ytimg.com/vi/Hh7Lq2Wv9sE/mqdefault.jpg", "width": 320, "height": 180 } },
+        "channelTitle": "Kurzgesagt – In a Nutshell",
+        "playlistId": "UUsXVk37bltHxD1rDPwtNM8Q",
+        "position": 1,
+        "resourceId": { "kind": "youtube#video", "videoId": "Hh7Lq2Wv9sE" },
+        "videoOwnerChannelTitle": "Kurzgesagt – In a Nutshell",
+        "videoOwnerChannelId": "UCsXVk37bltHxD1rDPwtNM8Q"
+      },
+      "contentDetails": { "videoId": "Hh7Lq2Wv9sE", "videoPublishedAt": "2026-09-01T14:00:00Z" }
+    }
+  ],
+  "pageInfo": { "totalResults": 214, "resultsPerPage": 2 }
+}

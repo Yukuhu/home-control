@@ -1,0 +1,22 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "dmlkZW9zLWJ5LWlk",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "dmlkZW8td3E5",
+      "id": "Wq9Ze2Lr5tA",
+      "snippet": {
+        "publishedAt": "2026-08-30T16:45:00Z",
+        "channelId": "UCSMOQeBJ2RAnuFungnQOxLg",
+        "title": "Blender 5.0 Reveal",
+        "description": "",
+        "thumbnails": { "medium": { "url": "https://i.ytimg.com/vi/Wq9Ze2Lr5tA/mqdefault.jpg", "width": 320, "height": 180 } },
+        "channelTitle": "Blender",
+        "categoryId": "28",
+        "liveBroadcastContent": "none"
+      }
+    }
+  ],
+  "pageInfo": { "totalResults": 1, "resultsPerPage": 1 }
+}

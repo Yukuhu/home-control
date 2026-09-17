@@ -18,6 +18,17 @@
         <div id="youtube-authorization" th:replace="~{fragments/youtube-setup :: authorization}"></div>
     </th:block>
 
+    <th:block th:if="${youtube.hasClient()}">
+        <p class="hint" th:with="q=${youtube.quota()}">
+            Quota today: <strong th:text="|${q.units()} of ${q.dailyUnits()} units|">212 of 10000 units</strong>,
+            <span th:text="|${q.searches()} of ${q.searchesPerDay()} searches|">1 of 20 searches</span>;
+            resets <span th:text="${q.resets()}">after midnight Pacific time (09:00 here)</span>.
+        </p>
+        <ul class="hint quota-calls" th:if="${!#lists.isEmpty(youtube.quota().calls())}">
+            <li th:each="c : ${youtube.quota().calls()}" th:text="|${c.api()}: ${c.count()} calls, ${c.units()} units|"></li>
+        </ul>
+    </th:block>
+
     <details th:open="${!youtube.hasClient()}">
         <summary>How to create your own Google OAuth client (about 10 minutes)</summary>
         <ol>

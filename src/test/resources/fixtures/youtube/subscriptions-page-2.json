@@ -1,0 +1,20 @@
+{
+  "kind": "youtube#subscriptionListResponse",
+  "etag": "c3Vic2NyaXB0aW9ucy1wYWdlLTI",
+  "pageInfo": { "totalResults": 3, "resultsPerPage": 1 },
+  "items": [
+    {
+      "kind": "youtube#subscription",
+      "etag": "c3ViLW5hc2E",
+      "id": "yJ8M0x0XgT3kQeHc9Wq1vB2nL7rP4sD6fA5gH8jK0mP",
+      "snippet": {
+        "publishedAt": "2021-07-20T20:17:00Z",
+        "title": "NASA",
+        "description": "Exploring the universe and our home planet.",
+        "resourceId": { "kind": "youtube#channel", "channelId": "UCLA_DiR1FfKNvjuUpBHmylQ" },
+        "channelId": "UC4fixtureHomeControl00a",
+        "thumbnails": { "default": { "url": "https://yt3.ggpht.com/nasa=s88-c-k-c0x00ffffff-no-rj" } }
+      }
+    }
+  ]
+}

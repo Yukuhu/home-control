@@ -1,0 +1,42 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "cGxheWxpc3QtaXRlbXMtYmxlbmRlcg",
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "aXRlbS1ibGVuZGVyLTE",
+      "id": "VVVTTU9RZUJKMlJBbnVGdW5nblFPeExnLmFxei1LRS1icEtR",
+      "snippet": {
+        "publishedAt": "2026-09-10T12:05:00Z",
+        "channelId": "UCSMOQeBJ2RAnuFungnQOxLg",
+        "title": "Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film",
+        "description": "",
+        "thumbnails": { "medium": { "url": "https://i.ytimg.com/vi/aqz-KE-bpKQ/mqdefault.jpg", "width": 320, "height": 180 } },
+        "channelTitle": "Blender",
+        "playlistId": "UUSMOQeBJ2RAnuFungnQOxLg",
+        "position": 0,
+        "resourceId": { "kind": "youtube#video", "videoId": "aqz-KE-bpKQ" },
+        "videoOwnerChannelTitle": "Blender",
+        "videoOwnerChannelId": "UCSMOQeBJ2RAnuFungnQOxLg"
+      },
+      "contentDetails": { "videoId": "aqz-KE-bpKQ", "videoPublishedAt": "2026-09-10T12:00:00Z" }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "aXRlbS1ibGVuZGVyLTI",
+      "id": "VVVTTU9RZUJKMlJBbnVGdW5nblFPeExnLlJ0NFliOE5jMXha",
+      "snippet": {
+        "publishedAt": "2026-09-11T09:00:00Z",
+        "channelId": "UCSMOQeBJ2RAnuFungnQOxLg",
+        "title": "Private video",
+        "description": "This video is private.",
+        "thumbnails": {},
+        "playlistId": "UUSMOQeBJ2RAnuFungnQOxLg",
+        "position": 1,
+        "resourceId": { "kind": "youtube#video", "videoId": "Rt4Yb8Nc1xZ" }
+      },
+      "contentDetails": { "videoId": "Rt4Yb8Nc1xZ" }
+    }
+  ],
+  "pageInfo": { "totalResults": 2, "resultsPerPage": 2 }
+}

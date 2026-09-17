@@ -1,0 +1,26 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "cGxheWxpc3QtaXRlbXMtbmFzYQ",
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "aXRlbS1uYXNhLTE",
+      "id": "VVVMQV9EaVIxRmZLTnZqdVVwQkhteWxRLlBtNkpkM0ZnMGtV",
+      "snippet": {
+        "publishedAt": "2026-09-12T09:35:00Z",
+        "channelId": "UCLA_DiR1FfKNvjuUpBHmylQ",
+        "title": "Artemis II: Crew Walkout & Launch",
+        "description": "",
+        "thumbnails": { "medium": { "url": "https://i.ytimg.com/vi/Pm6Jd3Fg0kU/mqdefault.jpg", "width": 320, "height": 180 } },
+        "channelTitle": "NASA",
+        "playlistId": "UULA_DiR1FfKNvjuUpBHmylQ",
+        "position": 0,
+        "resourceId": { "kind": "youtube#video", "videoId": "Pm6Jd3Fg0kU" },
+        "videoOwnerChannelTitle": "NASA",
+        "videoOwnerChannelId": "UCLA_DiR1FfKNvjuUpBHmylQ"
+      },
+      "contentDetails": { "videoId": "Pm6Jd3Fg0kU", "videoPublishedAt": "2026-09-12T09:30:00Z" }
+    }
+  ],
+  "pageInfo": { "totalResults": 1, "resultsPerPage": 1 }
+}

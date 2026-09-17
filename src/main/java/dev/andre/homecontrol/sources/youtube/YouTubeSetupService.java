@@ -6,6 +6,7 @@ import dev.andre.homecontrol.storage.SecretStore;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,15 +36,23 @@ public class YouTubeSetupService {
     private final GoogleOAuthClient oauth;
     private final GoogleTokens tokens;
     private final YouTubeAuthorizationService authorization;
+    private final ObjectProvider<YouTubeAccount> account;
+    private final QuotaLedger ledger;
+    private final ObjectProvider<YouTubeContentSource> source;
 
     public YouTubeSetupService(SecretStore secrets, LoginService login, JsonFileSourceSettings sourceSettings,
-                               GoogleOAuthClient oauth, GoogleTokens tokens, YouTubeAuthorizationService authorization) {
+                               GoogleOAuthClient oauth, GoogleTokens tokens, YouTubeAuthorizationService authorization,
+                               ObjectProvider<YouTubeAccount> account, QuotaLedger ledger,
+                               ObjectProvider<YouTubeContentSource> source) {
         this.secrets = secrets;
         this.login = login;
         this.sourceSettings = sourceSettings;
         this.oauth = oauth;
         this.tokens = tokens;
         this.authorization = authorization;
+        this.account = account;
+        this.ledger = ledger;
+        this.source = source;
     }
 
     public YouTubeSettings settings() {
@@ -109,8 +118,14 @@ public class YouTubeSetupService {
 
     public String check() {
         tokens.invalidate();
-        tokens.accessToken();
-        return "Google accepted the saved authorization";
+        YouTubeAccount youTubeAccount = account.getIfAvailable();
+        if (youTubeAccount == null) {
+            tokens.accessToken();
+            return "Google accepted the saved authorization";
+        }
+        String title = youTubeAccount.refreshChannel();
+        QuotaLedger.Usage usage = ledger.usage();
+        return "Connected as " + title + ". " + usage.units() + " of " + usage.dailyUnits() + " quota units used today.";
     }
 
     public void disconnect() {
@@ -125,5 +140,9 @@ public class YouTubeSetupService {
         login.removeSecrets(List.of(YouTubeSettings.CLIENT_ID, YouTubeSettings.CLIENT_SECRET, YouTubeSettings.REFRESH_TOKEN));
         save(settings().withoutAccount());
         tokens.reset();
+        YouTubeContentSource contentSource = source.getIfAvailable();
+        if (contentSource != null) {
+            contentSource.forgetAccount();
+        }
     }
 }
