@@ -94,13 +94,23 @@ public class ContentController {
 
     /** Used by the unified search box (D5): every enabled searchable source, in parallel, one deadline. */
     @GetMapping(path = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> search(@RequestParam(required = false) String q, @RequestParam(defaultValue = "20") int limit) {
+    public ResponseEntity<?> search(@RequestParam(required = false) String q, @RequestParam(defaultValue = "20") int limit,
+                                    @RequestParam(required = false) String source) {
         String query = q == null ? "" : q.strip();
         if (query.length() < 2 || query.length() > 100) {
             return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body("Search for 2 to 100 characters");
         }
         int clamped = Math.max(1, Math.min(50, limit));
-        SearchOutcome outcome = searchService.search(query, clamped);
+        SearchOutcome outcome;
+        if (source != null && !source.isBlank()) {
+            try {
+                outcome = searchService.searchSource(source, query, clamped);
+            } catch (IllegalArgumentException e) {
+                return text(HttpStatus.NOT_FOUND, e.getMessage());
+            }
+        } else {
+            outcome = searchService.search(query, clamped);
+        }
         List<SearchResult> results = outcome.hits().stream()
                 .map(h -> new SearchResult(h.source().id(), h.source().displayName(),
                         h.items().stream().map(ContentItemView::of).toList()))

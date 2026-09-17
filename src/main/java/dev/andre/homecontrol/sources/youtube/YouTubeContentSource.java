@@ -9,6 +9,7 @@ import tools.jackson.databind.JsonNode;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,16 +30,21 @@ public class YouTubeContentSource implements ContentSource {
     private final SubscriptionsFeed feed;
     private final YouTubeApiClient api;
     private final YouTubePlaylists playlists;
+    private final YouTubeSearch search;
+    private final QuotaLedger ledger;
     private final KnownVideos known;
     private final YouTubeProperties properties;
     private final Clock clock;
 
     public YouTubeContentSource(YouTubeSetupService setup, SubscriptionsFeed feed, YouTubeApiClient api,
-                                YouTubePlaylists playlists, KnownVideos known, YouTubeProperties properties, Clock clock) {
+                                YouTubePlaylists playlists, YouTubeSearch search, QuotaLedger ledger, KnownVideos known,
+                                YouTubeProperties properties, Clock clock) {
         this.setup = setup;
         this.feed = feed;
         this.api = api;
         this.playlists = playlists;
+        this.search = search;
+        this.ledger = ledger;
         this.known = known;
         this.properties = properties;
         this.clock = clock;
@@ -142,6 +148,32 @@ public class YouTubeContentSource implements ContentSource {
     @Override
     public Duration defaultRefreshInterval() {
         return properties.refreshInterval();
+    }
+
+    @Override
+    public boolean searchable() {
+        return true;
+    }
+
+    @Override
+    public boolean searchOnDemand() {
+        return true;
+    }
+
+    @Override
+    public Optional<String> searchNote() {
+        QuotaLedger.Usage usage = ledger.usage();
+        int left = usage.searchesLeft();
+        if (left <= 0) {
+            String until = DateTimeFormatter.ofPattern("HH:mm").format(usage.resetsAt());
+            return Optional.of("YouTube searches used up until " + until);
+        }
+        return Optional.of(left + " of " + usage.searchesPerDay() + " YouTube searches left today");
+    }
+
+    @Override
+    public List<ContentItem> search(String query, int limit) {
+        return search.search(query, limit).stream().map(YouTubeVideo::toItem).toList();
     }
 
     /** Called when the Google account is disconnected: nothing about the old account should linger. */

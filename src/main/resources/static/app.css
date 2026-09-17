@@ -106,6 +106,8 @@ main#content { max-width: none; padding: .5rem 0 5rem; }
                 background: #1b1e24; color: var(--fg); font-size: 1rem; min-height: 44px; }
 #search-results:not(:empty) { display: grid; gap: 1rem; margin: .75rem 0 1.25rem; }
 main#content:has(#search-results:not(:empty)) #rails { display: none; }
+.search-on-demand { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; padding: 0 1rem; }
+.search-more { min-height: 44px; padding: .5rem 1rem; border-radius: 999px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 :root { --safe-top: env(safe-area-inset-top, 0px); --safe-right: env(safe-area-inset-right, 0px);
         --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px); }

@@ -9,12 +9,19 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /** Re-serves a video's thumbnail so the browser never talks to Google directly and never sees a token. */
 @RestController
 @ConditionalOnProperty(name = "home-control.youtube.enabled", havingValue = "true", matchIfMissing = true)
 public class YouTubeThumbnailController {
+
+    // Google's thumbnail CDN only ever serves these; anything else is treated as a failure rather
+    // than trusted and passed through, so a compromised or misbehaving upstream can't get the
+    // browser to render or sniff an unexpected content type as an image.
+    private static final Set<String> ALLOWED_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
     private final YouTubeHttp http;
     private final YouTubeProperties properties;
@@ -41,9 +48,20 @@ public class YouTubeThumbnailController {
         if (!response.ok()) {
             return ResponseEntity.status(502).body("Could not load the thumbnail".getBytes());
         }
+        String contentType = baseType(response.contentType());
+        if (!ALLOWED_TYPES.contains(contentType)) {
+            return ResponseEntity.status(502).body("Could not load the thumbnail".getBytes());
+        }
         return ResponseEntity.ok()
-                .contentType(MediaType.IMAGE_JPEG)
+                .contentType(MediaType.parseMediaType(contentType))
+                .header("X-Content-Type-Options", "nosniff")
                 .cacheControl(CacheControl.maxAge(Duration.ofDays(1)).cachePrivate())
                 .body(response.body());
+    }
+
+    private static String baseType(String contentType) {
+        String value = contentType == null ? "" : contentType;
+        int semicolon = value.indexOf(';');
+        return (semicolon < 0 ? value : value.substring(0, semicolon)).trim().toLowerCase(Locale.ROOT);
     }
 }

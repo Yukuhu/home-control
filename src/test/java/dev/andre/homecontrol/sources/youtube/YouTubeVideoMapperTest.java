@@ -42,6 +42,23 @@ class YouTubeVideoMapperTest {
     }
 
     @Test
+    void aMalformedPrimaryPublishedDateFallsBackToSnippet() {
+        JsonNode item = MAPPER.readTree("""
+                {
+                  "snippet": { "title": "Something", "videoOwnerChannelTitle": "Someone", "videoOwnerChannelId": "UC1",
+                               "publishedAt": "2026-09-15T14:00:12Z",
+                               "resourceId": { "videoId": "Kz1aT5nM3pQ" } },
+                  "contentDetails": { "videoPublishedAt": "not-a-real-timestamp" }
+                }
+                """);
+
+        Optional<YouTubeVideo> video = YouTubeVideoMapper.fromPlaylistItem(item);
+
+        assertThat(video).isPresent();
+        assertThat(video.get().publishedAt()).isEqualTo(Instant.parse("2026-09-15T14:00:12Z"));
+    }
+
+    @Test
     void rejectsBadIds() {
         JsonNode item = MAPPER.readTree("""
                 {
@@ -78,5 +95,22 @@ class YouTubeVideoMapperTest {
 
         assertThat(video).contains(new YouTubeVideo("Wq9Ze2Lr5tA", "Blender 5.0 Reveal", "Blender",
                 Instant.parse("2026-08-30T16:45:00Z")));
+    }
+
+    @Test
+    void mapsASearchResultAndUnescapesItsText() {
+        JsonNode items = fixture("search-videos.json").path("items");
+
+        Optional<YouTubeVideo> video = YouTubeVideoMapper.fromSearchResult(items.path(1));
+
+        assertThat(video).contains(new YouTubeVideo("Hh7Lq2Wv9sE", "Bunnies & Black Holes: \"Why\" It's Not Fine",
+                "Kurzgesagt &ndash; In a Nutshell", Instant.parse("2026-09-01T14:00:00Z")));
+    }
+
+    @Test
+    void dropsUpcomingSearchResults() {
+        JsonNode items = fixture("search-videos.json").path("items");
+
+        assertThat(YouTubeVideoMapper.fromSearchResult(items.path(2))).isEmpty();
     }
 }

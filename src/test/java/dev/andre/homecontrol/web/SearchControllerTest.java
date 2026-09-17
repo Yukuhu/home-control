@@ -12,6 +12,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.emptyString;
@@ -124,5 +125,74 @@ class SearchControllerTest {
                 .andExpect(status().isOk());
 
         verify(search).search("bunny", 20);
+    }
+
+    @Test
+    void offersOnDemandSourcesAfterResults() throws Exception {
+        ContentSource jellyfin = sourceStub("jellyfin", "Jellyfin");
+        SearchOutcome outcome = new SearchOutcome("star",
+                List.of(new SearchOutcome.Hits(jellyfin, List.of(item("item-1", "jellyfin", "Star Wars")))), List.of());
+        given(search.search("star", 20)).willReturn(outcome);
+        ContentSource youtube = sourceStub("youtube", "YouTube");
+        given(youtube.searchNote()).willReturn(Optional.of("19 of 20 YouTube searches left today"));
+        given(search.onDemandSources()).willReturn(List.of(youtube));
+
+        mockMvc.perform(get("/search/results").param("q", "star"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("hx-get=\"/search/results/youtube?q=star\"")))
+                .andExpect(content().string(containsString("Search YouTube")))
+                .andExpect(content().string(containsString("19 of 20 YouTube searches left today")));
+    }
+
+    @Test
+    void onDemandSourcesAlsoWhenNothingFound() throws Exception {
+        given(search.search("star", 20)).willReturn(new SearchOutcome("star", List.of(), List.of()));
+        ContentSource youtube = sourceStub("youtube", "YouTube");
+        given(search.onDemandSources()).willReturn(List.of(youtube));
+
+        mockMvc.perform(get("/search/results").param("q", "star"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Nothing found for")))
+                .andExpect(content().string(containsString("Search YouTube")));
+    }
+
+    @Test
+    void noButtonForShortQueries() throws Exception {
+        mockMvc.perform(get("/search/results").param("q", "s"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Type at least 2 characters")));
+
+        verify(search, never()).onDemandSources();
+    }
+
+    @Test
+    void sourceResultsFragment() throws Exception {
+        ContentSource youtube = sourceStub("youtube", "YouTube");
+        SearchOutcome outcome = new SearchOutcome("star",
+                List.of(new SearchOutcome.Hits(youtube, List.of(item("item-1", "youtube", "Star video")))), List.of());
+        given(search.searchSource("youtube", "star", 20)).willReturn(outcome);
+
+        mockMvc.perform(get("/search/results/youtube").param("q", "star"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("class=\"rail search-hits\"")))
+                .andExpect(content().string(containsString("data-item=\"item-1\"")));
+
+        SearchOutcome failed = new SearchOutcome("star", List.of(),
+                List.of(new SearchOutcome.Failure(youtube, "YouTube search failed")));
+        given(search.searchSource("youtube", "star", 20)).willReturn(failed);
+        mockMvc.perform(get("/search/results/youtube").param("q", "star"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("class=\"rail-error\"")))
+                .andExpect(content().string(containsString("YouTube search failed")));
+
+        given(search.searchSource("nope", "star", 20)).willThrow(new IllegalArgumentException("No searchable source nope"));
+        mockMvc.perform(get("/search/results/nope").param("q", "star"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("No searchable source nope")));
+
+        mockMvc.perform(get("/search/results/youtube").param("q", "s"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Type at least 2 characters")));
+        verify(search, never()).searchSource("youtube", "s", 20);
     }
 }

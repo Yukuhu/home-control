@@ -38,10 +38,32 @@ public class SearchService {
     public SearchOutcome search(String query, int limit) {
         Map<ContentSource, Future<List<ContentItem>>> pending = new LinkedHashMap<>();
         for (ContentSource source : sources.searchable()) {
-            if (preferences.sourceEnabled(source.id())) {
+            if (preferences.sourceEnabled(source.id()) && !source.searchOnDemand()) {
                 pending.put(source, executor.submit(() -> source.search(query, limit)));
             }
         }
+        return collect(query, pending);
+    }
+
+    /** Runs one source's search on demand, e.g. after the user presses "Search YouTube". */
+    public SearchOutcome searchSource(String sourceId, String query, int limit) {
+        ContentSource source = sources.searchable().stream()
+                .filter(candidate -> candidate.id().equals(sourceId) && preferences.sourceEnabled(sourceId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No searchable source " + sourceId));
+        Map<ContentSource, Future<List<ContentItem>>> pending = new LinkedHashMap<>();
+        pending.put(source, executor.submit(() -> source.search(query, limit)));
+        return collect(query, pending);
+    }
+
+    /** Searchable, available, enabled sources that are left out of the unified search and offered on demand. */
+    public List<ContentSource> onDemandSources() {
+        return sources.searchable().stream()
+                .filter(source -> source.searchOnDemand() && preferences.sourceEnabled(source.id()))
+                .toList();
+    }
+
+    private SearchOutcome collect(String query, Map<ContentSource, Future<List<ContentItem>>> pending) {
         long deadline = System.nanoTime() + properties.search().timeout().toNanos();
         List<SearchOutcome.Hits> hits = new ArrayList<>();
         List<SearchOutcome.Failure> failures = new ArrayList<>();
