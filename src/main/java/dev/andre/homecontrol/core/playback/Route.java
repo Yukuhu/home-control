@@ -14,18 +14,14 @@ public sealed interface Route {
 
     record OpenAppLink(URI uri, String service) implements Route {
 
-        private static final Map<String, String> SERVICE_NAMES = Map.of(
-                "youtube", "YouTube", "netflix", "Netflix", "primevideo", "Prime Video",
-                "dazn", "DAZN", "jellyfin", "Jellyfin");
-
         public Action action() {
             return new Action.OpenAppLink(uri);
         }
 
         @Override
         public String describe() {
-            String name = SERVICE_NAMES.get(service);
-            return name == null ? "Open " + uri.getHost() + " on the device" : "Open in the " + name + " app";
+            return ServiceLinks.displayName(service).map(name -> "Open in the " + name + " app")
+                    .orElseGet(() -> "Open " + uri.getHost() + " on the device");
         }
     }
 

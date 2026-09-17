@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.content;
 
+import dev.andre.homecontrol.core.content.ContentChangedEvent;
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.ContentSources;
@@ -174,6 +175,17 @@ public class RailCache implements SmartLifecycle {
     @EventListener
     public void onPreferencesChanged(SourcePreferencesChangedEvent event) {
         reschedule();
+    }
+
+    /** A source said its rails changed (e.g. a new pin): pick up new rails and refetch that source now. */
+    @EventListener
+    public void onContentChanged(ContentChangedEvent event) {
+        reconcile();
+        for (RailSnapshot snapshot : peek()) {
+            if (snapshot.sourceId().equals(event.sourceId())) {
+                refresh(snapshot.sourceId(), snapshot.railId());
+            }
+        }
     }
 
     /** Re-evaluates due times after preferences changed (Task 4 calls this through an event). */

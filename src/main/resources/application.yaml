@@ -105,6 +105,9 @@ home-control:
     provider-ids:
       netflix: [8, 1796]
       primevideo: [9, 119, 2100]
+  pinned:
+    enabled: true
+    max-pins: 200
   youtube:
     enabled: ${HOME_CONTROL_YOUTUBE_ENABLED:true}
     oauth-base-url: https://oauth2.googleapis.com

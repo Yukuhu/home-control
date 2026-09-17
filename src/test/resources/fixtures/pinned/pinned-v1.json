@@ -1,0 +1,30 @@
+{
+  "version" : 1,
+  "pins" : [ {
+    "id" : "p-3f9a1c2b7d4e",
+    "url" : "https://www.netflix.com/title/80057281",
+    "service" : "netflix",
+    "title" : "Stranger Things",
+    "subtitle" : "Netflix",
+    "artwork" : "https://image.tmdb.org/t/p/w342/49WJfeN0moxb9IPfGn8AIqMGskD.jpg",
+    "kind" : "VIDEO",
+    "upgradeOf" : "tmdb/tv-66732",
+    "createdAt" : "2026-09-16T10:00:00Z"
+  }, {
+    "id" : "p-00000000000a",
+    "url" : "https://www.dazn.com/de-DE/home",
+    "title" : "DAZN",
+    "kind" : "VIDEO",
+    "createdAt" : "2026-09-15T08:00:00Z"
+  }, {
+    "id" : "p-00000000000b",
+    "url" : "javascript:alert(1)",
+    "title" : "x"
+  }, {
+    "id" : "p-00000000000c",
+    "url" : "https://example.org/",
+    "title" : "Evil art",
+    "artwork" : "//evil.example/x.jpg",
+    "upgradeOf" : "../x"
+  } ]
+}

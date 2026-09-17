@@ -5,6 +5,7 @@ import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
+import dev.andre.homecontrol.core.content.ContentChangedEvent;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import org.junit.jupiter.api.AfterEach;
@@ -68,6 +69,35 @@ class RailCacheTest {
             if (failure != null) throw failure;
             return new Rail(new RailDescriptor("stub", railId, "Rail " + railId),
                     List.of(new ContentItem("i-" + calls.get(), "stub", ContentKind.MOVIE, "Item", null, null, List.of())),
+                    clock.instant());
+        }
+        @Override public Optional<ContentItem> item(String itemId) { return Optional.empty(); }
+        @Override public Duration defaultRefreshInterval() { return Duration.ofMinutes(10); }
+    }
+
+    /** A named stub with one rail, whose availability and id can be flipped by the test. */
+    static final class NamedStubSource implements ContentSource {
+        final String id;
+        final String railId;
+        final AtomicInteger calls = new AtomicInteger();
+        volatile boolean available;
+        final Clock clock;
+        NamedStubSource(String id, String railId, boolean available, Clock clock) {
+            this.id = id;
+            this.railId = railId;
+            this.available = available;
+            this.clock = clock;
+        }
+        @Override public String id() { return id; }
+        @Override public String displayName() { return id; }
+        @Override public boolean available() { return available; }
+        @Override public List<RailDescriptor> rails() {
+            return available ? List.of(new RailDescriptor(id, railId, railId)) : List.of();
+        }
+        @Override public Rail rail(String requestedRailId) {
+            calls.incrementAndGet();
+            return new Rail(new RailDescriptor(id, requestedRailId, requestedRailId),
+                    List.of(new ContentItem("i-" + id + "-" + calls.get(), id, ContentKind.MOVIE, "Item", null, null, List.of())),
                     clock.instant());
         }
         @Override public Optional<ContentItem> item(String itemId) { return Optional.empty(); }
@@ -269,5 +299,49 @@ class RailCacheTest {
         clock.advance(Duration.ofMinutes(2));
         cache.tick();
         assertThat(executor.queued).hasSize(2);
+    }
+
+    @Test
+    void aContentChangeReconcilesAndRefreshesOnlyThatSource() {
+        NamedStubSource sourceA = new NamedStubSource("a", "r1", true, clock);
+        NamedStubSource sourceB = new NamedStubSource("b", "r2", true, clock);
+        RailCache twoSourceCache = new RailCache(new ContentSources(List.of(sourceA, sourceB)), preferences,
+                events::add, clock, properties, executor);
+        try {
+            twoSourceCache.snapshots();
+            executor.runAll();
+            assertThat(sourceA.calls).hasValue(1);
+            assertThat(sourceB.calls).hasValue(1);
+
+            twoSourceCache.onContentChanged(new ContentChangedEvent("a"));
+            executor.runAll();
+
+            assertThat(sourceA.calls).hasValue(2);
+            assertThat(sourceB.calls).hasValue(1);
+        } finally {
+            twoSourceCache.stop();
+        }
+    }
+
+    @Test
+    void aSourceThatBecameAvailableGetsItsRail() {
+        NamedStubSource sourceC = new NamedStubSource("c", "pinned", false, clock);
+        RailCache oneSourceCache = new RailCache(new ContentSources(List.of(sourceC)), preferences,
+                events::add, clock, properties, executor);
+        try {
+            assertThat(oneSourceCache.snapshots()).noneMatch(s -> s.key().equals("c/pinned"));
+
+            sourceC.available = true;
+            events.clear();
+            oneSourceCache.onContentChanged(new ContentChangedEvent("c"));
+            executor.runAll();
+
+            assertThat(events).filteredOn(RailsChangedEvent.class::isInstance)
+                    .extracting(e -> ((RailsChangedEvent) e).keys())
+                    .anyMatch(keys -> keys.contains("c/pinned"));
+            assertThat(sourceC.calls).hasValue(1);
+        } finally {
+            oneSourceCache.stop();
+        }
     }
 }

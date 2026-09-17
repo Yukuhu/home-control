@@ -1,0 +1,48 @@
+<section id="pinned" th:fragment="section">
+    <h2>Pinned links</h2>
+    <p class="error" th:if="${pinnedError}" th:text="${pinnedError}">Could not pin that link</p>
+    <p class="hint" th:if="${pinnedMessage}" th:text="${pinnedMessage}">Pinned</p>
+
+    <p>Pin a Netflix, Prime Video, DAZN or other streaming link (or any web link) to show it in the Pinned rail.
+        Home Control opens the link in the app on the TV; it never loads the page itself.</p>
+
+    <form method="post" th:action="@{/setup/sources/pinned}">
+        <label>Link
+            <input type="url" name="url" required maxlength="2048" inputmode="url"
+                   placeholder="https://www.netflix.com/title/80057281">
+        </label>
+        <label>Title (optional)
+            <input name="title" maxlength="120">
+        </label>
+        <button type="submit">Pin</button>
+    </form>
+
+    <p th:if="${#lists.isEmpty(pinned.pins())}">No pinned links yet.</p>
+    <ol class="pinned-list" th:unless="${#lists.isEmpty(pinned.pins())}">
+        <li th:each="pin : ${pinned.pins()}">
+            <span th:text="${pin.title()}">Stranger Things</span>
+            <span class="hint" th:if="${pin.subtitle() != null}" th:text="${pin.subtitle()}">Netflix</span>
+            <code th:text="${pin.url()}">https://www.netflix.com/title/80057281</code>
+
+            <form method="post" th:action="@{/setup/sources/pinned/{id}/title(id=${pin.id()})}">
+                <input name="title" maxlength="120" th:value="${pin.title()}">
+                <button type="submit">Rename</button>
+            </form>
+
+            <form method="post" th:action="@{/setup/sources/pinned/{id}/move(id=${pin.id()})}">
+                <input type="hidden" name="direction" value="up">
+                <button type="submit" th:disabled="${pin.first()}"
+                        th:attr="aria-label=|Move ${pin.title()} up|">Move up</button>
+            </form>
+            <form method="post" th:action="@{/setup/sources/pinned/{id}/move(id=${pin.id()})}">
+                <input type="hidden" name="direction" value="down">
+                <button type="submit" th:disabled="${pin.last()}"
+                        th:attr="aria-label=|Move ${pin.title()} down|">Move down</button>
+            </form>
+
+            <form method="post" th:action="@{/setup/sources/pinned/{id}/remove(id=${pin.id()})}">
+                <button type="submit">Remove</button>
+            </form>
+        </li>
+    </ol>
+</section>
