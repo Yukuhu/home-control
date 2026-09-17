@@ -104,6 +104,8 @@ public class CastSession implements DeviceHandle {
             case Action.Stop ignored -> stopForegroundApp();
             case Action.CastLoad load -> load(load.receiverAppId(), load.load());
             case Action.CastMessage message -> customMessage(message.receiverAppId(), message.namespace(), message.message());
+            case Action.SelectInput ignored -> throw new UnsupportedActionException(
+                    device.name() + " is a Cast receiver and has no inputs");
         }
     }
 

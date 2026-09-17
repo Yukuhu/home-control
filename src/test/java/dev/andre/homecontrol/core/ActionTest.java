@@ -77,4 +77,9 @@ class ActionTest {
         assertThatThrownBy(() -> new Action.CastMessage("F007D354", "com.connectsdk", Map.of()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void selectingAnInputRequiresRemoteKeys() {
+        assertThat(new Action.SelectInput("HDMI_1").requires()).isEqualTo(Capability.REMOTE_KEYS);
+    }
 }

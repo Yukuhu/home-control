@@ -26,4 +26,20 @@ class DeviceStateTest {
         assertThat(playing.withVolume(3, 100, false).nowPlaying()).isEqualTo(BUNNY);
         assertThat(playing.withNowPlaying(null).nowPlaying()).isNull();
     }
+
+    @Test
+    void sameIgnoringTimeComparesEverythingButTheTimestamp() {
+        DeviceState base = new DeviceState(DeviceStatus.DISCONNECTED, false, null, 0, 0, false, Instant.EPOCH);
+
+        assertThat(DeviceState.initial().sameIgnoringTime(DeviceState.initial().withStatus(DeviceStatus.DISCONNECTED))).isTrue();
+        assertThat(base.sameIgnoringTime(base.withStatus(DeviceStatus.DISCONNECTED))).isTrue();
+        assertThat(base.sameIgnoringTime(null)).isFalse();
+        assertThat(base.sameIgnoringTime(base.withStatus(DeviceStatus.CONNECTED))).isFalse();
+        assertThat(base.sameIgnoringTime(base.withPower(true))).isFalse();
+        assertThat(base.sameIgnoringTime(base.withCurrentApp("netflix"))).isFalse();
+        assertThat(base.sameIgnoringTime(base.withVolume(1, 0, false))).isFalse();
+        assertThat(base.sameIgnoringTime(base.withVolume(0, 100, false))).isFalse();
+        assertThat(base.sameIgnoringTime(base.withVolume(0, 0, true))).isFalse();
+        assertThat(base.sameIgnoringTime(base.withNowPlaying(BUNNY))).isFalse();
+    }
 }
