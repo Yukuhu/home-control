@@ -30,10 +30,10 @@ class LiveEventRoutingTest {
 
     private static PlaybackPlanner planner() {
         // Same strategy list and order as HomeControlConfiguration#playbackPlanner (spec §5.3):
-        // an open Jellyfin app, an app link, then Cast in its own preference order.
+        // an open Jellyfin app, an app link, then Cast in its own preference order, then media renderers.
         return new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), new AppLinkStrategy(),
                 new YouTubeLoungeStrategy(), new CastMessageStrategy(), new CastLoadStrategy(),
-                new CastStreamStrategy()));
+                new CastStreamStrategy(), new MediaRendererStrategy()));
     }
 
     private static ContentItem liveEvent(List<PlayableRef> playables) {
