@@ -38,9 +38,14 @@ class StaticAssetsTest {
         mockMvc.perform(get("/js/state-view.js")).andExpect(status().isOk())
                 .andExpect(content().string(containsString("export function applyState")))
                 .andExpect(content().string(containsString("nowPlaying")))
-                .andExpect(content().string(containsString("volume-${deviceId}")));
+                .andExpect(content().string(containsString("volume-${deviceId}")))
+                .andExpect(content().string(containsString("homecontrol:state")));
         mockMvc.perform(get("/js/remote-transport.js")).andExpect(status().isOk())
                 .andExpect(content().string(containsString("export function sendKey")));
+        mockMvc.perform(get("/js/events.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("export function on")));
+        mockMvc.perform(get("/js/rails.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("export function watchRails")));
         mockMvc.perform(get("/app.js")).andExpect(status().isNotFound());
     }
 }

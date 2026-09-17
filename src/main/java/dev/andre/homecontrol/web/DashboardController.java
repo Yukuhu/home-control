@@ -1,8 +1,10 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceState;
+import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -17,18 +19,23 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** The device strip plus the selected device's drawer: remote keys and/or Cast controls (spec §6.1). Rails arrive in sub-project D. */
+/** The device strip, rails and the selected device's drawer: remote keys and/or Cast controls (spec §6.1). */
 @Controller
 public class DashboardController {
 
     private final DeviceManager devices;
+    private final RailCache rails;
+    private final ContentSources contentSources;
 
-    public DashboardController(DeviceManager devices) {
+    public DashboardController(DeviceManager devices, RailCache rails, ContentSources contentSources) {
         this.devices = devices;
+        this.rails = rails;
+        this.contentSources = contentSources;
     }
 
     @GetMapping("/")
-    public String dashboard(@RequestParam(name = "device", required = false) String deviceId, Model model) {
+    public String dashboard(@RequestParam(name = "device", required = false) String deviceId,
+                            @RequestParam(name = "remote", required = false) String remote, Model model) {
         List<Device> all = devices.devices();
         if (all.isEmpty()) {
             return "redirect:/setup";
@@ -49,6 +56,9 @@ public class DashboardController {
         model.addAttribute("castControls", capabilities.contains(Capability.CAST_RECEIVER));
         model.addAttribute("canOpenLinks",
                 capabilities.contains(Capability.APP_LINK) || capabilities.contains(Capability.CAST_RECEIVER));
+        model.addAttribute("rails", rails.snapshots().stream().map(s -> RailView.of(s, contentSources)).toList());
+        model.addAttribute("hasSources", !contentSources.all().isEmpty());
+        model.addAttribute("remoteOpen", "open".equals(remote));
         return "dashboard";
     }
 
@@ -56,7 +66,8 @@ public class DashboardController {
     public String remote(@PathVariable String id) {
         // Built rather than interpolated so a device id containing "&" or "=" cannot smuggle
         // an extra query parameter into the redirect.
-        String target = UriComponentsBuilder.fromPath("/").queryParam("device", id).encode().build().toUriString();
+        String target = UriComponentsBuilder.fromPath("/").queryParam("device", id)
+                .queryParam("remote", "open").encode().build().toUriString();
         return "redirect:" + target;
     }
 }

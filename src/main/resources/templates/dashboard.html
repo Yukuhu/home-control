@@ -11,23 +11,35 @@
 <body th:attr="data-device=${selected.id()}">
 <header class="strip">
     <nav class="devices" aria-label="Devices">
-        <a th:each="device : ${devices}" class="chip"
-           th:classappend="${device.id() == selected.id()} ? 'selected'"
-           th:href="@{/(device=${device.id()})}" th:attr="data-device=${device.id()}"
-           th:with="state=${states[device.id()]}">
-            <span class="name" th:text="${device.name()}">Shield</span>
-            <span class="badge" th:id="'status-' + ${device.id()}"
-                  th:classappend="${state.connected()} ? 'ok' : 'off'"
-                  th:text="${state.status()}">DISCONNECTED</span>
-            <span class="app" th:id="'app-' + ${device.id()}"
-                  th:text="${state.nowPlaying() != null ? state.nowPlaying().title() : (state.currentApp() ?: 'Nothing playing')}">Nothing playing</span>
-        </a>
+        <div class="chip-group" th:each="device : ${devices}">
+            <a class="chip"
+               th:classappend="${device.id() == selected.id()} ? 'selected'"
+               th:href="@{/(device=${device.id()})}" th:attr="data-device=${device.id()}"
+               th:with="state=${states[device.id()]}">
+                <span class="name" th:text="${device.name()}">Shield</span>
+                <span class="badge" th:id="'status-' + ${device.id()}"
+                      th:classappend="${state.connected()} ? 'ok' : 'off'"
+                      th:text="${state.status()}">DISCONNECTED</span>
+                <span class="app" th:id="'app-' + ${device.id()}"
+                      th:text="${state.nowPlaying() != null ? state.nowPlaying().title() : (state.currentApp() ?: 'Nothing playing')}">Nothing playing</span>
+            </a>
+            <button type="button" class="drawer-toggle" th:if="${device.id() == selected.id()}"
+                    aria-controls="remote-drawer" th:attr="aria-expanded=${remoteOpen}" aria-label="Open the remote">⌄</button>
+        </div>
     </nav>
     <a th:href="@{/setup}">Setup</a>
 </header>
 
-<main hx-swap="none" th:with="id=${selected.id()}">
-    <h1 th:text="${selected.name()}">Shield</h1>
+<main id="content">
+    <section id="rails" th:replace="~{fragments/rails :: rails}"></section>
+</main>
+
+<aside id="remote-drawer" class="drawer" hx-swap="none" th:with="id=${selected.id()}"
+       th:attr="hidden=${!remoteOpen} ? 'hidden'" aria-label="Remote">
+    <header class="drawer-header">
+        <h2 th:text="${selected.name()}">Shield</h2>
+        <button type="button" class="drawer-close" aria-controls="remote-drawer" aria-label="Close the remote">✕</button>
+    </header>
     <p class="meta">
         <span th:id="'vol-' + ${id}" th:text="${selectedState.muted()} ? 'muted' : ('vol ' + ${selectedState.volumeLevel()})">vol</span>
     </p>
@@ -87,7 +99,7 @@
         <p class="hint">The device opens whichever app claims the link. If nothing happens, that app may not be installed.</p>
         <p class="hint">Direct media links (.mp4, .m4v, .mkv, .webm, .m3u8, .mp3, .flac …) play on Cast devices through the Default Media Receiver; the receiver must be able to reach the URL.</p>
     </section>
-</main>
+</aside>
 
 <div id="toast" hidden></div>
 </body>

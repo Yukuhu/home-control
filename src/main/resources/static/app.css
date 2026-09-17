@@ -25,7 +25,7 @@ button:active { background: var(--accent); }
 .error { background: #3a2020; padding: .75rem; border-radius: .5rem; }
 #toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
          background: #3a2020; padding: .75rem 1rem; border-radius: .5rem; }
-.strip { flex-wrap: wrap; }
+.strip { flex-wrap: wrap; position: sticky; top: 0; z-index: 10; background: var(--bg); }
 .devices { display: flex; gap: .5rem; overflow-x: auto; flex: 1; }
 .chip { display: grid; grid-template-columns: auto auto; gap: .15rem .5rem; align-items: center;
         padding: .5rem .75rem; border-radius: .75rem; background: var(--btn); color: var(--fg);
@@ -42,3 +42,43 @@ main h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
 .hint { font-size: .85rem; opacity: .8; }
 .cast .volume { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
 .cast .volume input { flex: 1; }
+.chip-group { display: flex; align-items: stretch; gap: .25rem; }
+.drawer-toggle, .drawer-close { min-width: 44px; min-height: 44px; }
+main#content { max-width: none; padding: .5rem 0 5rem; }
+#rails { display: grid; gap: 1.25rem; }
+.rail { min-height: 7.5rem; }
+.rail header { display: flex; align-items: baseline; gap: .5rem; padding: 0 1rem; }
+.rail h2 { font-size: 1.05rem; margin: 0; }
+.rail .source { font-size: .75rem; opacity: .65; }
+.rail .retry { margin-left: auto; padding: .4rem .9rem; min-height: 44px; }
+.rail.refreshing h2::after { content: " ⟳"; opacity: .6; }
+.tiles { display: grid; grid-auto-flow: column; grid-auto-columns: clamp(7.5rem, 31vw, 10.5rem);
+         gap: .6rem; overflow-x: auto; padding: .5rem 1rem; scroll-snap-type: x mandatory;
+         scroll-padding-inline: 1rem; overscroll-behavior-x: contain; }
+.tile { display: grid; gap: .25rem; padding: 0; border: 0; background: none; color: var(--fg);
+        text-align: left; scroll-snap-align: start; min-height: 44px; }
+.tile .art { position: relative; display: block; aspect-ratio: 2 / 3; border-radius: .6rem;
+             overflow: hidden; background: var(--btn); }
+.tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile .placeholder { display: grid; place-items: center; height: 100%; font-size: 2rem; opacity: .5; }
+.tile .progress { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: #0008; }
+.tile .progress span { display: block; height: 100%; background: var(--accent); }
+.tile .title { font-size: .85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile .subtitle { font-size: .75rem; opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile.skeleton { aspect-ratio: 2 / 3; border-radius: .6rem; background: var(--btn); }
+.rail-error, .rail-empty { margin: .5rem 1rem; padding: .75rem 1rem; border-radius: .6rem; min-height: 5.5rem;
+                           display: flex; align-items: center; gap: .75rem; background: #2a1d1d; }
+.rail-empty { background: var(--btn); opacity: .8; }
+.rail-error p { margin: 0; flex: 1; font-size: .9rem; }
+.rail-stale { font-size: .75rem; color: #f2b8b5; }
+.drawer { position: fixed; inset: auto 0 0 0; max-height: 85vh; overflow-y: auto; z-index: 20;
+          background: var(--bg); border-top: 1px solid #2a2d34; border-radius: 1rem 1rem 0 0; padding: 1rem; }
+.drawer[hidden] { display: none; }
+.drawer-header { display: flex; align-items: center; justify-content: space-between; }
+@media (min-width: 64rem) {
+    body:has(.drawer:not([hidden])) main#content { margin-right: 26rem; }
+    .drawer { inset: 4.5rem 0 0 auto; width: 26rem; max-height: none; border-radius: 0; border-top: 0;
+              border-left: 1px solid #2a2d34; }
+    .tiles { grid-auto-columns: 10.5rem; }
+}
+@media (prefers-reduced-motion: no-preference) { .tiles { scroll-behavior: smooth; } }

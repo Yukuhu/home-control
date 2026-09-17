@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+
+<section id="rails" th:fragment="rails" aria-label="Content">
+    <p class="hint rails-empty" th:if="${!hasSources or #lists.isEmpty(rails)}">
+        No content yet. Connect a source in <a th:href="@{/setup(_fragment='sources')}" href="/setup#sources">Setup</a>.
+    </p>
+    <th:block th:each="rail : ${rails}">
+        <section th:replace="~{fragments/rails :: rail}"></section>
+    </th:block>
+</section>
+
+<section th:fragment="rail" class="rail"
+         th:id="${rail.domId()}"
+         th:classappend="${rail.refreshing()} ? 'refreshing'"
+         th:attr="data-rail=${rail.key()},data-version=${rail.version()},data-status=${rail.status()},aria-busy=${rail.status() == 'LOADING'}"
+         th:with="failed=${rail.status() == 'FAILED'}, hasItems=${!#lists.isEmpty(rail.items())}">
+    <header>
+        <h2 th:text="${rail.title()}">Continue watching</h2>
+        <span class="source" th:text="${rail.sourceName()}">Jellyfin</span>
+        <th:block th:if="${failed and hasItems}">
+            <span class="rail-stale" role="status">Couldn't refresh</span>
+            <button type="button" class="retry"
+                    th:attr="hx-post=@{/rails/{s}/{r}/refresh(s=${rail.sourceId()},r=${rail.railId()})}"
+                    hx-target="closest section" hx-swap="outerHTML">Retry</button>
+        </th:block>
+    </header>
+
+    <div class="tiles" th:if="${rail.status() == 'LOADING'}" aria-hidden="true">
+        <div class="tile skeleton"></div><div class="tile skeleton"></div><div class="tile skeleton"></div>
+    </div>
+
+    <div class="tiles" role="list" th:if="${rail.status() != 'LOADING' and hasItems}">
+        <div role="listitem" th:each="item : ${rail.items()}">
+            <button th:replace="~{fragments/rails :: tile(${item})}"></button>
+        </div>
+    </div>
+
+    <p class="rail-empty" th:if="${rail.status() == 'READY' and !hasItems}">Nothing here right now</p>
+
+    <div class="rail-error" role="alert" th:if="${failed and !hasItems}">
+        <p th:text="|Couldn't load ${rail.title()}: ${rail.error()}|">Couldn't load</p>
+        <button type="button" class="retry"
+                th:attr="hx-post=@{/rails/{s}/{r}/refresh(s=${rail.sourceId()},r=${rail.railId()})}"
+                hx-target="closest section" hx-swap="outerHTML">Retry</button>
+    </div>
+</section>
+
+<button th:fragment="tile(item)" type="button" class="tile"
+        th:attr="data-source=${item.sourceId()},data-item=${item.id()},data-title=${item.title()},data-subtitle=${item.subtitle()},data-artwork=${item.artwork()},data-kind=${item.kind()}">
+    <span class="art">
+        <img th:if="${item.artwork() != null}" th:src="${item.artwork()}" alt="" loading="lazy" decoding="async">
+        <span th:if="${item.artwork() == null}" class="placeholder" aria-hidden="true"
+              th:text="${#strings.isEmpty(item.title())} ? '?' : ${#strings.substring(item.title(), 0, 1)}">A</span>
+        <span th:if="${item.progress() != null}" class="progress" aria-hidden="true"><span
+              th:style="'width:' + ${#numbers.formatDecimal(item.progress() * 100, 1, 0)} + '%'"></span></span>
+    </span>
+    <span class="title" th:text="${item.title()}">Title</span>
+    <span class="subtitle" th:if="${item.subtitle() != null}" th:text="${item.subtitle()}">S1:E1</span>
+</button>
+
+</body>
+</html>
