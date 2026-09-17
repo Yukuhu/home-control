@@ -3,6 +3,7 @@ package dev.andre.homecontrol.sources.sports;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import dev.andre.homecontrol.sources.sports.calendar.FeedStatus;
+import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
 import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -15,7 +16,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
-/** What the setup page shows about the sports source: time zone and calendar status. */
+/** What the setup page shows about the sports source: time zone, calendar and TheSportsDB status. */
 @ControllerAdvice(assignableTypes = SetupController.class)
 @ConditionalOnProperty(name = "home-control.sports.enabled", havingValue = "true", matchIfMissing = true)
 public class SportsSetupAdvice {
@@ -23,9 +24,14 @@ public class SportsSetupAdvice {
     public record CalendarView(String id, String label, String host, String status) {
     }
 
+    public record CompetitionView(String leagueId, String name, String sport, String country, String status) {
+    }
+
     /** What the setup page shows about the sports source. */
     public record View(String timeZone, String storedTimeZone, boolean timeZoneLooksUnset,
-                       List<CalendarView> calendars, int maxCalendars, boolean needsLoginPassword) {
+                       List<CalendarView> calendars, int maxCalendars, boolean needsLoginPassword,
+                       boolean theSportsDbEnabled, String keyKind, List<CompetitionView> competitions,
+                       int maxCompetitions) {
     }
 
     private final ObjectProvider<SportsSettingsService> settingsProvider;
@@ -33,17 +39,20 @@ public class SportsSetupAdvice {
     private final ObjectProvider<CalendarSchedule> scheduleProvider;
     private final ObjectProvider<LoginService> loginProvider;
     private final ObjectProvider<SportsProperties> propertiesProvider;
+    private final ObjectProvider<TheSportsDbSchedule> theSportsDbScheduleProvider;
 
     public SportsSetupAdvice(ObjectProvider<SportsSettingsService> settingsProvider,
                              ObjectProvider<SportsTimeZones> zonesProvider,
                              ObjectProvider<CalendarSchedule> scheduleProvider,
                              ObjectProvider<LoginService> loginProvider,
-                             ObjectProvider<SportsProperties> propertiesProvider) {
+                             ObjectProvider<SportsProperties> propertiesProvider,
+                             ObjectProvider<TheSportsDbSchedule> theSportsDbScheduleProvider) {
         this.settingsProvider = settingsProvider;
         this.zonesProvider = zonesProvider;
         this.scheduleProvider = scheduleProvider;
         this.loginProvider = loginProvider;
         this.propertiesProvider = propertiesProvider;
+        this.theSportsDbScheduleProvider = theSportsDbScheduleProvider;
     }
 
     @ModelAttribute("sports")
@@ -66,8 +75,22 @@ public class SportsSetupAdvice {
             calendarViews.add(new CalendarView(entry.id(), entry.label(), entry.host(),
                     statusText(status, entry.label(), zone)));
         }
+
+        TheSportsDbSchedule tsdbSchedule = theSportsDbScheduleProvider.getIfAvailable();
+        boolean theSportsDbEnabled = tsdbSchedule != null;
+        List<CompetitionView> competitionViews = new ArrayList<>();
+        if (theSportsDbEnabled) {
+            for (SportsSettings.CompetitionEntry entry : current.competitions()) {
+                FeedStatus status = tsdbSchedule.status(entry.leagueId()).orElse(null);
+                competitionViews.add(new CompetitionView(entry.leagueId(), entry.name(), entry.sport(), entry.country(),
+                        statusText(status, entry.name(), zone)));
+            }
+        }
+
         return new View(zone.getId(), current.timeZone() == null ? "" : current.timeZone(), looksUnset,
-                List.copyOf(calendarViews), properties.maxCalendars(), !login.loginRequired());
+                List.copyOf(calendarViews), properties.maxCalendars(), !login.loginRequired(), theSportsDbEnabled,
+                current.keyKind() == SportsSettings.KeyKind.PERSONAL ? "personal" : "free",
+                List.copyOf(competitionViews), properties.maxCompetitions());
     }
 
     static String statusText(FeedStatus status, String label, ZoneId zone) {

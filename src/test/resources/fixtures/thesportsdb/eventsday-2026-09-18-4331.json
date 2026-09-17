@@ -1,0 +1,5 @@
+{"events":[
+ {"idEvent":"2508360","strTimestamp":"2026-09-18T18:30:00","strEvent":"Bayern Munich vs Union Berlin","strSport":"Soccer","idLeague":"4331","strLeague":"German Bundesliga","strHomeTeam":"Bayern Munich","strAwayTeam":"Union Berlin","intHomeScore":"3","intAwayScore":"0","dateEvent":"2026-09-18","dateEventLocal":"2026-09-18","strTime":"18:30:00","strTimeLocal":"20:30:00","strThumb":"https:\/\/r2.thesportsdb.com\/images\/media\/event\/thumb\/mjnxjr1754041746.jpg","strStatus":"FT","strPostponed":"no"},
+ {"idEvent":"abc","strTimestamp":"2026-09-18T20:00:00","strEvent":"Bad id","idLeague":"4331","strStatus":"NS"},
+ {"idEvent":"2601999","strTimestamp":"2026-09-18T19:00:00","strEvent":"Wrong league","idLeague":"4328","strStatus":"NS"}
+]}
