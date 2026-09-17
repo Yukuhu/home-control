@@ -22,4 +22,8 @@ public record ContentItem(String id, String sourceId, ContentKind kind, String t
                        URI artwork, List<PlayableRef> playables) {
         this(id, sourceId, kind, title, subtitle, artwork, playables, null);
     }
+
+    public ContentItem withPlayables(List<PlayableRef> replacement) {
+        return new ContentItem(id, sourceId, kind, title, subtitle, artwork, replacement, progress);
+    }
 }

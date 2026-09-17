@@ -40,13 +40,15 @@ class ActionTest {
     }
 
     @Test
-    void aCastLoadRequiresACastReceiverAndCopiesItsBody() {
-        Map<String, Object> body = new HashMap<>(Map.of("autoplay", true));
+    void aCastLoadRequiresACastReceiverCopiesItsBodyAndNeverPrintsIt() {
+        Map<String, Object> body = new HashMap<>(Map.of("autoplay", true, "media", Map.of("contentId", "http://x?ApiKey=secret-key")));
         Action.CastLoad load = new Action.CastLoad("CC1AD845", body);
         body.put("autoplay", false);
 
         assertThat(load.requires()).isEqualTo(Capability.CAST_RECEIVER);
         assertThat(load.load()).containsEntry("autoplay", true);
+        assertThat(load.toString()).isEqualTo("CastLoad[receiverAppId=CC1AD845]")
+                .doesNotContain("secret-key");
     }
 
     @Test

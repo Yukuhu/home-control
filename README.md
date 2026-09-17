@@ -122,6 +122,87 @@ no pairing.
 mDNS is multicast and does not cross a Docker bridge network. Either run with
 `network_mode: host` as the bundled compose file does, or add the device by address.
 
+## Content sources and login
+
+Device-only deployments (no content source connected) are unchanged: `/`, `/setup` and the
+remote work with no login, exactly as before this feature.
+
+Connecting a content source — currently Jellyfin — stores a secret, so from that point on a
+login password guards every page, the live-update stream and artwork, for every client. Set
+the login password on the setup page at the same time you connect the source.
+
+### Connecting Jellyfin
+
+On the setup page, under **Jellyfin**, give:
+
+- **Server address** — the URL the app itself reaches Jellyfin at, e.g. `http://192.168.1.20:8096`.
+- **Address for TVs and speakers** (optional) — only needed when that differs from the server
+  address, for example when Jellyfin is reached by the container as `http://jellyfin:8096` over
+  a Docker network but TVs must use the LAN address instead.
+- **Sign in with** a user name and password (recommended) or an administrator API key. A user
+  login is preferred because Home Control never needs administrator rights, and because an API
+  key is handed to Cast receivers as-is — a user login is exchanged for a token scoped to that
+  session instead.
+
+A **Jellyfin apps** list lets you link a device's own Jellyfin app session to a paired device
+when Jellyfin cannot be matched to it automatically (see "Docker-networked Jellyfin" below).
+
+Jellyfin 10.9 or newer is required. Turn the whole module off with
+`HOME_CONTROL_JELLYFIN_ENABLED=false` — this does not remove a stored token, so the login
+requirement stays; disconnect Jellyfin first, or delete `secrets.json`, to drop it.
+
+### Play routes
+
+Playing a Jellyfin item on a device tries, in order:
+
+1. **The device's own open Jellyfin app** — if Jellyfin reports a session for that device, Home
+   Control tells the app to play, resuming at the saved position.
+2. **The Jellyfin receiver on a Cast device** (a Chromecast, or a device with a merged Cast side)
+   — if the device has no matching Jellyfin app session but does accept Cast messages, a
+   `Cast with the Jellyfin receiver` message starts playback there instead.
+3. Otherwise there is no route: `/devices/<id>/route` and `/devices/<id>/play` answer 422 with
+   the reason.
+
+A fourth option, a direct stream URL Jellyfin builds for the device to fetch itself, exists in
+the code (`JellyfinStreams`) but is groundwork for Wi-Fi/media-renderer speakers (sub-project I)
+— no device kind in this release advertises that capability, so Cast devices never use it (the
+receiver message always wins for them).
+
+`GET /devices/<id>/route?source=jellyfin&item=<id>` reports which of these a device would use,
+without playing anything.
+
+### Docker-networked Jellyfin
+
+When Jellyfin runs behind Docker bridge networking, the sessions it reports name a gateway
+address rather than the device's real LAN address, so Home Control cannot match a paired
+device to its Jellyfin app session automatically. Link them once on the setup page's
+**Jellyfin apps** list; rung 1 above then works normally.
+
+### Secrets
+
+Secrets (session tokens, the login password hash) live in `/data/secrets.json`, encrypted at
+rest. The key is either:
+
+- a random `/data/secret.key` created next to it the first time a secret is stored (the
+  default), or
+- the `HOME_CONTROL_SECRET` environment variable, if set.
+
+**Honest limit:** with the default key file, copying the whole `/data` directory (a backup, a
+migration) copies the key along with the encrypted secrets — anyone with that copy can decrypt
+them. Set `HOME_CONTROL_SECRET` if that risk matters to you; a copy of `/data` alone is then
+useless without it. Once you start the app with `HOME_CONTROL_SECRET` set, changing or losing
+that value stops the app from starting until the original value is restored — there is no
+partial recovery.
+
+**Forgotten login password:** stop the container, delete `/data/secrets.json`, and reconnect
+your content sources. This clears every stored secret and login password; there is no other
+way to reset just the password.
+
+Behind an HTTPS reverse proxy, set `HOME_CONTROL_SECURE_COOKIE=true` so the login cookie is
+marked `Secure`. If the proxy rewrites the `Host` header, also set
+`HOME_CONTROL_TRUSTED_ORIGINS` (see "Configuration" below) to the origin your browser actually
+sees, or requests will be refused as cross-site.
+
 ## Configuration
 
 | Property | Default | Meaning |
@@ -138,6 +219,7 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 | `HOME_CONTROL_TRUSTED_ORIGINS` | empty | Comma-separated origins allowed to send changes, e.g. `https://home.example.org` behind a reverse proxy; their host names are also allowed |
 | `HOME_CONTROL_ALLOWED_HOSTS` | empty | Comma-separated extra host names the app answers to: exact names, or `*.example.org` for its subdomains |
 | `HOME_CONTROL_SECURE_COOKIE` | `false` | Mark the login cookie `Secure` when the app is only reached over HTTPS |
+| `HOME_CONTROL_JELLYFIN_ENABLED` | `true` | Turn the Jellyfin module off entirely |
 
 The app only answers to host names that cannot be pointed at it by someone else's DNS
 (DNS rebinding): IP addresses, `localhost`, single-label names such as `nas`, and names
@@ -176,6 +258,7 @@ MIT. See [LICENSE](LICENSE).
 
 ## Security
 
-There is no authentication: anyone who can reach the port can control the TV. This is
-deliberate for a LAN-only tool. Do not expose it to the internet without putting an
-authenticating reverse proxy in front of it.
+Device-only deployments have no authentication: anyone who can reach the port can control the
+TV. This is deliberate for a LAN-only tool. Connecting a content source (see "Content sources
+and login" above) adds a login password that then guards every page. Either way, do not expose
+this app to the internet without putting an authenticating reverse proxy in front of it.

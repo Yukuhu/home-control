@@ -15,12 +15,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PlaybackPlannerTest {
 
     private final PlaybackPlanner planner = new PlaybackPlanner(
-            List.of(new AppLinkStrategy(), new CastMessageStrategy(), new CastLoadStrategy(), new CastStreamStrategy()));
+            List.of(new JellyfinSessionStrategy(), new AppLinkStrategy(), new CastMessageStrategy(),
+                    new CastLoadStrategy(), new CastStreamStrategy()));
+
+    private static final PlayableRef.JellyfinSession OPEN_APP =
+            new PlayableRef.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV");
 
     private static final PlayableRef.CastLoad JELLYFIN_LOAD =
             new PlayableRef.CastLoad("F007D354", Map.of("media", Map.of("contentId", "item-1")));
     private static final PlayableRef.StreamUrl STREAM =
             new PlayableRef.StreamUrl(URI.create("http://nas.local/films/bunny.mp4"), "video/mp4");
+    private static final PlayableRef.StreamUrl STREAM_WITH_KEY =
+            new PlayableRef.StreamUrl(URI.create("http://nas.local/films/bunny.mp4?ApiKey=tok-2"), "video/mp4");
     private static final PlayableRef.AppLink LINK =
             new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube");
     private static final PlayableRef.CastMessage JELLYFIN_MESSAGE = new PlayableRef.CastMessage(
@@ -51,11 +57,34 @@ class PlaybackPlannerTest {
     }
 
     @Test
-    void explainsThatJellyfinItemsHaveNoRouteYet() {
-        Route route = planner.plan(item(new PlayableRef.JellyfinItem("srv", "item", 0)), EnumSet.allOf(Capability.class));
+    void anUnresolvedJellyfinItemMeansTheSourceIsSwitchedOff() {
+        assertThat(planner.plan(item(new PlayableRef.JellyfinItem("srv", "item-1", 0)), EnumSet.allOf(Capability.class)))
+                .isEqualTo(new Route.Unroutable("Jellyfin is switched off on this server"));
+    }
 
-        assertThat(route).isInstanceOfSatisfying(Route.Unroutable.class, unroutable ->
-                assertThat(unroutable.reason()).contains("Jellyfin").contains("not supported yet"));
+    @Test
+    void anOpenJellyfinAppComesFirst() {
+        Route route = planner.plan(item(LINK, JELLYFIN_MESSAGE, STREAM, OPEN_APP),
+                EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK, Capability.CAST_RECEIVER));
+
+        assertThat(route).isEqualTo(new Route.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV"));
+        assertThat(route.describe()).isEqualTo("Play in the open Jellyfin app (Android TV)");
+        assertThat(new Route.JellyfinSession("s", "i", 0, " ").describe()).isEqualTo("Play in the open Jellyfin app");
+    }
+
+    @Test
+    void aSessionReferenceWithoutTheLiveCapabilityDoesNotRoute() {
+        assertThat(planner.plan(item(OPEN_APP), EnumSet.of(Capability.APP_LINK)))
+                .isEqualTo(new Route.Unroutable("the open Jellyfin app cannot be controlled"));
+    }
+
+    @Test
+    void jellyfinFallsBackFromSessionToReceiverToStream() {
+        ContentItem resolved = item(JELLYFIN_MESSAGE, STREAM);
+
+        assertThat(planner.plan(resolved, EnumSet.of(Capability.CAST_RECEIVER))).isInstanceOf(Route.CastMessage.class);
+        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER)))
+                .isInstanceOfSatisfying(Route.Cast.class, cast -> assertThat(cast.receiverAppId()).isEqualTo("CC1AD845"));
     }
 
     @Test
@@ -96,6 +125,15 @@ class PlaybackPlannerTest {
     }
 
     @Test
+    void aCastRouteNeverPrintsTheStreamUrlItLoads() {
+        Route route = planner.plan(item(STREAM_WITH_KEY), EnumSet.of(Capability.CAST_RECEIVER));
+
+        assertThat(route).isInstanceOf(Route.Cast.class);
+        assertThat(route.toString()).isEqualTo("Cast[receiverAppId=CC1AD845]").doesNotContain("tok-2");
+        assertThat(((Route.Cast) route).action().toString()).isEqualTo("CastLoad[receiverAppId=CC1AD845]").doesNotContain("tok-2");
+    }
+
+    @Test
     void followsSpecOrderAppLinkThenCastLoadThenStream() {
         ContentItem everything = item(STREAM, JELLYFIN_LOAD, LINK);
 
@@ -127,6 +165,8 @@ class PlaybackPlannerTest {
                 .isEqualTo(new Route.Cast("F007D354", JELLYFIN_LOAD.payload()));
         assertThat(configured.plan(item(JELLYFIN_LOAD, JELLYFIN_MESSAGE), EnumSet.of(Capability.CAST_RECEIVER)))
                 .isInstanceOf(Route.CastMessage.class);
+        assertThat(configured.plan(item(LINK, OPEN_APP), EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK)))
+                .isInstanceOf(Route.JellyfinSession.class);
     }
 
     @Test

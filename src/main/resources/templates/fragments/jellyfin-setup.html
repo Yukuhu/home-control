@@ -27,13 +27,13 @@
         <p class="hint">Home Control finds the Jellyfin app on a device by its network address. Link it
             here when Jellyfin sees a different address (for example behind Docker networking).</p>
         <p class="error" th:if="${jellyfin.sessionsError()}" th:text="${jellyfin.sessionsError()}">Could not reach Jellyfin</p>
-        <form method="post" th:action="@{/setup/sources/jellyfin/links}" th:each="session : ${jellyfin.sessions()}">
-            <input type="hidden" name="session" th:value="${session.jellyfinDeviceId()}">
-            <label th:text="${session.label()}">SHIELD Android TV · Android TV · 192.168.1.50</label>
+        <form method="post" th:action="@{/setup/sources/jellyfin/links}" th:each="jellyfinSession : ${jellyfin.sessions()}">
+            <input type="hidden" name="session" th:value="${jellyfinSession.jellyfinDeviceId()}">
+            <label th:text="${jellyfinSession.label()}">SHIELD Android TV · Android TV · 192.168.1.50</label>
             <select name="device">
-                <option value="" th:selected="${session.linkedDeviceId() == ''}">Not linked</option>
+                <option value="" th:selected="${jellyfinSession.linkedDeviceId() == ''}">Not linked</option>
                 <option th:each="device : ${jellyfin.devices()}" th:value="${device.id()}" th:text="${device.name()}"
-                        th:selected="${device.id() == session.linkedDeviceId()}">Living Room</option>
+                        th:selected="${device.id() == jellyfinSession.linkedDeviceId()}">Living Room</option>
             </select>
             <button type="submit">Link</button>
         </form>
