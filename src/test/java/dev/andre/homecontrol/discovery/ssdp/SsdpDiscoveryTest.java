@@ -289,6 +289,30 @@ class SsdpDiscoveryTest {
         assertThat(discovery.services(LG_TARGET).getFirst().friendlyName()).isEmpty();
     }
 
+    @Test
+    void fetchesDescriptionsOverHttp11() throws IOException {
+        List<String> protocols = new CopyOnWriteArrayList<>();
+        List<String> upgrades = new CopyOnWriteArrayList<>();
+        http.removeContext("/lg/description.xml");
+        http.createContext("/lg/description.xml", exchange -> {
+            protocols.add(exchange.getProtocol());
+            upgrades.add(String.valueOf(exchange.getRequestHeaders().getFirst("Upgrade")));
+            serve(exchange, "lg-description.xml");
+        });
+        responder.answer(LG_TARGET, FakeSsdpResponder.fixture("lg-search-response.txt", "127.0.0.1", httpPort()));
+
+        try (SsdpDiscovery real = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1))) {
+            real.start();
+            real.watch(LG_TARGET);
+
+            await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                    assertThat(real.services(LG_TARGET)).singleElement()
+                            .satisfies(service -> assertThat(service.friendlyName()).contains("[LG] webOS TV OLED55C9PLA")));
+        }
+        assertThat(protocols).first().isEqualTo("HTTP/1.1");
+        assertThat(upgrades).first().isEqualTo("null");
+    }
+
     /** A {@link Clock} whose {@code instant()} can be moved forward by the test. */
     private static final class MutableClock extends Clock {
 

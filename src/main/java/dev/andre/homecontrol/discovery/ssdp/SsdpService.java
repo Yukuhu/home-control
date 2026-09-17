@@ -10,7 +10,7 @@ import java.util.Optional;
  * actually came from — never a claim read out of the (unauthenticated) payload, such as
  * {@code location}'s host, which a forged packet could set to anything. {@code description} is
  * null until it has been fetched, which only happens when {@code location} matches {@code address}
- * (see {@code SsdpDiscovery.isSafeToFetch}).
+ * (see {@code DeviceFetch.isSafeToFetch}).
  */
 public record SsdpService(String usn, String type, String address, URI location, Map<String, String> headers,
                           Instant expiresAt, DeviceDescription description) {

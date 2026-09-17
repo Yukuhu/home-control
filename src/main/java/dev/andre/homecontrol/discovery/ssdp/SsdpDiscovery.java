@@ -3,9 +3,7 @@ package dev.andre.homecontrol.discovery.ssdp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -13,10 +11,7 @@ import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
 import java.net.NetworkInterface;
 import java.net.URI;
-import java.net.UnknownHostException;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,14 +21,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 
 /**
  * The one SSDP listener every UPnP-style adapter shares (spec §7): webOS and Tizen TVs now,
@@ -47,11 +40,7 @@ import java.util.regex.Pattern;
 public class SsdpDiscovery implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(SsdpDiscovery.class);
-    private static final String USER_AGENT = "Linux/1 UPnP/1.1 HomeControl/1";
-    /** A device description is small XML; anything past this is refused rather than read into memory. */
-    private static final long MAX_DESCRIPTION_BYTES = 64 * 1024;
-    private static final Pattern IPV4_LITERAL = Pattern.compile(
-            "^(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(\\.(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$");
+    private static final String USER_AGENT = DeviceFetch.USER_AGENT;
 
     private final SsdpProperties properties;
     private final Clock clock;
@@ -66,7 +55,9 @@ public class SsdpDiscovery implements AutoCloseable {
     private volatile ScheduledExecutorService scheduler;
 
     public SsdpDiscovery(SsdpProperties properties) {
-        this(properties, Clock.systemUTC(), HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build());
+        // Embedded UPnP servers reject the "Upgrade: h2c" header the JDK sends by default; never follow redirects.
+        this(properties, Clock.systemUTC(), HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(3)).build());
     }
 
     SsdpDiscovery(SsdpProperties properties, Clock clock, HttpClient http) {
@@ -217,7 +208,7 @@ public class SsdpDiscovery implements AutoCloseable {
                 clock.instant().plus(message.maxAge()), known);
         services.put(usn.get(), seen);
         if (known == null && location != null) {
-            if (isSafeToFetch(location, sender)) {
+            if (DeviceFetch.isSafeToFetch(location, sender)) {
                 Thread.ofVirtual().name("ssdp-describe").start(() -> describe(seen));
             } else {
                 // Deliberately omit the LOCATION value itself: it is attacker-controlled and this
@@ -229,101 +220,21 @@ public class SsdpDiscovery implements AutoCloseable {
         listenersOf(seen.type()).forEach(listener -> listener.alive(seen));
     }
 
-    /**
-     * Only ever fetch a description from the address it was announced from (spec §1.1's LOCATION
-     * is carried in an unauthenticated UDP payload, so trusting it as-is would let one forged
-     * datagram make this appliance issue an HTTP GET to any URL of the sender's choosing — a
-     * server-side request forgery into the LAN or, via a public multicast relay, further still).
-     * {@code https} and other schemes are refused outright (no adapter's UPnP services use them);
-     * the host must be an IP literal so nothing here ever triggers a DNS lookup driven by an
-     * unauthenticated datagram, and that literal must equal the datagram's sender; the port must
-     * be explicit, matching every real UPnP LOCATION.
-     */
-    private static boolean isSafeToFetch(URI location, InetAddress sender) {
-        if (!"http".equalsIgnoreCase(location.getScheme())) {
-            return false;
-        }
-        String host = location.getHost();
-        if (host == null || !isIpLiteral(host) || location.getPort() <= 0) {
-            return false;
-        }
-        try {
-            return InetAddress.getByName(host).equals(sender);
-        } catch (UnknownHostException e) {
-            // Unreachable: an address that passed isIpLiteral never performs a lookup and never fails.
-            return false;
-        }
-    }
-
-    /** True only for a textual IPv4/IPv6 address — never a name that would need a DNS lookup to resolve. */
-    private static boolean isIpLiteral(String host) {
-        if (IPV4_LITERAL.matcher(host).matches()) {
-            return true;
-        }
-        // An IPv6 literal (URI already strips the brackets) contains only hex digits, ':', '.'
-        // (an embedded IPv4 tail) and '%' (a zone id) — never a letter outside a-f, so this can
-        // never accidentally match a DNS hostname.
-        return host.indexOf(':') >= 0 && host.chars().allMatch(c ->
-                Character.isDigit(c) || c == ':' || c == '.' || c == '%' || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
-    }
-
     private List<SsdpListener> listenersOf(String type) {
         return listeners.getOrDefault(type, List.of());
     }
 
+    /** Fetched only when {@link DeviceFetch#isSafeToFetch} held for the announcing datagram. */
     private void describe(SsdpService service) {
         try {
-            HttpResponse<InputStream> response = http.send(
-                    HttpRequest.newBuilder(service.location()).timeout(Duration.ofSeconds(3)).GET().build(),
-                    HttpResponse.BodyHandlers.ofInputStream());
-            try (InputStream body = response.body()) {
-                if (response.statusCode() != 200) {
-                    return;
-                }
-                OptionalLong contentLength = contentLength(response);
-                if (contentLength.isPresent() && contentLength.getAsLong() > MAX_DESCRIPTION_BYTES) {
-                    log.debug("Description for {} declares {} bytes, over the {}-byte cap; ignoring",
-                            service.usn(), contentLength.getAsLong(), MAX_DESCRIPTION_BYTES);
-                    return;
-                }
-                byte[] bytes = readAtMost(body, MAX_DESCRIPTION_BYTES);
-                if (bytes == null) {
-                    log.debug("Description for {} exceeds the {}-byte cap; ignoring",
-                            service.usn(), MAX_DESCRIPTION_BYTES);
-                    return;
-                }
-                DeviceDescription description = DeviceDescriptions.parse(bytes, service.location());
-                services.computeIfPresent(service.usn(), (usn, current) -> current.withDescription(description));
-            }
+            byte[] bytes = DeviceFetch.get(http, service.location(), Duration.ofSeconds(3), DeviceFetch.MAX_DESCRIPTION_BYTES);
+            DeviceDescription description = DeviceDescriptions.parse(bytes, service.location());
+            services.computeIfPresent(service.usn(), (usn, current) -> current.withDescription(description));
         } catch (IOException | IllegalArgumentException e) {
             log.debug("No description for {}: {}", service.usn(), e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-    }
-
-    private static OptionalLong contentLength(HttpResponse<?> response) {
-        try {
-            return response.headers().firstValueAsLong("Content-Length");
-        } catch (NumberFormatException e) {
-            return OptionalLong.empty();
-        }
-    }
-
-    /** Reads at most {@code maxBytes} from {@code in}; {@code null} if the stream had more than that. */
-    private static byte[] readAtMost(InputStream in, long maxBytes) throws IOException {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        byte[] chunk = new byte[8192];
-        long total = 0;
-        int read;
-        while ((read = in.read(chunk)) != -1) {
-            total += read;
-            if (total > maxBytes) {
-                return null;
-            }
-            buffer.write(chunk, 0, read);
-        }
-        return buffer.toByteArray();
     }
 
     private static Optional<URI> toUri(String value) {

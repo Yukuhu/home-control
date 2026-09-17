@@ -107,6 +107,9 @@ public class CastSession implements DeviceHandle {
             case Action.CastMessage message -> customMessage(message.receiverAppId(), message.namespace(), message.message());
             case Action.SelectInput ignored -> throw new UnsupportedActionException(
                     device.name() + " is a Cast receiver and has no inputs");
+            case Action.PlayMedia ignored -> throw new UnsupportedActionException(device.name() + " cannot play a direct stream");
+            case Action.Pause ignored -> throw new UnsupportedActionException(device.name() + " cannot pause a direct stream");
+            case Action.Resume ignored -> throw new UnsupportedActionException(device.name() + " cannot resume a direct stream");
         }
     }
 

@@ -164,6 +164,9 @@ public class WebOsSession implements DeviceHandle, InputListing {
             case Action.Stop ignored -> call(SsapUris.MEDIA_STOP, SsapMessages.empty(), "stop playback");
             case Action.CastLoad ignored -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
             case Action.CastMessage ignored -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
+            case Action.PlayMedia ignored -> throw new UnsupportedActionException(device.name() + " cannot play a direct stream");
+            case Action.Pause ignored -> throw new UnsupportedActionException(device.name() + " cannot pause a direct stream");
+            case Action.Resume ignored -> throw new UnsupportedActionException(device.name() + " cannot resume a direct stream");
         }
     }
 

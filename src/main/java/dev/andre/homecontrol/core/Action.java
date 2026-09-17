@@ -5,11 +5,17 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** A command for one device. Each action names the capability an adapter must declare to accept it. */
 public sealed interface Action {
 
     Capability requires();
+
+    /** Whether an adapter declaring {@code capabilities} may be asked to perform this action. */
+    default boolean acceptedBy(Set<Capability> capabilities) {
+        return capabilities.contains(requires());
+    }
 
     record PressKey(RemoteKey key, KeyPress press) implements Action {
         public PressKey {
@@ -63,11 +69,54 @@ public sealed interface Action {
         }
     }
 
-    /** Stop whatever is being cast. */
+    /** Stop whatever is being cast or played. */
     record Stop() implements Action {
         @Override
         public Capability requires() {
             return Capability.CAST_RECEIVER;
+        }
+
+        /** Cast receivers and media renderers both stop playback (B kept requires() for its tests). */
+        @Override
+        public boolean acceptedBy(Set<Capability> capabilities) {
+            return capabilities.contains(Capability.CAST_RECEIVER) || capabilities.contains(Capability.MEDIA_RENDERER);
+        }
+    }
+
+    /** Play a direct stream on a media renderer (spec §5.3 rung 4). The URL may carry a credential. */
+    record PlayMedia(URI url, String mimeType, String title, String subtitle) implements Action {
+        public PlayMedia {
+            if (url == null) {
+                throw new IllegalArgumentException("A stream URL is required");
+            }
+            mimeType = mimeType == null || mimeType.isBlank() ? "application/octet-stream" : mimeType.strip();
+        }
+
+        @Override
+        public Capability requires() {
+            return Capability.MEDIA_RENDERER;
+        }
+
+        /** The query can hold a Jellyfin ApiKey; never print it. */
+        @Override
+        public String toString() {
+            return "PlayMedia[url=" + RedactedUris.withoutQuery(url) + ", mimeType=" + mimeType + ", title=" + title + "]";
+        }
+    }
+
+    /** Pause what a media renderer plays. */
+    record Pause() implements Action {
+        @Override
+        public Capability requires() {
+            return Capability.MEDIA_RENDERER;
+        }
+    }
+
+    /** Resume what a media renderer paused. */
+    record Resume() implements Action {
+        @Override
+        public Capability requires() {
+            return Capability.MEDIA_RENDERER;
         }
     }
 
