@@ -8,6 +8,7 @@ let current = null;   // { source, item, title }
 let target = null;    // device id
 let previewSeq = 0;
 let pinOffer = null;
+let sheetKind = null; // the open item's ContentKind, e.g. "LIVE_EVENT"
 
 function showPin(offer) {
     const form = document.getElementById("sheet-pin");
@@ -15,9 +16,14 @@ function showPin(offer) {
     pinOffer = offer;
     document.getElementById("sheet-pin-error").hidden = true;
     if (!offer) { form.hidden = true; return; }
+    const isLiveEvent = sheetKind === "LIVE_EVENT";
     document.getElementById("sheet-pin-text").textContent = offer.serviceName
-        ? `This opens the ${offer.serviceName} app, not the title. Paste the ${offer.serviceName} link for this title to open it directly.`
-        : "Home Control cannot open this title on your services. Paste a link to it (Netflix, Prime Video, YouTube, DAZN or any web link) to pin it.";
+        ? (isLiveEvent
+            ? `This opens the ${offer.serviceName} app, not this event. Paste the ${offer.serviceName} link for this event to open it directly.`
+            : `This opens the ${offer.serviceName} app, not this title. Paste the ${offer.serviceName} link for this title to open it directly.`)
+        : isLiveEvent
+            ? "Home Control cannot open this event directly. Paste a link to it (for example its page on dazn.com) to pin it."
+            : "Home Control cannot open this title on your services. Paste a link to it (Netflix, Prime Video, YouTube, DAZN or any web link) to pin it.";
     form.hidden = false;
 }
 
@@ -176,6 +182,7 @@ async function attempt(deviceId, skip) {
 export function openPlaySheet(tile) {
     const d = tile.dataset;
     current = { source: d.source, item: d.item, title: d.title };
+    sheetKind = d.kind || null;
     document.getElementById("sheet-title").textContent = d.title || "";
     document.getElementById("sheet-subtitle").textContent = d.subtitle || "";
     const art = document.getElementById("sheet-art");

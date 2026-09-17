@@ -13,7 +13,6 @@ import java.nio.file.Files;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -78,6 +77,7 @@ class StaticAssetsTest {
                 .andExpect(content().string(allOf(
                         containsString("sheet-pin"),
                         containsString("/setup/sources/pinned/upgrade"),
-                        not(containsString("not this title")))));
+                        containsString("not this event"),
+                        containsString("LIVE_EVENT"))));
     }
 }
