@@ -37,6 +37,14 @@ public sealed interface PlayableRef {
         }
     }
 
+    /** An open, controllable Jellyfin app on the device (spec §5.3 rung 1). Created at play time by a resolver. */
+    record JellyfinSession(String sessionId, String itemId, long startPositionTicks, String client) implements PlayableRef {
+        @Override
+        public String kindLabel() {
+            return "Jellyfin app";
+        }
+    }
+
     record StreamUrl(URI url, String mimeType) implements PlayableRef {
         @Override
         public String kindLabel() {

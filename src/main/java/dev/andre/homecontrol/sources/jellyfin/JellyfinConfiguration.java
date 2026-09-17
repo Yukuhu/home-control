@@ -42,4 +42,15 @@ public class JellyfinConfiguration {
     public JellyfinStreams jellyfinStreams(JellyfinClient client) {
         return new JellyfinStreams(client);
     }
+
+    @Bean
+    public JellyfinPlayableResolver jellyfinPlayableResolver(JellyfinSetupService setup, JellyfinSessions sessions,
+                                                              JellyfinClient client, JellyfinStreams streams) {
+        return new JellyfinPlayableResolver(setup, sessions, client, streams);
+    }
+
+    @Bean
+    public JellyfinRouteExecutor jellyfinRouteExecutor(JellyfinSessions sessions) {
+        return new JellyfinRouteExecutor(sessions);
+    }
 }

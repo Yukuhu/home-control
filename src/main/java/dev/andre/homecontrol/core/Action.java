@@ -69,6 +69,12 @@ public sealed interface Action {
         public Capability requires() {
             return Capability.CAST_RECEIVER;
         }
+
+        /** The load map can carry a StreamUrl with an API key; never print it. */
+        @Override
+        public String toString() {
+            return "CastLoad[receiverAppId=" + receiverAppId + "]";
+        }
     }
 
     /**

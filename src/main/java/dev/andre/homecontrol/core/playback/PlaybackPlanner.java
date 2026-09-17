@@ -37,12 +37,11 @@ public class PlaybackPlanner {
      * Reasons no strategy routed, one per distinct playable kind. An {@link PlayableRef.AppLink}
      * only ever fails here for lacking the capability: with {@link Capability#APP_LINK} present,
      * {@link AppLinkStrategy} would already have routed it, so there is no "was not accepted" case.
-     * The same holds for {@link PlayableRef.CastLoad}/{@link PlayableRef.StreamUrl} and
-     * {@link Capability#CAST_RECEIVER}: with it present, {@link CastLoadStrategy}/
-     * {@link CastStreamStrategy} would already have routed it. A {@link PlayableRef.CastMessage}
-     * can still fail with the capability present: {@link CastMessageStrategy} always routes it,
-     * and the device may then refuse it at execution time. Falls back to a generic reason
-     * when none applies (e.g. a planner without that strategy).
+     * The same holds for {@link PlayableRef.CastLoad}/{@link PlayableRef.CastMessage}/
+     * {@link PlayableRef.StreamUrl} and {@link Capability#CAST_RECEIVER}: with it present,
+     * {@link CastMessageStrategy}/{@link CastLoadStrategy}/{@link CastStreamStrategy} would
+     * already have routed it, so reaching here always means the capability is missing. Falls
+     * back to a generic reason when none applies (e.g. a planner without that strategy).
      */
     private static List<String> explain(ContentItem item, Set<Capability> capabilities) {
         Set<String> reasons = new LinkedHashSet<>();
@@ -54,10 +53,10 @@ public class PlaybackPlanner {
                     }
                 }
                 case PlayableRef.CastLoad ignored -> reasons.add("this device is not a Cast receiver");
-                case PlayableRef.CastMessage ignored -> reasons.add(capabilities.contains(Capability.CAST_RECEIVER)
-                        ? "the cast was not accepted" : "this device is not a Cast receiver");
+                case PlayableRef.CastMessage ignored -> reasons.add("this device is not a Cast receiver");
                 case PlayableRef.StreamUrl ignored -> reasons.add("this device cannot play a direct stream");
-                case PlayableRef.JellyfinItem j -> reasons.add(j.kindLabel() + " playback is not supported yet");
+                case PlayableRef.JellyfinItem ignored -> reasons.add("Jellyfin is switched off on this server");
+                case PlayableRef.JellyfinSession ignored -> reasons.add("the open Jellyfin app cannot be controlled");
             }
         }
         if (reasons.isEmpty()) {

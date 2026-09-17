@@ -49,6 +49,12 @@ public sealed interface Route {
             String name = RECEIVER_NAMES.get(receiverAppId);
             return name == null ? "Cast with receiver app " + receiverAppId : "Cast with " + name;
         }
+
+        /** The load map can carry a StreamUrl with an API key; never print it. */
+        @Override
+        public String toString() {
+            return "Cast[receiverAppId=" + receiverAppId + "]";
+        }
     }
 
     /** Run a Cast receiver app and send it a custom message (spec §5.3 rung 3). */
@@ -70,6 +76,16 @@ public sealed interface Route {
         @Override
         public String toString() {
             return "CastMessage[receiverAppId=" + receiverAppId + ", namespace=" + namespace + "]";
+        }
+    }
+
+    /** Tell the Jellyfin app already open on the device to play the item. Executed by a RouteExecutor, not an adapter. */
+    record JellyfinSession(String sessionId, String itemId, long startPositionTicks, String client) implements Route {
+        @Override
+        public String describe() {
+            return client == null || client.isBlank()
+                    ? "Play in the open Jellyfin app"
+                    : "Play in the open Jellyfin app (" + client + ")";
         }
     }
 
