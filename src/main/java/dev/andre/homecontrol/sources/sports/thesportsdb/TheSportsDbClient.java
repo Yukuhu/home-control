@@ -67,10 +67,12 @@ public class TheSportsDbClient {
                 body = in.readNBytes(MAX_BODY_BYTES + 1);
             }
         } catch (IOException e) {
-            throw new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "Could not reach TheSportsDB", e);
+            // No cause attached: the request URI (which the JDK's IOException/timeout messages can
+            // quote in full, e.g. via a wrapped ConnectException) embeds the API key in its path.
+            throw new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "Could not reach TheSportsDB", e);
+            throw new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
         }
         int status = response.statusCode();
         if (body.length > MAX_BODY_BYTES) {
