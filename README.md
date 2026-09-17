@@ -314,9 +314,9 @@ Control cannot deep-link into a title through TMDB alone); paste the title's own
 play sheet — see below — to make it open directly next time.
 
 **Pinned links:** paste a link from the service's own app or site under **Setup → Pinned links**,
-or from the play sheet's "paste a link to open this title directly" prompt after playing a
-trending title once. Home Control never fetches the pasted page — only the URL itself is parsed
-and stored. Links that work:
+or from the "paste a link to open this title directly" prompt the play sheet's preview already
+offers for a trending title that only opens an app's home screen — no need to play it first. Home
+Control never fetches the pasted page — only the URL itself is parsed and stored. Links that work:
 
 - Netflix: `https://www.netflix.com/title/<id>` or `.../watch/<id>` (any locale prefix or query
   string is stripped to the canonical title link).
@@ -324,7 +324,8 @@ and stored. Links that work:
   (`.../detail/<gti-or-id>...`), or `https://www.amazon.<tld>/gp/video/detail/<ASIN>`.
 - YouTube, DAZN, or any other web link — opened as-is.
 
-**What each device does with these links:**
+**What each device does with these links** (expected; unverified on hardware — see the
+[streaming launchers acceptance checklist](docs/superpowers/reviews/2026-09-16-streaming-launchers-acceptance.md)):
 
 | Link | Android TV (Shield) | LG webOS | Samsung Tizen |
 |---|---|---|---|
