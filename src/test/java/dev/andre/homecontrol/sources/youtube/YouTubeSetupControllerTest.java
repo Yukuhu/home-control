@@ -12,6 +12,7 @@ import org.springframework.web.servlet.FlashMap;
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -126,6 +127,37 @@ class YouTubeSetupControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("https://www.google.com/device")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("hx-trigger=\"every 3s\"")))
                 .andExpect(header().doesNotExist("HX-Refresh"));
+    }
+
+    @Test
+    void loadChooseAndWatchLaterEndpoints() throws Exception {
+        given(setup.loadPlaylists()).willReturn(List.of(
+                new YouTubePlaylists.PlaylistSummary("PLa", "Kids science", 17),
+                new YouTubePlaylists.PlaylistSummary("PLb", "Watch this evening", 2)));
+
+        mockMvc.perform(post("/setup/sources/youtube/playlists/load"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/setup#youtube"))
+                .andExpect(flash().attribute("youtubeMessage", "Found 2 playlists"));
+        verify(setup).loadPlaylists();
+
+        mockMvc.perform(post("/setup/sources/youtube/playlists").param("playlist", "A", "B"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attribute("youtubeMessage", "Playlists saved"));
+        verify(setup).choosePlaylists(List.of("A", "B"));
+
+        mockMvc.perform(post("/setup/sources/youtube/playlists"))
+                .andExpect(flash().attribute("youtubeMessage", "Playlists saved"));
+        verify(setup).choosePlaylists(List.of());
+
+        mockMvc.perform(post("/setup/sources/youtube/watch-later").param("enabled", "true"))
+                .andExpect(flash().attribute("youtubeMessage", "Watch Later shown"));
+        verify(setup).setWatchLater(true);
+
+        willThrow(new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Choose at most 20 playlists"))
+                .given(setup).choosePlaylists(any());
+        mockMvc.perform(post("/setup/sources/youtube/playlists").param("playlist", "A"))
+                .andExpect(flash().attribute("youtubeError", "Choose at most 20 playlists"));
     }
 
     @Test

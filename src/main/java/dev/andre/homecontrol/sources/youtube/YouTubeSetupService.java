@@ -11,6 +11,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 /** Connects, checks and disconnects the Google account; the only writer of YouTube's settings and secrets. */
@@ -21,6 +22,8 @@ public class YouTubeSetupService {
     private static final Pattern CLIENT_ID_PATTERN =
             Pattern.compile("^[0-9]{6,20}-[a-z0-9]{8,64}\\.apps\\.googleusercontent\\.com$", Pattern.CASE_INSENSITIVE);
     private static final int MAX_CLIENT_SECRET_LENGTH = 200;
+    private static final Pattern PLAYLIST_ID_PATTERN = Pattern.compile("[A-Za-z0-9_-]{2,64}");
+    private static final int MAX_SELECTED_PLAYLISTS = 20;
 
     public record ConnectRequest(String clientId, String clientSecret, String loginPassword,
                                  String loginPasswordConfirmation) {
@@ -39,11 +42,12 @@ public class YouTubeSetupService {
     private final ObjectProvider<YouTubeAccount> account;
     private final QuotaLedger ledger;
     private final ObjectProvider<YouTubeContentSource> source;
+    private final ObjectProvider<YouTubePlaylists> playlists;
 
     public YouTubeSetupService(SecretStore secrets, LoginService login, JsonFileSourceSettings sourceSettings,
                                GoogleOAuthClient oauth, GoogleTokens tokens, YouTubeAuthorizationService authorization,
                                ObjectProvider<YouTubeAccount> account, QuotaLedger ledger,
-                               ObjectProvider<YouTubeContentSource> source) {
+                               ObjectProvider<YouTubeContentSource> source, ObjectProvider<YouTubePlaylists> playlists) {
         this.secrets = secrets;
         this.login = login;
         this.sourceSettings = sourceSettings;
@@ -53,6 +57,7 @@ public class YouTubeSetupService {
         this.account = account;
         this.ledger = ledger;
         this.source = source;
+        this.playlists = playlists;
     }
 
     public YouTubeSettings settings() {
@@ -126,6 +131,35 @@ public class YouTubeSetupService {
         String title = youTubeAccount.refreshChannel();
         QuotaLedger.Usage usage = ledger.usage();
         return "Connected as " + title + ". " + usage.units() + " of " + usage.dailyUnits() + " quota units used today.";
+    }
+
+    public List<YouTubePlaylists.PlaylistSummary> loadPlaylists() {
+        YouTubePlaylists p = playlists.getIfAvailable();
+        return p == null ? List.of() : p.mine();
+    }
+
+    public void choosePlaylists(List<String> playlistIds) {
+        List<String> ids = playlistIds == null ? List.of() : playlistIds;
+        if (ids.size() > MAX_SELECTED_PLAYLISTS) {
+            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Choose at most " + MAX_SELECTED_PLAYLISTS + " playlists");
+        }
+        YouTubePlaylists p = playlists.getIfAvailable();
+        Map<String, String> chosen = new LinkedHashMap<>();
+        for (String id : ids) {
+            if (id == null || !PLAYLIST_ID_PATTERN.matcher(id).matches()) {
+                throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Load your playlists again, then choose");
+            }
+            Optional<YouTubePlaylists.PlaylistSummary> loaded = p == null ? Optional.empty() : p.loaded(id);
+            if (loaded.isEmpty()) {
+                throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Load your playlists again, then choose");
+            }
+            chosen.put(id, loaded.get().title());
+        }
+        save(settings().withPlaylists(chosen));
+    }
+
+    public void setWatchLater(boolean enabled) {
+        save(settings().withWatchLater(enabled));
     }
 
     public void disconnect() {

@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -57,6 +58,7 @@ class YouTubeSetupServiceTest {
     private ObjectProvider<YouTubeAccount> account;
     private QuotaLedger ledger;
     private ObjectProvider<YouTubeContentSource> source;
+    private ObjectProvider<YouTubePlaylists> playlists;
 
     @BeforeEach
     void setUp() {
@@ -69,7 +71,9 @@ class YouTubeSetupServiceTest {
         account = mock(ObjectProvider.class);
         ledger = mock(QuotaLedger.class);
         source = mock(ObjectProvider.class);
-        service = new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger, source);
+        playlists = mock(ObjectProvider.class);
+        service = new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger,
+                source, playlists);
         httpRequest = mock(HttpServletRequest.class);
     }
 
@@ -265,5 +269,58 @@ class YouTubeSetupServiceTest {
             assertThat(service.settings().channelTitle()).isEqualTo("Andre at Home");
             assertThat(realLedger.usage().calls()).isEqualTo(Map.of("channels.list", 1));
         }
+    }
+
+    @Test
+    void choosePlaylistsStoresLoadedTitles() {
+        YouTubePlaylists p = mock(YouTubePlaylists.class);
+        given(playlists.getIfAvailable()).willReturn(p);
+        given(p.loaded("PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG"))
+                .willReturn(Optional.of(new YouTubePlaylists.PlaylistSummary("PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG",
+                        "Watch this evening", 2)));
+
+        service.choosePlaylists(List.of("PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG"));
+
+        assertThat(service.settings().playlists()).containsExactly(
+                Map.entry("PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG", "Watch this evening"));
+
+        service.choosePlaylists(List.of());
+
+        assertThat(service.settings().playlists()).isEmpty();
+    }
+
+    @Test
+    void unknownOrTooManyPlaylistsAreRefused() {
+        YouTubePlaylists p = mock(YouTubePlaylists.class);
+        given(playlists.getIfAvailable()).willReturn(p);
+        given(p.loaded(anyString())).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.choosePlaylists(List.of("PLnotLoaded00000000000000000000")))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("Load your playlists again, then choose");
+        assertThatThrownBy(() -> service.choosePlaylists(List.of("../etc")))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("Load your playlists again, then choose");
+
+        List<String> tooMany = new ArrayList<>();
+        for (int i = 0; i < 21; i++) {
+            String id = "PLtoomany" + String.format("%022d", i);
+            tooMany.add(id);
+            given(p.loaded(id)).willReturn(Optional.of(new YouTubePlaylists.PlaylistSummary(id, "T" + i, 0)));
+        }
+        assertThatThrownBy(() -> service.choosePlaylists(tooMany))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("Choose at most 20 playlists");
+    }
+
+    @Test
+    void watchLaterSwitch() {
+        service.setWatchLater(true);
+
+        assertThat(service.settings().watchLater()).isTrue();
+
+        service.setWatchLater(false);
+
+        assertThat(service.settings().watchLater()).isFalse();
     }
 }

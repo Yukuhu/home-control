@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import org.junit.jupiter.api.AfterEach;
@@ -12,8 +13,11 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,6 +34,7 @@ class YouTubeContentSourceTest {
     private YouTubeSetupService setup;
     private SubscriptionsFeed feed;
     private YouTubeApiClient api;
+    private YouTubePlaylists playlists;
     private KnownVideos known;
     private YouTubeContentSource source;
 
@@ -38,13 +43,15 @@ class YouTubeContentSourceTest {
         fake = new FakeGoogleServer();
         clock = MutableClock.at(Instant.parse("2026-09-16T10:00:00Z"));
         setup = mock(YouTubeSetupService.class);
+        given(setup.settings()).willReturn(YouTubeSettings.EMPTY);
         feed = mock(SubscriptionsFeed.class);
         QuotaLedger ledger = new QuotaLedger(tempDir.resolve("quota.json"), clock, 10000, 20);
         GoogleTokens tokens = mock(GoogleTokens.class);
         given(tokens.accessToken()).willReturn("ya29.t");
         api = new YouTubeApiClient(new YouTubeHttp(fake.properties()), URI.create(fake.base() + "/youtube/v3"), tokens, ledger);
+        playlists = new YouTubePlaylists(api, fake.properties(), clock);
         known = new KnownVideos(1000);
-        source = new YouTubeContentSource(setup, feed, api, known, fake.properties(), clock);
+        source = new YouTubeContentSource(setup, feed, api, playlists, known, fake.properties(), clock);
     }
 
     @AfterEach
@@ -119,5 +126,71 @@ class YouTubeContentSourceTest {
         assertThatThrownBy(() -> source.rail("subscriptions"))
                 .isInstanceOf(dev.andre.homecontrol.core.content.ContentSourceException.class)
                 .hasMessage("no quota left");
+    }
+
+    private static final String EVENING = "PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG";
+    private static final String KIDS = "PLx0sYbCqOb8Q_CLZC2BdBSKEEB59BOPUM";
+
+    private static YouTubeSettings settingsWith(boolean watchLater, Map<String, String> playlists) {
+        return new YouTubeSettings(Instant.parse("2026-09-16T10:00:00Z"), "chan", "Andre", watchLater, playlists,
+                Set.of(), null);
+    }
+
+    @Test
+    void railsFollowTheSettings() {
+        given(setup.connected()).willReturn(true);
+        Map<String, String> selected = new LinkedHashMap<>();
+        selected.put(EVENING, "Watch this evening");
+        selected.put(KIDS, "Kids science");
+        given(setup.settings()).willReturn(settingsWith(true, selected));
+
+        assertThat(source.rails()).containsExactly(
+                new RailDescriptor("youtube", "subscriptions", "New from your subscriptions"),
+                new RailDescriptor("youtube", "watch-later", "Watch Later"),
+                new RailDescriptor("youtube", YouTubePlaylists.railId(KIDS), "Kids science"),
+                new RailDescriptor("youtube", YouTubePlaylists.railId(EVENING), "Watch this evening"));
+    }
+
+    @Test
+    void playlistRailServesItsItems() {
+        given(setup.connected()).willReturn(true);
+        given(setup.settings()).willReturn(settingsWith(false, Map.of(EVENING, "Watch this evening")));
+        fake.playlist(EVENING, "playlist-items-playlist.json");
+
+        Rail rail = source.rail(YouTubePlaylists.railId(EVENING));
+
+        assertThat(rail.items()).extracting(i -> i.id()).containsExactly("Wq9Ze2Lr5tA", "Kz1aT5nM3pQ");
+        assertThat(known.find("Wq9Ze2Lr5tA")).isPresent();
+    }
+
+    @Test
+    void aDeselectedPlaylistRailIsUnknown() {
+        given(setup.connected()).willReturn(true);
+
+        assertThatThrownBy(() -> source.rail("pl-0000000000000000")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aVanishedPlaylistSaysSo() {
+        given(setup.connected()).willReturn(true);
+        given(setup.settings()).willReturn(settingsWith(false, Map.of(EVENING, "Watch this evening")));
+        fake.respondWhen("GET", "/youtube/v3/playlistItems", r -> EVENING.equals(r.query().get("playlistId")),
+                FakeGoogleServer.Canned.fixture(404, "error-playlist-not-found.json"));
+
+        assertThatThrownBy(() -> source.rail(YouTubePlaylists.railId(EVENING)))
+                .isInstanceOf(ContentSourceException.class)
+                .hasMessage("The playlist “Watch this evening” no longer exists or is private to another"
+                        + " account; choose it again on the setup page");
+    }
+
+    @Test
+    void watchLaterRailExplainsTheRestriction() {
+        given(setup.connected()).willReturn(true);
+        given(setup.settings()).willReturn(settingsWith(true, Map.of()));
+        fake.playlist(YouTubePlaylists.WATCH_LATER_ID, "playlist-items-empty.json");
+
+        assertThatThrownBy(() -> source.rail("watch-later"))
+                .isInstanceOf(ContentSourceException.class)
+                .hasMessage(YouTubePlaylists.WATCH_LATER_UNAVAILABLE);
     }
 }

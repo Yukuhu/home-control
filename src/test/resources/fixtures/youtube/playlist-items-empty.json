@@ -1,0 +1,6 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "cGxheWxpc3QtaXRlbXMtZW1wdHk",
+  "items": [],
+  "pageInfo": { "totalResults": 0, "resultsPerPage": 50 }
+}

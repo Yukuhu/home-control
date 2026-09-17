@@ -70,8 +70,9 @@ public class YouTubeConfiguration {
                                                    JsonFileSourceSettings sourceSettings, GoogleOAuthClient oauth,
                                                    GoogleTokens tokens, YouTubeAuthorizationService authorization,
                                                    ObjectProvider<YouTubeAccount> account, QuotaLedger ledger,
-                                                   ObjectProvider<YouTubeContentSource> source) {
-        return new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger, source);
+                                                   ObjectProvider<YouTubeContentSource> source,
+                                                   ObjectProvider<YouTubePlaylists> playlists) {
+        return new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger, source, playlists);
     }
 
     @Bean
@@ -85,9 +86,15 @@ public class YouTubeConfiguration {
     }
 
     @Bean
+    public YouTubePlaylists youTubePlaylists(YouTubeApiClient api, YouTubeProperties properties, Clock clock) {
+        return new YouTubePlaylists(api, properties, clock);
+    }
+
+    @Bean
     public YouTubeContentSource youTubeContentSource(YouTubeSetupService setup, SubscriptionsFeed feed, YouTubeApiClient api,
-                                                     KnownVideos known, YouTubeProperties properties, Clock clock) {
-        return new YouTubeContentSource(setup, feed, api, known, properties, clock);
+                                                     YouTubePlaylists playlists, KnownVideos known,
+                                                     YouTubeProperties properties, Clock clock) {
+        return new YouTubeContentSource(setup, feed, api, playlists, known, properties, clock);
     }
 
     @Bean

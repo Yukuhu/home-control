@@ -1,0 +1,45 @@
+{
+  "kind": "youtube#playlistItemListResponse",
+  "etag": "cGxheWxpc3QtaXRlbXMtcGxheWxpc3Q",
+  "items": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "aXRlbS1wbGF5bGlzdC0x",
+      "id": "UEx4MHNZYkNxT2I4VEJQUmRtQkhzNUlmdHZ2OVRQYm9ZRy5XcTlaZTJMcjV0QQ",
+      "snippet": {
+        "publishedAt": "2026-09-14T20:00:00Z",
+        "channelId": "UC4fixtureHomeControl00a",
+        "title": "Blender 5.0 Reveal",
+        "description": "",
+        "thumbnails": { "medium": { "url": "https://i.ytimg.com/vi/Wq9Ze2Lr5tA/mqdefault.jpg", "width": 320, "height": 180 } },
+        "channelTitle": "Andre at Home",
+        "playlistId": "PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG",
+        "position": 0,
+        "resourceId": { "kind": "youtube#video", "videoId": "Wq9Ze2Lr5tA" },
+        "videoOwnerChannelTitle": "Blender",
+        "videoOwnerChannelId": "UCSMOQeBJ2RAnuFungnQOxLg"
+      },
+      "contentDetails": { "videoId": "Wq9Ze2Lr5tA", "videoPublishedAt": "2026-08-30T16:45:00Z" }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "aXRlbS1wbGF5bGlzdC0y",
+      "id": "UEx4MHNZYkNxT2I4VEJQUmRtQkhzNUlmdHZ2OVRQYm9ZRy5LejFhVDVuTTNwUQ",
+      "snippet": {
+        "publishedAt": "2026-09-15T21:00:00Z",
+        "channelId": "UC4fixtureHomeControl00a",
+        "title": "What If the Moon Turned Into a Black Hole?",
+        "description": "",
+        "thumbnails": { "medium": { "url": "https://i.ytimg.com/vi/Kz1aT5nM3pQ/mqdefault.jpg", "width": 320, "height": 180 } },
+        "channelTitle": "Andre at Home",
+        "playlistId": "PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG",
+        "position": 1,
+        "resourceId": { "kind": "youtube#video", "videoId": "Kz1aT5nM3pQ" },
+        "videoOwnerChannelTitle": "Kurzgesagt – In a Nutshell",
+        "videoOwnerChannelId": "UCsXVk37bltHxD1rDPwtNM8Q"
+      },
+      "contentDetails": { "videoId": "Kz1aT5nM3pQ", "videoPublishedAt": "2026-09-15T14:00:12Z" }
+    }
+  ],
+  "pageInfo": { "totalResults": 2, "resultsPerPage": 50 }
+}
