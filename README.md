@@ -440,6 +440,52 @@ marked `Secure`. If the proxy rewrites the `Host` header, also set
 `HOME_CONTROL_TRUSTED_ORIGINS` (see "Configuration" below) to the origin your browser actually
 sees, or requests will be refused as cross-site.
 
+## Sport and DAZN
+
+Home Control shows a "Live now / Today" rail built from two kinds of feed you choose yourself:
+calendar links you add, and competitions you pick from TheSportsDB. DAZN has no public schedule
+API, so Home Control never knows in advance what DAZN is showing — it only opens the app.
+
+**Calendars.** Setup → Sports → Calendars accepts `https://`, `http://` and `webcal://` links
+(the last is rewritten to `https://`). A calendar link can contain a private token, so it is
+stored as a secret; adding the first one sets the household login password if none exists yet.
+LAN calendar servers (Nextcloud, Radicale, a NAS) work over plain `http://`. Links to this
+machine (`localhost`, `127.0.0.1`) and to link-local/metadata addresses (`169.254.0.0/16`) are
+refused with a "belongs to this machine or its network link" message unless
+`HOME_CONTROL_SPORTS_CALENDAR_ALLOW_LOOPBACK=true` (only turn this on if the calendar really is
+served on this same box). Home Control reads each event's start, end and title; weekly and daily
+repeats are expanded, other repeat rules are shown once. Calendars refresh every 6 hours.
+
+**TheSportsDB.** Find a competition by country and sport, or enter its numeric id directly. The
+documented free key shows at most 3 matches per competition per day; entering your own
+TheSportsDB-supporter key removes that limit and is stored as a secret the same way a calendar
+link is. Fixtures are cached for a day per competition. This is a community-maintained database
+and can be wrong or incomplete; the setup page credits "Data from TheSportsDB."
+
+**Where you watch it.** Per calendar or competition, you tell Home Control which streaming
+service you use for it — this is always your own setting, never broadcast-rights data, and every
+place it is shown says so ("(your setting)"). A competition mapped to DAZN, Netflix or Prime Video
+opens that service's app. For any other case, paste a link to the specific event in the play
+sheet ("paste a link to open this directly"); the pasted link also appears under Pinned links so
+it can be reused or removed later.
+
+**Time zone.** Setup → Sports lets you choose the time zone kick-off times are shown in; it
+defaults to the container's `TZ`. Set `TZ` in your Compose file, or choose a zone in setup if you
+cannot change the container's environment.
+
+**On each TV:** an Android TV app link opens the DAZN/Netflix/Prime Video app directly; on LG
+webOS a DAZN link opens in the TV's browser (webOS has no way to prefer an installed app for a
+web link); Samsung Tizen refuses web links outright ("Samsung TVs cannot open web links …").
+
+**Security notes:** the server fetches every calendar link you add, so treat calendar URLs like
+any other credential; there is a known, accepted residual risk that a malicious calendar's DNS
+name could resolve to a blocked address between the address check and the actual connection
+(DNS rebinding) — the JDK's HTTP client does not support pinning the resolved address. Event
+artwork from TheSportsDB loads directly from `r2.thesportsdb.com` in the browser (not proxied),
+so that host sees the browser's IP address for artwork requests. Sports settings (calendar
+labels/hosts, chosen competitions, the "where you watch it" mapping, but never a calendar URL or
+API key) live in `/data/sports.json`.
+
 ## Configuration
 
 | Property | Default | Meaning |
@@ -484,6 +530,17 @@ sees, or requests will be refused as cross-site.
 | `home-control.upnp.idle-poll-interval-seconds` | `10` | State polling while idle |
 | `home-control.sonos.enabled` | `true` | Sonos module (`HOME_CONTROL_SONOS_ENABLED`; off: players appear as plain renderers) |
 | `home-control.sonos.topology-interval-seconds` | `30` | How often group topology is re-read |
+| `HOME_CONTROL_SPORTS_ENABLED` | `true` | Turn the sports module off entirely |
+| `HOME_CONTROL_SPORTS_TIME_ZONE` | empty | Time zone for kick-off times when none is chosen in setup; falls back to the container's `TZ` |
+| `HOME_CONTROL_SPORTS_RAIL_SIZE` | `30` | Items kept in the "Live now / Today" rail |
+| `HOME_CONTROL_SPORTS_MAX_CALENDARS` | `10` | Calendars a household can add |
+| `HOME_CONTROL_SPORTS_MAX_COMPETITIONS` | `10` | TheSportsDB competitions a household can add |
+| `HOME_CONTROL_SPORTS_DEFAULT_EVENT_DURATION` | `120m` | Assumed length when a calendar event has no end time or duration |
+| `HOME_CONTROL_SPORTS_CALENDAR_REFRESH` | `6h` | How often each calendar is refetched |
+| `HOME_CONTROL_SPORTS_CALENDAR_ALLOW_LOOPBACK` | `false` | Allow calendar links that resolve to this machine's own address (only if a calendar is served here) |
+| `HOME_CONTROL_SPORTS_THESPORTSDB_ENABLED` | `true` | Turn TheSportsDB fixtures off; calendars keep working |
+| `HOME_CONTROL_SPORTS_THESPORTSDB_API_BASE_URL` | `https://www.thesportsdb.com/api/v1/json` | TheSportsDB API base URL |
+| `HOME_CONTROL_SPORTS_THESPORTSDB_FIXTURES_TTL` | `24h` | How long a competition's daily fixtures are cached |
 
 The app only answers to host names that cannot be pointed at it by someone else's DNS
 (DNS rebinding): IP addresses, `localhost`, single-label names such as `nas`, and names

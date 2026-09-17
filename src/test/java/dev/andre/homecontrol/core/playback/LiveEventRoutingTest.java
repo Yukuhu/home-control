@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.content.PinOffers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.net.URI;
@@ -123,5 +124,44 @@ class LiveEventRoutingTest {
         PinOffers.Offer offer = PinOffers.offer(icsEvent).orElseThrow();
         assertThat(offer.upgradeOf()).isEqualTo("sports/ics:c-3f9a1c2b7d4e:069e696917c4a665");
         assertThat(UPGRADE_OF.matcher(offer.upgradeOf()).matches()).isTrue();
+    }
+
+    private static Stream<Arguments> liveEventMatrixRows() {
+        PlayableRef dazn = new PlayableRef.AppLink(URI.create("https://www.dazn.com/"), "dazn");
+        PlayableRef pastedDazn = new PlayableRef.AppLink(
+                URI.create("https://www.dazn.com/de-DE/fixture/ContentId:1a2b3c4d5e6f7g8h9i0j"), "dazn");
+        PlayableRef primeVideo = new PlayableRef.AppLink(URI.create("https://app.primevideo.com/"), "primevideo");
+        PlayableRef netflix = new PlayableRef.AppLink(URI.create("https://www.netflix.com/browse"), "netflix");
+        Set<Capability> appLink = Set.of(Capability.APP_LINK);
+        Set<Capability> shield = Set.of(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME, Capability.APP_LINK);
+        Set<Capability> castOnly = Set.of(Capability.CAST_RECEIVER, Capability.VOLUME);
+        Set<Capability> none = Set.of();
+
+        return Stream.of(
+                Arguments.of(List.of(dazn), appLink, "Open the DAZN app (not this title)", 1),
+                Arguments.of(List.of(dazn), shield, "Open the DAZN app (not this title)", 1),
+                Arguments.of(List.of(dazn), castOnly, "cannot open app links", 0),
+                Arguments.of(List.of(dazn), none, "cannot open app links", 0),
+                Arguments.of(List.of(pastedDazn), appLink, "Open in the DAZN app", 1),
+                Arguments.of(List.of(primeVideo), appLink, "Open the Prime Video app (not this title)", 1),
+                Arguments.of(List.of(netflix), appLink, "Open the Netflix app (not this title)", 1),
+                Arguments.of(List.of(), appLink, "This item has nothing playable", 0),
+                Arguments.of(List.of(), none, "This item has nothing playable", 0));
+    }
+
+    @ParameterizedTest
+    @MethodSource("liveEventMatrixRows")
+    void liveEventMatrix(List<PlayableRef> playables, Set<Capability> capabilities, String expectedDescribeContains,
+                         int expectedRouteCount) {
+        ContentItem event = new ContentItem("tsdb:2508361", "sports", ContentKind.LIVE_EVENT, "Werder Bremen vs Augsburg",
+                null, null, playables, null, Instant.parse("2026-09-19T13:30:00Z"), Instant.parse("2026-09-19T15:25:00Z"));
+        ContentItem video = new ContentItem("tsdb:2508361", "sports", ContentKind.VIDEO, "Werder Bremen vs Augsburg",
+                null, null, playables);
+
+        for (ContentItem item : List.of(event, video)) {
+            Route route = planner().plan(item, capabilities);
+            assertThat(route.describe()).as(item.kind() + ": " + expectedDescribeContains).contains(expectedDescribeContains);
+            assertThat(planner().routes(item, capabilities)).as(item.kind().toString()).hasSize(expectedRouteCount);
+        }
     }
 }
