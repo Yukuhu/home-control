@@ -1,0 +1,19 @@
+{
+  "MediaSources": [
+    {
+      "Protocol": "File",
+      "Id": "b1c2d3e4f5061728394a5b6c7d8e9f01",
+      "Path": "/media/movies/Big Buck Bunny (2008)/Big Buck Bunny.mkv",
+      "Container": "mkv",
+      "SupportsTranscoding": false,
+      "SupportsDirectStream": false,
+      "SupportsDirectPlay": false,
+      "MediaStreams": [
+        { "Codec": "hevc", "Type": "Video", "Index": 0, "Width": 3840, "Height": 2160 },
+        { "Codec": "truehd", "Type": "Audio", "Index": 1, "Channels": 8 }
+      ],
+      "Bitrate": 38000000
+    }
+  ],
+  "PlaySessionId": "1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f"
+}

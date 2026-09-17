@@ -37,4 +37,9 @@ public class JellyfinConfiguration {
     public JellyfinSessions jellyfinSessions(JellyfinClient client, JellyfinSetupService setup) {
         return new JellyfinSessions(client, setup);
     }
+
+    @Bean
+    public JellyfinStreams jellyfinStreams(JellyfinClient client) {
+        return new JellyfinStreams(client);
+    }
 }

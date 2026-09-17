@@ -1,0 +1,16 @@
+{
+  "MediaSources": [
+    {
+      "Protocol": "File",
+      "Id": "c0ffee00c0ffee00c0ffee00c0ffee01",
+      "Path": "/media/music/The Rabbits/Meadow/01 Bunny Song.flac",
+      "Container": "flac",
+      "SupportsTranscoding": false,
+      "SupportsDirectStream": true,
+      "SupportsDirectPlay": true,
+      "MediaStreams": [ { "Codec": "flac", "Type": "Audio", "Index": 0, "Channels": 2, "SampleRate": 44100 } ],
+      "Bitrate": 912000
+    }
+  ],
+  "PlaySessionId": "2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f70"
+}
