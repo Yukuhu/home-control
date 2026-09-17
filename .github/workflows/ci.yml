@@ -216,35 +216,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - id: meta-bluetooth
-        if: steps.version.outputs.skipped == 'false'
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/${{ github.repository }}
-          flavor: |
-            latest=false
-            suffix=-bluetooth
-          tags: |
-            type=raw,value=${{ steps.version.outputs.version }}
-            type=raw,value=${{ steps.guard.outputs.majorminor }}
-            type=raw,value=latest
-
-      # Same jar, plus mpv for Bluetooth speakers (docs/bluetooth-speakers.md).
-      - name: Build and push the Bluetooth variant
-        if: steps.version.outputs.skipped == 'false'
-        uses: docker/build-push-action@v7
-        with:
-          context: dist
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: WITH_MPV=true
-          tags: ${{ steps.meta-bluetooth.outputs.tags }}
-          labels: ${{ steps.meta-bluetooth.outputs.labels }}
-          cache-from: type=gha,scope=bluetooth
-          cache-to: type=gha,mode=max,scope=bluetooth
-
-      # Tag and release last, so a failed build never leaves a tag pointing at a
-      # release that was never published.
+      # Tag and release before the multi-arch -bluetooth image below, so a slow or failed
+      # build of that optional variant never blocks or gates the release itself.
       - name: Tag and release
         if: steps.version.outputs.skipped == 'false'
         env:
@@ -259,6 +232,37 @@ jobs:
           git tag -a "$TAG" -m "$TAG"
           git push origin "$TAG"
           gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md
+
+      - id: meta-bluetooth
+        if: steps.version.outputs.skipped == 'false'
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: |
+            latest=false
+            suffix=-bluetooth
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ steps.guard.outputs.majorminor }}
+            type=raw,value=latest
+
+      # Same jar, plus mpv for Bluetooth speakers (docs/bluetooth-speakers.md). Runs after the
+      # release is tagged and pushed: this multi-arch build is slow and optional, and must never
+      # gate or delay the release itself. continue-on-error so a failure here is visible in the
+      # job summary without failing the whole workflow.
+      - name: Build and push the Bluetooth variant
+        if: steps.version.outputs.skipped == 'false'
+        continue-on-error: true
+        uses: docker/build-push-action@v7
+        with:
+          context: dist
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: WITH_MPV=true
+          tags: ${{ steps.meta-bluetooth.outputs.tags }}
+          labels: ${{ steps.meta-bluetooth.outputs.labels }}
+          cache-from: type=gha,scope=bluetooth
+          cache-to: type=gha,mode=max,scope=bluetooth
 
       - name: Report
         run: |
