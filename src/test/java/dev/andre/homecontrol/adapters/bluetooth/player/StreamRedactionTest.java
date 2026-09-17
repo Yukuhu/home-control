@@ -23,6 +23,14 @@ class StreamRedactionTest {
     }
 
     @Test
+    void hidesUrlUserinfo() {
+        assertThat(StreamRedaction.redact("failed to open http://user:pass@nas/stream.flac"))
+                .isEqualTo("failed to open http://…@nas/stream.flac");
+        assertThat(StreamRedaction.redact("see http://a:b@host/x?k=1"))
+                .isEqualTo("see http://…@host/x?…");
+    }
+
+    @Test
     void leavesOtherTextAlone() {
         assertThat(StreamRedaction.redact("[ao] Failed to initialize audio output"))
                 .isEqualTo("[ao] Failed to initialize audio output");
