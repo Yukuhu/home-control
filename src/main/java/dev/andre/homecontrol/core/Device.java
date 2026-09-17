@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.StringJoiner;
 
 /**
  * A registered device. {@code adapters} maps adapter id → that adapter's own settings
@@ -28,6 +29,22 @@ public record Device(String id, String name, DeviceKind kind, String host,
 
     public boolean hasAdapter(String adapterId) {
         return adapters.containsKey(adapterId);
+    }
+
+    /**
+     * Adapter settings can hold credentials (a webOS client key, a Tizen token), so their values
+     * never reach a log line or an assertion message; the adapter ids and setting names do.
+     */
+    @Override
+    public String toString() {
+        StringJoiner printed = new StringJoiner(", ", "{", "}");
+        adapters.forEach((adapterId, settings) -> {
+            StringJoiner keys = new StringJoiner(", ", "{", "}");
+            settings.keySet().forEach(key -> keys.add(key + "=[redacted]"));
+            printed.add(adapterId + "=" + keys);
+        });
+        return "Device[id=" + id + ", name=" + name + ", kind=" + kind + ", host=" + host
+                + ", adapters=" + printed + ", lastSeen=" + lastSeen + "]";
     }
 
     public Device withAdapter(String adapterId, Map<String, String> settings) {

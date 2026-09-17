@@ -43,4 +43,17 @@ class DeviceTest {
         assertThat(original.hasAdapter("cast")).isFalse();
         assertThat(extended.adapterSettings("cast")).containsEntry("port", "8009");
     }
+
+    @Test
+    void printingADeviceNeverShowsAdapterSettingValues() {
+        Map<String, Map<String, String>> adapters = new LinkedHashMap<>();
+        adapters.put("webos", Map.of("clientKey", "5f1c0d7e2b9a4c3d8e7f6a5b4c3d2e1f"));
+        adapters.put("cast", Map.of("port", "8009"));
+        Device device = new Device("lg", "Living Room TV", DeviceKind.WEBOS, "10.0.0.60", adapters, Instant.EPOCH);
+
+        assertThat(device.toString())
+                .doesNotContain("5f1c0d7e2b9a4c3d8e7f6a5b4c3d2e1f")
+                .doesNotContain("8009")
+                .contains("lg", "Living Room TV", "WEBOS", "10.0.0.60", "webos", "cast", "[redacted]");
+    }
 }
