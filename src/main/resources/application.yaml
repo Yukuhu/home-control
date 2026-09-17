@@ -54,6 +54,26 @@ home-control:
     connect-timeout-seconds: 5
     request-timeout-seconds: 15
     rail-size: 20
+  youtube:
+    enabled: ${HOME_CONTROL_YOUTUBE_ENABLED:true}
+    oauth-base-url: https://oauth2.googleapis.com
+    api-base-url: https://www.googleapis.com/youtube/v3
+    lounge-base-url: https://www.youtube.com/api/lounge
+    thumbnail-base-url: https://i.ytimg.com
+    connect-timeout-seconds: 5
+    request-timeout-seconds: 15
+    # Your Cloud project's daily YouTube Data API quota (10000 unless Google raised it).
+    daily-quota-units: 10000
+    # Each search costs 100 units.
+    searches-per-day: 20
+    rail-size: 30
+    channels-per-refresh: 30
+    videos-per-channel: 5
+    subscriptions-refresh: 24h
+    max-subscription-pages: 20
+    refresh-interval: 60m
+    min-refresh-spacing: 15m
+    search-cache-ttl: 6h
   content:
     rails:
       # Background refresh; page loads never wait for it.

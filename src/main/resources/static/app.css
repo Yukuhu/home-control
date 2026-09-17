@@ -132,3 +132,4 @@ button, a { touch-action: manipulation; }
     .drawer[data-mode="touchpad"] .touchpad { height: 60vh; }
 }
 @media (forced-colors: active) { .touchpad { border: 2px solid CanvasText; } }
+.user-code { font: 600 2rem/1.2 ui-monospace, monospace; letter-spacing: .1em; }
