@@ -185,6 +185,21 @@ class SonosSessionTest {
     }
 
     @Test
+    void aStaleCoordinatorIsLookedUpAgainWhenTheSpeakerSaysItIsNotOne() {
+        SonosSession session = new SonosSession(kitchen.device("sonos-" + KITCHEN), new SonosProperties(true, 1, 1, 3600, 1, 1, 1, 2),
+                SoapClient.httpClient(Duration.ofSeconds(1)), states::add, () -> { });
+        sessions.add(session);
+        session.start();
+        await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
+        household.join(KITCHEN, LIVING); // grouped in the Sonos app; this session has not re-read the topology
+
+        session.execute(new Action.Pause());
+
+        assertThat(kitchen.calls("Pause")).hasSize(1);
+        assertThat(living.commandNames()).containsExactly("Pause");
+    }
+
+    @Test
     void isOfflineWhileThePlayerIsGone() {
         SonosSession session = connected(living);
 

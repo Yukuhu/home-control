@@ -140,6 +140,40 @@ class DeviceManagerExecuteTest {
     }
 
     @Test
+    void stopReachesEveryAdapterThatCanStop() {
+        registry.save(new Device("tv", "TV", DeviceKind.CAST, "10.0.0.31",
+                orderedAdapters("cast", "upnp"), Instant.now()));
+        StubAdapter upnp = new StubAdapter("upnp", DeviceKind.UPNP, true, false, Capability.MEDIA_RENDERER, Capability.VOLUME);
+        StubAdapter tvCast = new StubAdapter("cast", DeviceKind.CAST, true, false, Capability.CAST_RECEIVER, Capability.VOLUME);
+        DeviceManager both = new DeviceManager(registry, List.of(tvCast, upnp), event -> { });
+        both.start();
+        try {
+            both.execute("tv", new Action.Stop());
+            assertThat(tvCast.handles.get("tv").executed).containsExactly(new Action.Stop());
+            assertThat(upnp.handles.get("tv").executed).containsExactly(new Action.Stop());
+
+            // One adapter's refusal does not keep the other from stopping; the stop counts as done.
+            tvCast.handles.get("tv").failure = new ActionFailedException("nothing is casting");
+            both.execute("tv", new Action.Stop());
+            assertThat(upnp.handles.get("tv").executed).hasSize(2);
+
+            // Only when nobody could stop is the failure reported.
+            upnp.handles.get("tv").failure = new DeviceOfflineException("gone");
+            assertThatThrownBy(() -> both.execute("tv", new Action.Stop())).isInstanceOf(ActionFailedException.class);
+        } finally {
+            both.close();
+        }
+    }
+
+    private static Map<String, Map<String, String>> orderedAdapters(String... ids) {
+        Map<String, Map<String, String>> adapters = new LinkedHashMap<>();
+        for (String id : ids) {
+            adapters.put(id, Map.of());
+        }
+        return adapters;
+    }
+
+    @Test
     void stopReachesAMediaRendererWithoutCast() {
         registry.save(new Device("speaker", "Speaker", DeviceKind.UPNP, "10.0.0.30",
                 Map.of("upnp", Map.of()), Instant.now()));

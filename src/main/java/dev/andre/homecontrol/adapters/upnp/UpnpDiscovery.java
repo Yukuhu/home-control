@@ -55,14 +55,17 @@ public class UpnpDiscovery implements AutoCloseable {
     }
 
     /**
-     * The description address most recently announced for {@code udn} — only one whose host is the
-     * address the announcement actually came from (a forged LOCATION is never handed to a session).
+     * The description address most recently announced for {@code udn} by {@code host} — the registered
+     * device's own address. Both the announcement's sender and its LOCATION must be that host: another
+     * machine claiming the UDN can never move a session (and the stream URLs it sends) elsewhere. A
+     * renderer whose address changed is added again from Setup.
      */
-    public Optional<URI> location(String udn) {
-        if (udn == null) {
+    public Optional<URI> location(String udn, String host) {
+        if (udn == null || host == null) {
             return Optional.empty();
         }
         return ssdp.services(SEARCH_TARGET).stream()
+                .filter(service -> host.equals(service.address()))
                 .filter(service -> DeviceFetch.isSafeToFetch(service.location(), service.address()))
                 .filter(service -> udn.equalsIgnoreCase(udnOf(service.usn()))
                         || (service.description() != null && udn.equalsIgnoreCase(service.description().udn())))

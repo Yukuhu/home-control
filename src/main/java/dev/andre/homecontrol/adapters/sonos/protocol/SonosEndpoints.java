@@ -26,15 +26,29 @@ public final class SonosEndpoints {
     /**
      * Whether a player location (from a topology answer) may be called: F1's shape rules (http, IP
      * literal, explicit port; {@link DeviceFetch}) and an address on the local network — the
-     * appliance never follows a device-supplied topology to the internet.
+     * appliance never follows a device-supplied topology to the internet. Loopback locations only
+     * when {@code allowLoopback} (the answering player is itself on loopback).
      */
-    public static boolean isLanLocation(URI location) {
+    public static boolean isLanLocation(URI location, boolean allowLoopback) {
         if (location == null || !DeviceFetch.isSafeToFetch(location, location.getHost())) {
             return false;
         }
         try {
             InetAddress address = InetAddress.getByName(location.getHost()); // an IP literal: no lookup
-            return address.isSiteLocalAddress() || address.isLoopbackAddress() || address.isLinkLocalAddress();
+            return address.isSiteLocalAddress() || address.isLinkLocalAddress()
+                    || (allowLoopback && address.isLoopbackAddress());
+        } catch (UnknownHostException e) {
+            return false;
+        }
+    }
+
+    /** True for an IP literal on the loopback network; never resolves a name. */
+    public static boolean isLoopback(String host) {
+        if (!DeviceFetch.isIpLiteral(host)) {
+            return false;
+        }
+        try {
+            return InetAddress.getByName(host).isLoopbackAddress();
         } catch (UnknownHostException e) {
             return false;
         }

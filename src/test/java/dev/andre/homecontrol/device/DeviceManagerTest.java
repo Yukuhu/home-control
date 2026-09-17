@@ -9,10 +9,6 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
-import dev.andre.homecontrol.core.SpeakerTopology;
-import dev.andre.homecontrol.core.SpeakerGroup;
-import dev.andre.homecontrol.core.GroupMember;
-import dev.andre.homecontrol.core.GroupListing;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
@@ -24,9 +20,13 @@ import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
+import dev.andre.homecontrol.core.GroupListing;
+import dev.andre.homecontrol.core.GroupMember;
 import dev.andre.homecontrol.core.InputListing;
 import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.core.RemoteKey;
+import dev.andre.homecontrol.core.SpeakerGroup;
+import dev.andre.homecontrol.core.SpeakerTopology;
 import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.WakeOnLanAdapter;
@@ -47,6 +47,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import dev.andre.homecontrol.adapters.upnp.UpnpAdapter;
+import dev.andre.homecontrol.adapters.upnp.UpnpDiscovery;
+import dev.andre.homecontrol.adapters.upnp.UpnpProperties;
+import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
+import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
+import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -492,6 +498,26 @@ class DeviceManagerTest {
 
         @Override
         public void close() {
+        }
+    }
+
+    @Test
+    void aRendererInsideARegisteredTvIsMergedIntoIt() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        registry.save(new Device("webos-10-0-0-60", "Living Room TV", DeviceKind.WEBOS, "10.0.0.60",
+                Map.of("webos", Map.of("clientKey", "k")), Instant.now()));
+        SsdpDiscovery ssdp = new SsdpDiscovery(new SsdpProperties(false, "239.255.255.250", 1900, 1900, 60, 2));
+        UpnpDiscovery upnpDiscovery = new UpnpDiscovery(ssdp, event -> { }, true);
+        UpnpAdapter upnp = new UpnpAdapter(new UpnpProperties(true, 1, 1, 1, 1, 1, 2), upnpDiscovery);
+
+        try (DeviceManager manager = new DeviceManager(registry, List.of(upnp), publisher)) {
+            manager.onDiscovered(new DeviceDiscoveredEvent(new DiscoveredDevice("upnp", "[LG] webOS TV", "10.0.0.60", 1780,
+                    Map.of("udn", "uuid:tv", "location", "http://10.0.0.60:1780/", "model", "LG"))));
+
+            assertThat(registry.findAll()).hasSize(1);
+            assertThat(registry.findById("webos-10-0-0-60").orElseThrow().adapters().keySet()).containsExactly("webos", "upnp");
+        } finally {
+            upnpDiscovery.close();
         }
     }
 

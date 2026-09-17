@@ -71,8 +71,9 @@ class UpnpDiscoveryTest {
     void knowsTheLatestLocationOfAUdn() {
         await().atMost(Duration.ofSeconds(5)).until(() -> !discovery.devices().isEmpty());
 
-        assertThat(discovery.location(FakeUpnpRenderer.UDN)).contains(fake.location());
-        assertThat(discovery.location("uuid:nope")).isEmpty();
+        assertThat(discovery.location(FakeUpnpRenderer.UDN, "127.0.0.1")).contains(fake.location());
+        assertThat(discovery.location(FakeUpnpRenderer.UDN, "127.0.0.2")).isEmpty();
+        assertThat(discovery.location("uuid:nope", "127.0.0.1")).isEmpty();
     }
 
     @Test

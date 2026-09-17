@@ -91,7 +91,7 @@ public final class RendererCommands {
         try {
             return call.call();
         } catch (SoapFault fault) {
-            throw new ActionFailedException(deviceName + " refused to " + what + " (" + fault.getMessage() + ")");
+            throw new RendererFaultException(deviceName + " refused to " + what + " (" + fault.getMessage() + ")", fault.errorCode());
         } catch (SoapTimeoutException e) {
             throw new ActionFailedException(deviceName + " did not answer in time when asked to " + what);
         } catch (IOException e) {

@@ -10,6 +10,7 @@ import dev.andre.homecontrol.adapters.upnp.protocol.PositionInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ReconnectingPoller;
 import dev.andre.homecontrol.adapters.upnp.protocol.RendererCommands;
+import dev.andre.homecontrol.adapters.upnp.protocol.RendererFaultException;
 import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapFault;
@@ -53,6 +54,8 @@ import static dev.andre.homecontrol.adapters.sonos.protocol.SonosEndpoints.AV_TR
 public class SonosSession implements DeviceHandle, GroupListing {
 
     private static final Logger log = LoggerFactory.getLogger(SonosSession.class);
+    /** Sonos: "Command not supported or not a coordinator". */
+    private static final int NOT_COORDINATOR = 800;
 
     private final Device device;
     private final SonosSettings settings;
@@ -137,12 +140,15 @@ public class SonosSession implements DeviceHandle, GroupListing {
                 case Action.PlayMedia play -> {
                     Action.PlayMedia forSonos = new Action.PlayMedia(SonosUris.forPlayback(play.url(), play.mimeType()),
                             play.mimeType(), play.title(), play.subtitle());
-                    commands.playUri(coordinatorAvTransport(), sink, forSonos, "*");
+                    onCoordinator(coordinator -> commands.playUri(coordinator, sink, forSonos, "*"));
                     lastPlayed = new PlayedItem(forSonos.url().toString(), play.title());
                 }
-                case Action.Pause ignored -> commands.transport(coordinatorAvTransport(), UpnpActions.pause(AV_TRANSPORT), "pause");
-                case Action.Resume ignored -> commands.transport(coordinatorAvTransport(), UpnpActions.play(AV_TRANSPORT), "resume playback");
-                case Action.Stop ignored -> commands.transport(coordinatorAvTransport(), UpnpActions.stop(AV_TRANSPORT), "stop playback");
+                case Action.Pause ignored -> onCoordinator(coordinator ->
+                        commands.transport(coordinator, UpnpActions.pause(AV_TRANSPORT), "pause"));
+                case Action.Resume ignored -> onCoordinator(coordinator ->
+                        commands.transport(coordinator, UpnpActions.play(AV_TRANSPORT), "resume playback"));
+                case Action.Stop ignored -> onCoordinator(coordinator ->
+                        commands.transport(coordinator, UpnpActions.stop(AV_TRANSPORT), "stop playback"));
                 case Action.SetVolume volume -> commands.setVolume(renderingControl(), volume.level(), 100);
                 case Action.Mute mute -> commands.setMute(renderingControl(), mute.muted());
                 case Action.JoinGroup join -> join(join.memberId());
@@ -186,12 +192,28 @@ public class SonosSession implements DeviceHandle, GroupListing {
         String xml = soap.call(own(SonosEndpoints.ZONE_GROUP_TOPOLOGY_PATH, SonosEndpoints.ZONE_GROUP_TOPOLOGY).controlUrl(),
                 SonosActions.getZoneGroupState()).getOrDefault("ZoneGroupState", "");
         try {
-            ZoneGroupState parsed = ZoneGroupState.parse(xml);
+            ZoneGroupState parsed = ZoneGroupState.parse(xml, SonosEndpoints.isLoopback(device.host()));
             topology = parsed;
             topologyReadAt = clock.instant();
             return parsed;
         } catch (IllegalArgumentException e) {
             throw new SoapFault(0, "Unreadable zone group state");
+        }
+    }
+
+    /**
+     * Runs a transport command on the coordinator. Sonos answers 800 when the target is no longer the
+     * coordinator (grouping changed in the Sonos app since the last topology read): re-read once and retry.
+     */
+    private void onCoordinator(Consumer<ServiceEndpoint> command) {
+        try {
+            command.accept(coordinatorAvTransport());
+        } catch (RendererFaultException fault) {
+            if (fault.errorCode() != NOT_COORDINATOR) {
+                throw fault;
+            }
+            commands.run("look up the speaker groups", this::readTopology);
+            command.accept(coordinatorAvTransport());
         }
     }
 

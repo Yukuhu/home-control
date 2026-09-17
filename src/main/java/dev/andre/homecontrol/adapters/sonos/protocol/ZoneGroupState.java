@@ -46,7 +46,16 @@ public record ZoneGroupState(List<Group> groups) {
         groups = List.copyOf(groups);
     }
 
+    /** Members at loopback locations are dropped; see {@link #parse(String, boolean)}. */
     public static ZoneGroupState parse(String xml) {
+        return parse(xml, false);
+    }
+
+    /**
+     * {@code allowLoopback} only when the player that answered is itself at a loopback address: a
+     * LAN player naming 127.0.0.1 as a room would otherwise point this appliance at its own services.
+     */
+    public static ZoneGroupState parse(String xml, boolean allowLoopback) {
         Element root = UpnpXml.parse(xml);
         List<Group> groups = new ArrayList<>();
         List<Element> groupElements = "ZoneGroup".equals(UpnpXml.localName(root)) ? List.of(root) : UpnpXml.descendants(root, "ZoneGroup");
@@ -63,7 +72,7 @@ public record ZoneGroupState(List<Group> groups) {
                 } catch (IllegalArgumentException e) {
                     continue;
                 }
-                if (uuid.isBlank() || !SonosEndpoints.isLanLocation(location)) {
+                if (uuid.isBlank() || !SonosEndpoints.isLanLocation(location, allowLoopback)) {
                     continue; // device-supplied: never a member we would call outside the LAN or by host name
                 }
                 members.add(new Member(uuid, location, member.getAttribute("ZoneName"), "1".equals(member.getAttribute("Invisible"))));

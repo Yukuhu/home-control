@@ -136,17 +136,17 @@ public class UpnpSession implements DeviceHandle {
     }
 
     /**
-     * Reads the description and SCPD only under F1's rules ({@link DeviceFetch}): a location the
-     * discovery heard from that very address, or else the stored one on the device's own address;
-     * plain HTTP to an IP literal, 64 KiB at most, no redirects. Locations are never logged.
+     * Reads the description and SCPD only under F1's rules ({@link DeviceFetch}): the location
+     * announced for this UDN, else the stored one — either way on the registered device's own address;
+     * plain HTTP to an IP literal, 64 KiB at most, no redirects — and only a description that names
+     * this device's UDN. Locations are never logged.
      */
     private Endpoints resolve() throws IOException, InterruptedException {
         Optional<URI> announced = Optional.ofNullable(settings.udn()).flatMap(locator);
         URI location = announced.orElse(settings.location());
-        // The locator only hands out locations already checked against their announcing address, so for
-        // those isSafeToFetch(location, location.getHost()) re-validates only the URI's shape (http, IP literal, port).
-        String expectedHost = announced.isPresent() ? location.getHost() : device.host();
-        if (location == null || !DeviceFetch.isSafeToFetch(location, expectedHost)) {
+        // Whatever the source, the description must live on the registered device's address: an
+        // announcement cannot move this session (and the stream URLs it sends) to another host.
+        if (location == null || !DeviceFetch.isSafeToFetch(location, device.host())) {
             throw new IOException(device.id() + " has no description address on its own host");
         }
         Duration timeout = Duration.ofSeconds(properties.commandTimeoutSeconds());
@@ -156,6 +156,9 @@ public class UpnpSession implements DeviceHandle {
                     DeviceFetch.get(http, location, timeout, DeviceFetch.MAX_DESCRIPTION_BYTES), location);
         } catch (IllegalArgumentException e) {
             throw new IOException("Unreadable description for " + device.id());
+        }
+        if (settings.udn() != null && (description.udn() == null || !settings.udn().equalsIgnoreCase(description.udn()))) {
+            throw new IOException("The description at " + device.id() + "'s address belongs to another device");
         }
         ServiceEndpoint avTransport = service(description, UpnpActions.AV_TRANSPORT, location)
                 .orElseThrow(() -> new IOException(device.id() + " offers no usable AVTransport service"));
@@ -180,7 +183,11 @@ public class UpnpSession implements DeviceHandle {
             if (!sameHost) {
                 log.warn("Ignoring {} of {}: its control URL is not on the host it announced itself from", typePrefix, device.id());
             }
-            return sameHost;
+            boolean validType = SoapClient.isValidServiceType(endpoint.serviceType());
+            if (!validType) {
+                log.warn("Ignoring {} of {}: malformed service type", typePrefix, device.id());
+            }
+            return sameHost && validType;
         });
     }
 

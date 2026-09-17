@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /** UPnP control: one SOAP POST per action, HTTP/1.1, answers capped (UDA 1.1 §3). */
 public final class SoapClient {
@@ -28,6 +29,9 @@ public final class SoapClient {
             + "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\""
             + " s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body>";
     private static final String ENVELOPE_END = "</s:Body></s:Envelope>";
+
+    private static final Pattern SERVICE_TYPE = Pattern.compile("^urn:[A-Za-z0-9.:\\-]+$");
+    private static final Pattern ACTION = Pattern.compile("^[A-Za-z][A-Za-z0-9_]*$");
 
     private final HttpClient http;
     private final Duration timeout;
@@ -46,6 +50,11 @@ public final class SoapClient {
                 .build();
     }
 
+    /** Service types go into an XML attribute and the SOAPACTION header unescaped: only plain URNs pass. */
+    public static boolean isValidServiceType(String type) {
+        return type != null && SERVICE_TYPE.matcher(type).matches();
+    }
+
     public static String envelope(SoapRequest request) {
         StringBuilder xml = new StringBuilder(ENVELOPE_START)
                 .append("<u:").append(request.action()).append(" xmlns:u=\"").append(request.serviceType()).append("\">");
@@ -55,6 +64,10 @@ public final class SoapClient {
     }
 
     public Map<String, String> call(URI controlUrl, SoapRequest request) throws IOException, SoapFault {
+        if (!isValidServiceType(request.serviceType()) || !ACTION.matcher(request.action()).matches()
+                || !request.arguments().keySet().stream().allMatch(name -> ACTION.matcher(name).matches())) {
+            throw new SoapFault(0, "Refusing a malformed service type or action");
+        }
         HttpRequest httpRequest = HttpRequest.newBuilder(controlUrl)
                 .timeout(timeout)
                 .header("Content-Type", "text/xml; charset=\"utf-8\"")

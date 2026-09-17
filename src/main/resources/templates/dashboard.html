@@ -118,7 +118,7 @@
         <div class="row">
             <button th:attr="hx-post=@{/devices/{id}/mute(id=${id})}" hx-vals='{"muted": "true"}'>Mute</button>
             <button th:attr="hx-post=@{/devices/{id}/mute(id=${id})}" hx-vals='{"muted": "false"}'>Unmute</button>
-            <button th:attr="hx-post=@{/devices/{id}/stop(id=${id})}">Stop casting</button>
+            <button th:attr="hx-post=@{/devices/{id}/stop(id=${id})}" th:text="${rendererControls} ? 'Stop' : 'Stop casting'">Stop casting</button>
         </div>
     </section>
 
@@ -132,8 +132,8 @@
         <div class="row">
             <button th:attr="hx-post=@{/devices/{id}/pause(id=${id})}">Pause</button>
             <button th:attr="hx-post=@{/devices/{id}/resume(id=${id})}">Play</button>
-            <button th:attr="hx-post=@{/devices/{id}/stop(id=${id})}">Stop</button>
             <th:block th:unless="${castControls}">
+                <button th:attr="hx-post=@{/devices/{id}/stop(id=${id})}">Stop</button>
                 <button th:attr="hx-post=@{/devices/{id}/mute(id=${id})}" hx-vals='{"muted": "true"}'>Mute</button>
                 <button th:attr="hx-post=@{/devices/{id}/mute(id=${id})}" hx-vals='{"muted": "false"}'>Unmute</button>
             </th:block>

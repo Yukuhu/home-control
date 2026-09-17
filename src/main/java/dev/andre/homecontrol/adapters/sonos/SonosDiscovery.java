@@ -92,7 +92,7 @@ public class SonosDiscovery implements AutoCloseable {
         try {
             String xml = soap.call(SonosEndpoints.endpoint(address, port, SonosEndpoints.ZONE_GROUP_TOPOLOGY_PATH,
                     SonosEndpoints.ZONE_GROUP_TOPOLOGY).controlUrl(), SonosActions.getZoneGroupState()).getOrDefault("ZoneGroupState", "");
-            List<DiscoveredDevice> rooms = toDevices(ZoneGroupState.parse(xml));
+            List<DiscoveredDevice> rooms = toDevices(ZoneGroupState.parse(xml, SonosEndpoints.isLoopback(address)));
             refreshedAt.put(household, clock.instant());
             Map<String, DiscoveredDevice> previous = households.getOrDefault(household, Map.of());
             Map<String, DiscoveredDevice> current = new LinkedHashMap<>();
@@ -101,7 +101,12 @@ public class SonosDiscovery implements AutoCloseable {
             current.forEach((id, room) -> {
                 if (!room.equals(previous.get(id))) {
                     log.info("Discovered Sonos room {} at {}", room.name(), room.host());
-                    events.publishEvent(new DeviceDiscoveredEvent(room));
+                    // A player speaks only for itself: the other rooms it lists are shown on Setup, but only the
+                    // room at the announcing address, under the announced id, may merge into or re-point a
+                    // registered device (DeviceManager.onDiscovered) — a forged household cannot rewrite others.
+                    if (id.equals(uuid) && room.host().equals(address)) {
+                        events.publishEvent(new DeviceDiscoveredEvent(room));
+                    }
                 }
             });
         } catch (IOException | SoapFault | IllegalArgumentException e) {
