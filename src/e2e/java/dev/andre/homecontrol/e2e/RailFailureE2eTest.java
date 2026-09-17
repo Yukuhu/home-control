@@ -106,6 +106,35 @@ class RailFailureE2eTest extends E2eApplicationTest {
         }
     }
 
+    /**
+     * Regression for rails.js's endless microtask loop: {@code htmx.ajax} without a {@code source}
+     * tracks the in-flight request on {@code document.body}, so two rails refreshing back to back
+     * made the second call resolve immediately, and its {@code .finally()} recursed into another
+     * refetch synchronously forever, freezing the tab. Refreshing two rails at once must still leave
+     * both rails updated and the page able to answer an ordinary interaction afterwards.
+     */
+    @BrowserTest
+    void refreshingTwoRailsAtOnceKeepsThePageResponsive(String browser) {
+        fakeContent.heal("flaky-4");
+        fakeContent.heal("flaky-5");
+
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+            page.navigate("/");
+
+            rails.refresh("e2e", "flaky-4");
+            rails.refresh("e2e", "flaky-5");
+
+            Locator flaky4 = page.locator(".rail[data-rail='e2e/flaky-4']");
+            Locator flaky5 = page.locator(".rail[data-rail='e2e/flaky-5']");
+            assertThat(flaky4).hasAttribute("data-status", "READY", new LocatorAssertions.HasAttributeOptions().setTimeout(15_000));
+            assertThat(flaky5).hasAttribute("data-status", "READY", new LocatorAssertions.HasAttributeOptions().setTimeout(15_000));
+
+            page.locator("#search-q").fill("bunny");
+            assertThat(page.locator("#search-results .tile[data-item='clip-1']")).isVisible();
+        }
+    }
+
     @BrowserTest
     void searchResultsOpenThePlaySheet(String browser) {
         try (BrowserSession session = open(browser)) {

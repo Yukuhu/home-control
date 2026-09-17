@@ -21,8 +21,18 @@ function refetch(sourceId, railId) {
     if (!el || Number(el.dataset.version) >= wanted) return;
     const path = `/rails/${encodeURIComponent(sourceId)}/${encodeURIComponent(railId)}`;
     inFlight.add(key);
-    window.htmx.ajax("GET", path, { target: el, swap: "outerHTML" })
-        .finally(() => { inFlight.delete(key); refetch(sourceId, railId); });
+    // `source: el` gives htmx its own in-flight tracking per rail element instead of falling back
+    // to document.body: without it, two rails refreshing close together made the second call see
+    // an "already in flight" request on body and resolve immediately without swapping anything, so
+    // `.finally()` below recursed into another refetch on the same microtask turn, forever, and
+    // froze the tab. `!el.isConnected` (true once outerHTML actually swapped this element out) is a
+    // second guard against recursing when nothing changed, and `setTimeout` defers any recursion to
+    // a fresh task instead of the current microtask queue.
+    window.htmx.ajax("GET", path, { source: el, target: el, swap: "outerHTML" })
+        .finally(() => {
+            inFlight.delete(key);
+            if (!el.isConnected) setTimeout(() => refetch(sourceId, railId), 0);
+        });
 }
 
 export function watchRails() {
@@ -34,6 +44,6 @@ export function watchRails() {
     on("rails", ({ rails }) => {
         const shown = [...document.querySelectorAll("#rails > .rail")].map((el) => el.dataset.rail);
         if (shown.join("|") === rails.join("|")) return;
-        window.htmx.ajax("GET", "/rails", { target: "#rails", swap: "outerHTML" });
+        window.htmx.ajax("GET", "/rails", { source: "#rails", target: "#rails", swap: "outerHTML" });
     });
 }

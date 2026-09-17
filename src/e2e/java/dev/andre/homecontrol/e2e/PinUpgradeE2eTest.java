@@ -30,14 +30,16 @@ class PinUpgradeE2eTest extends E2eApplicationTest {
     }
 
     /**
-     * {@code @Timeout}: this is the one interaction in the whole e2e suite that both submits a
-     * form via fetch and, from that fetch's success handler, triggers a second async round trip
-     * (the re-preview) while a native {@code <dialog>} is open — in this headless environment
-     * that has been observed to make the browser stop answering Playwright's own protocol
-     * commands for several minutes at a time (reproduced in both Chromium and WebKit; a direct
-     * HTTP check against the running server while a run was stuck confirmed the server itself
-     * had already reached the correct end state, so this is a browser-automation timing issue,
-     * not an application bug). The bound keeps one flaky run from hanging the whole suite.
+     * {@code @Timeout}: this interaction both submits a form via fetch and, from that fetch's
+     * success handler, triggers a second async round trip (the re-preview) while a native
+     * {@code <dialog>} is open. It used to hang for minutes at a time in this headless environment
+     * (reproduced in both Chromium and WebKit) — not a browser-automation quirk after all, but
+     * rails.js's {@code refetch()} recursing into an endless microtask loop whenever a second rail
+     * refresh raced the first one's in-flight htmx request, starving the page's event loop. That is
+     * fixed (rails.js now tracks each rail's in-flight request against its own element instead of
+     * {@code document.body}, and only recurses once the element has actually been swapped out). The
+     * {@code @Timeout} stays as a guard against any future regression, not because this is expected
+     * to hang.
      */
     @BrowserTest
     @Timeout(value = 45, unit = TimeUnit.SECONDS)
