@@ -42,6 +42,20 @@ home-control:
     reconnect-max-delay-seconds: 30
     # After a Wake-on-LAN packet, how long the TV gets before the first reconnect.
     wake-grace-seconds: 3
+  tizen:
+    enabled: true
+    # Remote-control WebSocket (TLS, self-signed), REST API and DIAL.
+    port: 8002
+    rest-port: 8001
+    dial-port: 8080
+    # What the TV shows in its Allow prompt and its list of connected devices.
+    client-name: Home Control
+    connect-timeout-seconds: 3
+    request-timeout-seconds: 5
+    pairing-timeout-seconds: 30
+    # Samsung pushes no state: power and the app in front are polled.
+    poll-interval-seconds: 5
+    wake-grace-seconds: 3
   wake-on-lan:
     # Use the subnet broadcast (e.g. 192.168.1.255) if the host has several networks.
     broadcast-address: 255.255.255.255
