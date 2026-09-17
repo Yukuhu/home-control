@@ -183,7 +183,29 @@ class DashboardPageTest {
                 .andExpect(content().string(containsString("id=\"volume-cast-10-0-0-9\"")))
                 .andExpect(content().string(containsString("/devices/cast-10-0-0-9/mute")))
                 .andExpect(content().string(containsString("/devices/cast-10-0-0-9/stop")))
-                .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/key/"))));
+                .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/key/"))))
+                .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/pause"))));
+    }
+
+    @Test
+    void aMediaRendererGetsPlaybackControls() throws Exception {
+        Device speaker = new Device("upnp-10-0-0-30", "Kitchen Speaker", DeviceKind.UPNP, "10.0.0.30",
+                Map.of("upnp", Map.of("udn", "uuid:x")), Instant.now());
+        given(devices.devices()).willReturn(List.of(speaker));
+        given(devices.defaultDevice()).willReturn(Optional.of(speaker));
+        given(devices.device("upnp-10-0-0-30")).willReturn(Optional.of(speaker));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME));
+        given(rails.snapshots()).willReturn(List.of());
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/pause")))
+                .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/resume")))
+                .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/stop")))
+                .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/volume")))
+                .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/mute")))
+                .andExpect(content().string(not(containsString("/devices/upnp-10-0-0-30/key/"))));
     }
 
     @Test

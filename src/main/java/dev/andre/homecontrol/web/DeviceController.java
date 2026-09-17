@@ -107,13 +107,25 @@ public class DeviceController {
         return command(id, new Action.Stop());
     }
 
+    /** Pause what a media renderer plays. */
+    @PostMapping("/devices/{id}/pause")
+    public ResponseEntity<String> pause(@PathVariable String id) {
+        return command(id, new Action.Pause());
+    }
+
+    /** Resume what a media renderer paused. */
+    @PostMapping("/devices/{id}/resume")
+    public ResponseEntity<String> resume(@PathVariable String id) {
+        return command(id, new Action.Resume());
+    }
+
     /** Switch a TV to one of the inputs its handle listed. */
     @PostMapping("/devices/{id}/input/{inputId}")
     public ResponseEntity<String> input(@PathVariable String id, @PathVariable String inputId) {
         return command(id, new Action.SelectInput(inputId));
     }
 
-    /** Volume, stop and inputs go straight to the adapters, not through the planner (spec §5.3). */
+    /** Volume, stop, pause/resume and inputs go straight to the adapters, not through the planner (spec §5.3). */
     private ResponseEntity<String> command(String id, Action action) {
         devices.execute(id, action);
         return ResponseEntity.noContent().build();

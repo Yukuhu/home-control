@@ -40,8 +40,8 @@ main h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
 .open-link input { flex: 1; padding: .7rem; border-radius: .5rem; border: 1px solid #313640;
                    background: #1b1e24; color: var(--fg); }
 .hint { font-size: .85rem; opacity: .8; }
-.cast .volume { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
-.cast .volume input { flex: 1; }
+.cast .volume, .renderer .volume { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+.cast .volume input, .renderer .volume input { flex: 1; }
 .chip-group { display: flex; align-items: stretch; gap: .25rem; }
 .drawer-toggle, .drawer-close { min-width: 44px; min-height: 44px; }
 main#content { max-width: none; padding: .5rem 0 5rem; }
