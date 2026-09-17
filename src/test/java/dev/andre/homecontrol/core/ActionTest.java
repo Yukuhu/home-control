@@ -17,6 +17,20 @@ class ActionTest {
     }
 
     @Test
+    void aKeyPressIsShortByDefault() {
+        assertThat(new Action.PressKey(RemoteKey.HOME).press()).isEqualTo(KeyPress.SHORT);
+        assertThat(new Action.PressKey(RemoteKey.HOME, null).press()).isEqualTo(KeyPress.SHORT);
+    }
+
+    @Test
+    void longPressSupportIsLimitedToNavigationKeys() {
+        assertThat(RemoteKey.DPAD_CENTER.supportsLongPress()).isTrue();
+        assertThat(RemoteKey.BACK.supportsLongPress()).isTrue();
+        assertThat(RemoteKey.VOLUME_UP.supportsLongPress()).isFalse();
+        assertThat(RemoteKey.POWER.supportsLongPress()).isFalse();
+    }
+
+    @Test
     void openingAnAppLinkRequiresAppLink() {
         Action action = new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=abc"));
         assertThat(action.requires()).isEqualTo(Capability.APP_LINK);

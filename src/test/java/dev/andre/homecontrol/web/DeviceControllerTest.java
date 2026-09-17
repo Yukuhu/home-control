@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.Route;
@@ -54,6 +55,57 @@ class DeviceControllerTest {
         mockMvc.perform(post("/devices/shield/key/EJECT_TAPE")).andExpect(status().isBadRequest());
 
         verifyNoInteractions(devices);
+    }
+
+    @Test
+    void repeatsAShortPress() throws Exception {
+        mockMvc.perform(post("/devices/shield/key/DPAD_RIGHT").param("repeat", "3"))
+                .andExpect(status().isNoContent());
+
+        verify(devices, org.mockito.Mockito.times(3))
+                .execute("shield", new Action.PressKey(RemoteKey.DPAD_RIGHT, KeyPress.SHORT));
+    }
+
+    @Test
+    void sendsLongPressEdges() throws Exception {
+        mockMvc.perform(post("/devices/shield/key/DPAD_CENTER").param("press", "start_long"))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/devices/shield/key/DPAD_CENTER").param("press", "end_long"))
+                .andExpect(status().isNoContent());
+
+        verify(devices).execute("shield", new Action.PressKey(RemoteKey.DPAD_CENTER, KeyPress.START_LONG));
+        verify(devices).execute("shield", new Action.PressKey(RemoteKey.DPAD_CENTER, KeyPress.END_LONG));
+    }
+
+    @Test
+    void rejectsInvalidRepeatAndPress() throws Exception {
+        mockMvc.perform(post("/devices/shield/key/DPAD_RIGHT").param("repeat", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("repeat must be 1 to 4"));
+        mockMvc.perform(post("/devices/shield/key/DPAD_RIGHT").param("repeat", "5"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("repeat must be 1 to 4"));
+        mockMvc.perform(post("/devices/shield/key/DPAD_RIGHT").param("press", "double"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Unknown press double"));
+        mockMvc.perform(post("/devices/shield/key/DPAD_CENTER").param("press", "start_long").param("repeat", "2"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("A long press cannot repeat"));
+        mockMvc.perform(post("/devices/shield/key/VOLUME_UP").param("press", "start_long"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("VOLUME_UP has no long press"));
+
+        verifyNoInteractions(devices);
+    }
+
+    @Test
+    void stopsAtTheFirstFailure() throws Exception {
+        willThrow(new DeviceOfflineException("offline")).given(devices).execute(eq("shield"), any());
+
+        mockMvc.perform(post("/devices/shield/key/DPAD_RIGHT").param("repeat", "3"))
+                .andExpect(status().isConflict());
+
+        verify(devices, org.mockito.Mockito.times(1)).execute(eq("shield"), any());
     }
 
     @Test

@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <body>
-<th:block th:fragment="results">
+<!-- th:if on the fragment root itself (not just its children) so an empty query renders as
+     truly zero bytes, not stray inter-tag whitespace: #search-results must be CSS :empty for
+     "main#content:has(#search-results:not(:empty)) #rails { display: none; }" to let the rails
+     back through once the search box is cleared. -->
+<th:block th:fragment="results" th:if="${state != 'empty'}">
     <p class="hint" th:if="${state == 'short'}">Type at least 2 characters</p>
     <p class="hint" th:if="${state == 'long'}">Search for 2 to 100 characters</p>
     <th:block th:if="${state == 'done'}">

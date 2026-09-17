@@ -8,8 +8,12 @@ async function post(url, body) {
     return response;
 }
 
-export function sendKey(deviceId, key) {
-    return post(`/devices/${encodeURIComponent(deviceId)}/key/${key}`);
+export function sendKey(deviceId, key, { repeat = 1, press = "short" } = {}) {
+    const query = new URLSearchParams();
+    if (repeat !== 1) query.set("repeat", String(repeat));
+    if (press !== "short") query.set("press", press);
+    const suffix = query.size ? `?${query}` : "";
+    return post(`/devices/${encodeURIComponent(deviceId)}/key/${key}${suffix}`);
 }
 
 export async function openLink(deviceId, uri) {

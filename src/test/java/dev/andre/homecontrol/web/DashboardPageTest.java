@@ -323,6 +323,28 @@ class DashboardPageTest {
     }
 
     @Test
+    void hasPwaMetadataAndTheTouchpad() throws Exception {
+        Device bedroom = device("bedroom", "Bedroom", Instant.now());
+        given(devices.devices()).willReturn(List.of(bedroom));
+        given(devices.defaultDevice()).willReturn(Optional.of(bedroom));
+        given(devices.device("bedroom")).willReturn(Optional.of(bedroom));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.REMOTE_KEYS));
+        given(rails.snapshots()).willReturn(List.of());
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("rel=\"manifest\"")))
+                .andExpect(content().string(containsString("href=\"/manifest.webmanifest\"")))
+                .andExpect(content().string(containsString("viewport-fit=cover")))
+                .andExpect(content().string(containsString("name=\"theme-color\"")))
+                .andExpect(content().string(containsString("rel=\"apple-touch-icon\"")))
+                .andExpect(content().string(containsString("id=\"touchpad\"")))
+                .andExpect(content().string(containsString("data-mode-switch")))
+                .andExpect(content().string(not(containsString("maximum-scale"))));
+    }
+
+    @Test
     void pointsToSetupWhenNoSourceIsConfigured() throws Exception {
         Device bedroom = device("bedroom", "Bedroom", Instant.now());
         given(devices.devices()).willReturn(List.of(bedroom));

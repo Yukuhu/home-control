@@ -12,13 +12,24 @@ import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 /**
- * Once a login exists every path except the login page and its stylesheet needs an authenticated
+ * Once a login exists every path except the login page, its stylesheet and the handful of PWA
+ * assets a phone needs before it can even show the login page (D6) needs an authenticated
  * session — pages, JSON, SSE, scripts and artwork alike (spec §9). Without a login it lets every
  * request through. Cross-origin requests never get here: {@link CrossOriginFilter} runs first.
  */
 public class LoginGateFilter extends OncePerRequestFilter {
 
-    static final Set<String> OPEN_PATHS = Set.of("/login", "/app.css");
+    /**
+     * Exact raw-URI matches only — never a prefix. A prefix such as {@code /icons/} would
+     * reopen the {@code ;param}/percent-encoding bypass C1 fixed: a request whose raw URI is,
+     * say, {@code /icons/..;/setup} starts with that prefix while the container's normalised
+     * path is really {@code /setup}. Every new open asset (a new icon size, say) is one more
+     * entry here, not a new prefix.
+     */
+    static final Set<String> OPEN_PATHS = Set.of(
+            "/login", "/app.css", "/manifest.webmanifest", "/offline.html",
+            "/icons/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png",
+            "/icons/maskable-512.png", "/icons/apple-touch-icon.png");
 
     private final LoginService login;
 

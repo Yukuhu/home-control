@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.adapters.androidtv.protocol;
 
+import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteDirection;
+import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.RemoteKey;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +16,7 @@ import javax.net.ssl.X509TrustManager;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -131,6 +134,16 @@ class RemoteConnectionTest {
         connection.sendKey(RemoteKey.DPAD_UP);
 
         assertThat(device.nextKeyPress()).isEqualTo(19);
+    }
+
+    @Test
+    void sendsLongPressDirections() throws Exception {
+        connection.sendKey(RemoteKey.DPAD_CENTER, KeyPress.START_LONG);
+        connection.sendKey(RemoteKey.DPAD_CENTER, KeyPress.END_LONG);
+
+        await().until(() -> device.receivedKeyPresses().size() >= 2);
+        assertThat(device.receivedKeyPresses()).containsExactly(
+                Map.entry(23, RemoteDirection.START_LONG), Map.entry(23, RemoteDirection.END_LONG));
     }
 
     @Test

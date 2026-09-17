@@ -11,7 +11,15 @@ public sealed interface Action {
 
     Capability requires();
 
-    record PressKey(RemoteKey key) implements Action {
+    record PressKey(RemoteKey key, KeyPress press) implements Action {
+        public PressKey {
+            press = press == null ? KeyPress.SHORT : press;
+        }
+
+        public PressKey(RemoteKey key) {
+            this(key, KeyPress.SHORT);
+        }
+
         @Override
         public Capability requires() {
             return Capability.REMOTE_KEYS;

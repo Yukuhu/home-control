@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.AppLinks;
@@ -40,14 +41,34 @@ public class DeviceController {
     }
 
     @PostMapping("/devices/{id}/key/{key}")
-    public ResponseEntity<String> key(@PathVariable String id, @PathVariable String key) {
+    public ResponseEntity<String> key(@PathVariable String id, @PathVariable String key,
+                                      @RequestParam(defaultValue = "1") int repeat,
+                                      @RequestParam(defaultValue = "short") String press) {
         RemoteKey remoteKey;
         try {
             remoteKey = RemoteKey.valueOf(key.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return text(HttpStatus.BAD_REQUEST, "Unknown key " + key);
         }
-        devices.execute(id, new Action.PressKey(remoteKey));
+        KeyPress keyPress;
+        try {
+            keyPress = KeyPress.valueOf(press.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return text(HttpStatus.BAD_REQUEST, "Unknown press " + press);
+        }
+        if (repeat < 1 || repeat > 4) {
+            return text(HttpStatus.BAD_REQUEST, "repeat must be 1 to 4");
+        }
+        if (keyPress != KeyPress.SHORT && repeat != 1) {
+            return text(HttpStatus.BAD_REQUEST, "A long press cannot repeat");
+        }
+        if (keyPress != KeyPress.SHORT && !remoteKey.supportsLongPress()) {
+            return text(HttpStatus.BAD_REQUEST, remoteKey + " has no long press");
+        }
+        Action action = new Action.PressKey(remoteKey, keyPress);
+        for (int i = 0; i < repeat; i++) {
+            devices.execute(id, action);   // a failure stops here and maps to its status; nothing is retried
+        }
         return ResponseEntity.noContent().build();
     }
 
