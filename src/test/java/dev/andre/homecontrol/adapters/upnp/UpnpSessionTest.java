@@ -2,6 +2,7 @@ package dev.andre.homecontrol.adapters.upnp;
 
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -259,6 +260,71 @@ class UpnpSessionTest {
         int before = fake.calls("GetPositionInfo").size();
 
         await().atMost(Duration.ofSeconds(3)).until(() -> fake.calls("GetPositionInfo").size() >= before + 2);
+    }
+
+    @Test
+    void aSlowRendererFailsTheCommandAndRecovers() {
+        startConnected();
+
+        fake.delayAnswers(Duration.ofSeconds(2));
+        assertThatThrownBy(() -> session.execute(new Action.SetVolume(30)))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessageContaining("did not answer in time");
+
+        fake.delayAnswers(Duration.ZERO);
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+    }
+
+    @Test
+    void garbageAnswersAreIgnoredWhilePolling() {
+        startConnected();
+
+        fake.answerRaw("GetVolume", 200, "not xml");
+        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4))
+                .until(() -> session.state().status() == DeviceStatus.CONNECTED);
+
+        fake.answerRaw("Pause", 200, "<x/>");
+        assertThatThrownBy(() -> session.execute(new Action.Pause()))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessageContaining("Unreadable answer to Pause");
+    }
+
+    @Test
+    void aDoctypeInAnAnswerIsRefused() {
+        startConnected();
+
+        fake.answerRaw("GetTransportInfo", 200,
+                "<?xml version=\"1.0\"?><!DOCTYPE r [<!ENTITY x SYSTEM \"file:///etc/passwd\">]><r>&x;</r>");
+
+        int polls = fake.calls("GetTransportInfo").size();
+        await().atMost(WAIT).until(() -> fake.calls("GetTransportInfo").size() >= polls + 2);
+        assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
+        assertThat(states).noneMatch(state -> state.toString().contains("root:"));
+    }
+
+    @Test
+    void controlUrlsOnAnotherHostAreRefused() throws Exception {
+        fake.overrideDescription(Files.readString(Path.of("src/test/resources/fixtures/upnp/renderer-description.xml"))
+                .replace("<controlURL>/upnp/control/AVTransport1</controlURL>",
+                        "<controlURL>http://192.0.2.1:1/upnp/control/AVTransport1</controlURL>"));
+        session = start(fake.device("kitchen"), udn -> Optional.empty());
+
+        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4))
+                .until(() -> session.state().status() != DeviceStatus.CONNECTED);
+        assertThat(fake.calls("SetAVTransportURI")).isEmpty();
+        assertThat(fake.calls()).isEmpty();
+    }
+
+    @Test
+    void aDescriptionThatIsNotXmlIsAConnectFailure() {
+        fake.overrideDescription("<html>");
+        session = start(fake.device("kitchen"), udn -> Optional.empty());
+
+        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3))
+                .until(() -> session.state().status() != DeviceStatus.CONNECTED);
+
+        fake.overrideDescription(null);
+        await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
     }
 
     @Test

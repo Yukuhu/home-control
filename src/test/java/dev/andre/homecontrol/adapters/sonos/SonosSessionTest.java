@@ -173,6 +173,18 @@ class SonosSessionTest {
     }
 
     @Test
+    void aVanishedCoordinatorMakesTheMemberOffline() {
+        household.join(KITCHEN, LIVING);
+        SonosSession session = connected(kitchen);
+
+        living.hangUp(true);
+        await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
+
+        living.hangUp(false);
+        await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
+    }
+
+    @Test
     void isOfflineWhileThePlayerIsGone() {
         SonosSession session = connected(living);
 
