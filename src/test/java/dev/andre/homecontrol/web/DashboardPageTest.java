@@ -255,7 +255,9 @@ class DashboardPageTest {
                 .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/volume")))
                 .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/mute")))
                 .andExpect(content().string(not(containsString("/devices/upnp-10-0-0-30/key/"))))
-                .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/play")));
+                .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/play")))
+                .andExpect(content().string(containsString("the speaker must be able to reach the URL")))
+                .andExpect(content().string(not(containsString("This speaker plays through the server"))));
     }
 
     @Test
@@ -278,6 +280,7 @@ class DashboardPageTest {
                 .andExpect(content().string(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/mute")))
                 .andExpect(content().string(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/play")))
                 .andExpect(content().string(containsString("This speaker plays through the server")))
+                .andExpect(content().string(not(containsString("the speaker must be able to reach the URL"))))
                 .andExpect(content().string(not(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/key/"))));
     }
 
