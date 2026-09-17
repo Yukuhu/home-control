@@ -67,13 +67,50 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  e2e:
+    name: Browser tests (Chromium, WebKit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # Browser binaries are version-pinned by build.gradle.kts; OS packages are re-installed every
+      # run by --with-deps (fast when already present) because the runner image is fresh.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('build.gradle.kts') }}
+
+      - name: Install Chromium and WebKit
+        run: ./gradlew installPlaywrightBrowsers
+
+      - name: Run the browser tests
+        run: ./gradlew e2eTest
+
+      - name: Upload the browser test report and traces
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            build/reports/tests/e2eTest
+            build/e2e-artifacts
+          if-no-files-found: ignore
+
   release:
     name: Release
     # Conventional commits decide whether there is anything to release at all:
     # feat -> minor, fix/perf -> patch, breaking -> minor while still pre-1.0.
     # A push of only docs/ci/chore/test/refactor commits releases nothing.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, image]
+    needs: [test, image, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: write
