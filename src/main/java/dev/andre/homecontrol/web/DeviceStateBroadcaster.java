@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.content.RailUpdatedEvent;
+import dev.andre.homecontrol.content.RailsChangedEvent;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -37,7 +39,7 @@ public class DeviceStateBroadcaster {
      * reconnects. Single-threaded, so events still reach each tab in the order published.
      */
     private final ExecutorService fanOut = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "shield-sse-broadcast");
+        Thread thread = new Thread(runnable, "home-control-sse-broadcast");
         thread.setDaemon(true);
         return thread;
     });
@@ -95,16 +97,37 @@ public class DeviceStateBroadcaster {
         drop(emitter);
     }
 
+    @FunctionalInterface
+    interface Send {
+        void to(SseEmitter emitter) throws IOException;
+    }
+
     @EventListener
     public void onStateChanged(DeviceStateChangedEvent event) {
+        enqueue(emitter -> sendData(emitter, event));
+    }
+
+    @EventListener
+    public void onRailUpdated(RailUpdatedEvent event) {
+        RailEventView view = RailEventView.of(event.snapshot());
+        enqueue(emitter -> sendNamed(emitter, "rail", view));
+    }
+
+    @EventListener
+    public void onRailsChanged(RailsChangedEvent event) {
+        Map<String, Object> body = Map.of("rails", event.keys());
+        enqueue(emitter -> sendNamed(emitter, "rails", body));
+    }
+
+    private void enqueue(Send send) {
         try {
-            fanOut.execute(() -> broadcast(event));
+            fanOut.execute(() -> broadcast(send));
         } catch (RejectedExecutionException e) {
             // The application is shutting down; there is nobody left to tell.
         }
     }
 
-    private void broadcast(DeviceStateChangedEvent event) {
+    private void broadcast(Send send) {
         for (SseEmitter emitter : emitters) {
             if (!isAllowed(emitter)) {
                 drop(emitter);
@@ -112,7 +135,7 @@ public class DeviceStateBroadcaster {
                 continue;
             }
             try {
-                sendData(emitter, event);
+                send.to(emitter);
             } catch (Throwable t) {
                 // Not just IOException: send throws an unchecked IllegalStateException when the
                 // emitter completed after this loop took its snapshot of the list, which happens
@@ -125,9 +148,14 @@ public class DeviceStateBroadcaster {
         }
     }
 
-    /** The one place an event becomes an SSE frame; package-private so a test can observe the object. */
+    /** The one place a device-state event becomes an SSE frame; package-private so a test can observe the object. */
     void sendData(SseEmitter emitter, DeviceStateChangedEvent event) throws IOException {
         emitter.send(SseEmitter.event().name("state").data(event));
+    }
+
+    /** Named non-device events; package-private so a test can observe them. */
+    void sendNamed(SseEmitter emitter, String name, Object data) throws IOException {
+        emitter.send(SseEmitter.event().name(name).data(data));
     }
 
     private void completeQuietly(SseEmitter emitter) {

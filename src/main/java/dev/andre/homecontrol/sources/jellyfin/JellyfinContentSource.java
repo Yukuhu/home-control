@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.playback.ContentItem;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,6 +103,12 @@ public class JellyfinContentSource implements ContentSource {
         params.put("enableImageTypes", IMAGE_TYPES);
         params.put("imageTypeLimit", "1");
         return JellyfinItemMapper.toItems(client.get(connection, "/Items", params).path("Items"));
+    }
+
+    /** Continue watching changes while the household watches. */
+    @Override
+    public Duration defaultRefreshInterval() {
+        return Duration.ofMinutes(5);
     }
 
     JellyfinConnection connection() {

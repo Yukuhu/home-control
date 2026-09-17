@@ -42,3 +42,10 @@ home-control:
     connect-timeout-seconds: 5
     request-timeout-seconds: 15
     rail-size: 20
+  content:
+    rails:
+      scheduler-enabled: false
+      tick: 15s
+      retry-after-failure: 1m
+      max-concurrent-fetches: 4
+      refresh-intervals: {}

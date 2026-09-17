@@ -26,6 +26,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -132,8 +133,14 @@ class JellyfinEndToEndTest {
                 assertThat(send(stranger, get("/sources/jellyfin/images/" + EPISODE + "/Primary?tag=1a2b3c4d5e6f")).statusCode()).isEqualTo(401);
                 assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(302);
 
-                // Rails, artwork and search for the logged-in browser.
-                HttpResponse<String> rail = send(browser, get("/sources/jellyfin/rails/resume"));
+                // Rails, artwork and search for the logged-in browser. The rail cache (D1) answers
+                // the first request while it loads in the background, so poll until it is READY.
+                HttpResponse<String>[] railHolder = new HttpResponse[1];
+                await().atMost(Duration.ofSeconds(5)).until(() -> {
+                    railHolder[0] = send(browser, get("/sources/jellyfin/rails/resume"));
+                    return railHolder[0].statusCode() == 200;
+                });
+                HttpResponse<String> rail = railHolder[0];
                 assertThat(rail.statusCode()).isEqualTo(200);
                 assertThat(rail.body()).contains("Northern Lights").contains("/sources/jellyfin/images/" + EPISODE + "/Primary?tag=1a2b3c4d5e6f");
                 assertThat(send(browser, get("/sources/jellyfin/images/" + EPISODE + "/Primary?tag=1a2b3c4d5e6f")).statusCode()).isEqualTo(200);

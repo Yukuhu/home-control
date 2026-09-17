@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.content.RailCache;
+import dev.andre.homecontrol.content.RailSnapshot;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.device.DeviceManager;
@@ -21,11 +23,14 @@ public class StateController {
 
     private final DeviceStateBroadcaster broadcaster;
     private final DeviceManager sessions;
+    private final RailCache rails;
     private final LoginService login;
 
-    public StateController(DeviceStateBroadcaster broadcaster, DeviceManager sessions, ObjectProvider<LoginService> login) {
+    public StateController(DeviceStateBroadcaster broadcaster, DeviceManager sessions, RailCache rails,
+                           ObjectProvider<LoginService> login) {
         this.broadcaster = broadcaster;
         this.sessions = sessions;
+        this.rails = rails;
         this.login = login.getIfAvailable();
         if (this.login != null) {
             // A logout, a password change or a first login ends the streams that may no longer see state.
@@ -41,6 +46,10 @@ public class StateController {
             for (Map.Entry<String, DeviceState> entry : sessions.states().entrySet()) {
                 emitter.send(SseEmitter.event().name("state")
                         .data(new DeviceStateChangedEvent(entry.getKey(), entry.getValue())));
+            }
+            // Rail summaries let a reconnecting tab notice what changed while it was away.
+            for (RailSnapshot rail : rails.peek()) {
+                emitter.send(SseEmitter.event().name("rail").data(RailEventView.of(rail)));
             }
         } catch (IOException e) {
             // The emitter never reached Spring, so its onCompletion/onTimeout/onError
