@@ -29,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(DeviceController.class)
@@ -118,6 +119,27 @@ class DeviceControllerTest {
 
         willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
         mockMvc.perform(post("/devices/ghost/pause")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void joinsAndLeavesSpeakerGroups() throws Exception {
+        mockMvc.perform(post("/devices/kitchen/group/join/RINCON_000E58A0B1C201400"))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("HX-Refresh", "true"));
+        verify(devices).execute("kitchen", new Action.JoinGroup("RINCON_000E58A0B1C201400"));
+
+        mockMvc.perform(post("/devices/kitchen/group/leave"))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("HX-Refresh", "true"));
+        verify(devices).execute("kitchen", new Action.LeaveGroup());
+
+        willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
+        mockMvc.perform(post("/devices/ghost/group/leave")).andExpect(status().isNotFound());
+
+        willThrow(new ActionFailedException("Kitchen refused to leave the group")).given(devices).execute(eq("kitchen"), any());
+        mockMvc.perform(post("/devices/kitchen/group/leave"))
+                .andExpect(status().isBadGateway())
+                .andExpect(content().string("Kitchen refused to leave the group"));
     }
 
     @Test

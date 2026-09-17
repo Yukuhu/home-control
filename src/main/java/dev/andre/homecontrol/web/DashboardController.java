@@ -55,6 +55,7 @@ public class DashboardController {
         model.addAttribute("remoteKeys", capabilities.contains(Capability.REMOTE_KEYS));
         model.addAttribute("castControls", capabilities.contains(Capability.CAST_RECEIVER));
         model.addAttribute("rendererControls", capabilities.contains(Capability.MEDIA_RENDERER));
+        model.addAttribute("speakerTopology", devices.speakerTopology(selected.id()).orElse(null));
         model.addAttribute("inputs", devices.inputs(selected.id()));
         model.addAttribute("canOpenLinks",
                 capabilities.contains(Capability.APP_LINK) || capabilities.contains(Capability.CAST_RECEIVER));

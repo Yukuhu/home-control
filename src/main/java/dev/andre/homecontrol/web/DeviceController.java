@@ -119,6 +119,23 @@ public class DeviceController {
         return command(id, new Action.Resume());
     }
 
+    /** Join the speaker group that contains {@code memberId}. */
+    @PostMapping("/devices/{id}/group/join/{memberId}")
+    public ResponseEntity<String> joinGroup(@PathVariable String id, @PathVariable String memberId) {
+        return regroup(id, new Action.JoinGroup(memberId));
+    }
+
+    @PostMapping("/devices/{id}/group/leave")
+    public ResponseEntity<String> leaveGroup(@PathVariable String id) {
+        return regroup(id, new Action.LeaveGroup());
+    }
+
+    /** Grouping changes the whole drawer (and other rooms' chips): let htmx reload the page. */
+    private ResponseEntity<String> regroup(String id, Action action) {
+        devices.execute(id, action);
+        return ResponseEntity.noContent().header("HX-Refresh", "true").build();
+    }
+
     /** Switch a TV to one of the inputs its handle listed. */
     @PostMapping("/devices/{id}/input/{inputId}")
     public ResponseEntity<String> input(@PathVariable String id, @PathVariable String inputId) {
