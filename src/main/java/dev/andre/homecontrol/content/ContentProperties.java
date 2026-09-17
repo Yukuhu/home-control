@@ -7,7 +7,8 @@ import java.time.Duration;
 import java.util.Map;
 
 @ConfigurationProperties("home-control.content")
-public record ContentProperties(@DefaultValue Rails rails) {
+public record ContentProperties(@DefaultValue Rails rails, @DefaultValue("de-DE") String locale,
+                                @DefaultValue("DE") String region) {
 
     public record Rails(@DefaultValue("true") boolean schedulerEnabled,
                         @DefaultValue("15s") Duration tick,

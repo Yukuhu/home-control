@@ -16,6 +16,8 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -72,13 +74,46 @@ class RailCacheTest {
         @Override public Duration defaultRefreshInterval() { return Duration.ofMinutes(10); }
     }
 
+    /** Every rail of every available source in bean order, like the real default, but with order/interval knobs. */
+    static final class StubPreferences implements RailPreferences {
+        List<String> order = List.of();
+        final Map<String, Duration> intervals = new HashMap<>();
+
+        @Override
+        public List<RailDescriptor> rails(List<ContentSource> sources) {
+            List<RailDescriptor> natural = sources.stream().filter(ContentSource::available)
+                    .flatMap(s -> s.rails().stream()).toList();
+            if (order.isEmpty()) {
+                return natural;
+            }
+            Map<String, RailDescriptor> byKey = new LinkedHashMap<>();
+            natural.forEach(d -> byKey.put(RailSnapshot.key(d), d));
+            List<RailDescriptor> ordered = new ArrayList<>();
+            order.forEach(key -> {
+                RailDescriptor d = byKey.remove(key);
+                if (d != null) {
+                    ordered.add(d);
+                }
+            });
+            ordered.addAll(byKey.values());
+            return ordered;
+        }
+
+        @Override
+        public Duration refreshInterval(ContentSource source) {
+            return intervals.getOrDefault(source.id(), source.defaultRefreshInterval());
+        }
+    }
+
     final TestClock clock = new TestClock();
     final StubSource source = new StubSource(clock);
     final ManualExecutor executor = new ManualExecutor();
     final List<Object> events = new CopyOnWriteArrayList<>();
     final ContentProperties properties = new ContentProperties(
-            new ContentProperties.Rails(false, Duration.ofSeconds(15), Duration.ofMinutes(1), 4, Map.of()));
-    final RailCache cache = new RailCache(new ContentSources(List.of(source)), new DefaultRailPreferences(properties),
+            new ContentProperties.Rails(false, Duration.ofSeconds(15), Duration.ofMinutes(1), 4, Map.of()),
+            "de-DE", "DE");
+    final StubPreferences preferences = new StubPreferences();
+    final RailCache cache = new RailCache(new ContentSources(List.of(source)), preferences,
             events::add, clock, properties, executor);
 
     @AfterEach
@@ -215,5 +250,24 @@ class RailCacheTest {
     void peekNeitherReconcilesNorLoads() {
         assertThat(cache.peek()).isEmpty();
         assertThat(executor.queued).isEmpty();
+    }
+
+    @Test
+    void preferenceChangesReorderAndReschedule() {
+        cache.snapshots();
+        executor.runAll();
+        events.clear();
+
+        preferences.intervals.put("stub", Duration.ofMinutes(2));
+        preferences.order = List.of("stub/b", "stub/a");
+        cache.onPreferencesChanged(new SourcePreferencesChangedEvent());
+
+        assertThat(events).filteredOn(RailsChangedEvent.class::isInstance)
+                .extracting(e -> ((RailsChangedEvent) e).keys())
+                .contains(List.of("stub/b", "stub/a"));
+
+        clock.advance(Duration.ofMinutes(2));
+        cache.tick();
+        assertThat(executor.queued).hasSize(2);
     }
 }
