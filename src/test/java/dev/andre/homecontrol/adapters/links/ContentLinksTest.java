@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.links;
 
+import dev.andre.homecontrol.core.playback.ServiceLinks;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -47,5 +48,18 @@ class ContentLinksTest {
     @ValueSource(strings = {"https://www.netflix.com/browse", "https://example.org/title/80057281"})
     void noNetflixTitleIdOtherwise(String url) {
         assertThat(ContentLinks.netflixTitleId(URI.create(url))).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "https://www.netflix.com/title/80057281",
+            "https://www.netflix.com/de/title/80057281",
+            "https://www.netflix.com/de-en/title/80057281?s=a",
+            "https://www.netflix.com/watch/80057281?trackId=1",
+            "https://www.netflix.com/browse",
+            "https://example.org/title/80057281"})
+    void agreesWithServiceLinks(String url) {
+        URI uri = URI.create(url);
+        assertThat(ContentLinks.netflixTitleId(uri)).isEqualTo(ServiceLinks.netflixTitleId(uri));
     }
 }

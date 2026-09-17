@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.adapters.links;
 
+import dev.andre.homecontrol.core.playback.ServiceLinks;
+
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -13,8 +15,6 @@ public final class ContentLinks {
 
     private static final Pattern VIDEO_ID = Pattern.compile("[A-Za-z0-9_-]{11}");
     private static final Pattern VIDEO_PATH = Pattern.compile("^/(?:shorts|live|embed)/([A-Za-z0-9_-]{11})(?:/.*)?$");
-    private static final Pattern NETFLIX_PATH = Pattern.compile("^(?:/[a-z]{2}(?:-[a-z]{2})?)?/(?:title|watch)/(\\d+)",
-            Pattern.CASE_INSENSITIVE);
 
     private ContentLinks() {
     }
@@ -37,12 +37,7 @@ public final class ContentLinks {
     }
 
     public static Optional<String> netflixTitleId(URI uri) {
-        String host = host(uri);
-        if (!host.equals("netflix.com") && !host.endsWith(".netflix.com")) {
-            return Optional.empty();
-        }
-        Matcher matcher = NETFLIX_PATH.matcher(uri.getPath() == null ? "" : uri.getPath());
-        return matcher.find() ? Optional.of(matcher.group(1)) : Optional.empty();
+        return ServiceLinks.netflixTitleId(uri);
     }
 
     private static String host(URI uri) {

@@ -59,7 +59,7 @@ public class PinnedShortcuts {
             if (trimmedUrl.length() > MAX_URL_LENGTH) {
                 throw new IllegalArgumentException("That link is too long to pin");
             }
-            URI parsed = AppLinks.parseHttpUrl(trimmedUrl);
+            URI parsed = ServiceLinks.canonical(AppLinks.parseHttpUrl(trimmedUrl));
             String service = AppLinks.serviceOf(parsed.getHost().toLowerCase(Locale.ROOT), parsed.getPath());
             boolean duplicate = current.stream().anyMatch(existing -> existing.url().toString().equals(parsed.toString()));
             if (duplicate) {

@@ -3,9 +3,8 @@ package dev.andre.homecontrol.sources.pinned;
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
-import dev.andre.homecontrol.core.playback.AppLinks;
 import dev.andre.homecontrol.core.playback.ContentItem;
-import dev.andre.homecontrol.core.playback.PlayableRef;
+import dev.andre.homecontrol.core.playback.ServiceLinks;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -79,8 +78,7 @@ public class PinnedContentSource implements ContentSource {
     }
 
     static ContentItem toItem(Pin pin) {
-        String service = AppLinks.serviceOf(pin.url().getHost().toLowerCase(Locale.ROOT), pin.url().getPath());
         return new ContentItem(pin.id(), ID, pin.kind(), pin.title(), pin.subtitle(), pin.artwork(),
-                List.of(new PlayableRef.AppLink(pin.url(), service)), null);
+                List.of(ServiceLinks.appLink(pin.url())), null);
     }
 }

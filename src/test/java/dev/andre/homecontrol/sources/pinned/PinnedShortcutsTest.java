@@ -8,6 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -145,6 +146,17 @@ class PinnedShortcutsTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("No pinned link p-000000000000");
         assertThatThrownBy(() -> shortcuts.rename(b.id(), " "))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("Enter a title");
+    }
+
+    @Test
+    void storesCanonicalLinksAndSpotsDuplicatesAcrossForms() {
+        Pin pin = shortcuts.add("https://www.netflix.com/de/title/80057281?s=a", "");
+
+        assertThat(pin.url()).isEqualTo(URI.create("https://www.netflix.com/title/80057281"));
+
+        assertThatThrownBy(() -> shortcuts.add("https://www.netflix.com/watch/80057281", ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("That link is already pinned");
     }
 
     @Test
