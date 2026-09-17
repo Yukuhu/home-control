@@ -2,11 +2,14 @@ package dev.andre.homecontrol.e2e;
 
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
+import dev.andre.homecontrol.core.playback.ServiceLinks;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.net.URI;
 import java.time.Instant;
@@ -20,7 +23,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A {@link ContentSource} double: two fixed items, a rail that always works ("picks") and several
- * independent rails that can each be broken/healed on demand ("flaky", "flaky-2", "flaky-3").
+ * independent rails that can each be broken/healed on demand ("flaky", "flaky-2", "flaky-3"), plus
+ * a "launcher" item (G5) that is never in a rail but shows up in search and by id — it only ever
+ * opens the Netflix app home, unless {@link PinnedLinks} has an upgrade link for it, exactly like a
+ * real streaming source's item with no direct playback link.
  * There is more than one flaky rail so tests that each drive their own break/heal cycle (and the
  * RailCache failure-count/backoff state that comes with it) never interfere with one another —
  * each test uses its own id rather than needing a fresh Spring context per method.
@@ -28,13 +34,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class FakeContentSource implements ContentSource {
 
     private static final RailDescriptor PICKS = new RailDescriptor("e2e", "picks", "Picks");
+    private static final String LAUNCHER_ID = "launcher-1";
     static final List<String> FLAKY_RAIL_IDS = List.of("flaky", "flaky-2", "flaky-3");
 
     private final Map<String, ContentItem> items = new LinkedHashMap<>();
+    private final ContentItem launcherBase;
+    private final ObjectProvider<PinnedLinks> pinnedLinks;
     /** One flag per flaky rail id; each starts broken so a fresh test sees the failure by default. */
     private final Map<String, AtomicBoolean> broken = new LinkedHashMap<>();
 
-    public FakeContentSource() {
+    public FakeContentSource(ObjectProvider<PinnedLinks> pinnedLinks) {
+        this.pinnedLinks = pinnedLinks;
         FLAKY_RAIL_IDS.forEach(id -> broken.put(id, new AtomicBoolean(true)));
         ContentItem clip1 = new ContentItem("clip-1", "e2e", ContentKind.MOVIE, "Big Buck Bunny", "2008", null,
                 List.of(
@@ -45,6 +55,16 @@ public class FakeContentSource implements ContentSource {
                 List.of(new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=eRsGyueVLvQ"), "youtube")));
         items.put(clip1.id(), clip1);
         items.put(clip2.id(), clip2);
+        launcherBase = new ContentItem(LAUNCHER_ID, "e2e", ContentKind.MOVIE, "Launcher Film", "On Netflix", null, List.of());
+    }
+
+    /** Recomputed on every call, like a real streaming source: a pinned upgrade wins, else the app home. */
+    private ContentItem launcher() {
+        PinnedLinks links = pinnedLinks.getIfAvailable();
+        Optional<PlayableRef.AppLink> pinned = links == null ? Optional.empty() : links.linkFor("e2e", LAUNCHER_ID);
+        PlayableRef.AppLink playable = pinned.orElseGet(() ->
+                new PlayableRef.AppLink(ServiceLinks.appHome("netflix").orElseThrow(), "netflix"));
+        return launcherBase.withPlayables(List.of(playable));
     }
 
     @Override
@@ -92,13 +112,18 @@ public class FakeContentSource implements ContentSource {
 
     @Override
     public Optional<ContentItem> item(String itemId) {
+        if (LAUNCHER_ID.equals(itemId)) {
+            return Optional.of(launcher());
+        }
         return Optional.ofNullable(items.get(itemId));
     }
 
     @Override
     public List<ContentItem> search(String query, int limit) {
         String needle = query.toLowerCase(Locale.ROOT);
-        return items.values().stream()
+        List<ContentItem> candidates = new ArrayList<>(items.values());
+        candidates.add(launcher());
+        return candidates.stream()
                 .filter(item -> item.title().toLowerCase(Locale.ROOT).contains(needle))
                 .limit(limit)
                 .toList();

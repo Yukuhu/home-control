@@ -250,6 +250,60 @@ address rather than the device's real LAN address, so Home Control cannot match 
 device to its Jellyfin app session automatically. Link them once on the setup page's
 **Jellyfin apps** list; rung 1 above then works normally.
 
+### Netflix, Prime Video and DAZN
+
+TMDB supplies titles, artwork, a weekly trending list and where a title streams. Netflix, Prime
+Video and DAZN have no public APIs for this, so Home Control only ever opens their apps — it has
+no access to what you watch, your watchlist or "continue watching".
+
+**Setup:** create a free account at [themoviedb.org](https://www.themoviedb.org/), then under
+**Settings → API** copy the *API Read Access Token* (recommended) or the v3 API key. Paste it
+into **Setup → TMDB**. This stores a secret, so — exactly like connecting Jellyfin or YouTube — a
+login password is set the first time and required for every client from then on (see "Secrets"
+below). Under **Setup → Content** choose your language, region and which streaming services your
+household subscribes to.
+
+**Trending on your services:** the "Trending on your services" rail lists TMDB's weekly trending
+movies and series that are available with a subscription (JustWatch data) on the services you
+picked, in your region. Tapping a tile opens the matching service's app at its home screen (Home
+Control cannot deep-link into a title through TMDB alone); paste the title's own link in the
+play sheet — see below — to make it open directly next time.
+
+**Pinned links:** paste a link from the service's own app or site under **Setup → Pinned links**,
+or from the play sheet's "paste a link to open this title directly" prompt after playing a
+trending title once. Home Control never fetches the pasted page — only the URL itself is parsed
+and stored. Links that work:
+
+- Netflix: `https://www.netflix.com/title/<id>` or `.../watch/<id>` (any locale prefix or query
+  string is stripped to the canonical title link).
+- Prime Video: a share link from the Prime Video app or `primevideo.com`
+  (`.../detail/<gti-or-id>...`), or `https://www.amazon.<tld>/gp/video/detail/<ASIN>`.
+- YouTube, DAZN, or any other web link — opened as-is.
+
+**What each device does with these links:**
+
+| Link | Android TV (Shield) | LG webOS | Samsung Tizen |
+|---|---|---|---|
+| Netflix title link | opens that title | opens that title (ConnectSDK `contentId`) | opens the Netflix app only |
+| "Open Netflix" (app home) | opens the Netflix app | opens the Netflix app | opens the Netflix app |
+| Prime Video link (share link or ASIN) | opens that title | opens the Prime Video app only | opens the Prime Video app |
+| "Open Prime Video" (app home) | opens the Prime Video app | opens the Prime Video app | opens the Prime Video app |
+| DAZN link | opens the app | opens in the TV browser | refused — Samsung cannot open web links |
+
+**Privacy:** posters are loaded directly from `image.tmdb.org` by the browser, so TMDB's CDN sees
+the viewing device's IP address, not Home Control's. Set `HOME_CONTROL_TMDB_IMAGE_BASE_URL` to a
+mirror if that matters to you. No screen shows a personalised Netflix, Prime Video or DAZN feed —
+the trending rail is always labelled as coming from TMDB, and the TMDB credential never reaches
+the browser, a log line, or `sources.json` (it lives only in encrypted `secrets.json`, the same
+as other content sources' secrets). Pinned links are stored, unencrypted (they are not secret),
+in `/data/pinned.json`.
+
+*This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability
+data by JustWatch.*
+
+Turn TMDB off with `HOME_CONTROL_TMDB_ENABLED=false`, or pinned links off with
+`HOME_CONTROL_PINNED_ENABLED=false` (existing pins are kept, just not shown or usable, while off).
+
 ### YouTube
 
 YouTube shows three kinds of rails, all read-only:
@@ -374,6 +428,13 @@ sees, or requests will be refused as cross-site.
 | `home-control.youtube.searches-per-day` | `20` | On-demand searches allowed per day (100 quota units each) |
 | `home-control.youtube.channels-per-refresh` | `30` | Subscribed channels read per subscriptions refresh |
 | `home-control.youtube.refresh-interval` | `60m` | How often every YouTube rail (subscriptions, Watch Later, chosen playlists) refreshes in the background |
+| `HOME_CONTROL_TMDB_ENABLED` | `true` | Turn the TMDB module off entirely |
+| `HOME_CONTROL_TMDB_API_BASE_URL` | `https://api.themoviedb.org/3` | TMDB API base URL |
+| `HOME_CONTROL_TMDB_IMAGE_BASE_URL` | discovered from TMDB's `/configuration` | Override the poster CDN, e.g. with a mirror, for privacy |
+| `HOME_CONTROL_TMDB_PROVIDER_IDS_NETFLIX` | `8,1796` | TMDB watch-provider ids counted as Netflix |
+| `HOME_CONTROL_TMDB_PROVIDER_IDS_PRIMEVIDEO` | `9,119,2100` | TMDB watch-provider ids counted as Prime Video |
+| `HOME_CONTROL_PINNED_ENABLED` | `true` | Turn pinned shortcuts off entirely |
+| `HOME_CONTROL_PINNED_MAX_PINS` | `200` | How many links a household can pin |
 
 The app only answers to host names that cannot be pointed at it by someone else's DNS
 (DNS rebinding): IP addresses, `localhost`, single-label names such as `nas`, and names
