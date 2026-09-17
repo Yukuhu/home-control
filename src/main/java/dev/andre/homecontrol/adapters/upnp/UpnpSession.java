@@ -108,6 +108,8 @@ public class UpnpSession implements DeviceHandle {
                 case Action.SelectInput ignored -> throw unsupported("has no inputs");
                 case Action.CastLoad ignored -> throw unsupported("is not a Cast receiver");
                 case Action.CastMessage ignored -> throw unsupported("is not a Cast receiver");
+                case Action.JoinGroup ignored -> throw unsupported("cannot be grouped");
+                case Action.LeaveGroup ignored -> throw unsupported("cannot be grouped");
             }
         } finally {
             poller.pollNow();

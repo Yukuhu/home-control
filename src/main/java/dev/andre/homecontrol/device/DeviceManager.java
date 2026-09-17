@@ -17,7 +17,9 @@ import dev.andre.homecontrol.core.DeviceStates;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Hosts;
+import dev.andre.homecontrol.core.GroupListing;
 import dev.andre.homecontrol.core.InputListing;
+import dev.andre.homecontrol.core.SpeakerTopology;
 import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.core.MacAddress;
 import dev.andre.homecontrol.core.TvInput;
@@ -360,6 +362,15 @@ public class DeviceManager implements AutoCloseable {
             }
             registry.save(updated);
         }
+    }
+
+    /** Grouping as seen by the first of the device's handles that knows it; empty otherwise. */
+    public Optional<SpeakerTopology> speakerTopology(String id) {
+        return handles.getOrDefault(id, Map.of()).values().stream()
+                .filter(GroupListing.class::isInstance)
+                .map(handle -> ((GroupListing) handle).speakerTopology())
+                .flatMap(Optional::stream)
+                .findFirst();
     }
 
     /** Inputs from the first of the device's handles that lists any; empty when none does. */
