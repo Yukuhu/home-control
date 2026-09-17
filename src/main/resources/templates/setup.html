@@ -107,6 +107,10 @@
         </form>
     </section>
 
+    <th:block th:if="${jellyfin != null}">
+        <section th:replace="~{fragments/jellyfin-setup :: section}"></section>
+    </th:block>
+
     <section th:if="${loginRequired}">
         <h2>Login password</h2>
         <p class="error" th:if="${loginError}" th:text="${loginError}">Wrong password</p>

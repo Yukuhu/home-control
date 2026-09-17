@@ -10,6 +10,7 @@ import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.discovery.MdnsBrowser;
 import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.storage.DataDirectory;
+import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -46,5 +47,10 @@ public class HomeControlConfiguration {
     @Bean
     public DataDirectory dataDirectory(AndroidTvProperties properties) {
         return new DataDirectory(properties.dataDir());
+    }
+
+    @Bean
+    public JsonFileSourceSettings sourceSettings(AndroidTvProperties properties) {
+        return new JsonFileSourceSettings(properties.dataDir().resolve("sources.json"));
     }
 }
