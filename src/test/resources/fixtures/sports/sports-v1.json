@@ -1,0 +1,46 @@
+{
+  "version" : 1,
+  "timeZone" : "Europe/Berlin",
+  "calendars" : [ {
+    "id" : "c-3f9a1c2b7d4e",
+    "label" : "Bundesliga 2026/27",
+    "host" : "calendar.example.org",
+    "provider" : "dazn",
+    "addedAt" : "2026-09-16T10:00:00Z"
+  }, {
+    "id" : "c-00000000000a",
+    "label" : "Weekly sport",
+    "host" : "nas.local",
+    "provider" : "notaservice",
+    "addedAt" : "yesterday"
+  }, {
+    "id" : "x",
+    "label" : "Bad",
+    "host" : "h"
+  }, {
+    "id" : "c-3f9a1c2b7d4e",
+    "label" : "Duplicate",
+    "host" : "calendar.example.org",
+    "provider" : "dazn",
+    "addedAt" : "2026-09-16T10:00:00Z"
+  } ],
+  "theSportsDb" : {
+    "key" : "free",
+    "competitions" : [ {
+      "leagueId" : "4331",
+      "name" : "German Bundesliga",
+      "sport" : "Soccer",
+      "country" : "Germany",
+      "badge" : "https://r2.thesportsdb.com/images/media/league/badge/teqh1b1679952008.png",
+      "provider" : "dazn",
+      "addedAt" : "2026-09-16T10:05:00Z"
+    }, {
+      "leagueId" : "4328",
+      "name" : " ",
+      "sport" : "Soccer",
+      "country" : "England",
+      "badge" : "http://insecure.example/badge.png",
+      "provider" : null
+    } ]
+  }
+}

@@ -5,6 +5,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,5 +45,48 @@ class ContentItemTest {
         mutable.add(LINK);
 
         assertThat(item.playables()).containsExactly(LINK);
+    }
+
+    @Test
+    void sevenAndEightArgumentConstructorsHaveNoTimes() {
+        ContentItem seven = new ContentItem("id", "src", ContentKind.VIDEO, "Title", null, null, List.of(LINK));
+        ContentItem eight = new ContentItem("id", "src", ContentKind.VIDEO, "Title", null, null, List.of(LINK), 0.5);
+
+        assertThat(seven.startsAt()).isNull();
+        assertThat(seven.endsAt()).isNull();
+        assertThat(eight.startsAt()).isNull();
+        assertThat(eight.endsAt()).isNull();
+        assertThat(eight.progress()).isEqualTo(0.5);
+    }
+
+    @Test
+    void timesAreValidated() {
+        Instant start = Instant.parse("2026-09-19T13:30:00Z");
+
+        assertThatThrownBy(() -> new ContentItem("id", "src", ContentKind.LIVE_EVENT, "Title", null, null,
+                List.of(), null, null, start))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("endsAt needs startsAt");
+        assertThatThrownBy(() -> new ContentItem("id", "src", ContentKind.LIVE_EVENT, "Title", null, null,
+                List.of(), null, start, start.minusSeconds(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("endsAt must not be before startsAt");
+
+        ContentItem equal = new ContentItem("id", "src", ContentKind.LIVE_EVENT, "Title", null, null,
+                List.of(), null, start, start);
+        assertThat(equal.endsAt()).isEqualTo(start);
+    }
+
+    @Test
+    void withPlayablesKeepsTheTimes() {
+        Instant start = Instant.parse("2026-09-19T13:30:00Z");
+        Instant end = Instant.parse("2026-09-19T15:25:00Z");
+        ContentItem item = new ContentItem("id", "src", ContentKind.LIVE_EVENT, "Title", null, null,
+                List.of(), null, start, end);
+
+        ContentItem replaced = item.withPlayables(List.of(LINK));
+
+        assertThat(replaced.startsAt()).isEqualTo(start);
+        assertThat(replaced.endsAt()).isEqualTo(end);
     }
 }

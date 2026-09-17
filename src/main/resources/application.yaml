@@ -128,6 +128,40 @@ home-control:
   pinned:
     enabled: true
     max-pins: 200
+  sports:
+    enabled: true
+    # Blank: the time zone chosen in Setup, else the container's TZ.
+    time-zone: ""
+    rail-size: 30
+    max-calendars: 10
+    max-competitions: 10
+    default-event-duration: 120m
+    calendar:
+      refresh: 6h
+      connect-timeout-seconds: 5
+      request-timeout-seconds: 15
+      max-bytes: 5242880
+      max-redirects: 3
+      # Loopback addresses reach this box's own services; allow only if the calendar is served here.
+      allow-loopback: false
+    thesportsdb:
+      enabled: true
+      api-base-url: https://www.thesportsdb.com/api/v1/json
+      # TheSportsDB's documented free key; a personal key is entered in Setup and stored as a secret.
+      free-key: "123"
+      fixtures-ttl: 24h
+      connect-timeout-seconds: 5
+      request-timeout-seconds: 15
+      sport-durations:
+        soccer: 120m
+        basketball: 150m
+        americanfootball: 210m
+        icehockey: 165m
+        handball: 105m
+        rugby: 120m
+        tennis: 180m
+        motorsport: 150m
+        darts: 240m
   youtube:
     enabled: ${HOME_CONTROL_YOUTUBE_ENABLED:true}
     oauth-base-url: https://oauth2.googleapis.com

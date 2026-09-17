@@ -64,6 +64,37 @@ home-control:
   pinned:
     enabled: true
     max-pins: 200
+  sports:
+    enabled: true
+    time-zone: ""
+    rail-size: 30
+    max-calendars: 10
+    max-competitions: 10
+    default-event-duration: 120m
+    calendar:
+      refresh: 6h
+      connect-timeout-seconds: 1
+      request-timeout-seconds: 2
+      max-bytes: 5242880
+      max-redirects: 3
+      allow-loopback: false
+    thesportsdb:
+      enabled: true
+      api-base-url: http://127.0.0.1:9/api/v1/json
+      free-key: "123"
+      fixtures-ttl: 24h
+      connect-timeout-seconds: 1
+      request-timeout-seconds: 2
+      sport-durations:
+        soccer: 120m
+        basketball: 150m
+        americanfootball: 210m
+        icehockey: 165m
+        handball: 105m
+        rugby: 120m
+        tennis: 180m
+        motorsport: 150m
+        darts: 240m
   youtube:
     enabled: true
     oauth-base-url: http://127.0.0.1:9
