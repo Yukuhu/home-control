@@ -327,6 +327,10 @@ class WebOsSessionTest {
     void reconnectsAfterTheTvDropsTheConnection() throws Exception {
         started();
         connected();
+        // CONNECTED precedes the initial subscriptions and requests. MAC learning is last;
+        // wait for setup to finish so dropping the socket tests an established session.
+        await().atMost(Duration.ofSeconds(5)).until(() -> storedSetting("macAddress") != null);
+        int initialConnections = tv.connections();
 
         tv.dropConnections();
 
@@ -334,6 +338,7 @@ class WebOsSessionTest {
                 .anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED));
         connected();
         int connections = tv.connections();
+        assertThat(connections).isGreaterThan(initialConnections);
         session.reconnectNow();
         Thread.sleep(500);
         assertThat(tv.connections()).isEqualTo(connections);
