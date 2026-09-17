@@ -189,6 +189,46 @@ at growing intervals of up to 5 minutes — each retry may put the Allow prompt 
 screen. Only choosing **Deny** on the TV makes a Samsung device **UNPAIRED**. If the prompt keeps
 reappearing, choose Allow once or pair the TV again from **Setup**.
 
+## Wi-Fi speakers (DLNA/UPnP and Sonos)
+
+Speakers (and TVs or AV receivers with a DLNA renderer inside) are found over SSDP — UDP 1900
+multicast, so the container needs `network_mode: host`.
+
+- Open **Setup**. Renderers and Sonos rooms appear under **Devices on this network**; press
+  **Add**. No pairing is needed. A renderer inside a TV that is already registered is added to
+  that TV instead of appearing twice.
+- Sonos rooms appear once by room name; the partner of a stereo pair, subs and surrounds are
+  part of their room, not devices of their own. Any one announcing player lists the whole
+  household.
+
+What works:
+
+- Play a direct link (`.mp3`, `.flac`, `.m4a`, `.ogg` …) or a Jellyfin track — the play sheet
+  names the route "Stream directly to this device (DLNA/UPnP)". Cast still wins on a device
+  that is both a Cast receiver and a renderer.
+- Pause, Play and Stop, the volume slider and mute in the device drawer.
+- Now playing (title, position, duration), including playback started from another app.
+- Sonos grouping from the drawer: **Join** another room's group or **Leave group**. Playing on
+  a grouped room plays on its whole group; volume stays per room.
+- Jellyfin adds **Recently played music** and **Latest music** rails.
+
+Limits:
+
+- The speaker fetches the stream itself, so it must reach the URL. For Jellyfin set the address
+  TVs and speakers should use when connecting Jellyfin (the setup page shows "TVs and speakers
+  use …").
+- Only formats the speaker lists are sent; anything else is refused with "cannot play <type>".
+- Now playing refreshes every 2 s while something plays and every 10 s when idle (speakers are
+  polled; UPnP eventing is not used).
+- Bonded Sonos speakers show as one room; group volume, queues and Sonos music services are not
+  supported.
+- Two renderers on one IP address are not supported.
+- Device descriptions are only read from the address a speaker announced itself from, and a
+  speaker's control addresses must be on that same host.
+
+Switch a module off with `HOME_CONTROL_UPNP_ENABLED=false` or `HOME_CONTROL_SONOS_ENABLED=false`
+(without the Sonos module, Sonos players show up as plain UPnP renderers).
+
 ## Discovery does not work
 
 mDNS is multicast and does not cross a Docker bridge network. Either run with
@@ -435,6 +475,11 @@ sees, or requests will be refused as cross-site.
 | `HOME_CONTROL_TMDB_PROVIDER_IDS_PRIMEVIDEO` | `9,119,2100` | TMDB watch-provider ids counted as Prime Video |
 | `HOME_CONTROL_PINNED_ENABLED` | `true` | Turn pinned shortcuts off entirely |
 | `HOME_CONTROL_PINNED_MAX_PINS` | `200` | How many links a household can pin |
+| `home-control.upnp.enabled` | `true` | DLNA/UPnP media renderer module (`HOME_CONTROL_UPNP_ENABLED`) |
+| `home-control.upnp.poll-interval-seconds` | `2` | State polling while something plays |
+| `home-control.upnp.idle-poll-interval-seconds` | `10` | State polling while idle |
+| `home-control.sonos.enabled` | `true` | Sonos module (`HOME_CONTROL_SONOS_ENABLED`; off: players appear as plain renderers) |
+| `home-control.sonos.topology-interval-seconds` | `30` | How often group topology is re-read |
 
 The app only answers to host names that cannot be pointed at it by someone else's DNS
 (DNS rebinding): IP addresses, `localhost`, single-label names such as `nas`, and names
