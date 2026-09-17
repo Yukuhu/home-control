@@ -19,8 +19,12 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
+import dev.andre.homecontrol.core.InputListing;
+import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.core.RemoteKey;
+import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.UnsupportedActionException;
+import dev.andre.homecontrol.core.WakeOnLanAdapter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.ApplicationEventPublisher;
@@ -28,9 +32,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -282,6 +288,185 @@ class DeviceManagerTest {
                 assertThat(event.deviceId()).isEqualTo("flaky");
                 assertThat(event.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
             });
+        }
+    }
+
+    /** A TV adapter that wakes its devices; remembers the {@link LearnedSettings} each connect got. */
+    static class WakingAdapter extends StubAdapter implements WakeOnLanAdapter {
+
+        final Map<String, LearnedSettings> learned = new ConcurrentHashMap<>();
+
+        WakingAdapter() {
+            super("waking", DeviceKind.WEBOS, false, false, Capability.REMOTE_KEYS, Capability.POWER);
+        }
+
+        @Override
+        public DeviceHandle connect(Device device, Consumer<DeviceState> onChange, LearnedSettings settings) {
+            learned.put(device.id(), settings);
+            return connect(device, onChange);
+        }
+    }
+
+    private final StubAdapter alpha = new StubAdapter("alpha", DeviceKind.CAST, false, false, Capability.VOLUME);
+    private final WakingAdapter waking = new WakingAdapter();
+
+    private DeviceManager wakingManager(DeviceRegistry registry) {
+        registry.save(new Device("tv", "TV", DeviceKind.WEBOS, "10.0.0.60",
+                orderedAdapters("alpha", Map.of("host", "10.0.0.60"), "waking", Map.of("clientKey", "k")), Instant.now()));
+        registry.save(new Device("box", "Box", DeviceKind.CAST, "10.0.0.61",
+                Map.of("alpha", Map.of("host", "10.0.0.61")), Instant.now()));
+        DeviceManager manager = new DeviceManager(registry, List.of(alpha, waking), publisher);
+        manager.start();
+        return manager;
+    }
+
+    private static Map<String, Map<String, String>> orderedAdapters(String first, Map<String, String> firstSettings,
+                                                                    String second, Map<String, String> secondSettings) {
+        Map<String, Map<String, String>> adapters = new LinkedHashMap<>();
+        adapters.put(first, firstSettings);
+        adapters.put(second, secondSettings);
+        return adapters;
+    }
+
+    @Test
+    void onlyDevicesWithAWakeOnLanAdapterWakeOnLan() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        try (DeviceManager manager = wakingManager(registry)) {
+            assertThat(manager.wakesOnLan("tv")).isTrue();
+            assertThat(manager.wakesOnLan("box")).isFalse();
+            assertThat(manager.wakesOnLan("nope")).isFalse();
+        }
+    }
+
+    @Test
+    void aHandEnteredMacIsNormalisedAndMarkedManualOnEveryWakingAdapter() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        try (DeviceManager manager = wakingManager(registry)) {
+            StubAdapter.StubHandle before = alpha.handles.get("tv");
+
+            manager.setWakeOnLanMac("tv", "a8-23-fe-01-02-03");
+
+            Device stored = registry.findById("tv").orElseThrow();
+            assertThat(stored.adapterSettings("waking"))
+                    .containsEntry("macAddress", "A8:23:FE:01:02:03")
+                    .containsEntry("macAddressManual", "true")
+                    .containsEntry("clientKey", "k");
+            assertThat(stored.adapterSettings("alpha")).isEqualTo(Map.of("host", "10.0.0.60"));
+            assertThat(manager.wakeOnLanMac("tv")).contains("A8:23:FE:01:02:03");
+            assertThat(alpha.handles.get("tv")).as("no reconnect").isSameAs(before);
+        }
+    }
+
+    @Test
+    void aBlankMacClearsItSoItIsLearnedAgain() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        try (DeviceManager manager = wakingManager(registry)) {
+            manager.setWakeOnLanMac("tv", "a8-23-fe-01-02-03");
+
+            manager.setWakeOnLanMac("tv", " ");
+
+            assertThat(registry.findById("tv").orElseThrow().adapterSettings("waking"))
+                    .doesNotContainKeys("macAddress", "macAddressManual");
+            assertThat(manager.wakeOnLanMac("tv")).isEmpty();
+        }
+    }
+
+    @Test
+    void anInvalidMacIsRejected() throws Exception {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        try (DeviceManager manager = wakingManager(registry)) {
+            String before = Files.readString(dir.resolve("devices.json"));
+
+            assertThatThrownBy(() -> manager.setWakeOnLanMac("tv", "nope")).isInstanceOf(IllegalArgumentException.class);
+
+            assertThat(Files.readString(dir.resolve("devices.json"))).isEqualTo(before);
+        }
+    }
+
+    @Test
+    void whatAHandleLearnsIsStoredUnderItsAdapterWithoutReconnecting() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        try (DeviceManager manager = wakingManager(registry)) {
+            StubAdapter.StubHandle before = waking.handles.get("tv");
+
+            waking.learned.get("tv").store(Map.of("macAddress", "A8:23:FE:01:02:03", "clientKey", "k2"));
+
+            assertThat(registry.findById("tv").orElseThrow().adapterSettings("waking"))
+                    .isEqualTo(Map.of("macAddress", "A8:23:FE:01:02:03", "clientKey", "k2"));
+            assertThat(registry.findById("tv").orElseThrow().adapterSettings("alpha")).isEqualTo(Map.of("host", "10.0.0.60"));
+            assertThat(waking.handles.get("tv")).isSameAs(before);
+        }
+    }
+
+    @Test
+    void aLearnedMacNeverReplacesAHandEnteredOne() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        try (DeviceManager manager = wakingManager(registry)) {
+            manager.setWakeOnLanMac("tv", "11:22:33:44:55:66");
+
+            waking.learned.get("tv").store(Map.of("macAddress", "A8:23:FE:01:02:03"));
+
+            assertThat(manager.wakeOnLanMac("tv")).contains("11:22:33:44:55:66");
+        }
+    }
+
+    @Test
+    void aLateLearnedSettingNeverResurrectsAForgottenDevice() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        try (DeviceManager manager = wakingManager(registry)) {
+            LearnedSettings late = waking.learned.get("tv");
+            manager.forget("tv");
+
+            late.store(Map.of("clientKey", "k2"));
+
+            assertThat(registry.findById("tv")).isEmpty();
+        }
+    }
+
+    @Test
+    void inputsComeFromTheFirstHandleThatListsThem() {
+        List<TvInput> hdmi = List.of(new TvInput("HDMI_1", "HDMI 1"));
+        DeviceAdapter listing = new FakeAdapter("listing", Set.of(Capability.REMOTE_KEYS), device -> new ListingHandle(hdmi));
+        DeviceAdapter plain = new FakeAdapter("plain", Set.of(Capability.VOLUME), device -> new RecordingHandle());
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        registry.save(new Device("tv", "TV", DeviceKind.WEBOS, "10.0.0.60",
+                orderedAdapters("plain", Map.of(), "listing", Map.of()), Instant.now()));
+        registry.save(new Device("box", "Box", DeviceKind.CAST, "10.0.0.61", Map.of("plain", Map.of()), Instant.now()));
+
+        try (DeviceManager manager = new DeviceManager(registry, List.of(plain, listing), publisher)) {
+            manager.start();
+
+            assertThat(manager.inputs("tv")).isEqualTo(hdmi);
+            assertThat(manager.inputs("box")).isEmpty();
+            assertThat(manager.inputs("nope")).isEmpty();
+        }
+    }
+
+    /** A handle that lists fixed inputs. */
+    private static final class ListingHandle implements DeviceHandle, InputListing {
+
+        private final List<TvInput> inputs;
+
+        ListingHandle(List<TvInput> inputs) {
+            this.inputs = inputs;
+        }
+
+        @Override
+        public List<TvInput> inputs() {
+            return inputs;
+        }
+
+        @Override
+        public DeviceState state() {
+            return DeviceState.initial();
+        }
+
+        @Override
+        public void execute(Action action) {
+        }
+
+        @Override
+        public void close() {
         }
     }
 

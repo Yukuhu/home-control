@@ -8,6 +8,7 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
+import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.content.RailSnapshot;
@@ -342,6 +343,37 @@ class DashboardPageTest {
                 .andExpect(content().string(containsString("id=\"touchpad\"")))
                 .andExpect(content().string(containsString("data-mode-switch")))
                 .andExpect(content().string(not(containsString("maximum-scale"))));
+    }
+
+    private void onlyTheLivingRoomTv() {
+        Device living = device("living", "Living Room", Instant.now());
+        given(devices.devices()).willReturn(List.of(living));
+        given(devices.defaultDevice()).willReturn(Optional.of(living));
+        given(devices.device("living")).willReturn(Optional.of(living));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.REMOTE_KEYS));
+        given(rails.snapshots()).willReturn(List.of());
+    }
+
+    @Test
+    void showsTheInputsTheTvListed() throws Exception {
+        onlyTheLivingRoomTv();
+        given(devices.inputs("living")).willReturn(List.of(new TvInput("HDMI_1", "HDMI 1"), new TvInput("HDMI_2", "PlayStation")));
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/devices/living/input/HDMI_2")))
+                .andExpect(content().string(containsString("PlayStation")));
+    }
+
+    @Test
+    void showsNoInputRowWithoutInputs() throws Exception {
+        onlyTheLivingRoomTv();
+        given(devices.inputs("living")).willReturn(List.of());
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("/input/"))));
     }
 
     @Test

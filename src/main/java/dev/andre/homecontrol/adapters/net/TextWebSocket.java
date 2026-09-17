@@ -15,8 +15,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * A blocking, text-only facade over {@link java.net.http.WebSocket} for the TV protocols. Messages
  * arrive whole (fragments are reassembled); the listener hears a close at most once and never for
- * a {@link #close()} this side initiated. Listener callbacks run on the HTTP client's threads:
- * never call {@link #send} from inside one.
+ * a {@link #close()} this side initiated. Listener callbacks run on the HTTP client's threads (a
+ * close detected by a failed {@link #send} is reported on the sender's thread): never call
+ * {@link #send} from inside one.
  */
 public final class TextWebSocket implements AutoCloseable {
 
@@ -29,11 +30,13 @@ public final class TextWebSocket implements AutoCloseable {
     private final WebSocket socket;
     private final Duration timeout;
     private final AtomicBoolean closed;
+    private final Listener listener;
 
-    private TextWebSocket(WebSocket socket, Duration timeout, AtomicBoolean closed) {
+    private TextWebSocket(WebSocket socket, Duration timeout, AtomicBoolean closed, Listener listener) {
         this.socket = socket;
         this.timeout = timeout;
         this.closed = closed;
+        this.listener = listener;
     }
 
     public static TextWebSocket connect(HttpClient client, URI uri, Duration timeout, Listener listener)
@@ -87,7 +90,7 @@ public final class TextWebSocket implements AutoCloseable {
                     .connectTimeout(timeout)
                     .buildAsync(uri, adapter)
                     .get(timeout.toMillis() * 2, TimeUnit.MILLISECONDS);
-            return new TextWebSocket(socket, timeout, closed);
+            return new TextWebSocket(socket, timeout, closed, listener);
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             throw new IOException("Could not open " + withoutQuery(uri) + ": " + cause.getClass().getSimpleName(), cause);
@@ -99,7 +102,12 @@ public final class TextWebSocket implements AutoCloseable {
         }
     }
 
-    /** Sends one complete text message; one sender at a time (the JDK forbids overlapping sends). */
+    /**
+     * Sends one complete text message; one sender at a time (the JDK forbids overlapping sends).
+     * A failed or stuck send means the connection is gone: when the peer drops the socket while a
+     * send is in flight the JDK reports that only through the send, never to the listener, so this
+     * aborts the socket and reports the close itself (on the calling thread).
+     */
     public synchronized void send(String text) throws IOException {
         if (closed.get()) {
             throw new IOException("The connection is closed");
@@ -107,12 +115,22 @@ public final class TextWebSocket implements AutoCloseable {
         try {
             socket.sendText(text, true).get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (ExecutionException e) {
-            throw new IOException("Sending failed: " + e.getCause().getClass().getSimpleName(), e.getCause());
+            String reason = "Sending failed: " + e.getCause().getClass().getSimpleName();
+            lost(reason);
+            throw new IOException(reason, e.getCause());
         } catch (TimeoutException e) {
+            lost("Sending timed out");
             throw new IOException("Sending timed out", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while sending", e);
+        }
+    }
+
+    private void lost(String reason) {
+        if (closed.compareAndSet(false, true)) {
+            socket.abort();
+            listener.onClosed(reason);
         }
     }
 

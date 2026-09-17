@@ -26,6 +26,15 @@ public interface DeviceAdapter {
      */
     DeviceHandle connect(Device device, Consumer<DeviceState> onChange);
 
+    /**
+     * What the device manager calls: like {@link #connect(Device, Consumer)}, for adapters whose
+     * handles learn settings while connected and store them through {@code learned}. Default:
+     * ignores {@code learned}.
+     */
+    default DeviceHandle connect(Device device, Consumer<DeviceState> onChange, LearnedSettings learned) {
+        return connect(device, onChange);
+    }
+
     /** Removes credentials this adapter stored for the device. Default: nothing to remove. */
     default void forget(Device device) {
     }

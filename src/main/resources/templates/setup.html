@@ -39,11 +39,15 @@
         </p>
         <ul>
             <li th:each="device : ${discovered}">
-                <form method="post" th:action="@{/setup/pair}">
+                <form method="post"
+                      th:action="${promptAdapterIds.contains(device.adapterId())} ? @{/setup/prompt-pair} : @{/setup/pair}">
+                    <input type="hidden" name="adapter" th:value="${device.adapterId()}">
                     <input type="hidden" name="host" th:value="${device.host()}">
                     <input type="hidden" name="name" th:value="${device.name()}">
                     <span th:text="${device.name()} + ' (' + ${device.host()} + ')'">Shield</span>
                     <button type="submit">Pair</button>
+                    <p class="hint" th:if="${promptAdapterIds.contains(device.adapterId())}"
+                       th:text="${promptInstructions[device.adapterId()]}">Accept the request on the TV.</p>
                 </form>
             </li>
         </ul>
@@ -70,6 +74,20 @@
             <input name="name" placeholder="Living Room Shield">
             <button type="submit">Pair</button>
         </form>
+
+        <th:block th:if="${!#lists.isEmpty(promptPairings)}">
+            <h2>Add a smart TV by address</h2>
+            <form method="post" th:action="@{/setup/prompt-pair}">
+                <select name="adapter" aria-label="TV type">
+                    <option th:each="pairing : ${promptPairings}" th:value="${pairing.adapterId()}"
+                            th:text="${pairing.displayName()}">LG webOS TV</option>
+                </select>
+                <input name="host" placeholder="192.168.1.60" required>
+                <input name="name" placeholder="Living Room TV">
+                <button type="submit">Pair</button>
+            </form>
+            <p class="hint">The TV shows a request on screen. This page waits until you answer it.</p>
+        </th:block>
     </section>
 
     <section th:if="${!#lists.isEmpty(paired)}">
@@ -80,6 +98,15 @@
                     <input type="hidden" name="id" th:value="${device.id()}">
                     <span th:text="${device.name()} + ' at ' + ${device.host()}">Shield</span>
                     <button type="submit">Forget</button>
+                </form>
+                <form method="post" th:if="${wakeMacs.containsKey(device.id())}"
+                      th:action="@{/setup/devices/{id}/mac(id=${device.id()})}">
+                    <label>Wake-on-LAN MAC
+                        <input name="mac" th:value="${wakeMacs[device.id()]}" placeholder="A8:23:FE:01:02:03">
+                    </label>
+                    <button type="submit">Save</button>
+                    <p class="hint">Learned automatically while the TV is on. Switching on over the network
+                        also needs the TV's own "turn on via network" setting.</p>
                 </form>
                 <th:block th:if="${device.adapters().size() > 1}">
                     <form method="post" th:action="@{/setup/split}"

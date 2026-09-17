@@ -15,7 +15,12 @@ import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStates;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.Hosts;
+import dev.andre.homecontrol.core.InputListing;
+import dev.andre.homecontrol.core.LearnedSettings;
+import dev.andre.homecontrol.core.MacAddress;
+import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.UnsupportedActionException;
+import dev.andre.homecontrol.core.WakeOnLanAdapter;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -68,7 +73,8 @@ public class DeviceManager implements AutoCloseable {
      * racing another adopt, an adopt racing a forget, or a discovery merge on the mDNS thread
      * racing any of them, can never leave two live handles for one device or a live handle
      * for a device that {@link #forget} just deleted from the registry. The registry
-     * read-modify-writes of those methods run under it for the same reason.
+     * read-modify-writes of those methods — and of {@link #attach}, {@link #updateAdapterSettings}
+     * and {@link #setWakeOnLanMac} — run under it for the same reason.
      * {@code adapter.connect} returns immediately (it never blocks), so holding this while
      * calling it is safe. {@link #state}, {@link #states}, {@link #capabilities} and
      * {@link #execute} read {@link #handles} without it — they only ever see either the old
@@ -227,6 +233,88 @@ public class DeviceManager implements AutoCloseable {
             merged = registry.findById(merged.id()).orElse(merged);
         }
         return merged;
+    }
+
+    /**
+     * What a handle learned while connected ({@link LearnedSettings}): merged into the adapter's
+     * settings under {@link #lock}, without reconnecting. A no-op once the device was forgotten or
+     * lost the adapter (a late write must never resurrect it), or when nothing changes. A MAC
+     * address the user typed in is never replaced by a learned one.
+     */
+    public void updateAdapterSettings(String id, String adapterId, Map<String, String> updates) {
+        synchronized (lock) {
+            Optional<Device> registered = registry.findById(id).filter(device -> device.hasAdapter(adapterId));
+            if (registered.isEmpty()) {
+                return;
+            }
+            Device device = registered.get();
+            Map<String, String> settings = new LinkedHashMap<>(device.adapterSettings(adapterId));
+            Map<String, String> accepted = new LinkedHashMap<>(updates);
+            if ("true".equals(settings.get(WakeOnLanAdapter.MAC_ADDRESS_MANUAL))) {
+                accepted.remove(WakeOnLanAdapter.MAC_ADDRESS);
+                accepted.remove(WakeOnLanAdapter.MAC_ADDRESS_MANUAL);
+            }
+            settings.putAll(accepted);
+            if (!settings.equals(device.adapterSettings(adapterId))) {
+                registry.save(device.withAdapter(adapterId, settings));
+            }
+        }
+    }
+
+    /** True when one of the device's adapters can switch it on with Wake-on-LAN. */
+    public boolean wakesOnLan(String id) {
+        return registry.findById(id)
+                .map(device -> device.adapters().keySet().stream()
+                        .anyMatch(adapterId -> adapters.get(adapterId) instanceof WakeOnLanAdapter))
+                .orElse(false);
+    }
+
+    public Optional<String> wakeOnLanMac(String id) {
+        return registry.findById(id).flatMap(device -> device.adapters().keySet().stream()
+                .filter(adapterId -> adapters.get(adapterId) instanceof WakeOnLanAdapter)
+                .map(adapterId -> device.adapterSettings(adapterId).get(WakeOnLanAdapter.MAC_ADDRESS))
+                .filter(mac -> mac != null && !mac.isBlank())
+                .findFirst());
+    }
+
+    /**
+     * Stores a hand-entered MAC on every Wake-on-LAN adapter of the device and stops adapters from
+     * replacing it; blank clears it so they learn it again. No reconnect: handles read the MAC from
+     * the registry when they wake the device. An invalid MAC throws {@link IllegalArgumentException}
+     * before anything is written.
+     */
+    public void setWakeOnLanMac(String id, String mac) {
+        boolean clear = mac == null || mac.isBlank();
+        String normalized = clear ? null : MacAddress.normalize(mac);
+        synchronized (lock) {
+            Device device = registry.findById(id)
+                    .orElseThrow(() -> new DeviceNotFoundException("No device with id " + id));
+            Device updated = device;
+            for (String adapterId : device.adapters().keySet()) {
+                if (adapters.get(adapterId) instanceof WakeOnLanAdapter) {
+                    Map<String, String> settings = new LinkedHashMap<>(updated.adapterSettings(adapterId));
+                    if (clear) {
+                        settings.remove(WakeOnLanAdapter.MAC_ADDRESS);
+                        settings.remove(WakeOnLanAdapter.MAC_ADDRESS_MANUAL);
+                    } else {
+                        settings.put(WakeOnLanAdapter.MAC_ADDRESS, normalized);
+                        settings.put(WakeOnLanAdapter.MAC_ADDRESS_MANUAL, "true");
+                    }
+                    updated = updated.withAdapter(adapterId, settings);
+                }
+            }
+            registry.save(updated);
+        }
+    }
+
+    /** Inputs from the first of the device's handles that lists any; empty when none does. */
+    public List<TvInput> inputs(String id) {
+        return handles.getOrDefault(id, Map.of()).values().stream()
+                .filter(InputListing.class::isInstance)
+                .map(handle -> ((InputListing) handle).inputs())
+                .filter(list -> !list.isEmpty())
+                .findFirst()
+                .orElse(List.of());
     }
 
     public List<DiscoveredDevice> discovered() {
@@ -528,7 +616,8 @@ public class DeviceManager implements AutoCloseable {
             for (String adapterId : List.copyOf(states.keySet())) {
                 try {
                     deviceHandles.put(adapterId, adapters.get(adapterId).connect(device,
-                            state -> report(device.id(), states, adapterId, state)));
+                            state -> report(device.id(), states, adapterId, state),
+                            updates -> updateAdapterSettings(device.id(), adapterId, updates)));
                 } catch (RuntimeException e) {
                     log.warn("Could not connect {} via the {} adapter; leaving it disconnected",
                             device.id(), adapterId, e);
