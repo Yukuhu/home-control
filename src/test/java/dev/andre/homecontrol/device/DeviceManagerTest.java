@@ -9,6 +9,10 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.SpeakerTopology;
+import dev.andre.homecontrol.core.SpeakerGroup;
+import dev.andre.homecontrol.core.GroupMember;
+import dev.andre.homecontrol.core.GroupListing;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
@@ -36,6 +40,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -440,6 +445,53 @@ class DeviceManagerTest {
             assertThat(manager.inputs("tv")).isEqualTo(hdmi);
             assertThat(manager.inputs("box")).isEmpty();
             assertThat(manager.inputs("nope")).isEmpty();
+        }
+    }
+
+    @Test
+    void speakerTopologyComesFromTheFirstHandleThatHasOne() {
+        SpeakerTopology topology = new SpeakerTopology("K", List.of(new SpeakerGroup("K", List.of(new GroupMember("K", "Kitchen")))));
+        DeviceAdapter grouping = new FakeAdapter("grouping", Set.of(Capability.MEDIA_RENDERER), device -> new GroupingHandle(topology));
+        DeviceAdapter plain = new FakeAdapter("plain", Set.of(Capability.VOLUME), device -> new RecordingHandle());
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        registry.save(new Device("speaker", "Speaker", DeviceKind.SONOS, "10.0.0.71",
+                orderedAdapters("plain", Map.of(), "grouping", Map.of()), Instant.now()));
+        registry.save(new Device("box", "Box", DeviceKind.CAST, "10.0.0.61", Map.of("plain", Map.of()), Instant.now()));
+
+        try (DeviceManager manager = new DeviceManager(registry, List.of(plain, grouping), publisher)) {
+            manager.start();
+
+            assertThat(manager.speakerTopology("speaker")).contains(topology);
+            assertThat(manager.speakerTopology("box")).isEmpty();
+            assertThat(manager.speakerTopology("nope")).isEmpty();
+        }
+    }
+
+    /** A handle that knows fixed speaker groups. */
+    private static final class GroupingHandle implements DeviceHandle, GroupListing {
+
+        private final SpeakerTopology topology;
+
+        GroupingHandle(SpeakerTopology topology) {
+            this.topology = topology;
+        }
+
+        @Override
+        public Optional<SpeakerTopology> speakerTopology() {
+            return Optional.of(topology);
+        }
+
+        @Override
+        public DeviceState state() {
+            return DeviceState.initial();
+        }
+
+        @Override
+        public void execute(Action action) {
+        }
+
+        @Override
+        public void close() {
         }
     }
 

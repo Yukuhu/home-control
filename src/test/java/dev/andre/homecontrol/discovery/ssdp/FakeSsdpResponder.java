@@ -20,8 +20,17 @@ public class FakeSsdpResponder implements AutoCloseable {
     private final AtomicInteger searches = new AtomicInteger();
 
     public FakeSsdpResponder() throws IOException {
-        socket = new DatagramSocket(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
+        this(InetAddress.getLoopbackAddress());
+    }
+
+    /** Answers from {@code bindAddress}, so a device announced at 127.0.0.2 is heard from 127.0.0.2. */
+    public FakeSsdpResponder(InetAddress bindAddress) throws IOException {
+        socket = new DatagramSocket(new InetSocketAddress(bindAddress, 0));
         Thread.ofVirtual().name("fake-ssdp-responder").start(this::serve);
+    }
+
+    public String host() {
+        return socket.getLocalAddress().getHostAddress();
     }
 
     public int port() {

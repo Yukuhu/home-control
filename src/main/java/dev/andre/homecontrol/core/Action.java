@@ -120,6 +120,28 @@ public sealed interface Action {
         }
     }
 
+    /** Join the speaker group that contains {@code memberId} (a {@link GroupMember#memberId()}). */
+    record JoinGroup(String memberId) implements Action {
+        public JoinGroup {
+            if (memberId == null || memberId.isBlank()) {
+                throw new IllegalArgumentException("Pick a speaker to join");
+            }
+        }
+
+        @Override
+        public Capability requires() {
+            return Capability.MEDIA_RENDERER;
+        }
+    }
+
+    /** Leave the speaker group and play on its own. */
+    record LeaveGroup() implements Action {
+        @Override
+        public Capability requires() {
+            return Capability.MEDIA_RENDERER;
+        }
+    }
+
     /**
      * Start receiver app {@code receiverAppId} if it is not running and send it a media LOAD
      * whose body is {@code load} (without type, requestId, sessionId). Spec §5.2 {@code CastLoad}.

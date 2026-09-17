@@ -129,6 +129,8 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
                     "Android TV Remote v2 cannot pause a direct stream; use the play/pause key");
             case Action.Resume ignored -> throw new UnsupportedActionException(
                     "Android TV Remote v2 cannot resume a direct stream; use the play/pause key");
+            case Action.JoinGroup ignored -> throw new UnsupportedActionException("Android TV cannot be grouped");
+            case Action.LeaveGroup ignored -> throw new UnsupportedActionException("Android TV cannot be grouped");
         }
     }
 

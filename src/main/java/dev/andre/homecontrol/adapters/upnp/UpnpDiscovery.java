@@ -35,14 +35,17 @@ public class UpnpDiscovery implements AutoCloseable {
 
     private final SsdpDiscovery ssdp;
     private final ApplicationEventPublisher events;
+    private final boolean ignoreSonos;
     private final Map<String, DiscoveredDevice> announced = new ConcurrentHashMap<>();
     private final List<Consumer<String>> aliveListeners = new CopyOnWriteArrayList<>();
     private final ScheduledExecutorService worker =
             Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().name("upnp-discovery").factory());
 
-    public UpnpDiscovery(SsdpDiscovery ssdp, ApplicationEventPublisher events) {
+    /** {@code ignoreSonos}: leave Sonos players to the Sonos module (when it is on). */
+    public UpnpDiscovery(SsdpDiscovery ssdp, ApplicationEventPublisher events, boolean ignoreSonos) {
         this.ssdp = ssdp;
         this.events = events;
+        this.ignoreSonos = ignoreSonos;
         // SSDP listeners must return at once: hand off to our own thread.
         ssdp.addListener(SEARCH_TARGET, service -> submit(() -> seen(service.usn(), 0)));
     }
@@ -97,12 +100,15 @@ public class UpnpDiscovery implements AutoCloseable {
         });
     }
 
-    /** Hook for Task 2 (Sonos filtering); plain mapping here. */
+    /** The renderer this service describes, unless it is a Sonos player the Sonos module handles. */
     Optional<DiscoveredDevice> map(SsdpService service) {
-        return toDevice(service);
+        return toDevice(service, ignoreSonos);
     }
 
-    static Optional<DiscoveredDevice> toDevice(SsdpService service) {
+    static Optional<DiscoveredDevice> toDevice(SsdpService service, boolean ignoreSonos) {
+        if (ignoreSonos && isSonos(service)) {
+            return Optional.empty();
+        }
         DeviceDescription description = service.description();
         URI location = service.location();
         if (description == null || location == null || description.service(UpnpActions.AV_TRANSPORT).isEmpty()) {
@@ -121,6 +127,12 @@ public class UpnpDiscovery implements AutoCloseable {
                 ? "Media renderer at " + service.address() : description.friendlyName();
         int port = location.getPort() > 0 ? location.getPort() : 80;
         return Optional.of(new DiscoveredDevice(UpnpSettings.ADAPTER_ID, name, service.address(), port, attributes));
+    }
+
+    static boolean isSonos(SsdpService service) {
+        return service.usn().startsWith("uuid:RINCON_")
+                || (service.description() != null && service.description().manufacturer() != null
+                && service.description().manufacturer().startsWith("Sonos"));
     }
 
     static String udnOf(String usn) {

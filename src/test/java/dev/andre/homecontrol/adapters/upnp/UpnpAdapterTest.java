@@ -22,7 +22,7 @@ import static org.awaitility.Awaitility.await;
 class UpnpAdapterTest {
 
     private final SsdpDiscovery ssdp = new SsdpDiscovery(new SsdpProperties(false, "239.255.255.250", 1900, 1900, 60, 2));
-    private final UpnpDiscovery discovery = new UpnpDiscovery(ssdp, event -> { });
+    private final UpnpDiscovery discovery = new UpnpDiscovery(ssdp, event -> { }, true);
     private final UpnpAdapter adapter = new UpnpAdapter(new UpnpProperties(true, 1, 1, 1, 1, 1, 2), discovery);
 
     @AfterEach

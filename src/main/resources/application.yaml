@@ -68,6 +68,16 @@ home-control:
     connect-timeout-seconds: 3
     reconnect-initial-delay-seconds: 1
     reconnect-max-delay-seconds: 60
+  sonos:
+    # Sonos rooms found over SSDP; grouping from the device drawer. Off: players appear as plain UPnP renderers.
+    enabled: true
+    poll-interval-seconds: 2
+    idle-poll-interval-seconds: 10
+    topology-interval-seconds: 30
+    command-timeout-seconds: 5
+    connect-timeout-seconds: 3
+    reconnect-initial-delay-seconds: 1
+    reconnect-max-delay-seconds: 60
   deep-link-test:
     # Blender Foundation's "Big Buck Bunny": long-lived and region-free.
     youtube-url: https://www.youtube.com/watch?v=aqz-KE-bpKQ

@@ -167,6 +167,8 @@ public class WebOsSession implements DeviceHandle, InputListing {
             case Action.PlayMedia ignored -> throw new UnsupportedActionException(device.name() + " cannot play a direct stream");
             case Action.Pause ignored -> throw new UnsupportedActionException(device.name() + " cannot pause a direct stream");
             case Action.Resume ignored -> throw new UnsupportedActionException(device.name() + " cannot resume a direct stream");
+            case Action.JoinGroup ignored -> throw new UnsupportedActionException(device.name() + " cannot be grouped");
+            case Action.LeaveGroup ignored -> throw new UnsupportedActionException(device.name() + " cannot be grouped");
         }
     }
 

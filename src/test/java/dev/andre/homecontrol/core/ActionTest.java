@@ -121,4 +121,13 @@ class ActionTest {
 
         assertThat(printed).contains("http://nas:8096/Audio/x/stream.flac?…").doesNotContain("secret-key");
     }
+
+    @Test
+    void groupingRequiresAMediaRenderer() {
+        assertThat(new Action.JoinGroup("RINCON_1").requires()).isEqualTo(MEDIA_RENDERER);
+        assertThat(new Action.LeaveGroup().requires()).isEqualTo(MEDIA_RENDERER);
+        assertThatThrownBy(() -> new Action.JoinGroup(" "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Pick a speaker to join");
+    }
 }
