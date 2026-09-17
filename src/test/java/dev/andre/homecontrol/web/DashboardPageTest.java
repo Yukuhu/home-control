@@ -6,6 +6,9 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.GroupMember;
+import dev.andre.homecontrol.core.SpeakerGroup;
+import dev.andre.homecontrol.core.SpeakerTopology;
 import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.TvInput;
@@ -185,6 +188,33 @@ class DashboardPageTest {
                 .andExpect(content().string(containsString("/devices/cast-10-0-0-9/stop")))
                 .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/key/"))))
                 .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/pause"))));
+    }
+
+    @Test
+    void aGroupableSpeakerShowsItsGroups() throws Exception {
+        Device kitchen = new Device("sonos-10-0-0-71", "Kitchen", DeviceKind.SONOS, "10.0.0.71",
+                Map.of("sonos", Map.of("uuid", "K")), Instant.now());
+        given(devices.devices()).willReturn(List.of(kitchen));
+        given(devices.defaultDevice()).willReturn(Optional.of(kitchen));
+        given(devices.device("sonos-10-0-0-71")).willReturn(Optional.of(kitchen));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME));
+        given(devices.speakerTopology("sonos-10-0-0-71")).willReturn(Optional.of(new SpeakerTopology("K", List.of(
+                new SpeakerGroup("L", List.of(new GroupMember("L", "Living Room"), new GroupMember("K", "Kitchen"))),
+                new SpeakerGroup("O", List.of(new GroupMember("O", "Office")))))));
+        given(rails.snapshots()).willReturn(List.of());
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Living Room + Kitchen")))
+                .andExpect(content().string(containsString("/devices/sonos-10-0-0-71/group/leave")))
+                .andExpect(content().string(containsString("/devices/sonos-10-0-0-71/group/join/O")))
+                .andExpect(content().string(containsString("Join Office")));
+
+        given(devices.speakerTopology("sonos-10-0-0-71")).willReturn(Optional.empty());
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("/group/"))));
     }
 
     @Test

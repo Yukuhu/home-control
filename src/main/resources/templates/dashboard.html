@@ -140,6 +140,19 @@
         </div>
     </section>
 
+    <section class="speaker-group" th:if="${speakerTopology != null}" aria-label="Speaker group">
+        <h2>Group</h2>
+        <p th:if="${speakerTopology.grouped()}">Playing together:
+            <span th:text="${speakerTopology.ownGroup().get().label()}">Living Room + Kitchen</span></p>
+        <p th:unless="${speakerTopology.grouped()}">Playing on its own.</p>
+        <div class="row">
+            <button th:each="group : ${speakerTopology.otherGroups()}" th:text="'Join ' + ${group.label()}"
+                    th:attr="hx-post=@{/devices/{id}/group/join/{member}(id=${id},member=${group.coordinatorId()})}">Join Office</button>
+            <button th:if="${speakerTopology.grouped()}"
+                    th:attr="hx-post=@{/devices/{id}/group/leave(id=${id})}">Leave group</button>
+        </div>
+    </section>
+
     <section class="open-link" th:if="${canOpenLinks}">
         <h2>Open a link on this device</h2>
         <form th:attr="hx-post=@{/devices/{id}/play(id=${id})}" hx-target="#open-result" hx-swap="textContent">
