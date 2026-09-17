@@ -58,7 +58,7 @@
 </section>
 
 <button th:fragment="tile(item)" type="button" class="tile"
-        th:attr="data-source=${item.sourceId()},data-item=${item.id()},data-title=${item.title()},data-subtitle=${item.subtitle()},data-artwork=${item.artwork()},data-kind=${item.kind()}">
+        th:attr="data-source=${item.sourceId()},data-item=${item.id()},data-title=${item.title()},data-subtitle=${item.subtitle()},data-artwork=${item.artwork()},data-kind=${item.kind()},data-starts-at=${item.startsAt()},data-ends-at=${item.endsAt()}">
     <span class="art">
         <img th:if="${item.artwork() != null}" th:src="${item.artwork()}" alt="" loading="lazy" decoding="async">
         <span th:if="${item.artwork() == null}" class="placeholder" aria-hidden="true"

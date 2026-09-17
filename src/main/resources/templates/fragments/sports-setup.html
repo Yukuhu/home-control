@@ -1,0 +1,62 @@
+<section id="sports" th:fragment="section">
+    <h2>Sports</h2>
+    <p class="error" role="alert" th:if="${sportsError}" th:text="${sportsError}">Could not save</p>
+    <p class="ok" th:if="${sportsMessage}" th:text="${sportsMessage}">Added</p>
+
+    <p>Show live and upcoming sport from calendar links (.ics). Home Control does not know which service
+        broadcasts an event.</p>
+
+    <form method="post" th:action="@{/setup/sources/sports/time-zone}">
+        <label>Time zone
+            <input name="timeZone" list="sports-zones" placeholder="Europe/Berlin"
+                   th:value="${sports.storedTimeZone()}">
+        </label>
+        <datalist id="sports-zones">
+            <option value="Europe/Berlin"></option>
+            <option value="Europe/Vienna"></option>
+            <option value="Europe/Zurich"></option>
+            <option value="Europe/London"></option>
+            <option value="America/New_York"></option>
+            <option value="UTC"></option>
+        </datalist>
+        <button type="submit">Save</button>
+        <p class="hint" th:text="|Times are shown in ${sports.timeZone()}|">Times are shown in Europe/Berlin</p>
+        <p class="hint" th:if="${sports.timeZoneLooksUnset()}">
+            The server's clock is set to UTC. Choose your time zone so kick-off times are right.
+        </p>
+    </form>
+
+    <h3>Calendars</h3>
+    <p th:if="${#lists.isEmpty(sports.calendars())}">No calendars yet.</p>
+    <ul class="sports-calendars" th:unless="${#lists.isEmpty(sports.calendars())}">
+        <li th:each="calendar : ${sports.calendars()}">
+            <span th:text="${calendar.label()}">Bundesliga 2026/27</span>
+            <code th:text="${calendar.host()}">calendar.example.org</code>
+            <span class="hint" th:text="${calendar.status()}">Not loaded yet</span>
+            <form method="post" th:action="@{/setup/sources/sports/calendars/{id}/remove(id=${calendar.id()})}">
+                <button type="submit" th:attr="aria-label=|Remove ${calendar.label()}|">Remove</button>
+            </form>
+        </li>
+    </ul>
+
+    <form method="post" th:action="@{/setup/sources/sports/calendars}">
+        <label>Calendar link
+            <input type="url" name="url" required maxlength="2048" inputmode="url" autocomplete="off"
+                   placeholder="https://example.org/fixtures.ics">
+        </label>
+        <label>Name (optional)
+            <input name="label" maxlength="80" th:value="${sportsForm != null} ? ${sportsForm.label} : ''">
+        </label>
+        <th:block th:if="${sports.needsLoginPassword()}">
+            <p>A calendar link can contain a private token, so Home Control stores it as a secret and will
+                require this login password from now on.</p>
+            <input type="password" name="loginPassword" minlength="10" autocomplete="new-password"
+                   placeholder="New login password">
+            <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password"
+                   placeholder="Repeat login password">
+        </th:block>
+        <button type="submit">Add calendar</button>
+        <p class="hint">Links starting with webcal:// work too. Home Control only reads the calendar; it never
+            changes it.</p>
+    </form>
+</section>

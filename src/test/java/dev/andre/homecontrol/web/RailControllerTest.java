@@ -82,6 +82,26 @@ class RailControllerTest {
     }
 
     @Test
+    void liveEventTilesCarryTheirTimes() throws Exception {
+        mockJellyfin();
+        ContentItem event = new ContentItem("sports:1", "jellyfin", ContentKind.LIVE_EVENT, "Game", null,
+                null, List.of(), null, Instant.parse("2026-09-19T13:30:00Z"), Instant.parse("2026-09-19T15:25:00Z"));
+        RailSnapshot snapshot = new RailSnapshot(resume(), RailStatus.READY, List.of(item(), event),
+                Instant.parse("2026-09-17T00:00:00Z"), null, false, 7);
+        given(rails.snapshot("jellyfin", "resume")).willReturn(Optional.of(snapshot));
+
+        var result = mockMvc.perform(get("/rails/jellyfin/resume"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("data-starts-at=\"2026-09-19T13:30:00Z\"")))
+                .andExpect(content().string(containsString("data-ends-at=\"2026-09-19T15:25:00Z\"")))
+                .andReturn();
+        String body = result.getResponse().getContentAsString();
+        // the MOVIE tile (item()) has no times
+        String movieTile = body.substring(0, body.indexOf("data-item=\"sports:1\""));
+        org.junit.jupiter.api.Assertions.assertFalse(movieTile.contains("data-starts-at"));
+    }
+
+    @Test
     void aFailedRailIsACompactErrorWithRetryNeverAGap() throws Exception {
         mockJellyfin();
         RailSnapshot snapshot = new RailSnapshot(resume(), RailStatus.FAILED, List.of(), null,
