@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.RemoteKey;
+import dev.andre.homecontrol.core.playback.ServiceLinks;
 import dev.andre.homecontrol.storage.StorageException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -105,6 +106,27 @@ class AndroidTvAdapterTest {
 
                 handle.execute(new Action.OpenAppLink(URI.create("https://www.netflix.com/title/80057281")));
 
+                assertThat(remote.nextAppLink()).isEqualTo("https://www.netflix.com/title/80057281");
+            }
+        }
+    }
+
+    @Test
+    void sendsCanonicalServiceLinksVerbatim() throws Exception {
+        try (FakeRemoteServer remote = new FakeRemoteServer()) {
+            CertificateStore certificates = new CertificateStore(properties().keystoreFile(), "shield".toCharArray());
+            certificates.loadOrCreate("shield");
+            Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", remote.port(), null, Instant.now());
+
+            try (DeviceHandle handle = adapter(certificates).connect(device, state -> { })) {
+                await().until(() -> handle.state().status() == DeviceStatus.CONNECTED);
+
+                handle.execute(new Action.OpenAppLink(
+                        ServiceLinks.primeVideoDetail("amzn1.dv.gti.8eb3c4a1-1b2c-4d5e-9f60-718293a4b5c6")));
+                assertThat(remote.nextAppLink())
+                        .isEqualTo("https://app.primevideo.com/detail?gti=amzn1.dv.gti.8eb3c4a1-1b2c-4d5e-9f60-718293a4b5c6");
+
+                handle.execute(new Action.OpenAppLink(ServiceLinks.netflixTitle("80057281")));
                 assertThat(remote.nextAppLink()).isEqualTo("https://www.netflix.com/title/80057281");
             }
         }

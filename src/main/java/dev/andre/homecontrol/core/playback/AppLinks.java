@@ -34,9 +34,8 @@ public final class AppLinks {
 
     public static ContentItem fromUrl(String url) {
         URI uri = parseHttpUrl(url);
-        String service = serviceOf(uri.getHost().toLowerCase(Locale.ROOT), uri.getPath());
         List<PlayableRef> playables = new ArrayList<>();
-        playables.add(new PlayableRef.AppLink(uri, service));
+        playables.add(ServiceLinks.appLink(uri));
         Optional<String> mediaType = mediaTypeOf(uri.getRawPath());
         mediaType.ifPresent(type -> playables.add(new PlayableRef.StreamUrl(uri, type)));
         String title = mediaType.isPresent() ? fileName(uri.getRawPath()) : uri.getHost();

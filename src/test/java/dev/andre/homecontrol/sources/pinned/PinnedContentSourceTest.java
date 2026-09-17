@@ -1,17 +1,20 @@
 package dev.andre.homecontrol.sources.pinned;
 
 import dev.andre.homecontrol.core.playback.ContentItem;
+import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -77,5 +80,22 @@ class PinnedContentSourceTest {
     @Test
     void refreshesDaily() {
         assertThat(source.defaultRefreshInterval()).isEqualTo(Duration.ofHours(24));
+    }
+
+    @Test
+    void pinsCarryCanonicalLinks() {
+        JsonFilePinStore store = new JsonFilePinStore(dir.resolve("pinned.json"));
+        store.save(List.of(new Pin("p-aaaaaaaaaaaa",
+                URI.create("https://www.netflix.com/de/title/80057281?s=a"), "netflix", "Matrix", null, null,
+                ContentKind.VIDEO, null, Instant.parse("2026-09-16T10:00:00Z"))));
+        PinnedShortcuts freshShortcuts = new PinnedShortcuts(store, new PinnedProperties(true, 200),
+                mock(org.springframework.context.ApplicationEventPublisher.class),
+                Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC), new SecureRandom());
+        PinnedContentSource freshSource = new PinnedContentSource(freshShortcuts);
+
+        ContentItem item = freshSource.item("p-aaaaaaaaaaaa").orElseThrow();
+
+        assertThat(item.playables()).containsExactly(
+                new PlayableRef.AppLink(URI.create("https://www.netflix.com/title/80057281"), "netflix"));
     }
 }

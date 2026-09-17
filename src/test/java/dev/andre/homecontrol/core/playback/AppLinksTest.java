@@ -134,6 +134,18 @@ class AppLinksTest {
     }
 
     @Test
+    void pastedLinksAreCanonicalised() {
+        String url = "https://www.netflix.com/de/title/80057281?s=a";
+
+        ContentItem item = AppLinks.fromUrl(url);
+
+        assertThat(item.playables()).containsExactly(
+                new PlayableRef.AppLink(URI.create("https://www.netflix.com/title/80057281"), "netflix"));
+        assertThat(item.title()).isEqualTo("www.netflix.com");
+        assertThat(item.id()).isEqualTo("link:" + url);
+    }
+
+    @Test
     void parseHttpUrlAcceptsHttpAndHttps() {
         assertThat(AppLinks.parseHttpUrl("HTTPS://Example.org/a")).isEqualTo(URI.create("HTTPS://Example.org/a"));
     }

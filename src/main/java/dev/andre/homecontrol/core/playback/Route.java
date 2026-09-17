@@ -6,6 +6,7 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /** The planner's answer: an executable route, or the reason there is none. Shown to the user before playing. */
 public sealed interface Route {
@@ -20,8 +21,11 @@ public sealed interface Route {
 
         @Override
         public String describe() {
-            return ServiceLinks.displayName(service).map(name -> "Open in the " + name + " app")
-                    .orElseGet(() -> "Open " + uri.getHost() + " on the device");
+            Optional<String> name = ServiceLinks.displayName(service);
+            if (ServiceLinks.isAppHome(uri)) {
+                return "Open the " + name.orElse(uri.getHost()) + " app (not this title)";
+            }
+            return name.map(n -> "Open in the " + n + " app").orElseGet(() -> "Open " + uri.getHost() + " on the device");
         }
     }
 

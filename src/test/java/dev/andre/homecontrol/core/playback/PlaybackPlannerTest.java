@@ -222,4 +222,27 @@ class PlaybackPlannerTest {
         assertThat(none.plan(item(new PlayableRef.AppLink(URI.create("https://x"), "web")), Set.of(Capability.APP_LINK)))
                 .isEqualTo(new Route.Unroutable("no route to this device"));
     }
+
+    @Test
+    void serviceLinksRouteByCapabilityNotBrand() {
+        PlayableRef.AppLink netflixTitle = ServiceLinks.appLink(URI.create("https://www.netflix.com/de/title/80057281?s=a"));
+
+        Route routable = planner.plan(item(netflixTitle), EnumSet.of(Capability.APP_LINK));
+        assertThat(routable).isEqualTo(new Route.OpenAppLink(netflixTitle.uri(), netflixTitle.service()));
+
+        Route unroutable = planner.plan(item(netflixTitle),
+                EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER, Capability.REMOTE_KEYS));
+        assertThat(unroutable).isInstanceOfSatisfying(Route.Unroutable.class,
+                r -> assertThat(r.reason()).contains("cannot open app links"));
+
+        PlayableRef.AppLink primeHome = ServiceLinks.appLink(ServiceLinks.appHome("primevideo").orElseThrow());
+
+        Route primeRoutable = planner.plan(item(primeHome), EnumSet.of(Capability.APP_LINK));
+        assertThat(primeRoutable).isEqualTo(new Route.OpenAppLink(primeHome.uri(), primeHome.service()));
+
+        Route primeUnroutable = planner.plan(item(primeHome),
+                EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER, Capability.REMOTE_KEYS));
+        assertThat(primeUnroutable).isInstanceOfSatisfying(Route.Unroutable.class,
+                r -> assertThat(r.reason()).contains("cannot open app links"));
+    }
 }
