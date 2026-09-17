@@ -25,10 +25,19 @@ dependencies {
     implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
     // Argon2id for the login hash and the HOME_CONTROL_SECRET key (already transitive via bcpkix; used directly now).
     implementation("org.bouncycastle:bcprov-jdk18on:1.85")
+    // Bluetooth speakers (optional module, off by default). Only adapters/bluetooth/bluez/DbusBluezClient imports these.
+    implementation("com.github.hypfvieh:bluez-dbus:0.3.5")
+    implementation("com.github.hypfvieh:dbus-java-core:5.2.1")
+    implementation("com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.1")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-webmvc-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+// Child-JVM tests (class loading, fake mpv) start java with exactly the test runtime classpath.
+tasks.named<Test>("test") {
+    systemProperty("home-control.test.runtime-classpath", sourceSets["test"].runtimeClasspath.asPath)
 }
 
 protobuf {

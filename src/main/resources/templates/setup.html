@@ -152,6 +152,10 @@
         </form>
     </section>
 
+    <th:block th:if="${bluetooth != null}">
+        <section th:replace="~{fragments/bluetooth-setup :: section}"></section>
+    </th:block>
+
     <th:block th:if="${jellyfin != null}">
         <section th:replace="~{fragments/jellyfin-setup :: section}"></section>
     </th:block>

@@ -1,5 +1,9 @@
 package dev.andre.homecontrol.adapters.bluetooth;
 
+import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezClient;
+import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezException;
+import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure;
+import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.yaml.snakeyaml.Yaml;
@@ -10,6 +14,8 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 /**
  * The module is off unless {@code home-control.bluetooth.enabled=true}: no bean, no D-Bus, no host
@@ -20,25 +26,41 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BluetoothModuleSwitchTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
+            .withBean(DeviceManager.class, () -> mock(DeviceManager.class))
             .withUserConfiguration(BluetoothConfiguration.class);
 
     @Test
     void isOffByDefault() {
-        runner.run(context -> assertThat(context.getBeansOfType(BluetoothProperties.class)).isEmpty());
+        runner.run(context -> {
+            assertThat(context.getBeansOfType(BluetoothProperties.class)).isEmpty();
+            assertThat(context.getBeansOfType(BluezClient.class)).isEmpty();
+            assertThat(context.getBeansOfType(BluetoothSpeakerAdapter.class)).isEmpty();
+            assertThat(context.getBeansOfType(BluetoothPairingService.class)).isEmpty();
+            assertThat(context.getBeansOfType(BluetoothHostChecks.class)).isEmpty();
+        });
     }
 
     @Test
     void canBeSwitchedOn() {
-        runner.withPropertyValues("home-control.bluetooth.enabled=true")
+        runner.withPropertyValues("home-control.bluetooth.enabled=true",
+                        "home-control.bluetooth.dbus-address=unix:path=/nonexistent/hc-bus.sock")
                 .run(context -> {
-                    assertThat(context).hasSingleBean(BluetoothProperties.class);
+                    assertThat(context).hasSingleBean(BluetoothProperties.class)
+                            .hasSingleBean(BluezClient.class)
+                            .hasSingleBean(BluetoothSpeakerAdapter.class)
+                            .hasSingleBean(BluetoothPairingService.class)
+                            .hasSingleBean(BluetoothHostChecks.class);
                     BluetoothProperties properties = context.getBean(BluetoothProperties.class);
-                    assertThat(properties.dbusAddress()).isEqualTo("unix:path=/run/dbus/system_bus_socket");
+                    assertThat(properties.dbusAddress()).isEqualTo("unix:path=/nonexistent/hc-bus.sock");
                     assertThat(properties.scanSeconds()).isEqualTo(10);
                     assertThat(properties.defaultVolume()).isEqualTo(50);
                     assertThat(properties.mpvPath()).isEqualTo("mpv");
                     assertThat(properties.runtimeDir())
                             .isEqualTo(Path.of(System.getProperty("java.io.tmpdir"), "home-control-bluetooth"));
+                    // The context started although no D-Bus socket exists; only using the client fails.
+                    assertThatThrownBy(() -> context.getBean(BluezClient.class).adapters())
+                            .isInstanceOf(BluezException.class)
+                            .extracting(e -> ((BluezException) e).failure()).isEqualTo(BluezFailure.NO_DBUS_SOCKET);
                 });
     }
 

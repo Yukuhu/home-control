@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+<section th:fragment="section" id="bluetooth" class="setup bluetooth">
+    <h2>Bluetooth speakers</h2>
+    <p class="error" th:if="${bluetoothError}" th:text="${bluetoothError}">Error</p>
+    <p class="hint" th:if="${bluetoothMessage}" th:text="${bluetoothMessage}">Message</p>
+
+    <ul class="host-checks">
+        <li th:each="check : ${bluetooth.checks()}" th:classappend="${check.ok()} ? 'ok' : 'problem'"
+            th:attr="data-check=${check.id()}">
+            <strong th:text="${check.label()}">D-Bus system socket</strong>
+            <span th:text="${check.detail()}">Found /run/dbus/system_bus_socket</span>
+        </li>
+    </ul>
+    <p class="hint" th:unless="${bluetooth.hostReady()}">
+        Fix the items marked above on the host; docs/bluetooth-speakers.md in the repository lists every step.
+    </p>
+    <form method="post" th:action="@{/setup/bluetooth/check}">
+        <button type="submit">Check again</button>
+    </form>
+
+    <h3>Add a speaker</h3>
+    <p class="hint" th:text="|Put the speaker into pairing mode first. Scanning takes about ${bluetooth.scanSeconds()} seconds.|">
+        Put the speaker into pairing mode first.</p>
+    <form method="post" th:action="@{/setup/bluetooth/scan}">
+        <button type="submit">Scan for speakers</button>
+    </form>
+    <ul class="bluetooth-scan" th:if="${bluetooth.scan().ran()}">
+        <li th:each="found : ${bluetooth.scan().speakers()}">
+            <span th:text="${found.displayName()}">JBL Flip 5</span>
+            <code th:text="${found.address()}">AA:BB:CC:DD:EE:FF</code>
+            <span class="badge" th:text="${found.audioSink()} ? 'speaker'
+                    : (${found.icon() != null and #strings.startsWith(found.icon(), 'audio-')} ? 'audio device' : 'unknown type')">speaker</span>
+            <span class="badge" th:if="${found.paired()}">paired with the host</span>
+            <span th:if="${bluetooth.registeredAddresses().contains(found.address())}">Added</span>
+            <form method="post" th:action="@{/setup/bluetooth/pair}"
+                  th:unless="${bluetooth.registeredAddresses().contains(found.address())}">
+                <input type="hidden" name="address" th:value="${found.address()}">
+                <button type="submit">Pair and add</button>
+            </form>
+        </li>
+    </ul>
+    <p class="hint" th:if="${bluetooth.scan().ran() and bluetooth.scan().hiddenCount() > 0}"
+       th:text="|${bluetooth.scan().hiddenCount()} other Bluetooth devices hidden|">2 other Bluetooth devices hidden</p>
+
+    <h3 th:if="${!#lists.isEmpty(bluetooth.speakers())}">Paired speakers</h3>
+    <ul class="bluetooth-speakers">
+        <li th:each="speaker : ${bluetooth.speakers()}">
+            <span th:text="${speaker.name()}">JBL Flip 5</span>
+            <code th:text="${speaker.address()}">AA:BB:CC:DD:EE:FF</code>
+            <span class="badge" th:text="${speaker.status()}">CONNECTED</span>
+            <form method="post" th:action="@{/setup/bluetooth/connect}">
+                <input type="hidden" name="id" th:value="${speaker.id()}">
+                <button type="submit">Connect</button>
+            </form>
+            <form method="post" th:action="@{/setup/bluetooth/disconnect}">
+                <input type="hidden" name="id" th:value="${speaker.id()}">
+                <button type="submit">Disconnect</button>
+            </form>
+            <form method="post" th:action="@{/setup/bluetooth/audio-device}">
+                <input type="hidden" name="id" th:value="${speaker.id()}">
+                <label>Audio output
+                    <input name="audioDevice" th:value="${speaker.audioDevice()}" placeholder="automatic" autocomplete="off">
+                </label>
+                <button type="submit">Save</button>
+            </form>
+        </li>
+    </ul>
+    <p class="hint" th:if="${!#lists.isEmpty(bluetooth.speakers())}">Forget a speaker in the device list to unpair it from the host.</p>
+</section>
+</body>
+</html>

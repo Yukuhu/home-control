@@ -141,3 +141,7 @@ button, a { touch-action: manipulation; }
 @media (forced-colors: active) { .touchpad { border: 2px solid CanvasText; } }
 .user-code { font: 600 2rem/1.2 ui-monospace, monospace; letter-spacing: .1em; }
 @media (max-width: 40rem) { #sports-providers td { display: block; } }
+.host-checks { list-style: none; padding: 0; }
+.host-checks li.ok::before { content: "\2713 "; }
+.host-checks li.problem::before { content: "\2717 "; }
+.host-checks li.problem { color: #e05a5a; }
