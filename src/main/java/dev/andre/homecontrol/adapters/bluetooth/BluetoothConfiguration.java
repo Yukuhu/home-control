@@ -1,6 +1,8 @@
 package dev.andre.homecontrol.adapters.bluetooth;
 
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezClient;
+import dev.andre.homecontrol.adapters.bluetooth.player.MpvLauncher;
+import dev.andre.homecontrol.adapters.bluetooth.player.ProcessMpvLauncher;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -28,9 +30,14 @@ public class BluetoothConfiguration {
                 properties.dbusSocketPath(), Duration.ofSeconds(properties.bluezTimeoutSeconds()));
     }
 
+    @Bean(destroyMethod = "close")
+    public MpvLauncher mpvLauncher(BluetoothProperties properties) {
+        return new ProcessMpvLauncher(properties.mpvPath());
+    }
+
     @Bean
-    public BluetoothSpeakerAdapter bluetoothSpeakerAdapter(BluetoothProperties properties, BluezClient bluez) {
-        return new BluetoothSpeakerAdapter(properties, bluez);
+    public BluetoothSpeakerAdapter bluetoothSpeakerAdapter(BluetoothProperties properties, BluezClient bluez, MpvLauncher launcher) {
+        return new BluetoothSpeakerAdapter(properties, bluez, launcher);
     }
 
     @Bean
@@ -39,7 +46,7 @@ public class BluetoothConfiguration {
     }
 
     @Bean
-    public BluetoothHostChecks bluetoothHostChecks(BluetoothProperties properties, BluezClient bluez) {
-        return new BluetoothHostChecks(properties, bluez, Clock.systemUTC());
+    public BluetoothHostChecks bluetoothHostChecks(BluetoothProperties properties, BluezClient bluez, MpvLauncher launcher) {
+        return new BluetoothHostChecks(properties, bluez, launcher, Clock.systemUTC());
     }
 }
