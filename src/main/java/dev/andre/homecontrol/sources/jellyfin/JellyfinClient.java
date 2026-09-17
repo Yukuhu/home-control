@@ -20,8 +20,11 @@ import java.net.http.HttpTimeoutException;
 import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,6 +37,10 @@ public class JellyfinClient {
     private static final Pattern VERSION = Pattern.compile("^(\\d+)\\.(\\d+)");
     /** A generous cap on any Jellyfin JSON answer; a well-behaved server never comes close. */
     static final int MAX_JSON_BYTES = 2 * 1024 * 1024;
+    /** A generous cap on one artwork image; a well-behaved server never comes close. */
+    static final int MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+    /** Raster types only: an SVG served from our own origin could carry a script. */
+    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
 
     private final HttpClient http;
     private final JellyfinProperties properties;
@@ -151,7 +158,59 @@ public class JellyfinClient {
         return header.toString();
     }
 
-    private HttpRequest.Builder request(URI serverUrl, String path, Map<String, String> query, String deviceId, String token) {
+    public record Image(String contentType, byte[] bytes) {
+    }
+
+    /** Jellyfin's item image endpoint is anonymous; no credential is sent, so none can leak. */
+    public Optional<Image> image(URI serverUrl, String itemId, String type, String tag, int maxWidth) {
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("maxWidth", String.valueOf(maxWidth));
+        query.put("quality", "90");
+        if (tag != null) {
+            query.put("tag", tag);
+        }
+        HttpRequest request = HttpRequest.newBuilder(
+                        URI.create(serverUrl + "/Items/" + id(itemId) + "/Images/" + type + queryString(query)))
+                .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
+                .header("Accept", "image/*")
+                .GET()
+                .build();
+        HttpResponse<InputStream> response;
+        try {
+            response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        } catch (HttpConnectTimeoutException e) {
+            throw unreachable(serverUrl, "connection timed out");
+        } catch (HttpTimeoutException e) {
+            throw unreachable(serverUrl, "no answer in time");
+        } catch (ConnectException e) {
+            throw unreachable(serverUrl, e.getCause() instanceof UnresolvedAddressException ? "unknown host" : "connection refused");
+        } catch (IOException e) {
+            throw unreachable(serverUrl, e.getClass().getSimpleName());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw unreachable(serverUrl, "interrupted");
+        }
+        try (InputStream body = response.body()) {
+            if (response.statusCode() == 404) {
+                return Optional.empty();
+            }
+            String contentType = response.headers().firstValue("Content-Type").orElse("");
+            String bareType = contentType.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
+            if (response.statusCode() != 200 || !ALLOWED_IMAGE_TYPES.contains(bareType)
+                    || contentLengthExceeds(response, MAX_IMAGE_BYTES)) {
+                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent no image");
+            }
+            byte[] bytes = body.readNBytes(MAX_IMAGE_BYTES + 1);
+            if (bytes.length > MAX_IMAGE_BYTES) {
+                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized image");
+            }
+            return Optional.of(new Image(contentType, bytes));
+        } catch (IOException e) {
+            throw unreachable(serverUrl, e.getClass().getSimpleName());
+        }
+    }
+
+    private static String queryString(Map<String, String> query) {
         StringJoiner joined = new StringJoiner("&", "?", "");
         joined.setEmptyValue("");
         query.forEach((key, value) -> {
@@ -159,7 +218,11 @@ public class JellyfinClient {
                 joined.add(encode(key) + "=" + encode(value));
             }
         });
-        return HttpRequest.newBuilder(URI.create(serverUrl + path + joined))
+        return joined.toString();
+    }
+
+    private HttpRequest.Builder request(URI serverUrl, String path, Map<String, String> query, String deviceId, String token) {
+        return HttpRequest.newBuilder(URI.create(serverUrl + path + queryString(query)))
                 .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
                 .header("Accept", "application/json")
                 .header("Authorization", authorization(deviceId, token));

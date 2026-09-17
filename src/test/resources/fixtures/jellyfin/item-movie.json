@@ -1,0 +1,21 @@
+{
+  "Name": "Big Buck Bunny",
+  "ServerId": "4e1a2b3c4d5e4f60718293a4b5c6d7e8",
+  "Id": "b1c2d3e4f5061728394a5b6c7d8e9f01",
+  "RunTimeTicks": 5964800000,
+  "ProductionYear": 2008,
+  "IsFolder": false,
+  "Type": "Movie",
+  "MediaType": "Video",
+  "LocationType": "FileSystem",
+  "Overview": "A giant rabbit takes revenge.",
+  "UserData": {
+    "PlaybackPositionTicks": 1491200000,
+    "PlayCount": 0,
+    "IsFavorite": true,
+    "Played": false,
+    "Key": "b1c2d3e4f5061728394a5b6c7d8e9f01"
+  },
+  "ImageTags": { "Primary": "c0ffeec0ffee", "Logo": "10901090aa01" },
+  "BackdropImageTags": ["d00dd00dd00d"]
+}

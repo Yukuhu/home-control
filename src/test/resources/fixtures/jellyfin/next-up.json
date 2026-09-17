@@ -1,0 +1,23 @@
+{
+  "Items": [
+    {
+      "Name": "Aurora",
+      "ServerId": "4e1a2b3c4d5e4f60718293a4b5c6d7e8",
+      "Id": "5a4b3c2d1e0f49382716a5b4c3d2e1f0",
+      "RunTimeTicks": 15000000000,
+      "IsFolder": false,
+      "IndexNumber": 6,
+      "ParentIndexNumber": 2,
+      "Type": "Episode",
+      "SeriesName": "Northern Lights",
+      "SeriesId": "7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a29",
+      "SeriesPrimaryImageTag": "b8a7c6d5e4f3",
+      "MediaType": "Video",
+      "UserData": { "PlaybackPositionTicks": 0, "PlayCount": 0, "IsFavorite": false, "Played": false, "Key": "7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a29002006" },
+      "ImageTags": {},
+      "BackdropImageTags": []
+    }
+  ],
+  "TotalRecordCount": 1,
+  "StartIndex": 0
+}

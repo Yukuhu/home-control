@@ -2,6 +2,8 @@ package dev.andre.homecontrol;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.content.ContentSource;
+import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.playback.AppLinkStrategy;
 import dev.andre.homecontrol.core.playback.CastLoadStrategy;
 import dev.andre.homecontrol.core.playback.CastStreamStrategy;
@@ -11,6 +13,7 @@ import dev.andre.homecontrol.discovery.MdnsBrowser;
 import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -52,5 +55,11 @@ public class HomeControlConfiguration {
     @Bean
     public JsonFileSourceSettings sourceSettings(AndroidTvProperties properties) {
         return new JsonFileSourceSettings(properties.dataDir().resolve("sources.json"));
+    }
+
+    /** Every content source found in the context, in bean order (spec §5.2, §7). */
+    @Bean
+    public ContentSources contentSources(ObjectProvider<ContentSource> sources) {
+        return new ContentSources(sources.orderedStream().toList());
     }
 }
