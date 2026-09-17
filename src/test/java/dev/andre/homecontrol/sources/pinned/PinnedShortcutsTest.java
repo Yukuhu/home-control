@@ -259,6 +259,26 @@ class PinnedShortcutsTest {
     }
 
     @Test
+    void refusesAnUpgradeWhenAtMaxPins() {
+        shortcuts.add("https://example.org/a", "A");
+        shortcuts.add("https://example.org/b", "B");
+        shortcuts.add("https://example.org/c", "C");
+
+        assertThatThrownBy(() -> shortcuts.addUpgrade("https://www.netflix.com/title/1", "tmdb/tv-66732"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("You can pin up to 3 links");
+        assertThat(shortcuts.all()).hasSize(3);
+    }
+
+    @Test
+    void refusesAnAppHomeLinkAsAnUpgrade() {
+        assertThatThrownBy(() -> shortcuts.addUpgrade("https://www.netflix.com/browse", "tmdb/tv-66732"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Paste a link to this title, not the app's home screen");
+        assertThat(shortcuts.all()).isEmpty();
+    }
+
+    @Test
     void refusesWhenTheSourceLookupFails() {
         given(tmdbSource.item("tv-500")).willThrow(new ContentSourceException("TMDB had a server error"));
 
