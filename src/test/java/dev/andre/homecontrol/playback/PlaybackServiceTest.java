@@ -8,7 +8,11 @@ import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.playback.AppLinkStrategy;
 import dev.andre.homecontrol.core.playback.AppLinks;
 import dev.andre.homecontrol.core.playback.CastLoadStrategy;
+import dev.andre.homecontrol.core.playback.CastMessageStrategy;
 import dev.andre.homecontrol.core.playback.CastStreamStrategy;
+import dev.andre.homecontrol.core.playback.ContentItem;
+import dev.andre.homecontrol.core.playback.ContentKind;
+import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.UnroutableException;
@@ -84,5 +88,22 @@ class PlaybackServiceTest {
             assertThat(cast.receiverAppId()).isEqualTo("CC1AD845");
             verify(devices).execute("kitchen", cast.action());
         });
+    }
+
+    @Test
+    void executesACastMessageRoute() {
+        PlaybackPlanner castMessagePlanner = new PlaybackPlanner(List.of(new CastMessageStrategy()));
+        PlaybackService castMessageService = new PlaybackService(devices, castMessagePlanner);
+        Device kitchen = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9", Map.of("cast", Map.of()), Instant.now());
+        given(devices.device("kitchen")).willReturn(Optional.of(kitchen));
+        given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
+        PlayableRef.CastMessage message = new PlayableRef.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
+                Map.of("command", "PlayNow"), "the Jellyfin receiver");
+        ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null, List.of(message));
+
+        Route route = castMessageService.play(item, "kitchen");
+
+        assertThat(route).isInstanceOfSatisfying(Route.CastMessage.class,
+                cast -> verify(devices).execute("kitchen", cast.action()));
     }
 }

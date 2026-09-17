@@ -48,4 +48,17 @@ class ActionTest {
         assertThat(load.requires()).isEqualTo(Capability.CAST_RECEIVER);
         assertThat(load.load()).containsEntry("autoplay", true);
     }
+
+    @Test
+    void aCastMessageRequiresACastReceiverCopiesItsBodyAndNeverPrintsIt() {
+        Map<String, Object> body = new HashMap<>(Map.of("accessToken", "secret-token"));
+        Action.CastMessage message = new Action.CastMessage("F007D354", "urn:x-cast:com.connectsdk", body);
+        body.put("accessToken", "changed");
+
+        assertThat(message.requires()).isEqualTo(Capability.CAST_RECEIVER);
+        assertThat(message.message()).containsEntry("accessToken", "secret-token");
+        assertThat(message.toString()).doesNotContain("secret-token").contains("F007D354");
+        assertThatThrownBy(() -> new Action.CastMessage("F007D354", "com.connectsdk", Map.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

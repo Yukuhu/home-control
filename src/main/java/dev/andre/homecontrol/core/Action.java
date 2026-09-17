@@ -70,4 +70,29 @@ public sealed interface Action {
             return Capability.CAST_RECEIVER;
         }
     }
+
+    /**
+     * Start receiver app {@code receiverAppId} if needed and send {@code message} on its custom
+     * {@code namespace} (for receivers that do not take a media LOAD, such as Jellyfin's).
+     */
+    record CastMessage(String receiverAppId, String namespace, Map<String, Object> message) implements Action {
+        public CastMessage {
+            Objects.requireNonNull(receiverAppId, "receiverAppId");
+            if (namespace == null || !namespace.startsWith("urn:x-cast:")) {
+                throw new IllegalArgumentException("A Cast namespace starts with urn:x-cast:");
+            }
+            message = message == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(message));
+        }
+
+        @Override
+        public Capability requires() {
+            return Capability.CAST_RECEIVER;
+        }
+
+        /** The body can carry credentials; never print it. */
+        @Override
+        public String toString() {
+            return "CastMessage[receiverAppId=" + receiverAppId + ", namespace=" + namespace + "]";
+        }
+    }
 }

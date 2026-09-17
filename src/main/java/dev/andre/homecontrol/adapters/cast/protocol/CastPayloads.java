@@ -80,6 +80,11 @@ public final class CastPayloads {
         return node;
     }
 
+    /** A custom-namespace body, sent as given — no type, requestId or sessionId is added. */
+    public static ObjectNode custom(Map<String, Object> message) {
+        return (ObjectNode) MAPPER.valueToTree(message);
+    }
+
     public static ObjectNode pause(long mediaSessionId) {
         return mediaCommand("PAUSE", mediaSessionId);
     }

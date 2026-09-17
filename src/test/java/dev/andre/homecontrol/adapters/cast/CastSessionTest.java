@@ -18,6 +18,8 @@ import dev.andre.homecontrol.core.playback.PlayableRef;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.net.ServerSocket;
 import java.net.URI;
@@ -433,5 +435,81 @@ class CastSessionTest {
 
         await().until(() -> seen.stream().anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED
                 && state.nowPlaying() == null));
+    }
+
+    private static final String NS = "urn:x-cast:com.connectsdk";
+
+    private static Action.CastMessage playNow() {
+        return new Action.CastMessage("F007D354", NS,
+                Map.of("command", "PlayNow", "options", Map.of("items", List.of(Map.of("Id", "abc")))));
+    }
+
+    @Test
+    void aCustomMessageLaunchesTheReceiverAndIsSentUnchanged() {
+        receiver.appSpeaks("F007D354", NS);
+        start(receiver.port());
+        awaitStatus();
+
+        session.execute(playNow());
+
+        assertThat(receiver.last(RECEIVER, "LAUNCH").orElseThrow().payload().path("appId").asString("")).isEqualTo("F007D354");
+        assertThat(receiver.virtualConnections()).contains("transport-1");
+        List<CastIncoming> sent = receiver.received(NS, "");
+        assertThat(sent).hasSize(1);
+        CastIncoming message = sent.getFirst();
+        assertThat(message.payload().path("command").asString("")).isEqualTo("PlayNow");
+        assertThat(message.payload().path("options").path("items").get(0).path("Id").asString("")).isEqualTo("abc");
+        assertThat(message.payload().has("requestId")).isFalse();
+        assertThat(message.payload().has("sessionId")).isFalse();
+        assertThat(message.payload().has("type")).isFalse();
+    }
+
+    @Test
+    void aRunningReceiverIsReused() {
+        receiver.appSpeaks("F007D354", NS);
+        receiver.runApp("F007D354", "Jellyfin");
+        start(receiver.port());
+        await().until(() -> "Jellyfin".equals(session.state().currentApp()));
+
+        session.execute(playNow());
+
+        assertThat(receiver.received(RECEIVER, "LAUNCH")).isEmpty();
+    }
+
+    @Test
+    void aSynchronousReceiverErrorFailsTheAction() {
+        receiver.appSpeaks("F007D354", NS);
+        receiver.answerCustom(NS, (ObjectNode) JsonMapper.builder().build().readTree("""
+                {"type":"error","message":"Missing one or more required params - command,options,userId,accessToken,serverAddress"}
+                """));
+        start(receiver.port());
+        awaitStatus();
+
+        assertThatThrownBy(() -> session.execute(playNow()))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessageContaining("refused to play it (Missing one or more required params");
+    }
+
+    @Test
+    void aReceiverThatNeverSpeaksTheNamespaceTimesOut() {
+        start(receiver.port());
+        awaitStatus();
+
+        assertThatThrownBy(() -> session.execute(playNow()))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessageContaining("did not answer in time");
+    }
+
+    @Test
+    void anOfflineReceiverRejectsTheMessage() throws Exception {
+        int port;
+        try (ServerSocket probe = new ServerSocket(0)) {
+            port = probe.getLocalPort();
+        }
+        start(port);
+        await().until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
+
+        assertThatThrownBy(() -> session.execute(playNow()))
+                .isInstanceOf(DeviceOfflineException.class);
     }
 }
