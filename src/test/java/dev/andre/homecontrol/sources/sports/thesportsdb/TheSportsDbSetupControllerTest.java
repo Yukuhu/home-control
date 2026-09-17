@@ -173,5 +173,11 @@ class TheSportsDbSetupControllerTest {
                 .contains("name=\"key\"").contains("type=\"password\"")
                 .contains("Data from <a href=\"https://www.thesportsdb.com\"")
                 .doesNotContain("9876543210");
+
+        assertThat(body).contains("id=\"sports-providers\"")
+                .contains("name=\"provider:thesportsdb:4331\"")
+                .contains("German Bundesliga")
+                .contains("English Premier League")
+                .contains("<option value=\"\" selected=\"selected\">Not set</option>");
     }
 }

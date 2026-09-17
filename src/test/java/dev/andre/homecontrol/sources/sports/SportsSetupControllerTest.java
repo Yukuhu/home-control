@@ -194,4 +194,71 @@ class SportsSetupControllerTest {
         mockMvc.perform(get("/setup")).andExpect(content().string(
                 containsString("The server's clock is set to UTC. Choose your time zone so kick-off times are right.")));
     }
+
+    @Test
+    void savesTheMapping() throws Exception {
+        SportsSettings fixture = SportsSettings.empty()
+                .withCalendars(List.of(new SportsSettings.CalendarEntry(
+                        "c-3f9a1c2b7d4e", "Bundesliga 2026/27", "calendar.example.org", null, Instant.EPOCH)))
+                .withCompetitions(List.of(new SportsSettings.CompetitionEntry(
+                        "4331", "German Bundesliga", "Soccer", "Germany", null, null, Instant.EPOCH)));
+
+        mockMvc.perform(post("/setup/sources/sports/providers")
+                        .param("provider:calendar:c-3f9a1c2b7d4e", "dazn")
+                        .param("provider:thesportsdb:4331", "")
+                        .param("unrelated", "x"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/setup#sports-providers"))
+                .andExpect(flash().attribute("sportsMessage",
+                        "Saved. These are your own settings; Home Control does not check broadcast rights."));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.function.UnaryOperator<SportsSettings>> captor =
+                ArgumentCaptor.forClass(java.util.function.UnaryOperator.class);
+        verify(settings, org.mockito.Mockito.times(1)).update(captor.capture());
+        SportsSettings result = captor.getValue().apply(fixture);
+        assertThat(result.calendar("c-3f9a1c2b7d4e").orElseThrow().provider()).isEqualTo("dazn");
+        assertThat(result.competition("4331").orElseThrow().provider()).isNull();
+    }
+
+    @Test
+    void mappingErrorsAreFlashed() throws Exception {
+        SportsSettings fixture = SportsSettings.empty().withCompetitions(List.of(
+                new SportsSettings.CompetitionEntry("4331", "German Bundesliga", "Soccer", "Germany", null, null, Instant.EPOCH)));
+        given(settings.update(any())).willAnswer(invocation -> {
+            java.util.function.UnaryOperator<SportsSettings> op = invocation.getArgument(0);
+            return op.apply(fixture);
+        });
+
+        mockMvc.perform(post("/setup/sources/sports/providers").param("provider:thesportsdb:4331", "sky"))
+                .andExpect(flash().attribute("sportsError", "Unknown streaming service sky"));
+    }
+
+    @Test
+    void theSetupPageLabelsTheMappingAsTheUsersSetting() throws Exception {
+        given(settings.current()).willReturn(SportsSettings.empty().withCalendars(List.of(
+                new SportsSettings.CalendarEntry("c-3f9a1c2b7d4e", "Bundesliga 2026/27", "calendar.example.org", "dazn", Instant.EPOCH))));
+
+        String body = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("id=\"sports-providers\"")
+                .contains("Where you watch it (your setting)")
+                .contains("This is your own setting: Home Control does not know broadcast rights and does not use TheSportsDB's TV listings.")
+                .contains("<select name=\"provider:calendar:c-3f9a1c2b7d4e\"")
+                .contains("<option value=\"dazn\" selected")
+                .contains("<option value=\"\">Not set</option>")
+                .contains("Save your settings")
+                .contains("Events of a competition set to DAZN, Netflix or Prime Video open that app. For other services, paste a link to the event in the play sheet.");
+        assertThat(body).doesNotContain("Available on").doesNotContain("Official")
+                .doesNotContain("Broadcast by").doesNotContain("Live on DAZN");
+    }
+
+    @Test
+    void noCompetitionsNoMappingForm() throws Exception {
+        given(settings.current()).willReturn(SportsSettings.empty());
+
+        String body = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
+
+        assertThat(body).doesNotContain("id=\"sports-providers\"");
+    }
 }

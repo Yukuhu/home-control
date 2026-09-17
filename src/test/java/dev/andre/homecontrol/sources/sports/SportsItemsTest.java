@@ -1,6 +1,9 @@
 package dev.andre.homecontrol.sources.sports;
 
+import dev.andre.homecontrol.core.content.StreamingProviders;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -88,5 +91,43 @@ class SportsItemsTest {
                 null, null, SportsEvent.Status.SCHEDULED);
 
         assertThat(SportsItems.subtitle(event, SETTINGS, BERLIN, DE, NOW)).isEqualTo("Live · Sports");
+    }
+
+    @Test
+    void mappedCompetitionsNameTheProviderAsTheUsersSetting() {
+        SportsSettings withCalendarProvider = SportsSettings.empty().withCalendars(List.of(
+                new SportsSettings.CalendarEntry("c-3f9a1c2b7d4e", "Bundesliga 2026/27", "calendar.example.org", "dazn", Instant.EPOCH)));
+        SportsEvent werder = event("2026-09-19T13:30:00Z", "2026-09-19T15:25:00Z");
+        assertThat(SportsItems.subtitle(werder, withCalendarProvider, BERLIN, DE, NOW))
+                .isEqualTo("Live · Bundesliga 2026/27 · DAZN (your setting)");
+
+        SportsSettings withCompetitionProvider = SportsSettings.empty().withCompetitions(List.of(
+                new SportsSettings.CompetitionEntry("4331", "German Bundesliga", "Soccer", "Germany", null, "primevideo", Instant.EPOCH)));
+        SportsEvent tsdbEvent = new SportsEvent("tsdb:1", "thesportsdb:4331", "Title",
+                Instant.parse("2026-09-19T16:30:00Z"), Instant.parse("2026-09-19T18:30:00Z"), null, null, SportsEvent.Status.SCHEDULED);
+        assertThat(SportsItems.subtitle(tsdbEvent, withCompetitionProvider, BERLIN, DE, NOW))
+                .isEqualTo("18:30 · German Bundesliga · Prime Video (your setting)");
+    }
+
+    @Test
+    void unmappedCompetitionsNameNoProvider() {
+        SportsEvent werder = event("2026-09-19T13:30:00Z", "2026-09-19T15:25:00Z");
+        String subtitle = SportsItems.subtitle(werder, SETTINGS, BERLIN, DE, NOW);
+        assertThat(subtitle).isEqualTo("Live · Bundesliga 2026/27");
+        assertThat(subtitle.split(" · ")).hasSize(2);
+        assertThat(subtitle).doesNotContain("DAZN");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"netflix", "primevideo", "dazn", "disneyplus", "appletvplus", "paramountplus", "wowtv", "joyn", "rtlplus"})
+    void noSubtitleClaimsAProviderWithoutTheLabel(String providerKey) {
+        SportsSettings settings = SportsSettings.empty().withCalendars(List.of(
+                new SportsSettings.CalendarEntry("c-3f9a1c2b7d4e", "Bundesliga 2026/27", "calendar.example.org", providerKey, Instant.EPOCH)));
+        SportsEvent werder = event("2026-09-19T13:30:00Z", "2026-09-19T15:25:00Z");
+        String subtitle = SportsItems.subtitle(werder, settings, BERLIN, DE, NOW);
+        String name = StreamingProviders.KNOWN.get(providerKey);
+        if (subtitle.contains(name)) {
+            assertThat(subtitle).endsWith("(your setting)");
+        }
     }
 }

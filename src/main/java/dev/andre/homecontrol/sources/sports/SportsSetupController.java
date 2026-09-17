@@ -10,11 +10,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Adds/removes calendars and sets the household time zone from the setup page; always redirects back to it. */
@@ -92,5 +94,26 @@ public class SportsSetupController {
             redirect.addFlashAttribute("sportsError", "Could not save sports settings");
         }
         return "redirect:/setup#sports";
+    }
+
+    @PostMapping("/setup/sources/sports/providers")
+    public String providers(@RequestParam MultiValueMap<String, String> parameters, RedirectAttributes flash) {
+        Map<String, String> mapping = new LinkedHashMap<>();
+        parameters.forEach((name, values) -> {
+            if (name.startsWith("provider:") && !values.isEmpty()) {
+                mapping.put(name.substring("provider:".length()), values.getFirst());
+            }
+        });
+        try {
+            settings.update(current -> SportsProviders.apply(current, mapping));
+            flash.addFlashAttribute("sportsMessage",
+                    "Saved. These are your own settings; Home Control does not check broadcast rights.");
+        } catch (IllegalArgumentException e) {
+            flash.addFlashAttribute("sportsError", e.getMessage());
+        } catch (StorageException e) {
+            log.warn("Could not save sports settings", e);
+            flash.addFlashAttribute("sportsError", "Could not save sports settings");
+        }
+        return "redirect:/setup#sports-providers";
     }
 }

@@ -36,6 +36,10 @@ public final class SportsItems {
                             .format(event.startsAt());
         };
         String competition = settings.labelFor(event.competitionKey()).orElse("Sports");
-        return when + " · " + competition;
+        String providerSuffix = settings.providerFor(event.competitionKey())
+                .flatMap(SportsProviders::displayName)
+                .map(name -> " · " + name + SportsProviders.USER_SETTING)
+                .orElse("");
+        return when + " · " + competition + providerSuffix;
     }
 }
