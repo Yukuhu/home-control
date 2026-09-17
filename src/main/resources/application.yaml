@@ -91,6 +91,20 @@ home-control:
     connect-timeout-seconds: 5
     request-timeout-seconds: 15
     rail-size: 20
+  tmdb:
+    enabled: true
+    api-base-url: https://api.themoviedb.org/3
+    # Leave empty to use TMDB's /configuration; set to serve posters from a mirror.
+    image-base-url:
+    connect-timeout-seconds: 5
+    request-timeout-seconds: 10
+    rail-size: 20
+    trending-candidates: 40
+    provider-cache-ttl: 24h
+    configuration-cache-ttl: 24h
+    provider-ids:
+      netflix: [8, 1796]
+      primevideo: [9, 119, 2100]
   youtube:
     enabled: ${HOME_CONTROL_YOUTUBE_ENABLED:true}
     oauth-base-url: https://oauth2.googleapis.com

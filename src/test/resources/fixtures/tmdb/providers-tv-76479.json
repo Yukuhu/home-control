@@ -1,0 +1,10 @@
+{
+  "id": 76479,
+  "results": {
+    "DE": {
+      "link": "https://www.themoviedb.org/tv/76479-the-boys/watch?locale=DE",
+      "flatrate": [ { "logo_path": "/pvske1MyAoymrs5bguRfVqYiM9a.jpg", "provider_id": 119, "provider_name": "Amazon Prime Video", "display_priority": 2 } ],
+      "ads": [ { "logo_path": "/8aBqoNeGGr0oSA85iopgNZUOTOc.jpg", "provider_id": 2100, "provider_name": "Amazon Prime Video with Ads", "display_priority": 180 } ]
+    }
+  }
+}
