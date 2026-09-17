@@ -5,8 +5,10 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
 
 import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.ByteArrayInputStream;
@@ -23,13 +25,7 @@ public final class DeviceDescriptions {
 
     public static DeviceDescription parse(byte[] xml, URI location) {
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            factory.setXIncludeAware(false);
-            factory.setExpandEntityReferences(false);
-            factory.setNamespaceAware(false);
-            Document document = factory.newDocumentBuilder().parse(new ByteArrayInputStream(xml));
+            Document document = documentBuilder().parse(new ByteArrayInputStream(xml));
             Element root = document.getDocumentElement();
             String urlBase = childText(root, "URLBase");
             URI base = urlBase != null ? URI.create(urlBase) : location;
@@ -53,6 +49,27 @@ public final class DeviceDescriptions {
         } catch (ParserConfigurationException | SAXException | IOException | IllegalArgumentException e) {
             throw new IllegalArgumentException("Unreadable device description at " + location + ": " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * The one hardened parser for device-supplied XML (descriptions, SCPDs, SOAP answers): no DTDs,
+     * no external entities or schemas, no XInclude, prefixes kept as written, and nothing printed
+     * to stderr on a malformed document (fatal errors still throw).
+     */
+    public static DocumentBuilder documentBuilder() throws ParserConfigurationException {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        factory.setXIncludeAware(false);
+        factory.setExpandEntityReferences(false);
+        factory.setNamespaceAware(false);
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        builder.setErrorHandler(new DefaultHandler());
+        return builder;
     }
 
     private static Element firstChild(Element parent, String name) {

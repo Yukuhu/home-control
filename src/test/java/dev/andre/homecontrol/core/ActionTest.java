@@ -3,9 +3,14 @@ package dev.andre.homecontrol.core;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
+import static dev.andre.homecontrol.core.Capability.CAST_RECEIVER;
+import static dev.andre.homecontrol.core.Capability.MEDIA_RENDERER;
+import static dev.andre.homecontrol.core.Capability.REMOTE_KEYS;
+import static dev.andre.homecontrol.core.Capability.VOLUME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -81,5 +86,39 @@ class ActionTest {
     @Test
     void selectingAnInputRequiresRemoteKeys() {
         assertThat(new Action.SelectInput("HDMI_1").requires()).isEqualTo(Capability.REMOTE_KEYS);
+    }
+
+    @Test
+    void mediaRendererActionsRequireAMediaRenderer() {
+        assertThat(new Action.PlayMedia(URI.create("http://nas/a.flac"), "audio/flac", "A", null).requires())
+                .isEqualTo(MEDIA_RENDERER);
+        assertThat(new Action.Pause().requires()).isEqualTo(MEDIA_RENDERER);
+        assertThat(new Action.Resume().requires()).isEqualTo(MEDIA_RENDERER);
+    }
+
+    @Test
+    void stopReachesCastReceiversAndMediaRenderers() {
+        assertThat(new Action.Stop().requires()).isEqualTo(CAST_RECEIVER);
+        assertThat(new Action.Stop().acceptedBy(EnumSet.of(MEDIA_RENDERER))).isTrue();
+        assertThat(new Action.Stop().acceptedBy(EnumSet.of(CAST_RECEIVER))).isTrue();
+        assertThat(new Action.Stop().acceptedBy(EnumSet.of(VOLUME, REMOTE_KEYS))).isFalse();
+        assertThat(new Action.PressKey(RemoteKey.HOME).acceptedBy(EnumSet.of(REMOTE_KEYS))).isTrue();
+        assertThat(new Action.PressKey(RemoteKey.HOME).acceptedBy(EnumSet.of(VOLUME))).isFalse();
+    }
+
+    @Test
+    void playMediaNeedsAUrlAndDefaultsTheType() {
+        assertThatThrownBy(() -> new Action.PlayMedia(null, "audio/flac", "A", null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new Action.PlayMedia(URI.create("http://nas/a"), " ", "A", null).mimeType())
+                .isEqualTo("application/octet-stream");
+    }
+
+    @Test
+    void playMediaNeverPrintsTheStreamCredential() {
+        String printed = new Action.PlayMedia(URI.create("http://nas:8096/Audio/x/stream.flac?static=true&ApiKey=secret-key"),
+                "audio/flac", "Song", null).toString();
+
+        assertThat(printed).contains("http://nas:8096/Audio/x/stream.flac?…").doesNotContain("secret-key");
     }
 }

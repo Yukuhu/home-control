@@ -156,7 +156,7 @@ public class DeviceManager implements AutoCloseable {
         UnsupportedActionException lastUnsupported = null;
         for (String adapterId : device.adapters().keySet()) {
             DeviceAdapter adapter = adapters.get(adapterId);
-            if (adapter == null || !adapter.capabilities(device).contains(action.requires())) {
+            if (adapter == null || !action.acceptedBy(adapter.capabilities(device))) {
                 continue;
             }
             DeviceHandle handle = deviceHandles.get(adapterId);

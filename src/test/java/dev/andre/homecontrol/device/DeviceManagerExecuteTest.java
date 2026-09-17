@@ -9,6 +9,7 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
+import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -136,5 +137,24 @@ class DeviceManagerExecuteTest {
                 .hasMessage("Shield is not connected");
         assertThatThrownBy(() -> manager.execute("shield", new Action.OpenAppLink(URI.create("https://a.example"))))
                 .isInstanceOf(UnsupportedActionException.class);
+    }
+
+    @Test
+    void stopReachesAMediaRendererWithoutCast() {
+        registry.save(new Device("speaker", "Speaker", DeviceKind.UPNP, "10.0.0.30",
+                Map.of("upnp", Map.of()), Instant.now()));
+        StubAdapter upnp = new StubAdapter("upnp", DeviceKind.UPNP, true, false,
+                Capability.MEDIA_RENDERER, Capability.VOLUME);
+        DeviceManager speakers = new DeviceManager(registry, List.of(upnp), event -> { });
+        speakers.start();
+        try {
+            speakers.execute("speaker", new Action.Stop());
+
+            assertThat(upnp.handles.get("speaker").executed).containsExactly(new Action.Stop());
+            assertThatThrownBy(() -> speakers.execute("speaker", new Action.PressKey(RemoteKey.HOME)))
+                    .isInstanceOf(UnsupportedActionException.class);
+        } finally {
+            speakers.close();
+        }
     }
 }
