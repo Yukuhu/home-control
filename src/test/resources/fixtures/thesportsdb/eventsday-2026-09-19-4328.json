@@ -1,0 +1,5 @@
+{"events":[
+ {"idEvent":"2601001","strTimestamp":"2026-09-19T11:30:00+00:00","strEvent":"Arsenal vs Chelsea","strSport":"Soccer","idLeague":"4328","strLeague":"English Premier League","strHomeTeam":"Arsenal","strAwayTeam":"Chelsea","dateEvent":"2026-09-19","strTime":"11:30:00","strThumb":"https:\/\/r2.thesportsdb.com\/images\/media\/event\/thumb\/arsche1754000001.jpg","strStatus":"FT","strPostponed":"no"},
+ {"idEvent":"2601002","strTimestamp":"2026-09-19T14:00:00+00:00","strEvent":"Liverpool vs Everton","strSport":"Soccer","idLeague":"4328","strLeague":"English Premier League","strHomeTeam":"Liverpool","strAwayTeam":"Everton","dateEvent":"2026-09-19","strTime":"14:00:00","strThumb":"https:\/\/r2.thesportsdb.com\/images\/media\/event\/thumb\/liveve1754000002.jpg","strStatus":"NS","strPostponed":"no"},
+ {"idEvent":"2601003","strTimestamp":null,"strEvent":"Brighton vs Fulham","strSport":"Soccer","idLeague":"4328","strLeague":"English Premier League","strHomeTeam":"Brighton","strAwayTeam":"Fulham","dateEvent":"2026-09-19","dateEventLocal":"2026-09-19","strTime":"00:00:00","strThumb":null,"strStatus":"","strPostponed":"no"}
+]}

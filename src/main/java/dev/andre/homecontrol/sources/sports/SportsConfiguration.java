@@ -7,7 +7,9 @@ import dev.andre.homecontrol.sources.sports.calendar.CalendarFetcher;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarUrlPolicy;
 import dev.andre.homecontrol.sources.sports.calendar.SportsCalendars;
+import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
 import dev.andre.homecontrol.storage.SecretStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
@@ -65,8 +67,8 @@ public class SportsConfiguration {
     }
 
     @Bean
-    public SportsSchedule sportsSchedule(CalendarSchedule schedule) {
-        return new SportsSchedule(schedule);
+    public SportsSchedule sportsSchedule(CalendarSchedule schedule, ObjectProvider<TheSportsDbSchedule> competitions) {
+        return new SportsSchedule(schedule, competitions.getIfAvailable());
     }
 
     @Bean

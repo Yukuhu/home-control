@@ -3,8 +3,9 @@
     <p class="error" role="alert" th:if="${sportsError}" th:text="${sportsError}">Could not save</p>
     <p class="ok" th:if="${sportsMessage}" th:text="${sportsMessage}">Added</p>
 
-    <p>Show live and upcoming sport from calendar links (.ics). Home Control does not know which service
-        broadcasts an event.</p>
+    <p>Show live and upcoming sport from calendar links (.ics) and from TheSportsDB. Home Control does not know
+        which service broadcasts an event.</p>
+    <p>If you add the same competition as a calendar and from TheSportsDB, its matches appear twice.</p>
 
     <form method="post" th:action="@{/setup/sources/sports/time-zone}">
         <label>Time zone
@@ -59,4 +60,94 @@
         <p class="hint">Links starting with webcal:// work too. Home Control only reads the calendar; it never
             changes it.</p>
     </form>
+
+    <th:block th:if="${sports.theSportsDbEnabled()}">
+        <h3>TheSportsDB</h3>
+        <p>Fixtures for the competitions you choose come from TheSportsDB, a community database. Kick-off times
+            can be missing or late.</p>
+
+        <p th:if="${sports.keyKind() == 'free'}">
+            Using the free key. The free key shows at most 3 matches per competition per day.
+        </p>
+        <th:block th:if="${sports.keyKind() == 'personal'}">
+            <p>Using your personal key.</p>
+            <form method="post" th:action="@{/setup/sources/sports/thesportsdb/free-key}">
+                <button type="submit">Use the free key</button>
+            </form>
+        </th:block>
+
+        <form method="post" th:action="@{/setup/sources/sports/thesportsdb/key}">
+            <label>Your TheSportsDB key
+                <input type="password" name="key" autocomplete="off">
+            </label>
+            <th:block th:if="${sports.needsLoginPassword()}">
+                <input type="password" name="loginPassword" minlength="10" autocomplete="new-password"
+                       placeholder="New login password">
+                <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password"
+                       placeholder="Repeat login password">
+            </th:block>
+            <button type="submit">Use my key</button>
+        </form>
+
+        <form method="post" th:action="@{/setup/sources/sports/thesportsdb/search}">
+            <label>Country
+                <input name="country" required maxlength="60" placeholder="Germany">
+            </label>
+            <label>Sport (optional)
+                <input name="sport" list="sports-tsdb-sports">
+            </label>
+            <datalist id="sports-tsdb-sports">
+                <option value="Soccer"></option>
+                <option value="Basketball"></option>
+                <option value="Ice Hockey"></option>
+                <option value="Handball"></option>
+                <option value="American Football"></option>
+                <option value="Tennis"></option>
+                <option value="Motorsport"></option>
+                <option value="Darts"></option>
+            </datalist>
+            <button type="submit">Find competitions</button>
+        </form>
+
+        <div th:if="${sportsSearch != null}">
+            <p th:if="${#lists.isEmpty(sportsSearch.leagues())}"
+               th:text="|TheSportsDB found no competitions for ${sportsSearch.country()}.|">
+                TheSportsDB found no competitions for Germany.
+            </p>
+            <ul th:unless="${#lists.isEmpty(sportsSearch.leagues())}">
+                <li th:each="league : ${sportsSearch.leagues()}">
+                    <span th:text="${league.name()}">German Bundesliga</span>
+                    <span th:text="${league.sport()}">Soccer</span>
+                    <span th:text="${league.country()}">Germany</span>
+                    <span th:if="${league.added()}">Added</span>
+                    <form th:unless="${league.added()}" method="post" th:action="@{/setup/sources/sports/competitions}">
+                        <input type="hidden" name="leagueId" th:value="${league.id()}">
+                        <button type="submit">Add</button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+
+        <form method="post" th:action="@{/setup/sources/sports/competitions}">
+            <label>Competition id
+                <input name="leagueId" inputmode="numeric" pattern="[0-9]{1,9}">
+            </label>
+            <p class="hint">The id is the number in a TheSportsDB league page address, e.g. 4331 for the
+                Bundesliga.</p>
+            <button type="submit">Add competition</button>
+        </form>
+
+        <p th:if="${#lists.isEmpty(sports.competitions())}">No competitions yet.</p>
+        <ul class="sports-competitions" th:unless="${#lists.isEmpty(sports.competitions())}">
+            <li th:each="competition : ${sports.competitions()}">
+                <span th:text="${competition.name()}">German Bundesliga</span>
+                <span class="hint" th:text="${competition.status()}">Not loaded yet</span>
+                <form method="post" th:action="@{/setup/sources/sports/competitions/{id}/remove(id=${competition.leagueId()})}">
+                    <button type="submit" th:attr="aria-label=|Remove ${competition.name()}|">Remove</button>
+                </form>
+            </li>
+        </ul>
+
+        <p class="hint">Data from <a href="https://www.thesportsdb.com" rel="noopener noreferrer">TheSportsDB</a>.</p>
+    </th:block>
 </section>

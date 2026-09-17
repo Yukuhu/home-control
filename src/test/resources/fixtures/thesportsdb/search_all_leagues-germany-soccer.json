@@ -1,0 +1,7 @@
+{"countries":[
+ {"idLeague":"4485","strSport":"Soccer","strLeague":"DFB-Pokal","strLeagueAlternate":"DFB Cup","strCountry":"Germany","strBadge":"https:\/\/r2.thesportsdb.com\/images\/media\/league\/badge\/tlczpm1780941454.png"},
+ {"idLeague":"4399","strSport":"Soccer","strLeague":"German 2. Bundesliga","strLeagueAlternate":"","strCountry":"Germany","strBadge":"https:\/\/r2.thesportsdb.com\/images\/media\/league\/badge\/hl40981534764789.png"},
+ {"idLeague":"4331","strSport":"Soccer","strLeague":"German Bundesliga","strLeagueAlternate":"Bundesliga, Fußball-Bundesliga","strCountry":"Germany","strBadge":"https:\/\/r2.thesportsdb.com\/images\/media\/league\/badge\/teqh1b1679952008.png"},
+ {"idLeague":"x12","strSport":"Soccer","strLeague":"Broken id","strCountry":"Germany","strBadge":null},
+ {"idLeague":"5891","strSport":"Soccer","strLeague":"German Oberliga Baden-Württemberg","strCountry":"Germany","strBadge":"http:\/\/insecure.example\/badge.png"}
+]}
