@@ -1,0 +1,74 @@
+{
+  "Items": [
+    {
+      "Name": "Bunny Song",
+      "ServerId": "4e1a2b3c4d5e4f60718293a4b5c6d7e8",
+      "Id": "c0ffee00c0ffee00c0ffee00c0ffee01",
+      "RunTimeTicks": 1870000000,
+      "IsFolder": false,
+      "IndexNumber": 1,
+      "Type": "Audio",
+      "MediaType": "Audio",
+      "Album": "Meadow",
+      "AlbumId": "a1b0c2d3e4f5061728394a5b6c7d8e9f",
+      "AlbumPrimaryImageTag": "d4e5f6a7b8c9",
+      "Artists": [
+        "The Rabbits"
+      ],
+      "ArtistItems": [
+        {
+          "Name": "The Rabbits",
+          "Id": "b0a1c2d3e4f5061728394a5b6c7d8e9f"
+        }
+      ],
+      "AlbumArtist": "The Rabbits",
+      "LocationType": "FileSystem",
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 3,
+        "IsFavorite": true,
+        "LastPlayedDate": "2026-09-15T18:12:40.0000000Z",
+        "Played": true,
+        "Key": "The Rabbits-Meadow-0001-0001Bunny Song"
+      },
+      "ImageTags": {},
+      "BackdropImageTags": []
+    },
+    {
+      "Name": "Carrot Waltz",
+      "ServerId": "4e1a2b3c4d5e4f60718293a4b5c6d7e8",
+      "Id": "c0ffee00c0ffee00c0ffee00c0ffee02",
+      "RunTimeTicks": 2520000000,
+      "IsFolder": false,
+      "IndexNumber": 1,
+      "Type": "Audio",
+      "MediaType": "Audio",
+      "Album": "Garden Suite",
+      "AlbumId": "a2b0c2d3e4f5061728394a5b6c7d8e9f",
+      "AlbumPrimaryImageTag": "e5f6a7b8c9d0",
+      "Artists": [
+        "Clara Hopkins"
+      ],
+      "ArtistItems": [
+        {
+          "Name": "Clara Hopkins",
+          "Id": "b1a1c2d3e4f5061728394a5b6c7d8e9f"
+        }
+      ],
+      "AlbumArtist": "Clara Hopkins",
+      "LocationType": "FileSystem",
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 1,
+        "IsFavorite": false,
+        "LastPlayedDate": "2026-09-14T08:02:11.0000000Z",
+        "Played": true,
+        "Key": "Clara Hopkins-Garden Suite-0001-0003Carrot Waltz"
+      },
+      "ImageTags": {},
+      "BackdropImageTags": []
+    }
+  ],
+  "TotalRecordCount": 2,
+  "StartIndex": 0
+}

@@ -54,14 +54,53 @@ class JellyfinContentSourceTest {
     }
 
     @Test
-    void offersThreeRailsInOrder() throws IOException {
+    void offersFiveRailsInOrder() throws IOException {
         connected();
 
         List<RailDescriptor> rails = source.rails();
 
-        assertThat(rails).extracting(RailDescriptor::id).containsExactly("resume", "next-up", "latest");
+        assertThat(rails).extracting(RailDescriptor::id).containsExactly("resume", "next-up", "latest", "music-recent", "music-latest");
         assertThat(rails).extracting(RailDescriptor::title)
-                .containsExactly("Continue watching", "Next up", "Latest in library");
+                .containsExactly("Continue watching", "Next up", "Latest in library", "Recently played music", "Latest music");
+    }
+
+    @Test
+    void recentlyPlayedMusicAsksForPlayedTracks() throws IOException {
+        connected();
+        fake.respond("GET", "/Items", 200, "music-recent.json");
+
+        Rail rail = source.rail("music-recent");
+
+        assertThat(rail.items()).hasSize(2);
+        ContentItem first = rail.items().getFirst();
+        assertThat(first.kind()).isEqualTo(dev.andre.homecontrol.core.playback.ContentKind.TRACK);
+        assertThat(first.title()).isEqualTo("Bunny Song");
+        assertThat(first.subtitle()).isEqualTo("The Rabbits");
+        assertThat(first.artwork()).hasToString("/sources/jellyfin/images/a1b0c2d3e4f5061728394a5b6c7d8e9f/Primary?tag=d4e5f6a7b8c9");
+        assertThat(fake.last("GET", "/Items").query()).isEqualTo(Map.of(
+                "userId", FakeJellyfinServer.USER_ID,
+                "limit", "20",
+                "includeItemTypes", "Audio",
+                "recursive", "true",
+                "filters", "IsPlayed",
+                "sortBy", "DatePlayed",
+                "sortOrder", "Descending",
+                "enableUserData", "true",
+                "enableImageTypes", "Primary,Thumb,Backdrop",
+                "imageTypeLimit", "1"));
+    }
+
+    @Test
+    void latestMusicAsksForUngroupedTracks() throws IOException {
+        connected();
+        fake.respond("GET", "/Items/Latest", 200, "music-latest.json");
+
+        Rail rail = source.rail("music-latest");
+
+        assertThat(rail.items()).hasSize(2);
+        assertThat(rail.items().getFirst().title()).isEqualTo("Carrot Waltz");
+        assertThat(fake.last("GET", "/Items/Latest").query()).containsEntry("includeItemTypes", "Audio")
+                .containsEntry("groupItems", "false");
     }
 
     @Test

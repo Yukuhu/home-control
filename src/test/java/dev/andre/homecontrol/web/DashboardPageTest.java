@@ -235,7 +235,8 @@ class DashboardPageTest {
                 .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/stop")))
                 .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/volume")))
                 .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/mute")))
-                .andExpect(content().string(not(containsString("/devices/upnp-10-0-0-30/key/"))));
+                .andExpect(content().string(not(containsString("/devices/upnp-10-0-0-30/key/"))))
+                .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/play")));
     }
 
     @Test

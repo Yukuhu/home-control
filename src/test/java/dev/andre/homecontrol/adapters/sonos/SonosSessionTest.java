@@ -162,6 +162,17 @@ class SonosSessionTest {
     }
 
     @Test
+    void groupMembersShowTheCoordinatorsNowPlaying() {
+        household.join(KITCHEN, LIVING);
+        SonosSession kitchenSession = connected(kitchen);
+
+        connected(living).execute(song);
+
+        await().atMost(WAIT).untilAsserted(() -> assertThat(kitchenSession.state().nowPlaying()).isNotNull()
+                .extracting(dev.andre.homecontrol.core.NowPlaying::title).isEqualTo("Bunny Song"));
+    }
+
+    @Test
     void isOfflineWhileThePlayerIsGone() {
         SonosSession session = connected(living);
 

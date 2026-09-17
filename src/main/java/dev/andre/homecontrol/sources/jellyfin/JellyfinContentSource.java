@@ -18,6 +18,8 @@ public class JellyfinContentSource implements ContentSource {
     static final RailDescriptor RESUME = new RailDescriptor(JellyfinSettings.SOURCE_ID, "resume", "Continue watching");
     static final RailDescriptor NEXT_UP = new RailDescriptor(JellyfinSettings.SOURCE_ID, "next-up", "Next up");
     static final RailDescriptor LATEST = new RailDescriptor(JellyfinSettings.SOURCE_ID, "latest", "Latest in library");
+    static final RailDescriptor MUSIC_RECENT = new RailDescriptor(JellyfinSettings.SOURCE_ID, "music-recent", "Recently played music");
+    static final RailDescriptor MUSIC_LATEST = new RailDescriptor(JellyfinSettings.SOURCE_ID, "music-latest", "Latest music");
     private static final String IMAGE_TYPES = "Primary,Thumb,Backdrop";
 
     private final JellyfinClient client;
@@ -49,7 +51,7 @@ public class JellyfinContentSource implements ContentSource {
 
     @Override
     public List<RailDescriptor> rails() {
-        return available() ? List.of(RESUME, NEXT_UP, LATEST) : List.of();
+        return available() ? List.of(RESUME, NEXT_UP, LATEST, MUSIC_RECENT, MUSIC_LATEST) : List.of();
     }
 
     @Override
@@ -62,6 +64,11 @@ public class JellyfinContentSource implements ContentSource {
                     listQuery(connection, "enableResumable", "false")).path("Items")), clock.instant());
             case "latest" -> new Rail(LATEST, JellyfinItemMapper.toItems(client.get(connection, "/Items/Latest",
                     listQuery(connection, "includeItemTypes", "Movie,Episode", "groupItems", "false"))), clock.instant());
+            case "music-recent" -> new Rail(MUSIC_RECENT, JellyfinItemMapper.toItems(client.get(connection, "/Items",
+                    listQuery(connection, "includeItemTypes", "Audio", "recursive", "true", "filters", "IsPlayed",
+                            "sortBy", "DatePlayed", "sortOrder", "Descending")).path("Items")), clock.instant());
+            case "music-latest" -> new Rail(MUSIC_LATEST, JellyfinItemMapper.toItems(client.get(connection, "/Items/Latest",
+                    listQuery(connection, "includeItemTypes", "Audio", "groupItems", "false"))), clock.instant());
             default -> throw new IllegalArgumentException("Jellyfin has no rail '" + railId + "'");
         };
     }

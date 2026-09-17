@@ -15,6 +15,7 @@ import dev.andre.homecontrol.core.playback.CastMessageStrategy;
 import dev.andre.homecontrol.core.playback.CastStreamStrategy;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
+import dev.andre.homecontrol.core.playback.MediaRendererStrategy;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlayableResolver;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
@@ -69,6 +70,22 @@ class PlaybackServiceTest {
                 return resolution;
             }
         };
+    }
+
+    @Test
+    void executesARenderRoute() {
+        Device speaker = new Device("upnp-10-0-0-30", "Kitchen Speaker", DeviceKind.UPNP, "10.0.0.30",
+                Map.of("upnp", Map.of()), Instant.now());
+        given(devices.device("upnp-10-0-0-30")).willReturn(Optional.of(speaker));
+        given(devices.capabilities("upnp-10-0-0-30")).willReturn(EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME));
+        PlaybackService renderers = new PlaybackService(devices, new PlaybackPlanner(List.of(new AppLinkStrategy(),
+                new CastLoadStrategy(), new CastStreamStrategy(), new MediaRendererStrategy())));
+
+        Route route = renderers.play(AppLinks.fromUrl("http://nas.local/music/song.flac"), "upnp-10-0-0-30");
+
+        assertThat(route).isInstanceOf(Route.Render.class);
+        verify(devices).execute("upnp-10-0-0-30",
+                new Action.PlayMedia(URI.create("http://nas.local/music/song.flac"), "audio/flac", "song.flac", null));
     }
 
     @Test

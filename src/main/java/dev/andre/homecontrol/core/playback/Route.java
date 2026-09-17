@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.core.playback;
 
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.RedactedUris;
 
 import java.net.URI;
 import java.util.Collections;
@@ -97,6 +98,25 @@ public sealed interface Route {
         @Override
         public String describe() {
             return "Cast with the YouTube receiver (best effort)";
+        }
+    }
+
+    /** Hand a direct stream to a DLNA/UPnP/Sonos media renderer (spec §5.3 rung 4). */
+    record Render(URI url, String mimeType, String title, String subtitle) implements Route {
+
+        public Action action() {
+            return new Action.PlayMedia(url, mimeType, title, subtitle);
+        }
+
+        @Override
+        public String describe() {
+            return "Stream directly to this device (DLNA/UPnP)";
+        }
+
+        /** The URL can carry a Jellyfin ApiKey; never print its query. */
+        @Override
+        public String toString() {
+            return "Render[url=" + RedactedUris.withoutQuery(url) + ", mimeType=" + mimeType + ", title=" + title + "]";
         }
     }
 
