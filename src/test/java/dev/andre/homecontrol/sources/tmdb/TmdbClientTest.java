@@ -3,8 +3,10 @@ package dev.andre.homecontrol.sources.tmdb;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 
 import java.io.IOException;
@@ -148,15 +150,64 @@ class TmdbClientTest {
         assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(3));
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {401, 403, 404, 429, 500})
+    void noMessageLeaksTheKeyOnStatusFailures(int status) {
+        fake.respondJson("GET", "/3/leak-test", status, "{}");
+
+        assertNoLeak(() -> client.get(apiKey, "/leak-test", Map.of()));
+        assertNoLeak(() -> client.get(bearer, "/leak-test", Map.of()));
+    }
+
     @Test
-    void noMessageLeaksTheKey() {
+    void noMessageLeaksTheKeyOnARedirect() {
+        fake.redirect("/3/leak-redirect", "http://127.0.0.1:1/elsewhere");
+
+        assertNoLeak(() -> client.get(apiKey, "/leak-redirect", Map.of()));
+        assertNoLeak(() -> client.get(bearer, "/leak-redirect", Map.of()));
+    }
+
+    @Test
+    void noMessageLeaksTheKeyOnANonJsonBody() {
+        fake.respondBytes("GET", "/3/leak-html", 200, "text/html", "<html>".getBytes());
+
+        assertNoLeak(() -> client.get(apiKey, "/leak-html", Map.of()));
+        assertNoLeak(() -> client.get(bearer, "/leak-html", Map.of()));
+    }
+
+    @Test
+    void noMessageLeaksTheKeyOnAnOversizedBody() {
+        String padding = " ".repeat(2 * 1024 * 1024 + 10);
+        String json = "{\"padding\":\"" + padding + "\"}";
+        fake.respondBytes("GET", "/3/leak-big", 200, "application/json", json.getBytes());
+
+        assertNoLeak(() -> client.get(apiKey, "/leak-big", Map.of()));
+        assertNoLeak(() -> client.get(bearer, "/leak-big", Map.of()));
+    }
+
+    @Test
+    void noMessageLeaksTheKeyWhenUnreachable() {
         fake.close();
-        try {
-            client.get(apiKey, "/authentication", Map.of());
-        } catch (TmdbException e) {
-            assertThat(e.getMessage()).doesNotContain(FakeTmdbServer.API_KEY).doesNotContain("api_key");
-            assertThat(String.valueOf(e.getCause())).doesNotContain(FakeTmdbServer.API_KEY).doesNotContain("api_key");
-        }
+
+        assertNoLeak(() -> client.get(apiKey, "/authentication", Map.of()));
+        assertNoLeak(() -> client.get(bearer, "/authentication", Map.of()));
+    }
+
+    /** Neither credential form (API key in the query, bearer token in the header) ever reaches a user-facing message. */
+    private static void assertNoLeak(ThrowingCallable call) {
+        assertThatThrownBy(call)
+                .isInstanceOf(TmdbException.class)
+                .satisfies(e -> {
+                    TmdbException exception = (TmdbException) e;
+                    assertThat(exception.getMessage())
+                            .doesNotContain(FakeTmdbServer.API_KEY)
+                            .doesNotContain(FakeTmdbServer.READ_TOKEN)
+                            .doesNotContain("api_key");
+                    assertThat(String.valueOf(exception.getCause()))
+                            .doesNotContain(FakeTmdbServer.API_KEY)
+                            .doesNotContain(FakeTmdbServer.READ_TOKEN)
+                            .doesNotContain("api_key");
+                });
     }
 
     @Test
