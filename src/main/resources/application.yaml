@@ -78,6 +78,27 @@ home-control:
     connect-timeout-seconds: 3
     reconnect-initial-delay-seconds: 1
     reconnect-max-delay-seconds: 60
+  bluetooth:
+    # Bluetooth speakers through the host's BlueZ and a server-side mpv player.
+    # Needs host plumbing and the -bluetooth image: see docs/bluetooth-speakers.md.
+    enabled: false
+    dbus-address: unix:path=/run/dbus/system_bus_socket
+    # Blank = first powered adapter; otherwise an adapter MAC or id such as hci0.
+    adapter: ""
+    scan-seconds: 10
+    bluez-timeout-seconds: 45
+    poll-interval-seconds: 5
+    playing-poll-interval-seconds: 1
+    auto-connect: true
+    mpv-path: mpv
+    # runtime-dir defaults to <java.io.tmpdir>/home-control-bluetooth
+    # e.g. alsa/bluealsa:DEV={mac},PROFILE=a2dp - blank = find the speaker's PipeWire/PulseAudio sink.
+    audio-device-template: ""
+    default-volume: 50
+    player-start-timeout-seconds: 5
+    load-timeout-seconds: 15
+    command-timeout-seconds: 3
+    host-check-cache-seconds: 30
   deep-link-test:
     # Blender Foundation's "Big Buck Bunny": long-lived and region-free.
     youtube-url: https://www.youtube.com/watch?v=aqz-KE-bpKQ

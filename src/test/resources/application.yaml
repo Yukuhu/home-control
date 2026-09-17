@@ -26,6 +26,8 @@ home-control:
     enabled: true
   sonos:
     enabled: true
+  bluetooth:
+    enabled: false
   cast:
     enabled: true
     # A PING every 5 s; 15 s without any inbound frame means the receiver is gone.
