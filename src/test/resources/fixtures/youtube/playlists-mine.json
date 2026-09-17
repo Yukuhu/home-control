@@ -1,0 +1,37 @@
+{
+  "kind": "youtube#playlistListResponse",
+  "etag": "cGxheWxpc3RzLW1pbmU",
+  "pageInfo": { "totalResults": 2, "resultsPerPage": 50 },
+  "items": [
+    {
+      "kind": "youtube#playlist",
+      "etag": "cGwtZXZlbmluZw",
+      "id": "PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG",
+      "snippet": {
+        "publishedAt": "2024-02-11T19:00:00Z",
+        "channelId": "UC4fixtureHomeControl00a",
+        "title": "Watch this evening",
+        "description": "",
+        "thumbnails": { "medium": { "url": "https://i.ytimg.com/vi/aqz-KE-bpKQ/mqdefault.jpg", "width": 320, "height": 180 } },
+        "channelTitle": "Andre at Home",
+        "localized": { "title": "Watch this evening", "description": "" }
+      },
+      "contentDetails": { "itemCount": 2 }
+    },
+    {
+      "kind": "youtube#playlist",
+      "etag": "cGwta2lkcw",
+      "id": "PLx0sYbCqOb8Q_CLZC2BdBSKEEB59BOPUM",
+      "snippet": {
+        "publishedAt": "2023-11-03T08:30:00Z",
+        "channelId": "UC4fixtureHomeControl00a",
+        "title": "Kids science",
+        "description": "",
+        "thumbnails": {},
+        "channelTitle": "Andre at Home",
+        "localized": { "title": "Kids science", "description": "" }
+      },
+      "contentDetails": { "itemCount": 17 }
+    }
+  ]
+}

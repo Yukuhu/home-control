@@ -12,6 +12,31 @@
         <form method="post" th:action="@{/setup/sources/youtube/disconnect}">
             <button type="submit">Disconnect</button>
         </form>
+
+        <fieldset>
+            <legend>Rails</legend>
+            <form method="post" th:action="@{/setup/sources/youtube/watch-later}">
+                <input type="hidden" name="enabled" th:value="${!youtube.watchLater()}">
+                <button type="submit" th:text="${youtube.watchLater()} ? 'Hide Watch Later' : 'Show Watch Later'">Show Watch Later</button>
+            </form>
+            <p class="hint">YouTube stopped sharing Watch Later with other apps for most accounts in 2016. If the
+                rail says so, save videos to a playlist of your own and show that instead.</p>
+
+            <form method="post" th:action="@{/setup/sources/youtube/playlists/load}">
+                <button type="submit">Load my playlists</button>
+            </form>
+            <p class="hint">Costs 1 quota unit per 50 playlists.</p>
+
+            <form method="post" th:action="@{/setup/sources/youtube/playlists}" th:if="${!#lists.isEmpty(youtube.playlists())}">
+                <label th:each="p : ${youtube.playlists()}">
+                    <input type="checkbox" name="playlist" th:value="${p.id()}" th:checked="${p.selected()}">
+                    <span th:text="|${p.title()} (${p.itemCount()} videos)|">Kids science (17 videos)</span>
+                </label>
+                <button type="submit">Save playlists</button>
+            </form>
+            <p class="hint" th:if="${!#lists.isEmpty(youtube.playlists())}">Each shown playlist refreshes hourly and
+                costs 1 unit per refresh. Order rails in &ldquo;Sources&rdquo; above.</p>
+        </fieldset>
     </th:block>
 
     <th:block th:with="authorization=${youtube.authorization()}">

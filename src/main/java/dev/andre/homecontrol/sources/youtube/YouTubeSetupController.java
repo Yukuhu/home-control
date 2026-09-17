@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.List;
 import java.util.Map;
 
 /** Connects, authorizes, tests and disconnects YouTube from the setup page; always a redirect back to it. */
@@ -81,6 +82,40 @@ public class YouTubeSetupController {
         try {
             setup.disconnect();
             redirect.addFlashAttribute("youtubeMessage", "YouTube disconnected");
+        } catch (YouTubeException e) {
+            redirect.addFlashAttribute("youtubeError", e.getMessage());
+        }
+        return REDIRECT;
+    }
+
+    @PostMapping("/setup/sources/youtube/playlists/load")
+    public String loadPlaylists(RedirectAttributes redirect) {
+        try {
+            int found = setup.loadPlaylists().size();
+            redirect.addFlashAttribute("youtubeMessage", "Found " + found + " playlists");
+        } catch (YouTubeException e) {
+            redirect.addFlashAttribute("youtubeError", e.getMessage());
+        }
+        return REDIRECT;
+    }
+
+    @PostMapping("/setup/sources/youtube/playlists")
+    public String choosePlaylists(@RequestParam(name = "playlist", required = false) List<String> playlist,
+                                  RedirectAttributes redirect) {
+        try {
+            setup.choosePlaylists(playlist == null ? List.of() : playlist);
+            redirect.addFlashAttribute("youtubeMessage", "Playlists saved");
+        } catch (YouTubeException e) {
+            redirect.addFlashAttribute("youtubeError", e.getMessage());
+        }
+        return REDIRECT;
+    }
+
+    @PostMapping("/setup/sources/youtube/watch-later")
+    public String watchLater(@RequestParam boolean enabled, RedirectAttributes redirect) {
+        try {
+            setup.setWatchLater(enabled);
+            redirect.addFlashAttribute("youtubeMessage", enabled ? "Watch Later shown" : "Watch Later hidden");
         } catch (YouTubeException e) {
             redirect.addFlashAttribute("youtubeError", e.getMessage());
         }
