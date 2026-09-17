@@ -458,16 +458,19 @@ repeats are expanded, other repeat rules are shown once. Calendars refresh every
 
 **TheSportsDB.** Find a competition by country and sport, or enter its numeric id directly. The
 documented free key shows at most 3 matches per competition per day; entering your own
-TheSportsDB-supporter key removes that limit and is stored as a secret the same way a calendar
+TheSportsDB-supporter key raises that limit and is stored as a secret the same way a calendar
 link is. Fixtures are cached for a day per competition. This is a community-maintained database
 and can be wrong or incomplete; the setup page credits "Data from TheSportsDB."
 
 **Where you watch it.** Per calendar or competition, you tell Home Control which streaming
 service you use for it — this is always your own setting, never broadcast-rights data, and every
 place it is shown says so ("(your setting)"). A competition mapped to DAZN, Netflix or Prime Video
-opens that service's app. For any other case, paste a link to the specific event in the play
-sheet ("paste a link to open this directly"); the pasted link also appears under Pinned links so
-it can be reused or removed later.
+opens that service's app, but only to its home screen, not the specific event; the play sheet then
+offers to pin the actual link ("Paste the DAZN link for this event to open it directly"). For a
+competition with no mapped service, the play sheet instead says "Home Control cannot open this
+event directly. Paste a link to it (for example the event's page on your streaming service) to
+pin it." Either way, the pasted link also appears under Pinned links so it can be reused or
+removed later.
 
 **Time zone.** Setup → Sports lets you choose the time zone kick-off times are shown in; it
 defaults to the container's `TZ`. Set `TZ` in your Compose file, or choose a zone in setup if you

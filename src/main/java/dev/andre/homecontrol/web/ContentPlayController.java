@@ -9,6 +9,7 @@ import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.PinOffers;
 import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.playback.ContentItem;
+import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.device.DeviceManager;
@@ -61,7 +62,7 @@ public class ContentPlayController {
         if (content.isEmpty()) {
             return notFound(source);
         }
-        return text(HttpStatus.OK, playback.play(content.get(), id).describe());
+        return text(HttpStatus.OK, playback.play(content.get(), id).describe(content.get().kind()));
     }
 
     @GetMapping(path = "/devices/{id}/route", params = {"source", "item"}, produces = MediaType.TEXT_PLAIN_VALUE)
@@ -76,7 +77,7 @@ public class ContentPlayController {
         Route route = playback.plan(content.get(), id);
         return route instanceof Route.Unroutable unroutable
                 ? text(HttpStatus.UNPROCESSABLE_CONTENT, unroutable.reason())
-                : text(HttpStatus.OK, route.describe());
+                : text(HttpStatus.OK, route.describe(content.get().kind()));
     }
 
     @GetMapping(path = "/devices/{id}/route-preview", params = {"source", "item"}, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -90,7 +91,7 @@ public class ContentPlayController {
         }
         PinOfferView pin = pinnedLinks.getIfAvailable() == null ? null
                 : PinOffers.offer(content.get()).map(PinOfferView::of).orElse(null);
-        return ResponseEntity.ok(RoutePreviewView.of(playback.preview(content.get(), id), pin));
+        return ResponseEntity.ok(RoutePreviewView.of(playback.preview(content.get(), id), pin, content.get().kind()));
     }
 
     @PostMapping(path = "/devices/{id}/play-attempt", params = {"source", "item"}, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -107,11 +108,13 @@ public class ContentPlayController {
         if (content.isEmpty()) {
             return notFound(source);
         }
+        ContentKind kind = content.get().kind();
         return switch (playback.attempt(content.get(), id, Set.copyOf(skips))) {
             case PlayAttempt.Played played -> ResponseEntity.ok(new PlayResultView(true, id, played.device().name(),
-                    RouteView.of(played.route()), RouteView.of(first(played.remaining())), played.route().describe()));
+                    RouteView.of(played.route(), kind), RouteView.of(first(played.remaining()), kind),
+                    played.route().describe(kind)));
             case PlayAttempt.Failed failed -> ResponseEntity.status(statusOf(failed.cause())).body(new PlayResultView(false, id,
-                    failed.device().name(), RouteView.of(failed.route()), RouteView.of(first(failed.remaining())),
+                    failed.device().name(), RouteView.of(failed.route(), kind), RouteView.of(first(failed.remaining()), kind),
                     failed.cause().getMessage()));
             case PlayAttempt.Unroutable unroutable -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(
                     new PlayResultView(false, id, unroutable.device().name(), null, null,

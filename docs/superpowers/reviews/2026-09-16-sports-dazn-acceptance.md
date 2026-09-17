@@ -53,7 +53,7 @@ fixture contract tests, `LiveEventRoutingTest`, unit tests for the ICS subset, f
 
 ## Shield (Android TV app links)
 
-13. A live event of a competition set to DAZN: the play sheet says "Open the DAZN app (not this title)"; playing
+13. A live event of a competition set to DAZN: the play sheet says "Open the DAZN app (not this event)"; playing
     opens the DAZN app (`https://www.dazn.com/`).
     **Pending — requires real hardware.**
 14. Paste a DAZN event link (from dazn.com in a browser) in the play sheet: the sheet then says "Open in the DAZN

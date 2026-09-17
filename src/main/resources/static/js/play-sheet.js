@@ -22,7 +22,7 @@ function showPin(offer) {
             ? `This opens the ${offer.serviceName} app, not this event. Paste the ${offer.serviceName} link for this event to open it directly.`
             : `This opens the ${offer.serviceName} app, not this title. Paste the ${offer.serviceName} link for this title to open it directly.`)
         : isLiveEvent
-            ? "Home Control cannot open this event directly. Paste a link to it (for example its page on dazn.com) to pin it."
+            ? "Home Control cannot open this event directly. Paste a link to it (for example the event's page on your streaming service) to pin it."
             : "Home Control cannot open this title on your services. Paste a link to it (Netflix, Prime Video, YouTube, DAZN or any web link) to pin it.";
     form.hidden = false;
 }

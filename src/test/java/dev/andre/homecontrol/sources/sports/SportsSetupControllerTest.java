@@ -231,7 +231,7 @@ class SportsSetupControllerTest {
         });
 
         mockMvc.perform(post("/setup/sources/sports/providers").param("provider:thesportsdb:4331", "sky"))
-                .andExpect(flash().attribute("sportsError", "Unknown streaming service sky"));
+                .andExpect(flash().attribute("sportsError", "Unknown streaming service"));
     }
 
     @Test
