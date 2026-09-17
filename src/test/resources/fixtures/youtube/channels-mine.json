@@ -1,0 +1,19 @@
+{
+  "kind": "youtube#channelListResponse",
+  "etag": "Qk9fDeA3xw1dsvWmPzCj0sXw2hE",
+  "pageInfo": { "totalResults": 1, "resultsPerPage": 5 },
+  "items": [
+    {
+      "kind": "youtube#channel",
+      "etag": "b3JpZ2luYWwtZXRhZy1taW5l",
+      "id": "UC4fixtureHomeControl00a",
+      "snippet": {
+        "title": "Andre at Home",
+        "description": "",
+        "publishedAt": "2012-03-01T10:00:00Z",
+        "thumbnails": { "default": { "url": "https://yt3.ggpht.com/fixture=s88-c-k-c0x00ffffff-no-rj", "width": 88, "height": 88 } },
+        "localized": { "title": "Andre at Home", "description": "" }
+      }
+    }
+  ]
+}

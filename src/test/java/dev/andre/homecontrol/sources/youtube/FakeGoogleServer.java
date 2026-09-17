@@ -114,6 +114,34 @@ public final class FakeGoogleServer implements AutoCloseable {
         return this;
     }
 
+    /** Channel, three subscriptions on two pages, their uploads playlists and their newest videos. */
+    public FakeGoogleServer youtubeLibrary() {
+        respondWhen("GET", "/youtube/v3/channels", r -> "true".equals(r.query().get("mine")),
+                Canned.fixture(200, "channels-mine.json"));
+        respondWhen("GET", "/youtube/v3/channels", r -> "contentDetails".equals(r.query().get("part")),
+                Canned.fixture(200, "channels-uploads.json"));
+        respondWhen("GET", "/youtube/v3/subscriptions", r -> !r.query().containsKey("pageToken"),
+                Canned.fixture(200, "subscriptions-page-1.json"));
+        respondWhen("GET", "/youtube/v3/subscriptions", r -> "CAIQAA".equals(r.query().get("pageToken")),
+                Canned.fixture(200, "subscriptions-page-2.json"));
+        playlist("UUsXVk37bltHxD1rDPwtNM8Q", "playlist-items-uploads-kurzgesagt.json");
+        playlist("UUSMOQeBJ2RAnuFungnQOxLg", "playlist-items-uploads-blender.json");
+        playlist("UULA_DiR1FfKNvjuUpBHmylQ", "playlist-items-uploads-nasa.json");
+        respond("GET", "/youtube/v3/videos", Canned.fixture(200, "videos-by-id.json"));
+        return this;
+    }
+
+    public FakeGoogleServer playlist(String playlistId, String fixture) {
+        return respondWhen("GET", "/youtube/v3/playlistItems", r -> playlistId.equals(r.query().get("playlistId")),
+                Canned.fixture(200, fixture));
+    }
+
+    /** A 1×1 JPEG-looking body for any thumbnail. */
+    public FakeGoogleServer thumbnails() {
+        byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 16, 'J', 'F', 'I', 'F', 0, (byte) 0xFF, (byte) 0xD9};
+        return respondWhen("GET", "/thumbs/vi/aqz-KE-bpKQ/mqdefault.jpg", r -> true, new Canned(200, "image/jpeg", jpeg));
+    }
+
     private void handle(HttpExchange exchange) throws IOException {
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         Map<String, String> headers = new LinkedHashMap<>();

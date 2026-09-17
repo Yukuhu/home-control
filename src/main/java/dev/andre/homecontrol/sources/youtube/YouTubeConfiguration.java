@@ -1,9 +1,12 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -46,9 +49,59 @@ public class YouTubeConfiguration {
     }
 
     @Bean
+    public QuotaLedger youTubeQuotaLedger(AndroidTvProperties storage, YouTubeProperties properties, Clock clock) {
+        return new QuotaLedger(storage.dataDir().resolve("youtube-quota.json"), clock, properties.dailyQuotaUnits(),
+                properties.searchesPerDay());
+    }
+
+    @Bean
+    public YouTubeApiClient youTubeApiClient(YouTubeHttp http, YouTubeProperties properties, GoogleTokens tokens,
+                                             QuotaLedger ledger) {
+        return new YouTubeApiClient(http, properties.apiBaseUrl(), tokens, ledger);
+    }
+
+    @Bean
+    public KnownVideos knownVideos() {
+        return new KnownVideos(1000);
+    }
+
+    @Bean
     public YouTubeSetupService youTubeSetupService(SecretStore secrets, LoginService login,
                                                    JsonFileSourceSettings sourceSettings, GoogleOAuthClient oauth,
-                                                   GoogleTokens tokens, YouTubeAuthorizationService authorization) {
-        return new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization);
+                                                   GoogleTokens tokens, YouTubeAuthorizationService authorization,
+                                                   ObjectProvider<YouTubeAccount> account, QuotaLedger ledger,
+                                                   ObjectProvider<YouTubeContentSource> source) {
+        return new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger, source);
+    }
+
+    @Bean
+    public YouTubeAccount youTubeAccount(YouTubeApiClient api, YouTubeSetupService setup) {
+        return new YouTubeAccount(api, setup);
+    }
+
+    @Bean
+    public SubscriptionsFeed subscriptionsFeed(YouTubeApiClient api, YouTubeProperties properties, Clock clock) {
+        return new SubscriptionsFeed(api, properties, clock);
+    }
+
+    @Bean
+    public YouTubeContentSource youTubeContentSource(YouTubeSetupService setup, SubscriptionsFeed feed, YouTubeApiClient api,
+                                                     KnownVideos known, YouTubeProperties properties, Clock clock) {
+        return new YouTubeContentSource(setup, feed, api, known, properties, clock);
+    }
+
+    @Bean
+    public YouTubeThumbnailController youTubeThumbnailController(YouTubeHttp http, YouTubeProperties properties) {
+        return new YouTubeThumbnailController(http, properties);
+    }
+
+    /** After a successful device authorization, the account's own channel is looked up once and cached settings cleared. */
+    @Bean
+    public ApplicationRunner youTubeConnectHook(YouTubeAuthorizationService authorization, YouTubeAccount account,
+                                                YouTubeContentSource source) {
+        return args -> authorization.onConnected(() -> {
+            source.forgetAccount();
+            account.refreshChannel();
+        });
     }
 }

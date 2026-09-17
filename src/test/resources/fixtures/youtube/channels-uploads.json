@@ -1,0 +1,13 @@
+{
+  "kind": "youtube#channelListResponse",
+  "etag": "Y2hhbm5lbHMtdXBsb2Fkcw",
+  "pageInfo": { "totalResults": 3, "resultsPerPage": 3 },
+  "items": [
+    { "kind": "youtube#channel", "etag": "a3Vyeg", "id": "UCsXVk37bltHxD1rDPwtNM8Q",
+      "contentDetails": { "relatedPlaylists": { "likes": "", "uploads": "UUsXVk37bltHxD1rDPwtNM8Q" } } },
+    { "kind": "youtube#channel", "etag": "Ymxlbg", "id": "UCSMOQeBJ2RAnuFungnQOxLg",
+      "contentDetails": { "relatedPlaylists": { "likes": "", "uploads": "UUSMOQeBJ2RAnuFungnQOxLg" } } },
+    { "kind": "youtube#channel", "etag": "bmFzYQ", "id": "UCLA_DiR1FfKNvjuUpBHmylQ",
+      "contentDetails": { "relatedPlaylists": { "likes": "", "uploads": "UULA_DiR1FfKNvjuUpBHmylQ" } } }
+  ]
+}

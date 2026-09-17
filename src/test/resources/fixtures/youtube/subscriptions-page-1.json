@@ -1,0 +1,34 @@
+{
+  "kind": "youtube#subscriptionListResponse",
+  "etag": "c3Vic2NyaXB0aW9ucy1wYWdlLTE",
+  "nextPageToken": "CAIQAA",
+  "pageInfo": { "totalResults": 3, "resultsPerPage": 2 },
+  "items": [
+    {
+      "kind": "youtube#subscription",
+      "etag": "c3ViLWt1cnpnZXNhZ3Q",
+      "id": "yJ8M0x0XgT3kQeHc9Wq1vB2nL7rP4sD6fA5gH8jK0mN",
+      "snippet": {
+        "publishedAt": "2019-05-12T18:21:07.123456Z",
+        "title": "Kurzgesagt – In a Nutshell",
+        "description": "Videos explaining things with optimistic nihilism.",
+        "resourceId": { "kind": "youtube#channel", "channelId": "UCsXVk37bltHxD1rDPwtNM8Q" },
+        "channelId": "UC4fixtureHomeControl00a",
+        "thumbnails": { "default": { "url": "https://yt3.ggpht.com/kurzgesagt=s88-c-k-c0x00ffffff-no-rj" } }
+      }
+    },
+    {
+      "kind": "youtube#subscription",
+      "etag": "c3ViLWJsZW5kZXI",
+      "id": "yJ8M0x0XgT3kQeHc9Wq1vB2nL7rP4sD6fA5gH8jK0mO",
+      "snippet": {
+        "publishedAt": "2020-01-02T08:00:00Z",
+        "title": "Blender",
+        "description": "Blender is the free and open source 3D creation suite.",
+        "resourceId": { "kind": "youtube#channel", "channelId": "UCSMOQeBJ2RAnuFungnQOxLg" },
+        "channelId": "UC4fixtureHomeControl00a",
+        "thumbnails": { "default": { "url": "https://yt3.ggpht.com/blender=s88-c-k-c0x00ffffff-no-rj" } }
+      }
+    }
+  ]
+}

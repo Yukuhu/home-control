@@ -12,9 +12,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.beans.factory.ObjectProvider;
 
+import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,6 +54,9 @@ class YouTubeSetupServiceTest {
     private JsonFileSourceSettings sourceSettings;
     private YouTubeSetupService service;
     private HttpServletRequest httpRequest;
+    private ObjectProvider<YouTubeAccount> account;
+    private QuotaLedger ledger;
+    private ObjectProvider<YouTubeContentSource> source;
 
     @BeforeEach
     void setUp() {
@@ -57,7 +66,10 @@ class YouTubeSetupServiceTest {
         tokens = mock(GoogleTokens.class);
         authorization = mock(YouTubeAuthorizationService.class);
         sourceSettings = new JsonFileSourceSettings(tempDir.resolve("sources.json"));
-        service = new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization);
+        account = mock(ObjectProvider.class);
+        ledger = mock(QuotaLedger.class);
+        source = mock(ObjectProvider.class);
+        service = new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger, source);
         httpRequest = mock(HttpServletRequest.class);
     }
 
@@ -218,5 +230,40 @@ class YouTubeSetupServiceTest {
         String text = request.toString();
 
         assertThat(text).doesNotContain("GOCSPX-secret").doesNotContain("pw-1234567890").doesNotContain("pw-0987654321");
+    }
+
+    @Test
+    void checkNamesTheChannelAndQuota() {
+        YouTubeAccount youTubeAccount = mock(YouTubeAccount.class);
+        given(account.getIfAvailable()).willReturn(youTubeAccount);
+        given(youTubeAccount.refreshChannel()).willReturn("Andre at Home");
+        given(ledger.usage()).willReturn(new QuotaLedger.Usage(LocalDate.of(2026, 9, 16), 212, 10000, 0, 20,
+                Map.of(), ZonedDateTime.now(ZoneId.of("Europe/Berlin"))));
+
+        String result = service.check();
+
+        assertThat(result).isEqualTo("Connected as Andre at Home. 212 of 10000 quota units used today.");
+    }
+
+    @Test
+    void refreshChannelStoresTitleAndId() throws IOException {
+        try (FakeGoogleServer fake = new FakeGoogleServer()) {
+            fake.respondWhen("GET", "/youtube/v3/channels", r -> "true".equals(r.query().get("mine")),
+                    FakeGoogleServer.Canned.fixture(200, "channels-mine.json"));
+            QuotaLedger realLedger = new QuotaLedger(tempDir.resolve("account-quota.json"),
+                    MutableClock.at(Instant.parse("2026-09-16T10:00:00Z")), 10000, 20);
+            GoogleTokens accountTokens = mock(GoogleTokens.class);
+            given(accountTokens.accessToken()).willReturn("ya29.a");
+            YouTubeApiClient api = new YouTubeApiClient(new YouTubeHttp(fake.properties()),
+                    URI.create(fake.base() + "/youtube/v3"), accountTokens, realLedger);
+            YouTubeAccount youTubeAccount = new YouTubeAccount(api, service);
+
+            String title = youTubeAccount.refreshChannel();
+
+            assertThat(title).isEqualTo("Andre at Home");
+            assertThat(service.settings().channelId()).isEqualTo("UC4fixtureHomeControl00a");
+            assertThat(service.settings().channelTitle()).isEqualTo("Andre at Home");
+            assertThat(realLedger.usage().calls()).isEqualTo(Map.of("channels.list", 1));
+        }
     }
 }
