@@ -166,6 +166,22 @@ class SsdpDiscoveryTest {
     }
 
     @Test
+    void garbageDatagramsAreIgnored() throws Exception {
+        discovery.watch(LG_TARGET);
+
+        responder.sendGarbage(discovery.listenPort());
+        Thread.sleep(300);
+        assertThat(discovery.services(LG_TARGET)).isEmpty();
+
+        String alive = "NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: " + LG_TARGET + "\r\nNTS: ssdp:alive\r\n"
+                + "USN: uuid:after-garbage::" + LG_TARGET + "\r\nCACHE-CONTROL: max-age=120\r\n\r\n";
+        sendUdp(alive);
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                assertThat(discovery.services(LG_TARGET)).extracting(SsdpService::usn)
+                        .containsExactly("uuid:after-garbage::" + LG_TARGET));
+    }
+
+    @Test
     void expiresAServiceAfterItsMaxAge() throws IOException {
         responder.answer(LG_TARGET, FakeSsdpResponder.fixture("lg-search-response.txt", "127.0.0.1", httpPort()));
         discovery.watch(LG_TARGET);

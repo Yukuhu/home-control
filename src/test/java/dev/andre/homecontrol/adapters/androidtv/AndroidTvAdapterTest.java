@@ -39,6 +39,15 @@ class AndroidTvAdapterTest {
     }
 
     @Test
+    void reportsTheForegroundAppLive() {
+        Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", 6466, null, Instant.now());
+
+        assertThat(adapter(new CertificateStore(properties().keystoreFile(), "shield".toCharArray()))
+                .foregroundAppReporting(device))
+                .isEqualTo(dev.andre.homecontrol.core.ForegroundAppReporting.LIVE);
+    }
+
+    @Test
     void declaresRemoteKeysPowerVolumeAndAppLink() {
         Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", 6466, null, Instant.now());
 

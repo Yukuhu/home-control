@@ -2,6 +2,7 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
 import dev.andre.homecontrol.adapters.androidtv.PairingService;
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DiscoveredDevice;
@@ -16,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.file.AccessDeniedException;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,6 +103,25 @@ class SetupControllerTest {
                 .andExpect(content().string(containsString("Kitchen speaker")))
                 .andExpect(content().string(containsString("action=\"/setup/add\"")))
                 .andExpect(content().string(containsString("value=\"8009\"")));
+    }
+
+    @Test
+    void offersTheDeepLinkTestOnlyForDevicesThatOpenAppLinks() throws Exception {
+        given(devices.devices()).willReturn(List.of(
+                new Device("lg", "LG TV", DeviceKind.WEBOS, "10.0.0.60", Map.of("webos", Map.of()), Instant.now()),
+                new Device("speaker", "Speaker", DeviceKind.CAST, "10.0.0.9", Map.of("cast", Map.of()), Instant.now())));
+        given(devices.capabilities("lg")).willReturn(EnumSet.of(Capability.APP_LINK));
+        given(devices.capabilities("speaker")).willReturn(EnumSet.of(Capability.VOLUME));
+
+        mockMvc.perform(get("/setup"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/setup/devices/lg/deep-link-test")))
+                .andExpect(content().string(containsString("hx-target=\"next .deep-link-output\"")))
+                .andExpect(content().string(containsString("htmx.min.js")))
+                .andExpect(content().string(containsString("<div class=\"deep-link-output\"")))
+                .andExpect(content().string(containsString("hx-on::response-error")))
+                .andExpect(content().string(containsString("Takes up to 10 seconds")))
+                .andExpect(content().string(not(containsString("/setup/devices/speaker/deep-link-test"))));
     }
 
     @Test

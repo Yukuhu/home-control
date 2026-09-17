@@ -40,6 +40,16 @@ public class FakeSsdpResponder implements AutoCloseable {
         responses.remove(searchTarget);
     }
 
+    /** Datagrams no SSDP parser should accept: not SSDP at all, and a response without a USN. */
+    public void sendGarbage(int port) throws IOException {
+        InetSocketAddress target = new InetSocketAddress(InetAddress.getLoopbackAddress(), port);
+        for (String text : new String[]{" not ssdp",
+                "HTTP/1.1 200 OK\r\nST: urn:lge-com:service:webos-second-screen:1\r\n\r\n"}) {
+            byte[] bytes = text.getBytes(StandardCharsets.US_ASCII);
+            socket.send(new DatagramPacket(bytes, bytes.length, target));
+        }
+    }
+
     /** Loads a fixture, fills in {@code {host}} / {@code {port}}, and normalises to CRLF. */
     public static String fixture(String name, String host, int port) throws IOException {
         return Files.readString(Path.of("src/test/resources/fixtures/ssdp/" + name))

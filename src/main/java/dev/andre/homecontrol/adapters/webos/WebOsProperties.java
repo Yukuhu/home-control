@@ -5,13 +5,15 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
  * {@code home-control.webos.*}. {@code wakeGraceSeconds}: after a Wake-on-LAN packet, how long the
- * TV gets before the first reconnect. A bad value fails startup instead of surfacing later as a
- * busy reconnect loop.
+ * TV gets before the first reconnect. {@code livenessIntervalSeconds}: how often a connected TV is
+ * asked a cheap question; no answer within the request timeout means the connection is lost.
+ * A bad value fails startup instead of surfacing later as a busy reconnect loop.
  */
 @ConfigurationProperties("home-control.webos")
 @Validated
@@ -23,13 +25,23 @@ public record WebOsProperties(@DefaultValue("true") boolean enabled,
                               @DefaultValue("60") @Positive int pairingTimeoutSeconds,
                               @DefaultValue("1") @Positive int reconnectInitialDelaySeconds,
                               @DefaultValue("30") @Positive int reconnectMaxDelaySeconds,
-                              @DefaultValue("3") @PositiveOrZero int wakeGraceSeconds) {
+                              @DefaultValue("3") @PositiveOrZero int wakeGraceSeconds,
+                              @DefaultValue("30") @Positive int livenessIntervalSeconds) {
 
+    @ConstructorBinding
     public WebOsProperties {
         if (reconnectMaxDelaySeconds < reconnectInitialDelaySeconds) {
             throw new IllegalArgumentException("home-control.webos.reconnect-max-delay-seconds (" + reconnectMaxDelaySeconds
                     + ") must not be less than home-control.webos.reconnect-initial-delay-seconds ("
                     + reconnectInitialDelaySeconds + ")");
         }
+    }
+
+    /** Everything but the liveness interval, which then is the 30-second default. */
+    public WebOsProperties(boolean enabled, int port, int securePort, int connectTimeoutSeconds, int requestTimeoutSeconds,
+                           int pairingTimeoutSeconds, int reconnectInitialDelaySeconds, int reconnectMaxDelaySeconds,
+                           int wakeGraceSeconds) {
+        this(enabled, port, securePort, connectTimeoutSeconds, requestTimeoutSeconds, pairingTimeoutSeconds,
+                reconnectInitialDelaySeconds, reconnectMaxDelaySeconds, wakeGraceSeconds, 30);
     }
 }

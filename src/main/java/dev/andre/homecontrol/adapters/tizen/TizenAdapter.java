@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.tizen;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
@@ -60,6 +61,12 @@ public class TizenAdapter implements WakeOnLanAdapter {
     @Override
     public DeviceKind kind() {
         return DeviceKind.TIZEN;
+    }
+
+    /** Polled from the REST applications endpoint, and only for YouTube, Netflix and Prime Video. */
+    @Override
+    public ForegroundAppReporting foregroundAppReporting(Device device) {
+        return ForegroundAppReporting.POLLED;
     }
 
     @Override

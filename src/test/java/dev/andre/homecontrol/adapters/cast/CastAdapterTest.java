@@ -79,6 +79,12 @@ class CastAdapterTest {
     }
 
     @Test
+    void reportsTheForegroundAppLive() {
+        assertThat(adapter.foregroundAppReporting(CastSessionTest.device(8009)))
+                .isEqualTo(dev.andre.homecontrol.core.ForegroundAppReporting.LIVE);
+    }
+
+    @Test
     void declaresCastReceiverAndVolume() {
         assertThat(adapter.capabilities(CastSessionTest.device(8009)))
                 .containsExactlyInAnyOrder(Capability.CAST_RECEIVER, Capability.VOLUME);

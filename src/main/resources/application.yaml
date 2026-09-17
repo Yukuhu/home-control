@@ -42,6 +42,8 @@ home-control:
     reconnect-max-delay-seconds: 30
     # After a Wake-on-LAN packet, how long the TV gets before the first reconnect.
     wake-grace-seconds: 3
+    # SSAP has no heartbeat: a connected TV is asked a cheap question this often; silence means it is gone.
+    liveness-interval-seconds: 30
   tizen:
     enabled: true
     # Remote-control WebSocket (TLS, self-signed), REST API and DIAL.
@@ -56,6 +58,10 @@ home-control:
     # Samsung pushes no state: power and the app in front are polled.
     poll-interval-seconds: 5
     wake-grace-seconds: 3
+  deep-link-test:
+    # Blender Foundation's "Big Buck Bunny": long-lived and region-free.
+    youtube-url: https://www.youtube.com/watch?v=aqz-KE-bpKQ
+    timeout: 10s
   wake-on-lan:
     # Use the subnet broadcast (e.g. 192.168.1.255) if the host has several networks.
     broadcast-address: 255.255.255.255

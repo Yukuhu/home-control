@@ -144,6 +144,33 @@ class SsapConnectionTest {
     }
 
     @Test
+    void garbageFromTheTvIsIgnored() throws IOException {
+        SsapConnection opened = open();
+        opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
+
+        server.sendRaw("not json");
+        server.sendRaw("{\"type\":\"response\",\"id\":\"nobody\"}");
+
+        assertThat(opened.request(SsapUris.SYSTEM_INFO, SsapMessages.empty()).path("modelName").asString(""))
+                .isEqualTo("OLED55C9PLA");
+    }
+
+    @Test
+    void anUnansweredRequestTimesOutAsSuch() throws IOException {
+        SsapConnection opened = open();
+        opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
+        server.ignoreRequests(SsapUris.SET_VOLUME);
+        long started = System.nanoTime();
+
+        assertThatThrownBy(() -> opened.request(SsapUris.SET_VOLUME, SsapMessages.empty().put("volume", 5)))
+                .isInstanceOf(SsapTimeoutException.class);
+
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isBetween(Duration.ofMillis(1800), Duration.ofSeconds(4));
+        assertThat(opened.request(SsapUris.SYSTEM_INFO, SsapMessages.empty()).path("modelName").asString(""))
+                .isEqualTo("OLED55C9PLA");
+    }
+
+    @Test
     void anErrorAnswerIsAnSsapException() throws IOException {
         SsapConnection opened = open();
         opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));

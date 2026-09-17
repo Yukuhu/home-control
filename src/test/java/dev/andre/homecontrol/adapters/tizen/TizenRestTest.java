@@ -67,6 +67,15 @@ class TizenRestTest {
     }
 
     @Test
+    void anOversizedBodyIsRefusedButOneJustUnderTheCapIsRead() {
+        fake.setDeviceInfoPadding(TizenRest.MAX_BODY_BYTES + 10);
+        assertThat(rest.deviceInfo("127.0.0.1")).isEmpty();
+
+        fake.setDeviceInfoPadding(TizenRest.MAX_BODY_BYTES - 4096);
+        assertThat(rest.deviceInfo("127.0.0.1")).isPresent();
+    }
+
+    @Test
     void appVisibilityComesFromTheApplicationsEndpoint() {
         fake.setVisible(FakeTizenServer.YOUTUBE, true);
 

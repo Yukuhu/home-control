@@ -4,6 +4,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -15,6 +16,9 @@ import java.util.Optional;
 
 /** The TV's REST API on 8001. Every failure is "no answer": the TV may be off or the model may lack the endpoint. */
 final class TizenRest {
+
+    /** The device info is a few KiB; anything past this is refused unread. */
+    static final int MAX_BODY_BYTES = 1024 * 1024;
 
     private final HttpClient http;
     private final TizenProperties properties;
@@ -49,8 +53,17 @@ final class TizenRest {
                 .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
                 .GET().build();
         try {
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            return response.statusCode() == 200 ? Optional.of(TizenMessages.JSON.readTree(response.body())) : Optional.empty();
+            HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream body = response.body()) {
+                if (response.statusCode() != 200) {
+                    return Optional.empty();
+                }
+                byte[] bytes = body.readNBytes(MAX_BODY_BYTES + 1);
+                if (bytes.length > MAX_BODY_BYTES) {
+                    return Optional.empty(); // not a TV's small JSON; never read it into memory
+                }
+                return Optional.of(TizenMessages.JSON.readTree(bytes));
+            }
         } catch (IOException | JacksonException e) {
             return Optional.empty();
         } catch (InterruptedException e) {

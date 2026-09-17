@@ -43,12 +43,14 @@ public class FakeTizenServer implements AutoCloseable {
     private final BlockingQueue<String> launches = new LinkedBlockingQueue<>();
     private final BlockingQueue<String> dialBodies = new LinkedBlockingQueue<>();
     private final List<String> queries = new CopyOnWriteArrayList<>();
+    private final List<FakeWebSocketServer.Connection> openConnections = new CopyOnWriteArrayList<>();
     private final Map<String, Boolean> visible = new ConcurrentHashMap<>(Map.of(YOUTUBE, false, NETFLIX, false));
     private volatile Authorization authorization = Authorization.ALLOW;
     private volatile String powerState = "on";
     private volatile boolean restAvailable = true;
     private volatile boolean dialAvailable = true;
     private volatile boolean issueTokens = true;
+    private volatile int deviceInfoPadding;
 
     public FakeTizenServer() throws IOException {
         remote = FakeWebSocketServer.tls(new FakeWebSocketServer.Handler() {
@@ -105,6 +107,11 @@ public class FakeTizenServer implements AutoCloseable {
         issueTokens = issue;
     }
 
+    /** Trailing whitespace after the device info JSON: still valid JSON, but as large as asked. */
+    public void setDeviceInfoPadding(int bytes) {
+        deviceInfoPadding = bytes;
+    }
+
     public void setVisible(String appId, boolean isVisible) {
         visible.put(appId, isVisible);
     }
@@ -142,7 +149,13 @@ public class FakeTizenServer implements AutoCloseable {
         return dialBodies.poll(5, TimeUnit.SECONDS);
     }
 
+    /** Sends {@code text} as-is on every connection opened so far (closed ones fail silently). */
+    public void sendRaw(String text) {
+        openConnections.forEach(connection -> connection.send(text));
+    }
+
     private void open(FakeWebSocketServer.Connection connection) {
+        openConnections.add(connection);
         queries.add(connection.query() == null ? "" : connection.query());
         // Real sets chatter before answering; the client must skip this.
         connection.send("{\"event\":\"ed.edenTV.update\",\"data\":{\"update_type\":\"ed.edenApp.update\"}}");
@@ -193,7 +206,8 @@ public class FakeTizenServer implements AutoCloseable {
         String path = exchange.getRequestURI().getPath();
         if (path.equals("/api/v2/")) {
             respond(exchange, 200, fixture("device-info.json")
-                    .replace("\"PowerState\":\"on\"", "\"PowerState\":\"" + powerState + "\""));
+                    .replace("\"PowerState\":\"on\"", "\"PowerState\":\"" + powerState + "\"")
+                    + " ".repeat(deviceInfoPadding));
         } else if (path.startsWith("/api/v2/applications/")) {
             String appId = path.substring("/api/v2/applications/".length());
             Boolean isVisible = visible.get(appId);

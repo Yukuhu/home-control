@@ -98,6 +98,12 @@ class WebOsAdapterTest {
     }
 
     @Test
+    void reportsTheForegroundAppLive() throws IOException {
+        assertThat(adapter(notStarted(), properties(1)).foregroundAppReporting(device()))
+                .isEqualTo(dev.andre.homecontrol.core.ForegroundAppReporting.LIVE);
+    }
+
+    @Test
     void connectReturnsAStartedSession() throws Exception {
         WebOsAdapter adapter = adapter(notStarted(), properties(1));
         DeviceHandle handle = adapter.connect(device(), state -> { });

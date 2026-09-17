@@ -8,10 +8,12 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,20 +36,46 @@ public class FakeSsapServer implements AutoCloseable {
     private final BlockingQueue<String> buttons = new LinkedBlockingQueue<>();
     private final Map<String, Subscription> subscriptions = new ConcurrentHashMap<>();
     private final AtomicInteger registrations = new AtomicInteger();
+    private final Set<String> ignored = ConcurrentHashMap.newKeySet();
+    private final List<FakeWebSocketServer.Connection> mainConnections = new CopyOnWriteArrayList<>();
     private volatile Prompt prompt = Prompt.ACCEPT;
     private volatile String foregroundApp = "com.webos.app.home";
     private volatile int volume = 12;
     private volatile boolean muted;
 
     public FakeSsapServer(boolean tls) throws IOException {
-        FakeWebSocketServer.Handler handler = (connection, text) -> {
-            if (POINTER_PATH.equals(connection.path())) {
-                buttons.add(text);
-            } else {
-                onMain(connection, text);
+        FakeWebSocketServer.Handler handler = new FakeWebSocketServer.Handler() {
+            @Override
+            public void onOpen(FakeWebSocketServer.Connection connection) {
+                if (!POINTER_PATH.equals(connection.path())) {
+                    mainConnections.add(connection);
+                }
+            }
+
+            @Override
+            public void onText(FakeWebSocketServer.Connection connection, String text) {
+                if (POINTER_PATH.equals(connection.path())) {
+                    buttons.add(text);
+                } else {
+                    onMain(connection, text);
+                }
             }
         };
         server = tls ? FakeWebSocketServer.tls(handler) : FakeWebSocketServer.plain(handler);
+    }
+
+    /** Requests for {@code uri} are still recorded but never answered: a TV that hangs on one service. */
+    public void ignoreRequests(String uri) {
+        ignored.add(uri);
+    }
+
+    public void answerRequests(String uri) {
+        ignored.remove(uri);
+    }
+
+    /** Sends {@code text} as-is on every main connection opened so far (closed ones fail silently). */
+    public void sendRaw(String text) {
+        mainConnections.forEach(connection -> connection.send(text));
     }
 
     public int port() {
@@ -116,6 +144,9 @@ public class FakeSsapServer implements AutoCloseable {
         String uri = message.path("uri").asString("");
         if (type.equals("subscribe")) {
             subscriptions.put(uri, new Subscription(connection, id));
+        }
+        if (ignored.contains(uri)) {
+            return;
         }
         respond(connection, id, uri, message.path("payload"));
     }

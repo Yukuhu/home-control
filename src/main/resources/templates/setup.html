@@ -13,6 +13,7 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <title>Home Control · Setup</title>
     <link rel="stylesheet" th:href="@{/app.css}">
+    <script th:src="@{/vendor/htmx.min.js}" defer></script>
 </head>
 <body>
 <header>
@@ -99,6 +100,15 @@
                     <span th:text="${device.name()} + ' at ' + ${device.host()}">Shield</span>
                     <button type="submit">Forget</button>
                 </form>
+                <th:block th:if="${deepLinkTestable.contains(device.id())}">
+                    <button type="button" hx-swap="innerHTML" hx-target="next .deep-link-output"
+                            th:attr="hx-post=@{/setup/devices/{id}/deep-link-test(id=${device.id()})}"
+                            hx-on::response-error="this.nextElementSibling.textContent = event.detail.xhr.responseText || 'The test could not run'"
+                            hx-on::send-error="this.nextElementSibling.textContent = 'Cannot reach the server'">Test deep link</button>
+                    <div class="deep-link-output" aria-live="polite"></div>
+                    <p class="hint" th:text="|Opens a YouTube test video on the device and reports what the device told us. Takes up to ${deepLinkTestSeconds} seconds; the device must be on.|">Opens a YouTube test video on the device and reports what the device told us.
+                        Takes up to 10 seconds; the device must be on.</p>
+                </th:block>
                 <form method="post" th:if="${wakeMacs.containsKey(device.id())}"
                       th:action="@{/setup/devices/{id}/mac(id=${device.id()})}">
                     <label>Wake-on-LAN MAC

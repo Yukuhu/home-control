@@ -95,6 +95,12 @@ class TizenAdapterTest {
     }
 
     @Test
+    void pollsTheForegroundApp() {
+        assertThat(adapter(notStarted(), properties(1)).foregroundAppReporting(device()))
+                .isEqualTo(dev.andre.homecontrol.core.ForegroundAppReporting.POLLED);
+    }
+
+    @Test
     void listsSamsungTvsTheSharedListenerFound() throws Exception {
         HttpServer http = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         http.createContext("/samsung/description.xml", exchange -> {
