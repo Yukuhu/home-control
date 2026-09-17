@@ -111,7 +111,7 @@ public final class AppLinks {
     }
 
     /** Host-based detection; the service key drives the route description and later per-platform link builders. */
-    static String serviceOf(String host, String path) {
+    public static String serviceOf(String host, String path) {
         if (isOrUnder(host, "youtube.com") || host.equals("youtu.be")) {
             return "youtube";
         }

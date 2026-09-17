@@ -34,6 +34,14 @@ public sealed interface Action {
         }
     }
 
+    /** Switch a TV to an input its handle listed through {@link InputListing}. */
+    record SelectInput(String inputId) implements Action {
+        @Override
+        public Capability requires() {
+            return Capability.REMOTE_KEYS;
+        }
+    }
+
     /** Absolute volume as a percentage of the device's range. */
     record SetVolume(int level) implements Action {
         public SetVolume {

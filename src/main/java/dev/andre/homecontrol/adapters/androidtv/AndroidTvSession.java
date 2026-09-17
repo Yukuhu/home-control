@@ -121,6 +121,8 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
                     "Android TV Remote v2 cannot load Cast media");
             case Action.CastMessage ignored -> throw new UnsupportedActionException(
                     "Android TV Remote v2 cannot run Cast receiver apps");
+            case Action.SelectInput ignored -> throw new UnsupportedActionException(
+                    "Android TV does not list its inputs; switch inputs from the Home screen");
         }
     }
 

@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.core;
 
 import java.time.Instant;
+import java.util.Objects;
 
 /** Last known state of one device. {@code nowPlaying} is null when nothing plays or the adapter cannot tell. */
 public record DeviceState(DeviceStatus status, boolean powerOn, String currentApp,
@@ -18,6 +19,14 @@ public record DeviceState(DeviceStatus status, boolean powerOn, String currentAp
 
     public static DeviceState unpaired() {
         return new DeviceState(DeviceStatus.UNPAIRED, false, null, 0, 0, false, Instant.now());
+    }
+
+    /** Equal in everything the UI shows; {@code updatedAt} is ignored so polling adapters publish only real changes. */
+    public boolean sameIgnoringTime(DeviceState other) {
+        return other != null && status == other.status && powerOn == other.powerOn
+                && Objects.equals(currentApp, other.currentApp)
+                && volumeLevel == other.volumeLevel && volumeMax == other.volumeMax && muted == other.muted
+                && Objects.equals(nowPlaying, other.nowPlaying);
     }
 
     public boolean connected() {
