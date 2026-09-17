@@ -89,6 +89,38 @@ public class WebOsSession implements DeviceHandle, InputListing {
 
     void start() {
         onScheduler(this::connect);
+        long interval = properties.livenessIntervalSeconds();
+        try {
+            scheduler.scheduleWithFixedDelay(this::checkLiveness, interval, interval, TimeUnit.SECONDS);
+        } catch (RejectedExecutionException e) {
+            // Closed before it started.
+        }
+    }
+
+    /**
+     * SSAP has no heartbeat and the JDK WebSocket does not ping, so a TV that lost power without
+     * closing TCP would stay CONNECTED forever. A cheap request every {@code livenessIntervalSeconds}
+     * settles it: any answer (even an error) proves the TV is there; silence past the request
+     * timeout means the connection is gone. Runs on the scheduler thread, so it never races
+     * {@link #connect} or {@link #lost}.
+     */
+    private void checkLiveness() {
+        SsapConnection current = connection;
+        if (current == null || closed) {
+            return;
+        }
+        try {
+            current.request(SsapUris.SYSTEM_INFO, SsapMessages.empty());
+        } catch (SsapTimeoutException e) {
+            lost(current, "no answer to the liveness check");
+        } catch (SsapException e) {
+            // The TV answered; it is alive even if it refuses this request.
+        } catch (IOException e) {
+            lost(current, e.getMessage());
+        } catch (RuntimeException e) {
+            // Never let an exception cancel the fixed-delay schedule.
+            log.warn("Checking the connection to {} failed", device.name(), e);
+        }
     }
 
     String host() {
@@ -159,6 +191,8 @@ public class WebOsSession implements DeviceHandle, InputListing {
         SsapConnection current = requireConnected();
         try {
             current.button(name);
+        } catch (SsapTimeoutException e) {
+            throw new ActionFailedException(device.name() + " did not answer in time when asked to press " + name);
         } catch (SsapException e) {
             throw new ActionFailedException(device.name() + " refused the " + name + " button: " + e.getMessage());
         } catch (IOException e) {
@@ -170,6 +204,10 @@ public class WebOsSession implements DeviceHandle, InputListing {
         SsapConnection current = requireConnected();
         try {
             current.request(uri, payload);
+        } catch (SsapTimeoutException e) {
+            // Reachable but silent is a refusal (502), not an offline device; the liveness check
+            // decides separately whether the whole connection is gone.
+            throw new ActionFailedException(device.name() + " did not answer in time when asked to " + what);
         } catch (SsapException e) {
             throw new ActionFailedException(device.name() + " could not " + what + ": " + e.getMessage());
         } catch (IOException e) {

@@ -11,6 +11,7 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DiscoveredDevice;
+import dev.andre.homecontrol.core.ForegroundAppReporting;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
 
@@ -57,6 +58,12 @@ public class AndroidTvAdapter implements DeviceAdapter {
     @Override
     public boolean credentialsBoundToDeviceId() {
         return true;
+    }
+
+    /** The Remote v2 protocol pushes the current app package. */
+    @Override
+    public ForegroundAppReporting foregroundAppReporting(Device device) {
+        return ForegroundAppReporting.LIVE;
     }
 
     @Override

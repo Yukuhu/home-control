@@ -35,6 +35,11 @@ public interface DeviceAdapter {
         return connect(device, onChange);
     }
 
+    /** Whether and how this adapter reports the foreground app; the deep-link test words its answer by it. */
+    default ForegroundAppReporting foregroundAppReporting(Device device) {
+        return ForegroundAppReporting.NONE;
+    }
+
     /** Removes credentials this adapter stored for the device. Default: nothing to remove. */
     default void forget(Device device) {
     }

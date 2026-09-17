@@ -67,6 +67,47 @@ class TextWebSocketTest {
     }
 
     @Test
+    void aMessageOverTheCapClosesTheConnectionAsAProtocolError() throws Exception {
+        try (TextWebSocket socket = connect()) {
+            socket.send("x".repeat(TextWebSocket.MAX_MESSAGE_CHARS + 1));
+
+            assertThat(closes.poll(5, TimeUnit.SECONDS)).contains("larger than");
+            assertThat(texts.poll(500, TimeUnit.MILLISECONDS)).isNull();
+            assertThat(closes.poll(500, TimeUnit.MILLISECONDS)).isNull();
+            assertThat(socket.isOpen()).isFalse();
+        }
+    }
+
+    @Test
+    void aMessageAtTheCapIsDelivered() throws Exception {
+        try (TextWebSocket socket = connect()) {
+            socket.send("x".repeat(TextWebSocket.MAX_MESSAGE_CHARS));
+
+            assertThat(texts.poll(5, TimeUnit.SECONDS)).hasSize(TextWebSocket.MAX_MESSAGE_CHARS);
+        }
+    }
+
+    @Test
+    void aSocketThatOpensAfterTheTimeoutIsAborted() throws Exception {
+        java.util.concurrent.CompletableFuture<java.net.http.WebSocket> opening = new java.util.concurrent.CompletableFuture<>();
+        java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicBoolean aborted = new java.util.concurrent.atomic.AtomicBoolean();
+        java.net.http.WebSocket late = (java.net.http.WebSocket) java.lang.reflect.Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{java.net.http.WebSocket.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("abort")) {
+                        aborted.set(true);
+                    }
+                    return null;
+                });
+
+        TextWebSocket.abandon(opening, closed);
+        opening.complete(late);
+
+        assertThat(aborted).isTrue();
+        assertThat(closed).isTrue();
+    }
+
+    @Test
     void reportsTheServerDroppingTheConnectionOnce() throws Exception {
         try (TextWebSocket socket = connect()) {
             server.dropAll();

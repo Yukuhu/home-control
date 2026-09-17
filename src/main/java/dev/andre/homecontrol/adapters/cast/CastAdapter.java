@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.cast;
 
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceHandle;
@@ -36,6 +37,12 @@ public class CastAdapter implements DeviceAdapter {
     @Override
     public DeviceKind kind() {
         return DeviceKind.CAST;
+    }
+
+    /** Receiver status pushes the running app. */
+    @Override
+    public ForegroundAppReporting foregroundAppReporting(Device device) {
+        return ForegroundAppReporting.LIVE;
     }
 
     @Override

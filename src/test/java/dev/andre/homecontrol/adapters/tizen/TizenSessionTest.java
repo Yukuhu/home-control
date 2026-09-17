@@ -134,6 +134,19 @@ class TizenSessionTest {
     }
 
     @Test
+    void errorsAndNoiseFromTheTvAreIgnored() throws Exception {
+        start(PAIRED);
+        connected();
+
+        tv.sendRaw("{\"event\":\"ms.error\",\"data\":{\"message\":\"unrecognized method value\"}}");
+        tv.sendRaw("garbage");
+        session.execute(new Action.PressKey(RemoteKey.HOME));
+
+        assertThat(tv.nextKey()).isEqualTo("KEY_HOME");
+        assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
+    }
+
+    @Test
     void playPauseAlternatesPauseAndPlay() throws Exception {
         start(PAIRED);
         connected();

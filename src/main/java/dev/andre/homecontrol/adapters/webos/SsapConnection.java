@@ -188,7 +188,7 @@ final class SsapConnection implements AutoCloseable {
             socket.send(SsapMessages.command(id, type, uri, payload));
             return answer.get(requestTimeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
-            throw new IOException("No answer from the TV to " + uri + " within " + requestTimeout.toSeconds() + " seconds");
+            throw new SsapTimeoutException("No answer from the TV to " + uri + " within " + requestTimeout.toSeconds() + " seconds");
         } catch (ExecutionException e) {
             throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause());
         } catch (InterruptedException e) {

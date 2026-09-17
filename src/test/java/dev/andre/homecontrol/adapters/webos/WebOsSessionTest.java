@@ -5,6 +5,7 @@ import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -336,6 +337,58 @@ class WebOsSessionTest {
         session.reconnectNow();
         Thread.sleep(500);
         assertThat(tv.connections()).isEqualTo(connections);
+    }
+
+    @Test
+    void aTvThatStopsAnsweringFailsTheCommandButStaysConnected() throws Exception {
+        started();
+        connected();
+        tv.ignoreRequests(SsapUris.LAUNCH);
+
+        assertThatThrownBy(() -> session.execute(new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ"))))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessageContaining("did not answer in time");
+        assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
+    }
+
+    @Test
+    void aConnectionThatAnswersNothingIsDetectedByTheLivenessCheckAndReopened() throws Exception {
+        Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1",
+                Map.of("webos", Map.of("clientKey", FakeSsapServer.CLIENT_KEY)), Instant.now());
+        registry.save(device);
+        WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 1, 2, 1, 2, 0, 1);
+        session = new WebOsSession(device, properties, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
+                learned(), new WakeOnLan(receiver.address()), states::add, () -> { });
+        session.start();
+        connected();
+        int connections = tv.connections();
+
+        tv.ignoreRequests(SsapUris.SYSTEM_INFO);
+
+        await().atMost(Duration.ofSeconds(6)).until(() -> states.stream()
+                .anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED));
+        tv.answerRequests(SsapUris.SYSTEM_INFO);
+        connected();
+        assertThat(tv.connections()).isGreaterThan(connections);
+    }
+
+    @Test
+    void aLivenessCheckTheTvAnswersKeepsTheConnection() throws Exception {
+        Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1",
+                Map.of("webos", Map.of("clientKey", FakeSsapServer.CLIENT_KEY)), Instant.now());
+        registry.save(device);
+        WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 1, 2, 1, 2, 0, 1);
+        session = new WebOsSession(device, properties, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
+                learned(), new WakeOnLan(receiver.address()), states::add, () -> { });
+        session.start();
+        connected();
+        int connections = tv.connections();
+
+        assertThat(tv.nextRequest(SsapUris.SYSTEM_INFO)).isNotNull();
+        Thread.sleep(2500);
+
+        assertThat(tv.connections()).isEqualTo(connections);
+        assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
     }
 
     @Test

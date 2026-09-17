@@ -19,6 +19,7 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
+import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.InputListing;
 import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.core.RemoteKey;
@@ -439,6 +440,33 @@ class DeviceManagerTest {
             assertThat(manager.inputs("tv")).isEqualTo(hdmi);
             assertThat(manager.inputs("box")).isEmpty();
             assertThat(manager.inputs("nope")).isEmpty();
+        }
+    }
+
+    /** A stub adapter that reports the foreground app the given way. */
+    private static StubAdapter reporting(String id, ForegroundAppReporting how) {
+        return new StubAdapter(id, DeviceKind.UPNP, false, false, Capability.APP_LINK) {
+            @Override
+            public ForegroundAppReporting foregroundAppReporting(Device device) {
+                return how;
+            }
+        };
+    }
+
+    @Test
+    void foregroundAppReportingIsTheBestOfTheDevicesAdapters() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        registry.save(new Device("tv", "TV", DeviceKind.TIZEN, "10.0.0.60",
+                orderedAdapters("none", Map.of(), "polled", Map.of()), Instant.now()));
+        registry.save(new Device("box", "Box", DeviceKind.ANDROID_TV, "10.0.0.61",
+                orderedAdapters("polled", Map.of(), "live", Map.of()), Instant.now()));
+
+        try (DeviceManager manager = new DeviceManager(registry, List.of(reporting("none", ForegroundAppReporting.NONE),
+                reporting("polled", ForegroundAppReporting.POLLED), reporting("live", ForegroundAppReporting.LIVE)),
+                publisher)) {
+            assertThat(manager.foregroundAppReporting("tv")).isEqualTo(ForegroundAppReporting.POLLED);
+            assertThat(manager.foregroundAppReporting("box")).isEqualTo(ForegroundAppReporting.LIVE);
+            assertThat(manager.foregroundAppReporting("nope")).isEqualTo(ForegroundAppReporting.NONE);
         }
     }
 

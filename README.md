@@ -137,6 +137,58 @@ no pairing.
 - Switch the whole Cast module off with `HOME_CONTROL_CAST_ENABLED=false`. Timings live under
   `home-control.cast.*` in `application.yaml`.
 
+## Smart TVs (LG webOS, Samsung Tizen)
+
+LG and Samsung TVs are paired by accepting a request on the TV itself.
+
+- Open **Setup**. TVs found on the network appear under **Devices on this network**; press
+  **Pair**, or enter the TV's address under **Add a smart TV by address**.
+- The TV shows a prompt ("allow Home Control"). Accept it with the TV remote. The setup page
+  waits for your answer — up to 60 seconds for LG, 30 seconds for Samsung — and then opens the
+  dashboard for the new TV. Declining shows "declined" and stores nothing.
+- A TV at the same address as an already registered device (for example its Cast receiver) is
+  added to that device instead of appearing twice.
+
+What works on each brand:
+
+| | LG webOS | Samsung Tizen |
+|---|---|---|
+| Remote keys (d-pad, OK, Back, Home, Menu, media keys) | yes | yes |
+| Volume up / down / mute | yes | yes |
+| Absolute volume slider | yes | no |
+| Inputs (HDMI …) listed in the drawer | yes | no — use the TV's Source button |
+| Power off | yes | yes |
+| Power on | Wake-on-LAN | Wake-on-LAN |
+| YouTube video link | opens that video | opens that video (DIAL) |
+| Netflix title link | opens that title (firmware permitting) | opens the Netflix app only |
+| Prime Video link | opens the app | opens the app, if installed |
+| Other web links | open in the TV browser | refused |
+
+**Switching a TV on.** Power sends a Wake-on-LAN packet. The TV must allow it: on LG enable
+"Turn on via Wi-Fi" or "Mobile TV On"; on Samsung enable "Power On with Mobile" (network
+standby). The TV's MAC address is learned automatically while the TV is on; if it is not, type
+it into the device's **Wake-on-LAN MAC** field on the setup page. On a host with several
+networks set `home-control.wake-on-lan.broadcast-address` to the subnet broadcast
+(e.g. `192.168.1.255`).
+
+**Test deep link.** Each device that opens app links has a **Test deep link** button on the
+setup page. It opens a YouTube test video and reports what the device told us: LG, Android TV
+and Cast report the app in front as it changes; Samsung is polled and only recognises YouTube,
+Netflix and Prime Video (and some models not even those). No device reports *which* video
+plays, so always check the screen.
+
+**Networking.** Discovery uses SSDP (UDP 1900 multicast) and Wake-on-LAN uses UDP broadcasts;
+both need `network_mode: host`. On bridge networking pair by address; switching the TV on may
+not work.
+
+Switch a module off with `HOME_CONTROL_WEBOS_ENABLED=false` or `HOME_CONTROL_TIZEN_ENABLED=false`.
+An LG TV that forgot this server (factory reset, stored key rejected) shows **UNPAIRED**; pair it
+again from **Setup**. A Samsung TV cannot tell "forgot this server" apart from "still booting":
+it simply does not answer, so the device shows **DISCONNECTED**, keeps its pairing and is retried
+at growing intervals of up to 5 minutes — each retry may put the Allow prompt back on the TV
+screen. Only choosing **Deny** on the TV makes a Samsung device **UNPAIRED**. If the prompt keeps
+reappearing, choose Allow once or pair the TV again from **Setup**.
+
 ## Discovery does not work
 
 mDNS is multicast and does not cross a Docker bridge network. Either run with
@@ -235,6 +287,16 @@ sees, or requests will be refused as cross-site.
 | `shield.reconnect-max-delay-seconds` | `60` | Upper bound on reconnect backoff |
 | `HOME_CONTROL_CAST_ENABLED` | `true` | Turn the Cast module off entirely; Android TV devices keep working |
 | `home-control.cast.*` | see `CastProperties` | Cast receiver heartbeat interval, stale timeout, reconnect backoff, and command/load timeouts |
+| `home-control.ssdp.enabled` | `true` | SSDP discovery for smart TVs |
+| `home-control.webos.enabled` | `true` | LG webOS module (`HOME_CONTROL_WEBOS_ENABLED`) |
+| `home-control.webos.pairing-timeout-seconds` | `60` | How long pairing waits for the prompt |
+| `home-control.webos.liveness-interval-seconds` | `30` | How often a connected LG TV is checked; no answer means it is gone |
+| `home-control.tizen.enabled` | `true` | Samsung Tizen module (`HOME_CONTROL_TIZEN_ENABLED`) |
+| `home-control.tizen.client-name` | `Home Control` | Name shown in the Samsung Allow prompt |
+| `home-control.tizen.poll-interval-seconds` | `5` | How often Samsung state is polled |
+| `home-control.wake-on-lan.broadcast-address` | `255.255.255.255` | Use the subnet broadcast on multi-homed hosts |
+| `home-control.deep-link-test.youtube-url` | Big Buck Bunny on YouTube | Video the test button opens |
+| `home-control.deep-link-test.timeout` | `10s` | How long the test button watches for the app to change (the setup page says so) |
 | `HOME_CONTROL_SECRET` | unset | Passphrase that encrypts `secrets.json`; without it a random `secret.key` is created next to it on first use |
 | `HOME_CONTROL_TRUSTED_ORIGINS` | empty | Comma-separated origins allowed to send changes, e.g. `https://home.example.org` behind a reverse proxy; their host names are also allowed |
 | `HOME_CONTROL_ALLOWED_HOSTS` | empty | Comma-separated extra host names the app answers to: exact names, or `*.example.org` for its subdomains |

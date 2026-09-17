@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.PromptPairing;
 import dev.andre.homecontrol.core.PromptPairingResult;
@@ -7,6 +8,7 @@ import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.adapters.androidtv.PairingService;
 import dev.andre.homecontrol.adapters.androidtv.PairingOutcome;
 import dev.andre.homecontrol.storage.StorageException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -18,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,11 +34,18 @@ public class SetupController {
     private final DeviceManager devices;
     private final List<PromptPairing> promptPairings;
 
-    /** {@code promptPairings}: one per enabled smart-TV module; empty when none is. */
-    public SetupController(PairingService pairing, DeviceManager devices, List<PromptPairing> promptPairings) {
+    private final Duration deepLinkTestTimeout;
+
+    /**
+     * {@code promptPairings}: one per enabled smart-TV module; empty when none is.
+     * {@code deepLinkTestTimeout}: shown next to the "Test deep link" button.
+     */
+    public SetupController(PairingService pairing, DeviceManager devices, List<PromptPairing> promptPairings,
+                           @Value("${home-control.deep-link-test.timeout:10s}") Duration deepLinkTestTimeout) {
         this.pairing = pairing;
         this.devices = devices;
         this.promptPairings = List.copyOf(promptPairings);
+        this.deepLinkTestTimeout = deepLinkTestTimeout;
     }
 
     @GetMapping("/setup")
@@ -134,6 +144,11 @@ public class SetupController {
         paired.stream().filter(device -> devices.wakesOnLan(device.id()))
                 .forEach(device -> wakeMacs.put(device.id(), devices.wakeOnLanMac(device.id()).orElse("")));
         model.addAttribute("wakeMacs", wakeMacs);
+        model.addAttribute("deepLinkTestable", paired.stream()
+                .map(Device::id)
+                .filter(id -> devices.capabilities(id).contains(Capability.APP_LINK))
+                .collect(Collectors.toSet()));
+        model.addAttribute("deepLinkTestSeconds", Math.max(1, (deepLinkTestTimeout.toMillis() + 999) / 1000));
     }
 
     @PostMapping("/setup/forget")

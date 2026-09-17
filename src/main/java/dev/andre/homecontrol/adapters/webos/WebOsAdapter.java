@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.webos;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
@@ -64,6 +65,12 @@ public class WebOsAdapter implements WakeOnLanAdapter {
     @Override
     public DeviceKind kind() {
         return DeviceKind.WEBOS;
+    }
+
+    /** The getForegroundAppInfo subscription pushes every change. */
+    @Override
+    public ForegroundAppReporting foregroundAppReporting(Device device) {
+        return ForegroundAppReporting.LIVE;
     }
 
     @Override

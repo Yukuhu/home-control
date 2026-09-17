@@ -14,6 +14,7 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStates;
 import dev.andre.homecontrol.core.DiscoveredDevice;
+import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.InputListing;
 import dev.andre.homecontrol.core.LearnedSettings;
@@ -259,6 +260,17 @@ public class DeviceManager implements AutoCloseable {
                 registry.save(device.withAdapter(adapterId, settings));
             }
         }
+    }
+
+    /** The best foreground-app reporting among the device's adapters; {@code NONE} for an unknown id. */
+    public ForegroundAppReporting foregroundAppReporting(String id) {
+        return registry.findById(id)
+                .flatMap(device -> device.adapters().keySet().stream()
+                        .map(adapters::get)
+                        .filter(Objects::nonNull)
+                        .map(adapter -> adapter.foregroundAppReporting(device))
+                        .min(Comparator.naturalOrder()))
+                .orElse(ForegroundAppReporting.NONE);
     }
 
     /** True when one of the device's adapters can switch it on with Wake-on-LAN. */

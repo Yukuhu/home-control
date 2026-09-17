@@ -6,6 +6,7 @@ import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +27,10 @@ public final class TextWebSocket implements AutoCloseable {
 
         void onClosed(String reason);
     }
+
+    /** Largest reassembled message accepted; a TV that sends more is disconnected as a protocol error. */
+    static final int MAX_MESSAGE_CHARS = 1024 * 1024;
+    private static final int MESSAGE_TOO_BIG = 1009;
 
     private final WebSocket socket;
     private final Duration timeout;
@@ -52,6 +57,20 @@ public final class TextWebSocket implements AutoCloseable {
 
             @Override
             public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+                if (closed.get()) {
+                    return null;
+                }
+                if (partial.length() + data.length() > MAX_MESSAGE_CHARS) {
+                    // A TV's messages are small; a runaway one must not grow the heap. Protocol error.
+                    partial.setLength(0);
+                    if (closed.compareAndSet(false, true)) {
+                        webSocket.sendClose(MESSAGE_TOO_BIG, "")
+                                .orTimeout(1, TimeUnit.SECONDS)
+                                .whenComplete((ignored, error) -> webSocket.abort());
+                        listener.onClosed("the device sent a message larger than " + MAX_MESSAGE_CHARS + " characters");
+                    }
+                    return null;
+                }
                 partial.append(data);
                 if (last) {
                     String text = partial.toString();
@@ -85,21 +104,29 @@ public final class TextWebSocket implements AutoCloseable {
                 }
             }
         };
+        CompletableFuture<WebSocket> opening = client.newWebSocketBuilder()
+                .connectTimeout(timeout)
+                .buildAsync(uri, adapter);
         try {
-            WebSocket socket = client.newWebSocketBuilder()
-                    .connectTimeout(timeout)
-                    .buildAsync(uri, adapter)
-                    .get(timeout.toMillis() * 2, TimeUnit.MILLISECONDS);
+            WebSocket socket = opening.get(timeout.toMillis() * 2, TimeUnit.MILLISECONDS);
             return new TextWebSocket(socket, timeout, closed, listener);
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             throw new IOException("Could not open " + withoutQuery(uri) + ": " + cause.getClass().getSimpleName(), cause);
         } catch (TimeoutException e) {
+            abandon(opening, closed);
             throw new IOException("Timed out opening " + withoutQuery(uri), e);
         } catch (InterruptedException e) {
+            abandon(opening, closed);
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while opening " + withoutQuery(uri), e);
         }
+    }
+
+    /** Nobody will use a socket that finishes opening after we gave up: abort it and stay silent. */
+    static void abandon(CompletableFuture<WebSocket> opening, AtomicBoolean closed) {
+        closed.set(true);
+        opening.thenAccept(WebSocket::abort);
     }
 
     /**
