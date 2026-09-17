@@ -1,0 +1,42 @@
+[
+  {
+    "Name": "Sintel",
+    "ServerId": "4e1a2b3c4d5e4f60718293a4b5c6d7e8",
+    "Id": "d4c3b2a1f0e94837261504a3b2c1d0e9",
+    "RunTimeTicks": 8880000000,
+    "ProductionYear": 2010,
+    "IsFolder": false,
+    "Type": "Movie",
+    "MediaType": "Video",
+    "UserData": { "PlaybackPositionTicks": 0, "PlayCount": 0, "IsFavorite": false, "Played": false, "Key": "d4c3b2a1f0e94837261504a3b2c1d0e9" },
+    "ImageTags": { "Primary": "5117e15117e1" },
+    "BackdropImageTags": []
+  },
+  {
+    "Name": "Pilot",
+    "ServerId": "4e1a2b3c4d5e4f60718293a4b5c6d7e8",
+    "Id": "e5d4c3b2a1f04938271605b4c3d2e1f0",
+    "RunTimeTicks": 26000000000,
+    "IsFolder": false,
+    "IndexNumber": 1,
+    "ParentIndexNumber": 1,
+    "Type": "Episode",
+    "SeriesName": "Harbour Town",
+    "SeriesId": "f6e5d4c3b2a14938271605b4c3d2e1f0",
+    "SeriesPrimaryImageTag": "4a4b4c4d4e4f",
+    "MediaType": "Video",
+    "UserData": { "PlaybackPositionTicks": 0, "PlayCount": 1, "IsFavorite": false, "Played": true, "Key": "f6e5d4c3b2a14938271605b4c3d2e1f0001001" },
+    "ImageTags": { "Primary": "0e0e0e0e0e0e" },
+    "BackdropImageTags": []
+  },
+  {
+    "Name": "Harbour Town",
+    "ServerId": "4e1a2b3c4d5e4f60718293a4b5c6d7e8",
+    "Id": "f6e5d4c3b2a14938271605b4c3d2e1f0",
+    "IsFolder": true,
+    "Type": "Series",
+    "ChildCount": 1,
+    "UserData": { "UnplayedItemCount": 0, "PlaybackPositionTicks": 0, "PlayCount": 0, "IsFavorite": false, "Played": false, "Key": "f6e5d4c3b2a14938271605b4c3d2e1f0" },
+    "ImageTags": { "Primary": "4a4b4c4d4e4f" }
+  }
+]

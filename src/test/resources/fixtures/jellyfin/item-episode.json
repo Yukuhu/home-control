@@ -1,0 +1,32 @@
+{
+  "Name": "The Long Night",
+  "ServerId": "4e1a2b3c4d5e4f60718293a4b5c6d7e8",
+  "Id": "3f2a9c1e7b6d4e5f8a9b0c1d2e3f4a5b",
+  "RunTimeTicks": 14400000000,
+  "IsFolder": false,
+  "IndexNumber": 5,
+  "ParentIndexNumber": 2,
+  "Type": "Episode",
+  "SeriesName": "Northern Lights",
+  "SeriesId": "7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a29",
+  "SeasonId": "6b5a4f3e2d1c0b9a8f7e6d5c4b3a2918",
+  "SeriesPrimaryImageTag": "b8a7c6d5e4f3",
+  "SeasonName": "Season 2",
+  "MediaType": "Video",
+  "LocationType": "FileSystem",
+  "Overview": "The lights fail on the longest night of the year.",
+  "Path": "/media/tv/Northern Lights/Season 02/Northern Lights S02E05.mp4",
+  "UserData": {
+    "PlaybackPositionTicks": 6120000000,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "LastPlayedDate": "2026-09-15T20:41:12.0000000Z",
+    "Played": false,
+    "PlayedPercentage": 42.5,
+    "Key": "7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a29002005"
+  },
+  "ImageTags": { "Primary": "1a2b3c4d5e6f" },
+  "BackdropImageTags": [],
+  "ParentBackdropItemId": "7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a29",
+  "ParentBackdropImageTags": ["9f8e7d6c5b4a"]
+}

@@ -8,6 +8,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Clock;
+
 /** The Jellyfin module. {@code home-control.jellyfin.enabled=false} removes all of it. */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "home-control.jellyfin.enabled", havingValue = "true", matchIfMissing = true)
@@ -23,5 +25,11 @@ public class JellyfinConfiguration {
     public JellyfinSetupService jellyfinSetupService(JellyfinClient client, JsonFileSourceSettings sources,
                                                      SecretStore secrets, LoginService login) {
         return new JellyfinSetupService(client, sources, secrets, login);
+    }
+
+    @Bean
+    public JellyfinContentSource jellyfinContentSource(JellyfinClient client, JellyfinSetupService setup,
+                                                        JellyfinProperties properties) {
+        return new JellyfinContentSource(client, setup, properties, Clock.systemUTC());
     }
 }

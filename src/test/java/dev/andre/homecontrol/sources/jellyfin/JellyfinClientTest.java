@@ -195,6 +195,50 @@ class JellyfinClientTest {
     }
 
     @Test
+    void fetchesImagesAnonymously() throws IOException {
+        String itemId = "b1c2d3e4f5061728394a5b6c7d8e9f01";
+        fake = new FakeJellyfinServer().respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 200,
+                "image/jpeg", new byte[] {1, 2, 3});
+
+        JellyfinClient.Image image = client.image(fake.url(), itemId, "Primary", "c0ffeec0ffee", 480).orElseThrow();
+
+        assertThat(image.contentType()).isEqualTo("image/jpeg");
+        assertThat(image.bytes()).containsExactly(1, 2, 3);
+        FakeJellyfinServer.Recorded recorded = fake.last("GET", "/Items/" + itemId + "/Images/Primary");
+        assertThat(recorded.header("authorization")).isNull();
+        assertThat(recorded.query()).isEqualTo(Map.of("maxWidth", "480", "quality", "90", "tag", "c0ffeec0ffee"));
+        fake.close();
+
+        fake = new FakeJellyfinServer();
+        assertThat(client.image(fake.url(), itemId, "Primary", null, 480)).isEmpty();
+        fake.close();
+
+        fake = new FakeJellyfinServer().respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 200,
+                "text/html", "<html>".getBytes());
+        assertThatThrownBy(() -> client.image(fake.url(), itemId, "Primary", null, 480))
+                .isInstanceOf(JellyfinException.class)
+                .extracting(e -> ((JellyfinException) e).kind())
+                .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);
+        fake.close();
+
+        // A raster-only allowlist: an SVG served from our own origin could carry a script.
+        fake = new FakeJellyfinServer().respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 200,
+                "image/svg+xml", "<svg onload=\"alert(1)\"></svg>".getBytes());
+        assertThatThrownBy(() -> client.image(fake.url(), itemId, "Primary", null, 480))
+                .isInstanceOf(JellyfinException.class)
+                .extracting(e -> ((JellyfinException) e).kind())
+                .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);
+        fake.close();
+
+        fake = new FakeJellyfinServer().respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 200,
+                "image/jpeg", new byte[JellyfinClient.MAX_IMAGE_BYTES + 1]);
+        assertThatThrownBy(() -> client.image(fake.url(), itemId, "Primary", null, 480))
+                .isInstanceOf(JellyfinException.class)
+                .extracting(e -> ((JellyfinException) e).kind())
+                .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);
+    }
+
+    @Test
     void idsAreValidatedBeforeTheyBecomePathSegments() {
         assertThat(JellyfinClient.id("a1b2-C3")).isEqualTo("a1b2-C3");
 
