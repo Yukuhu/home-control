@@ -1,5 +1,9 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
@@ -22,6 +26,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,6 +64,7 @@ class YouTubeSetupServiceTest {
     private QuotaLedger ledger;
     private ObjectProvider<YouTubeContentSource> source;
     private ObjectProvider<YouTubePlaylists> playlists;
+    private ObjectProvider<DeviceManager> devices;
 
     @BeforeEach
     void setUp() {
@@ -72,8 +78,9 @@ class YouTubeSetupServiceTest {
         ledger = mock(QuotaLedger.class);
         source = mock(ObjectProvider.class);
         playlists = mock(ObjectProvider.class);
+        devices = mock(ObjectProvider.class);
         service = new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger,
-                source, playlists);
+                source, playlists, devices);
         httpRequest = mock(HttpServletRequest.class);
     }
 
@@ -322,5 +329,37 @@ class YouTubeSetupServiceTest {
         service.setWatchLater(false);
 
         assertThat(service.settings().watchLater()).isFalse();
+    }
+
+    @Test
+    void loungeSwitchNeedsACastDevice() {
+        DeviceManager manager = mock(DeviceManager.class);
+        given(devices.getIfAvailable()).willReturn(manager);
+        given(manager.device("kitchen")).willReturn(Optional.of(new Device("kitchen", "Kitchen", DeviceKind.CAST,
+                "10.0.0.9", Map.of("cast", Map.of()), Instant.now())));
+        given(manager.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
+        given(manager.device("living")).willReturn(Optional.of(new Device("living", "Living Room", DeviceKind.WEBOS,
+                "10.0.0.7", Map.of("webos", Map.of()), Instant.now())));
+        given(manager.capabilities("living")).willReturn(EnumSet.of(Capability.APP_LINK));
+        given(manager.device("gone")).willReturn(Optional.empty());
+
+        assertThat(service.setLounge("kitchen", true)).isEqualTo("Kitchen");
+        assertThat(service.settings().loungeDevices()).containsExactly("kitchen");
+
+        assertThatThrownBy(() -> service.setLounge("living", true))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("Only Cast devices can use YouTube Cast")
+                .extracting(e -> ((YouTubeException) e).kind()).isEqualTo(YouTubeException.Kind.INVALID_INPUT);
+        assertThatThrownBy(() -> service.setLounge("gone", true))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("No device with id gone")
+                .extracting(e -> ((YouTubeException) e).kind()).isEqualTo(YouTubeException.Kind.INVALID_INPUT);
+
+        service.save(service.settings().withLoungeDevice("gone", true));
+        assertThat(service.setLounge("gone", false)).isEqualTo("gone");
+        assertThat(service.settings().loungeDevices()).containsExactly("kitchen");
+
+        assertThat(service.setLounge("kitchen", false)).isEqualTo("Kitchen");
+        assertThat(service.settings().loungeDevices()).isEmpty();
     }
 }

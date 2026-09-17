@@ -24,6 +24,12 @@ class RouteKeysTest {
     }
 
     @Test
+    void youtubeLoungeKey() {
+        assertThat(RouteKeys.key(new Route.YouTubeLounge("x"))).isEqualTo("youtube-lounge");
+        assertThat(RouteKeys.optimistic(new Route.YouTubeLounge("x"))).isFalse();
+    }
+
+    @Test
     void onlyAppLinksAreOptimistic() {
         assertThat(RouteKeys.optimistic(new Route.OpenAppLink(URI.create("https://x"), "web"))).isTrue();
         assertThat(RouteKeys.optimistic(new Route.Cast("CC1AD845", Map.of()))).isFalse();

@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
@@ -122,6 +123,9 @@ class StubAdapter implements DeviceAdapter {
 
         private final Consumer<DeviceState> onChange;
         final List<Action> executed = new CopyOnWriteArrayList<>();
+        final List<CastAppQuery> queried = new CopyOnWriteArrayList<>();
+        /** What {@link #query} answers; null means this connection cannot ask receiver apps. */
+        volatile Map<String, Object> answer;
         volatile DeviceState state = DeviceState.initial();
         volatile RuntimeException failure;
         volatile boolean closed;
@@ -146,6 +150,18 @@ class StubAdapter implements DeviceAdapter {
                 throw failure;
             }
             executed.add(action);
+        }
+
+        @Override
+        public Map<String, Object> query(CastAppQuery query) {
+            if (failure != null) {
+                throw failure;
+            }
+            queried.add(query);
+            if (answer == null) {
+                return DeviceHandle.super.query(query);
+            }
+            return answer;
         }
 
         @Override

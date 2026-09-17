@@ -47,9 +47,9 @@ public class PlaybackPlanner {
      * only ever fails here for lacking the capability: with {@link Capability#APP_LINK} present,
      * {@link AppLinkStrategy} would already have routed it, so there is no "was not accepted" case.
      * The same holds for {@link PlayableRef.CastLoad}/{@link PlayableRef.CastMessage}/
-     * {@link PlayableRef.StreamUrl} and {@link Capability#CAST_RECEIVER}: with it present,
-     * {@link CastMessageStrategy}/{@link CastLoadStrategy}/{@link CastStreamStrategy} would
-     * already have routed it, so reaching here always means the capability is missing. Falls
+     * {@link PlayableRef.YouTubeLounge}/{@link PlayableRef.StreamUrl} and {@link Capability#CAST_RECEIVER}:
+     * with it present, {@link YouTubeLoungeStrategy}/{@link CastMessageStrategy}/{@link CastLoadStrategy}/
+     * {@link CastStreamStrategy} would already have routed it, so reaching here always means the capability is missing. Falls
      * back to a generic reason when none applies (e.g. a planner without that strategy).
      */
     private static List<String> explain(ContentItem item, Set<Capability> capabilities) {
@@ -63,6 +63,7 @@ public class PlaybackPlanner {
                 }
                 case PlayableRef.CastLoad ignored -> reasons.add("this device is not a Cast receiver");
                 case PlayableRef.CastMessage ignored -> reasons.add("this device is not a Cast receiver");
+                case PlayableRef.YouTubeLounge ignored -> reasons.add("this device is not a Cast receiver");
                 case PlayableRef.StreamUrl ignored -> reasons.add("this device cannot play a direct stream");
                 case PlayableRef.JellyfinItem ignored -> reasons.add("Jellyfin is switched off on this server");
                 case PlayableRef.JellyfinSession ignored -> reasons.add("the open Jellyfin app cannot be controlled");

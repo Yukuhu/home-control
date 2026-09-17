@@ -26,7 +26,7 @@ import java.util.function.Predicate;
 public final class FakeGoogleServer implements AutoCloseable {
 
     public record Recorded(String method, String path, Map<String, String> query, Map<String, String> form,
-                           Map<String, String> headers, String body) {
+                           Map<String, String> headers, String body, String rawQuery) {
         public String header(String name) {
             return headers.get(name.toLowerCase(Locale.ROOT));
         }
@@ -136,6 +136,16 @@ public final class FakeGoogleServer implements AutoCloseable {
                 Canned.fixture(200, fixture));
     }
 
+    /** Lounge: token for the fixture screen, a bind answer, setPlaylist accepted. */
+    public FakeGoogleServer loungeAccepts() {
+        respond("POST", "/lounge/pairing/get_lounge_token_batch", Canned.fixture(200, "lounge-token-batch.json"));
+        respondWhen("POST", "/lounge/bc/bind", r -> "1".equals(r.query().get("RID")),
+                new Canned(200, "text/plain; charset=utf-8", fixture("lounge-bind.txt").getBytes(StandardCharsets.UTF_8)));
+        respondWhen("POST", "/lounge/bc/bind", r -> "2".equals(r.query().get("RID")),
+                new Canned(200, "text/plain; charset=utf-8", "7\n[[5,[]]\n".getBytes(StandardCharsets.UTF_8)));
+        return this;
+    }
+
     /** A 1×1 JPEG-looking body for any thumbnail. */
     public FakeGoogleServer thumbnails() {
         byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 16, 'J', 'F', 'I', 'F', 0, (byte) 0xFF, (byte) 0xD9};
@@ -150,7 +160,7 @@ public final class FakeGoogleServer implements AutoCloseable {
         Recorded recorded = new Recorded(exchange.getRequestMethod(), exchange.getRequestURI().getPath(),
                 decode(exchange.getRequestURI().getRawQuery()),
                 contentType.startsWith("application/x-www-form-urlencoded") ? decode(body) : Map.of(),
-                headers, body);
+                headers, body, exchange.getRequestURI().getRawQuery());
         requests.add(recorded);
         Canned answer = rules.stream()
                 .filter(rule -> rule.method().equals(recorded.method()) && rule.path().equals(recorded.path())

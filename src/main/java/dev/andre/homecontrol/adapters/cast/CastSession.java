@@ -9,6 +9,7 @@ import dev.andre.homecontrol.adapters.cast.protocol.MediaStatus;
 import dev.andre.homecontrol.adapters.cast.protocol.ReceiverStatus;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
+import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -184,6 +185,41 @@ public class CastSession implements DeviceHandle {
             throw new ActionFailedException(device.name() + " refused to play it (" + (reason.isBlank() ? error.type() : reason) + ")");
         } finally {
             rejection.cancel();
+        }
+    }
+
+    /**
+     * Launch the app unless it runs, wait until it speaks the namespace, connect, send, and wait
+     * (command timeout) for the reply of the asked type; an error reply fails.
+     */
+    @Override
+    public Map<String, Object> query(CastAppQuery query) {
+        CastConnection current = requireConnected();
+        ReceiverStatus.ReceiverApp running = Optional.ofNullable(receiver)
+                .flatMap(status -> status.app(query.receiverAppId()))
+                .orElseGet(() -> launch(current, query.receiverAppId()));
+        ReceiverStatus.ReceiverApp app = running.speaks(query.namespace())
+                ? running : awaitNamespace(current, query.receiverAppId(), query.namespace());
+        call(() -> {
+            current.connect(app.transportId());
+            return null;
+        }, "reach " + describe(app));
+        CastConnection.Waiter answer = current.expect(incoming -> query.namespace().equals(incoming.namespace())
+                && app.transportId().equals(incoming.sourceId())
+                && (query.replyType().equals(incoming.type()) || CUSTOM_ERROR_TYPES.contains(incoming.type())));
+        try {
+            CastIncoming reply = call(() -> {
+                current.send(query.namespace(), app.transportId(), CastPayloads.custom(query.message()));
+                return answer.await(commandTimeout());
+            }, "answer " + query.replyType());
+            if (!query.replyType().equals(reply.type())) {
+                String reason = reply.payload().path("message").asString("");
+                throw new ActionFailedException(device.name() + " refused the request ("
+                        + (reason.isBlank() ? reply.type() : reason) + ")");
+            }
+            return CastPayloads.toMap(reply.payload());
+        } finally {
+            answer.cancel();
         }
     }
 

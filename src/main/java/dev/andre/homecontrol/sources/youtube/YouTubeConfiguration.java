@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.youtube;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
+import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
@@ -71,8 +72,10 @@ public class YouTubeConfiguration {
                                                    GoogleTokens tokens, YouTubeAuthorizationService authorization,
                                                    ObjectProvider<YouTubeAccount> account, QuotaLedger ledger,
                                                    ObjectProvider<YouTubeContentSource> source,
-                                                   ObjectProvider<YouTubePlaylists> playlists) {
-        return new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger, source, playlists);
+                                                   ObjectProvider<YouTubePlaylists> playlists,
+                                                   ObjectProvider<DeviceManager> devices) {
+        return new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger, source,
+                playlists, devices);
     }
 
     @Bean
@@ -105,6 +108,23 @@ public class YouTubeConfiguration {
     @Bean
     public YouTubeThumbnailController youTubeThumbnailController(YouTubeHttp http, YouTubeProperties properties) {
         return new YouTubeThumbnailController(http, properties);
+    }
+
+    @Bean
+    public LoungeClient youTubeLoungeClient(YouTubeHttp http, YouTubeProperties properties) {
+        return new LoungeClient(http, properties.loungeBaseUrl());
+    }
+
+    /** Needs no Google account: the Lounge switch per Cast device is all that decides. */
+    @Bean
+    public YouTubeLoungeResolver youTubeLoungeResolver(YouTubeSetupService setup) {
+        return new YouTubeLoungeResolver(setup);
+    }
+
+    @Bean
+    public YouTubeLoungeRouteExecutor youTubeLoungeRouteExecutor(DeviceManager devices, LoungeClient lounge,
+                                                                 YouTubeSetupService setup) {
+        return new YouTubeLoungeRouteExecutor(devices, lounge, setup);
     }
 
     /** After a successful device authorization, the account's own channel is looked up once and cached settings cleared. */

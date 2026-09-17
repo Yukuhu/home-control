@@ -52,7 +52,7 @@ class CrossOriginEndToEndTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/devices/nope/key/HOME", "/devices;x/nope/key/HOME", "/devices/nope;x/key/HOME",
-            "/%64evices/nope/key/HOME", "/devices/%6eope/key/HOME"})
+            "/%64evices/nope/key/HOME", "/devices/%6eope/key/HOME", "/setup/sources/youtube/lounge"})
     void aCrossSiteRequestIsRefusedWhateverThePathLooksLike(String path) throws Exception {
         assertThat(post(path, "Sec-Fetch-Site", "cross-site", "Origin", "http://evil.example")).isEqualTo(403);
         assertThat(post(path, "Origin", "http://evil.example")).isEqualTo(403);

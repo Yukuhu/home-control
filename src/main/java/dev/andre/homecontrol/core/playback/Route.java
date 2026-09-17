@@ -89,6 +89,17 @@ public sealed interface Route {
         }
     }
 
+    /**
+     * Start the video on a Cast receiver through its best-effort remote-control pairing. Executed by a
+     * RouteExecutor, not an adapter; the device part goes through DeviceManager.query.
+     */
+    record YouTubeLounge(String videoId) implements Route {
+        @Override
+        public String describe() {
+            return "Cast with the YouTube receiver (best effort)";
+        }
+    }
+
     record Unroutable(String reason) implements Route {
         @Override
         public String describe() {

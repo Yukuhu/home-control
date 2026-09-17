@@ -97,6 +97,12 @@ public final class CastPayloads {
         return mediaCommand("STOP", mediaSessionId);
     }
 
+    /** A received payload as plain maps, lists and scalars, for callers outside the protocol package. */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> toMap(JsonNode payload) {
+        return payload != null && payload.isObject() ? MAPPER.convertValue(payload, Map.class) : Map.of();
+    }
+
     public static String toJson(JsonNode node) {
         return MAPPER.writeValueAsString(node);
     }

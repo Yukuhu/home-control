@@ -1,5 +1,8 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
@@ -43,11 +46,13 @@ public class YouTubeSetupService {
     private final QuotaLedger ledger;
     private final ObjectProvider<YouTubeContentSource> source;
     private final ObjectProvider<YouTubePlaylists> playlists;
+    private final ObjectProvider<DeviceManager> devices;
 
     public YouTubeSetupService(SecretStore secrets, LoginService login, JsonFileSourceSettings sourceSettings,
                                GoogleOAuthClient oauth, GoogleTokens tokens, YouTubeAuthorizationService authorization,
                                ObjectProvider<YouTubeAccount> account, QuotaLedger ledger,
-                               ObjectProvider<YouTubeContentSource> source, ObjectProvider<YouTubePlaylists> playlists) {
+                               ObjectProvider<YouTubeContentSource> source, ObjectProvider<YouTubePlaylists> playlists,
+                               ObjectProvider<DeviceManager> devices) {
         this.secrets = secrets;
         this.login = login;
         this.sourceSettings = sourceSettings;
@@ -58,6 +63,7 @@ public class YouTubeSetupService {
         this.ledger = ledger;
         this.source = source;
         this.playlists = playlists;
+        this.devices = devices;
     }
 
     public YouTubeSettings settings() {
@@ -160,6 +166,29 @@ public class YouTubeSetupService {
 
     public void setWatchLater(boolean enabled) {
         save(settings().withWatchLater(enabled));
+    }
+
+    /**
+     * Switches best-effort YouTube Cast on or off for one device and returns its name (the id when it
+     * is gone). Only registered Cast receivers can be switched on; switching off never checks, so a
+     * forgotten device's entry can always be removed.
+     */
+    public String setLounge(String deviceId, boolean enabled) {
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Choose a device");
+        }
+        DeviceManager manager = devices.getIfAvailable();
+        Optional<Device> device = manager == null ? Optional.empty() : manager.device(deviceId);
+        if (enabled) {
+            if (device.isEmpty()) {
+                throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "No device with id " + deviceId);
+            }
+            if (!manager.capabilities(deviceId).contains(Capability.CAST_RECEIVER)) {
+                throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Only Cast devices can use YouTube Cast");
+            }
+        }
+        save(settings().withLoungeDevice(deviceId, enabled));
+        return device.map(Device::name).orElse(deviceId);
     }
 
     public void disconnect() {

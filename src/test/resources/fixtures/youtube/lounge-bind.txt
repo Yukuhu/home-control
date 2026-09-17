@@ -1,0 +1,10 @@
+278
+[[0,["c","8A3F2E1D0C9B8A77","",8]
+]
+,[1,["S","fixture-gsessionid-Qm9vYmFy"]]
+,[2,["loungeStatus",{"devices":"[{\"app\":\"lb-v4\",\"name\":\"YouTube on TV\",\"id\":\"fixture-screen-6hq3r1ukd0n5mc3t2v8p\",\"type\":\"LOUNGE_SCREEN\"}]"}]]
+,[3,["playlistModified",{"videoIds":""}]]
+]
+52
+[[4,["onAutoplayModeChanged",{"autoplayMode":"UNSUPPORTED"}]]
+]

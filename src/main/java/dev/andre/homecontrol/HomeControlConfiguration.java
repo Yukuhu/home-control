@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.playback.CastMessageStrategy;
 import dev.andre.homecontrol.core.playback.CastStreamStrategy;
 import dev.andre.homecontrol.core.playback.JellyfinSessionStrategy;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
+import dev.andre.homecontrol.core.playback.YouTubeLoungeStrategy;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.discovery.MdnsBrowser;
 import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
@@ -34,11 +35,12 @@ public class HomeControlConfiguration {
 
     @Bean
     public PlaybackPlanner playbackPlanner() {
-        // Preference order of spec §5.3: an open Jellyfin app, an app link, Cast (custom-message
-        // receivers, then LOADs, then bare streams on the Default Media Receiver). Sub-project I
-        // appends media renderers.
+        // Preference order of spec §5.3: an open Jellyfin app, an app link, Cast (a video through the
+        // receiver's best-effort remote pairing, custom-message receivers, then LOADs, then bare streams
+        // on the Default Media Receiver). Sub-project I appends media renderers.
         return new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), new AppLinkStrategy(),
-                new CastMessageStrategy(), new CastLoadStrategy(), new CastStreamStrategy()));
+                new YouTubeLoungeStrategy(), new CastMessageStrategy(), new CastLoadStrategy(),
+                new CastStreamStrategy()));
     }
 
     /** The one mDNS browser every adapter's discovery shares (spec §7). */

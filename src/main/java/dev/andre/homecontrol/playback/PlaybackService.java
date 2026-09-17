@@ -153,6 +153,11 @@ public class PlaybackService {
                     .findFirst()
                     .orElseThrow(() -> new UnroutableException(device.name() + ": Jellyfin is switched off on this server"))
                     .execute(session, device);
+            case Route.YouTubeLounge lounge -> executors.stream()
+                    .filter(executor -> executor.executes(lounge))
+                    .findFirst()
+                    .orElseThrow(() -> new UnroutableException(device.name() + ": YouTube is switched off on this server"))
+                    .execute(lounge, device);
             case Route.Unroutable unroutable -> throw new UnroutableException(device.name() + ": " + unroutable.reason());
         }
     }

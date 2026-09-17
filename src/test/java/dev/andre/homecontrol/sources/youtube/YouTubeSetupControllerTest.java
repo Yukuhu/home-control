@@ -170,4 +170,25 @@ class YouTubeSetupControllerTest {
                 .andExpect(header().string("HX-Refresh", "true"))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("hx-trigger"))));
     }
+
+    @Test
+    void loungeEndpoint() throws Exception {
+        given(setup.setLounge("kitchen", true)).willReturn("Kitchen");
+        given(setup.setLounge("kitchen", false)).willReturn("Kitchen");
+
+        mockMvc.perform(post("/setup/sources/youtube/lounge").param("device", "kitchen").param("enabled", "true"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/setup#youtube"))
+                .andExpect(flash().attribute("youtubeMessage", "YouTube Cast switched on for Kitchen"));
+        verify(setup).setLounge("kitchen", true);
+
+        mockMvc.perform(post("/setup/sources/youtube/lounge").param("device", "kitchen").param("enabled", "false"))
+                .andExpect(flash().attribute("youtubeMessage", "YouTube Cast switched off for Kitchen"));
+
+        willThrow(new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Only Cast devices can use YouTube Cast"))
+                .given(setup).setLounge("living", true);
+        mockMvc.perform(post("/setup/sources/youtube/lounge").param("device", "living").param("enabled", "true"))
+                .andExpect(redirectedUrl("/setup#youtube"))
+                .andExpect(flash().attribute("youtubeError", "Only Cast devices can use YouTube Cast"));
+    }
 }
