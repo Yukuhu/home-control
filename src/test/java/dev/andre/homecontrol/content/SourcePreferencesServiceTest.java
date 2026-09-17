@@ -23,7 +23,7 @@ class SourcePreferencesServiceTest {
     final ApplicationEventPublisher events = published::add;
     final ContentProperties properties = new ContentProperties(
             new ContentProperties.Rails(false, java.time.Duration.ofSeconds(15), java.time.Duration.ofMinutes(1), 4, Map.of()),
-            "de-DE", "DE");
+            new ContentProperties.Search(java.time.Duration.ofSeconds(8)), "de-DE", "DE");
 
     private SourcePreferencesService service(Path file) {
         return new SourcePreferencesService(new JsonFileSourceSettings(file), properties, events);

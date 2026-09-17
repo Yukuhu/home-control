@@ -31,6 +31,13 @@
 </header>
 
 <main id="content">
+    <form role="search" class="search" onsubmit="return false">
+        <label for="search-q" class="visually-hidden">Search every source</label>
+        <input id="search-q" name="q" type="search" placeholder="Search" autocomplete="off" enterkeyhint="search"
+               hx-get="/search/results" hx-trigger="input changed delay:350ms, search"
+               hx-target="#search-results" hx-swap="innerHTML" hx-sync="this:replace">
+    </form>
+    <div id="search-results" aria-live="polite"></div>
     <section id="rails" th:replace="~{fragments/rails :: rails}"></section>
 </main>
 

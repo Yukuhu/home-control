@@ -55,6 +55,9 @@ home-control:
       max-concurrent-fetches: 4
       # Per-source override of the source's default refresh interval, e.g. jellyfin: 10m
       refresh-intervals: {}
+    search:
+      # One deadline for every source; a source that misses it is reported as a failure, not held for.
+      timeout: 8s
     # Defaults until changed on the setup page (TMDB watch region and deep-link domains use them).
     locale: ${HOME_CONTROL_LOCALE:de-DE}
     region: ${HOME_CONTROL_REGION:DE}

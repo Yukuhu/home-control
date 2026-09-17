@@ -31,4 +31,11 @@ public class ContentConfiguration {
         return new RailCache(sources, preferences, events, Clock.systemUTC(), properties,
                 Executors.newVirtualThreadPerTaskExecutor());
     }
+
+    // Not a bean of type ExecutorService itself (Boot auto-configuration could pick that up); it lives
+    // only inside SearchService, which owns closing it.
+    @Bean(destroyMethod = "close")
+    public SearchService searchService(ContentSources sources, RailPreferences preferences, ContentProperties properties) {
+        return new SearchService(sources, preferences, properties, Executors.newVirtualThreadPerTaskExecutor());
+    }
 }

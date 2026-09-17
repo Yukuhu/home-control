@@ -111,7 +111,7 @@ class RailCacheTest {
     final List<Object> events = new CopyOnWriteArrayList<>();
     final ContentProperties properties = new ContentProperties(
             new ContentProperties.Rails(false, Duration.ofSeconds(15), Duration.ofMinutes(1), 4, Map.of()),
-            "de-DE", "DE");
+            new ContentProperties.Search(Duration.ofSeconds(8)), "de-DE", "DE");
     final StubPreferences preferences = new StubPreferences();
     final RailCache cache = new RailCache(new ContentSources(List.of(source)), preferences,
             events::add, clock, properties, executor);
