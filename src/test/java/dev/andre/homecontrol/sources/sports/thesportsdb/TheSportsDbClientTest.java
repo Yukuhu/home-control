@@ -159,9 +159,15 @@ class TheSportsDbClientTest {
         server.delay(Duration.ofSeconds(3));
         try {
             client.lookupLeague(FakeTheSportsDbServer.PERSONAL_KEY, "4331");
+            org.junit.jupiter.api.Assertions.fail("expected a TheSportsDbException");
         } catch (TheSportsDbException e) {
             assertThat(e.getMessage()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
             assertThat(e.toString()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
+            assertThat(e.getCause()).isNull();
+            for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+                assertThat(cause.getMessage()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
+                assertThat(cause.toString()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
+            }
         }
     }
 
