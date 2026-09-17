@@ -46,3 +46,12 @@ home-control:
     connect-timeout-seconds: 5
     request-timeout-seconds: 15
     rail-size: 20
+  content:
+    rails:
+      # Background refresh; page loads never wait for it.
+      scheduler-enabled: true
+      tick: 15s
+      retry-after-failure: 1m
+      max-concurrent-fetches: 4
+      # Per-source override of the source's default refresh interval, e.g. jellyfin: 10m
+      refresh-intervals: {}

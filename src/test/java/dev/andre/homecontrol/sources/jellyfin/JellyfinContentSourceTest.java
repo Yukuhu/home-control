@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -144,6 +145,11 @@ class JellyfinContentSourceTest {
     @Test
     void isSearchable() {
         assertThat(source.searchable()).isTrue();
+    }
+
+    @Test
+    void refreshesEveryFiveMinutes() {
+        assertThat(source.defaultRefreshInterval()).isEqualTo(Duration.ofMinutes(5));
     }
 
     @Test

@@ -2,6 +2,7 @@ package dev.andre.homecontrol.core.content;
 
 import dev.andre.homecontrol.core.playback.ContentItem;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,5 +38,10 @@ public interface ContentSource {
     /** I/O. Only called when {@link #searchable()} and {@link #available()}. */
     default List<ContentItem> search(String query, int limit) {
         throw new UnsupportedOperationException(displayName() + " cannot search");
+    }
+
+    /** How long a loaded rail stays fresh. Users override it per source (D4). */
+    default Duration defaultRefreshInterval() {
+        return Duration.ofMinutes(15);
     }
 }

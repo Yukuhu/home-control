@@ -1,13 +1,20 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.content.RailSnapshot;
+import dev.andre.homecontrol.content.RailStatus;
+import dev.andre.homecontrol.content.RailUpdatedEvent;
+import dev.andre.homecontrol.content.RailsChangedEvent;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.content.RailDescriptor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -101,6 +108,37 @@ class DeviceStateBroadcasterTest {
         await().until(() -> other.count().get() == 1);
         assertThat(revoked.count()).hasValue(0);
         assertThat(revoked.completed()).isTrue();
+    }
+
+    @Test
+    void forwardsRailEventsUnderTheirOwnName() {
+        record Sent(String name, Object data) {
+        }
+        List<Sent> sent = new CopyOnWriteArrayList<>();
+        DeviceStateBroadcaster recording = new DeviceStateBroadcaster() {
+            @Override
+            void sendNamed(SseEmitter emitter, String name, Object data) {
+                sent.add(new Sent(name, data));
+            }
+        };
+        recording.register(new SseEmitter(0L));
+
+        RailDescriptor descriptor = new RailDescriptor("stub", "a", "Rail A");
+        RailSnapshot snapshot = new RailSnapshot(descriptor, RailStatus.READY, List.of(),
+                Instant.parse("2026-09-16T09:00:00Z"), null, false, 3);
+        recording.onRailUpdated(new RailUpdatedEvent(snapshot));
+
+        await().until(() -> !sent.isEmpty());
+        assertThat(sent.getFirst().name()).isEqualTo("rail");
+        assertThat(((RailEventView) sent.getFirst().data()).railId()).isEqualTo("a");
+
+        recording.onRailsChanged(new RailsChangedEvent(List.of("stub/a")));
+
+        await().until(() -> sent.size() == 2);
+        assertThat(sent.get(1).name()).isEqualTo("rails");
+        assertThat(sent.get(1).data()).isEqualTo(Map.of("rails", List.of("stub/a")));
+
+        recording.shutdown();
     }
 
     private static DeviceStateChangedEvent event() {

@@ -1,16 +1,17 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.content.RailCache;
+import dev.andre.homecontrol.content.RailSnapshot;
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.ContentSources;
-import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,7 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Content sources and their rails. Interim: fetches upstream on every call. Sub-project D1 puts a cache in front. */
+/** Content sources and their rails, read from the {@link RailCache} that keeps them fresh in the background. */
 @RestController
 public class ContentController {
 
@@ -29,14 +30,20 @@ public class ContentController {
     public record SourceView(String id, String name, boolean available, boolean searchable, List<RailView> rails) {
     }
 
-    public record RailContentView(String sourceId, String id, String title, Instant fetchedAt,
-                                  List<ContentItemView> items) {
+    public record RailContentView(String sourceId, String id, String title, String status, Instant fetchedAt,
+                                  String error, List<ContentItemView> items) {
+        static RailContentView of(RailSnapshot s) {
+            return new RailContentView(s.sourceId(), s.railId(), s.descriptor().title(), s.status().name(),
+                    s.fetchedAt(), s.error(), s.items().stream().map(ContentItemView::of).toList());
+        }
     }
 
     private final ContentSources sources;
+    private final RailCache rails;
 
-    public ContentController(ContentSources sources) {
+    public ContentController(ContentSources sources, RailCache rails) {
         this.sources = sources;
+        this.rails = rails;
     }
 
     @GetMapping("/sources")
@@ -48,12 +55,27 @@ public class ContentController {
     }
 
     @GetMapping("/sources/{sourceId}/rails/{railId}")
-    public RailContentView rail(@PathVariable String sourceId, @PathVariable String railId) {
-        ContentSource source = sources.find(sourceId)
-                .orElseThrow(() -> new IllegalArgumentException("No content source " + sourceId));
-        Rail rail = source.rail(railId);
-        return new RailContentView(rail.descriptor().sourceId(), rail.descriptor().id(), rail.descriptor().title(),
-                rail.fetchedAt(), rail.items().stream().map(ContentItemView::of).toList());
+    public ResponseEntity<?> rail(@PathVariable String sourceId, @PathVariable String railId) {
+        return rails.snapshot(sourceId, railId).<ResponseEntity<?>>map(snapshot -> switch (snapshot.status()) {
+            case LOADING -> ResponseEntity.status(HttpStatus.ACCEPTED).body(RailContentView.of(snapshot));
+            case READY -> ResponseEntity.ok(RailContentView.of(snapshot));
+            case FAILED -> snapshot.hasItems()
+                    ? ResponseEntity.ok(RailContentView.of(snapshot))
+                    : text(HttpStatus.BAD_GATEWAY, snapshot.error());
+        }).orElseGet(() -> unknownRail(sourceId, railId));
+    }
+
+    @PostMapping("/sources/{sourceId}/rails/{railId}/refresh")
+    public ResponseEntity<?> refresh(@PathVariable String sourceId, @PathVariable String railId) {
+        return rails.refresh(sourceId, railId)
+                .<ResponseEntity<?>>map(snapshot -> ResponseEntity.status(HttpStatus.ACCEPTED).body(RailContentView.of(snapshot)))
+                .orElseGet(() -> unknownRail(sourceId, railId));
+    }
+
+    private ResponseEntity<?> unknownRail(String sourceId, String railId) {
+        return sources.find(sourceId)
+                .<ResponseEntity<?>>map(source -> text(HttpStatus.NOT_FOUND, source.displayName() + " has no rail '" + railId + "'"))
+                .orElseGet(() -> text(HttpStatus.NOT_FOUND, "No content source " + sourceId));
     }
 
     private RailView toRailView(RailDescriptor descriptor) {
@@ -88,16 +110,6 @@ public class ContentController {
             }
         }
         return ResponseEntity.ok(new SearchResponse(query, results, errors));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<String> notFound(IllegalArgumentException e) {
-        return text(HttpStatus.NOT_FOUND, e.getMessage());
-    }
-
-    @ExceptionHandler(ContentSourceException.class)
-    public ResponseEntity<String> upstreamFailure(ContentSourceException e) {
-        return text(HttpStatus.BAD_GATEWAY, e.getMessage());
     }
 
     private static ResponseEntity<String> text(HttpStatus status, String body) {

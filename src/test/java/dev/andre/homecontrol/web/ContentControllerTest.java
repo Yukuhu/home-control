@@ -1,5 +1,8 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.content.RailCache;
+import dev.andre.homecontrol.content.RailSnapshot;
+import dev.andre.homecontrol.content.RailStatus;
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.ContentSources;
@@ -19,10 +22,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,6 +42,9 @@ class ContentControllerTest {
 
     @MockitoBean
     ContentSources sources;
+
+    @MockitoBean
+    RailCache rails;
 
     private static ContentSource jellyfin(boolean available, boolean searchable, List<RailDescriptor> rails) {
         return new ContentSource() {
@@ -94,36 +104,14 @@ class ContentControllerTest {
         ContentItem item = new ContentItem("item-1", "jellyfin", ContentKind.EPISODE, "Title", "Sub",
                 URI.create("/sources/jellyfin/images/item-1/Primary?tag=t"),
                 List.of(new PlayableRef.JellyfinItem("srv", "item-1", 99)), 0.5);
-        ContentSource source = new ContentSource() {
-            @Override
-            public String id() {
-                return "jellyfin";
-            }
-
-            @Override
-            public String displayName() {
-                return "Jellyfin";
-            }
-
-            @Override
-            public List<RailDescriptor> rails() {
-                return List.of(descriptor);
-            }
-
-            @Override
-            public Rail rail(String railId) {
-                return new Rail(descriptor, List.of(item), Instant.parse("2026-09-16T09:00:00Z"));
-            }
-
-            @Override
-            public Optional<ContentItem> item(String itemId) {
-                return Optional.empty();
-            }
-        };
-        given(sources.find("jellyfin")).willReturn(Optional.of(source));
+        RailSnapshot snapshot = new RailSnapshot(descriptor, RailStatus.READY, List.of(item),
+                Instant.parse("2026-09-16T09:00:00Z"), null, false, 1);
+        given(rails.snapshot("jellyfin", "resume")).willReturn(Optional.of(snapshot));
 
         String body = mockMvc.perform(get("/sources/jellyfin/rails/resume"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("READY"))
+                .andExpect(jsonPath("$.error").value(nullValue()))
                 .andExpect(jsonPath("$.items[0].id").value("item-1"))
                 .andExpect(jsonPath("$.items[0].kind").value("EPISODE"))
                 .andExpect(jsonPath("$.items[0].artwork").value("/sources/jellyfin/images/item-1/Primary?tag=t"))
@@ -135,80 +123,90 @@ class ContentControllerTest {
     }
 
     @Test
-    void unknownSourceOrRailIs404() throws Exception {
-        given(sources.find("jellyfinx")).willReturn(Optional.empty());
+    void aLoadingRailIs202() throws Exception {
+        RailDescriptor descriptor = new RailDescriptor("jellyfin", "resume", "Continue watching");
+        RailSnapshot snapshot = new RailSnapshot(descriptor, RailStatus.LOADING, List.of(), null, null, false, 1);
+        given(rails.snapshot("jellyfin", "resume")).willReturn(Optional.of(snapshot));
 
-        mockMvc.perform(get("/sources/jellyfinx/rails/resume"))
-                .andExpect(status().isNotFound())
-                .andExpect(content().string("No content source jellyfinx"));
-
-        ContentSource source = jellyfin(true, false, List.of());
-        given(sources.find("jellyfin")).willReturn(Optional.of(new ContentSource() {
-            @Override
-            public String id() {
-                return "jellyfin";
-            }
-
-            @Override
-            public String displayName() {
-                return "Jellyfin";
-            }
-
-            @Override
-            public List<RailDescriptor> rails() {
-                return List.of();
-            }
-
-            @Override
-            public Rail rail(String railId) {
-                throw new IllegalArgumentException("Jellyfin has no rail 'ghost'");
-            }
-
-            @Override
-            public Optional<ContentItem> item(String itemId) {
-                return Optional.empty();
-            }
-        }));
-
-        mockMvc.perform(get("/sources/jellyfin/rails/ghost"))
-                .andExpect(status().isNotFound())
-                .andExpect(content().string("Jellyfin has no rail 'ghost'"));
+        mockMvc.perform(get("/sources/jellyfin/rails/resume"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.status").value("LOADING"));
     }
 
     @Test
-    void anUpstreamFailureIs502WithTheReason() throws Exception {
+    void aFailedRailWithoutItemsIs502WithTheReason() throws Exception {
         String message = "Could not reach Jellyfin at http://nas:8096 (connection refused). …";
-        given(sources.find("jellyfin")).willReturn(Optional.of(new ContentSource() {
-            @Override
-            public String id() {
-                return "jellyfin";
-            }
-
-            @Override
-            public String displayName() {
-                return "Jellyfin";
-            }
-
-            @Override
-            public List<RailDescriptor> rails() {
-                return List.of();
-            }
-
-            @Override
-            public Rail rail(String railId) {
-                throw new ContentSourceException(message);
-            }
-
-            @Override
-            public Optional<ContentItem> item(String itemId) {
-                return Optional.empty();
-            }
-        }));
+        RailDescriptor descriptor = new RailDescriptor("jellyfin", "resume", "Continue watching");
+        RailSnapshot snapshot = new RailSnapshot(descriptor, RailStatus.FAILED, List.of(), null, message, false, 2);
+        given(rails.snapshot("jellyfin", "resume")).willReturn(Optional.of(snapshot));
 
         mockMvc.perform(get("/sources/jellyfin/rails/resume"))
                 .andExpect(status().isBadGateway())
                 .andExpect(content().contentTypeCompatibleWith("text/plain"))
                 .andExpect(content().string(message));
+    }
+
+    @Test
+    void aFailedRailWithItemsIsServedWithItsError() throws Exception {
+        String message = "Jellyfin could not load Continue watching";
+        RailDescriptor descriptor = new RailDescriptor("jellyfin", "resume", "Continue watching");
+        ContentItem item = new ContentItem("item-1", "jellyfin", ContentKind.MOVIE, "Old Item", null, null, List.of());
+        RailSnapshot snapshot = new RailSnapshot(descriptor, RailStatus.FAILED, List.of(item),
+                Instant.parse("2026-09-16T09:00:00Z"), message, false, 3);
+        given(rails.snapshot("jellyfin", "resume")).willReturn(Optional.of(snapshot));
+
+        mockMvc.perform(get("/sources/jellyfin/rails/resume"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.error").value(message))
+                .andExpect(jsonPath("$.items[0].id").value("item-1"));
+    }
+
+    @Test
+    void aRailFromAnUnknownSourceIs404() throws Exception {
+        given(rails.snapshot("jellyfinx", "resume")).willReturn(Optional.empty());
+        given(sources.find("jellyfinx")).willReturn(Optional.empty());
+
+        mockMvc.perform(get("/sources/jellyfinx/rails/resume"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("No content source jellyfinx"));
+    }
+
+    @Test
+    void unknownRailIs404WithTheSourceName() throws Exception {
+        given(rails.snapshot("jellyfin", "nope")).willReturn(Optional.empty());
+        ContentSource source = mock(ContentSource.class);
+        given(source.displayName()).willReturn("Jellyfin");
+        given(sources.find("jellyfin")).willReturn(Optional.of(source));
+
+        mockMvc.perform(get("/sources/jellyfin/rails/nope"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("Jellyfin has no rail 'nope'"));
+
+        verify(source, never()).rail(any());
+    }
+
+    @Test
+    void refreshStartsAFetchAndAnswers202() throws Exception {
+        RailDescriptor descriptor = new RailDescriptor("jellyfin", "resume", "Continue watching");
+        RailSnapshot snapshot = new RailSnapshot(descriptor, RailStatus.READY, List.of(),
+                Instant.parse("2026-09-16T09:00:00Z"), null, true, 4);
+        given(rails.refresh("jellyfin", "resume")).willReturn(Optional.of(snapshot));
+
+        mockMvc.perform(post("/sources/jellyfin/rails/resume/refresh"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.status").value("READY"));
+
+        verify(rails).refresh("jellyfin", "resume");
+    }
+
+    @Test
+    void refreshOfAnUnknownRailIs404() throws Exception {
+        given(rails.refresh("jellyfin", "nope")).willReturn(Optional.empty());
+        given(sources.find("jellyfin")).willReturn(Optional.empty());
+
+        mockMvc.perform(post("/sources/jellyfin/rails/nope/refresh"))
+                .andExpect(status().isNotFound());
     }
 
     private static ContentSource searchableMock(String id, String name) {
