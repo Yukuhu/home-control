@@ -42,6 +42,14 @@ public sealed interface PlayableRef {
         public String kindLabel() {
             return "direct stream";
         }
+
+        /** Stream URLs may carry an ApiKey; print them without the query. */
+        @Override
+        public String toString() {
+            String where = url.getScheme() == null ? url.getRawPath()
+                    : url.getScheme() + "://" + url.getRawAuthority() + url.getRawPath();
+            return "StreamUrl[url=" + where + (url.getRawQuery() == null ? "" : "?…") + ", mimeType=" + mimeType + "]";
+        }
     }
 
     /** A custom-namespace message for a Cast receiver app. Built at play time only: it may carry a token. */
