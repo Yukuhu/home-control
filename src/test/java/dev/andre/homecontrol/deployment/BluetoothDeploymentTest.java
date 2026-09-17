@@ -144,6 +144,27 @@ class BluetoothDeploymentTest {
                 .contains("A2DP");
     }
 
+    @Test
+    void hostDocumentationCoversEveryFailureMode() throws Exception {
+        String text = Files.readString(Path.of("docs/bluetooth-speakers.md"));
+        assertThat(text).contains("## Failure modes")
+                .contains("No D-Bus system socket")
+                .contains("BlueZ is not running on the host")
+                .contains("refused this container")
+                .contains("No Bluetooth adapter found")
+                .contains("powered off")
+                .contains("mpv is not installed")
+                .contains("No PipeWire or PulseAudio server is reachable")
+                .contains("refused pairing")
+                .contains("br-connection-profile-unavailable")
+                .contains("did not answer")
+                .contains("No audio output for")
+                .contains("could not play the stream")
+                .contains("plays audio only")
+                .contains("not paired with this server any more")
+                .contains("Nothing is playing");
+    }
+
     private static Map<String, Object> load(String path) throws Exception {
         try (InputStream input = Files.newInputStream(Path.of(path))) {
             return new Yaml().load(input);

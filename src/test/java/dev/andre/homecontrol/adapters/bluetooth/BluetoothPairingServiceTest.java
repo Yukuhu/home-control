@@ -19,6 +19,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluetoothDeviceInfo.A2DP_SINK;
+import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.ACCESS_DENIED;
+import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.BUSY;
+import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.NO_AUDIO_PROFILE;
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.PAIRING_REJECTED;
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.UNREACHABLE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -249,6 +252,33 @@ class BluetoothPairingServiceTest {
 
         assertThatThrownBy(() -> service.setAudioDevice("bluetooth-aa-bb-cc-dd-ee-ff", "bad device"))
                 .isInstanceOf(BluetoothSetupException.class).hasMessageContaining("audio device");
+    }
+
+    @Test
+    void aBusyAdapterIsExplained() {
+        bluez.failNext("discover", BUSY, "Operation already in progress");
+        BluetoothScan scan = service.scan();
+        assertThat(scan.error()).containsIgnoringCase("busy");
+    }
+
+    @Test
+    void aMissingAudioServiceIsExplainedWhenConnecting() throws Exception {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").uuids(A2DP_SINK);
+        bluez.failNext("connect", NO_AUDIO_PROFILE, "br-connection-profile-unavailable");
+
+        BluetoothPairing result = service.pair("AA:BB:CC:DD:EE:FF");
+
+        verify(devices).adopt(any());
+        assertThat(result.warning()).contains("no Bluetooth audio service").contains("PipeWire");
+    }
+
+    @Test
+    void accessDeniedIsExplained() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").uuids(A2DP_SINK);
+        bluez.unavailable(ACCESS_DENIED);
+
+        assertThatThrownBy(() -> service.pair("AA:BB:CC:DD:EE:FF"))
+                .isInstanceOf(BluetoothSetupException.class).hasMessageContaining("refused this container");
     }
 
     private Device registeredSpeaker() {

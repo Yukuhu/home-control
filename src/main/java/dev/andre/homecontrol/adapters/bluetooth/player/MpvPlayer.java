@@ -132,14 +132,19 @@ public final class MpvPlayer implements AutoCloseable {
         require().ipc().command(commandTimeout, "set_property", "mute", muted);
     }
 
-    /** Empty when nothing is loaded; a dead player is cleaned up. */
+    /**
+     * Empty when nothing is loaded; a dead player is cleaned up. Deliberately not {@code synchronized}
+     * (several IPC round trips): a concurrent {@link #play(URI, String, int, boolean)} may replace
+     * {@code running} while this reads a stale snapshot, so any failure here stops that snapshot only
+     * if it is still current — never the new player a concurrent play might already have installed.
+     */
     public Optional<PlayerStatus> status() {
         Running current = running;
         if (current == null) {
             return Optional.empty();
         }
         if (!current.alive()) {
-            stop();
+            stopIfCurrent(current);
             return Optional.empty();
         }
         try {
@@ -153,8 +158,15 @@ public final class MpvPlayer implements AutoCloseable {
                     (int) Math.round(number(current, "volume").orElse(0.0)),
                     flag(current, "mute")));
         } catch (IOException e) {
-            stop();
+            stopIfCurrent(current);
             return Optional.empty();
+        }
+    }
+
+    /** Stops {@code expected} only if it is still the running player: never tears down a newer one. */
+    private synchronized void stopIfCurrent(Running expected) {
+        if (running == expected) {
+            stop();
         }
     }
 

@@ -8,6 +8,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,7 +21,9 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
+import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.ACCESS_DENIED;
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.BLUEZ_NOT_RUNNING;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -170,6 +175,44 @@ class BluetoothHostChecksTest {
         assertThat(byId.get("audio-output").ok()).isTrue();
         assertThat(byId.get("audio-output").detail()).isEqualTo("Using the template alsa/bluealsa:DEV={mac},PROFILE=a2dp");
         assertThat(launcher.runs).containsExactly(List.of("--no-config", "--version"));
+    }
+
+    static Stream<Arguments> failureModes() {
+        return Stream.of(
+                Arguments.of("socket-deleted", "dbus-socket", "No D-Bus system socket", List.of("bluez", "adapter")),
+                Arguments.of("bluez-not-running", "bluez", "BlueZ is not running on the host", List.of("adapter")),
+                Arguments.of("access-denied", "bluez", "refused this container", List.of("adapter")),
+                Arguments.of("no-adapter", "adapter", "No Bluetooth adapter found", List.of()),
+                Arguments.of("adapter-off", "adapter", "powered off", List.of()),
+                Arguments.of("mpv-missing", "mpv", "mpv is not installed", List.of("audio-output")),
+                Arguments.of("no-sound-server", "audio-output", "No PipeWire or PulseAudio server is reachable", List.of()));
+    }
+
+    @ParameterizedTest
+    @MethodSource("failureModes")
+    void everyHostFailureModeNamesItsCheck(String scenario, String failingCheckId, String detailFragment,
+                                           List<String> alsoNotOk) throws Exception {
+        switch (scenario) {
+            case "socket-deleted" -> Files.delete(socket);
+            case "bluez-not-running" -> bluez.unavailable(BLUEZ_NOT_RUNNING);
+            case "access-denied" -> bluez.unavailable(ACCESS_DENIED);
+            case "no-adapter" -> bluez.noAdapters();
+            case "adapter-off" -> bluez.adapterPowered(false);
+            case "mpv-missing" -> launcher.startFailure = new MpvNotInstalledException("mpv", new IOException("error=2"));
+            case "no-sound-server" -> launcher.options = FakeMpv.Options.defaults();
+            default -> throw new IllegalStateException("Unknown scenario " + scenario);
+        }
+
+        Map<String, HostCheck> byId = byId(checks().results());
+
+        assertThat(byId.get(failingCheckId).ok()).as(failingCheckId).isFalse();
+        assertThat(byId.get(failingCheckId).detail()).contains(detailFragment);
+        alsoNotOk.forEach(id -> assertThat(byId.get(id).ok()).as(id).isFalse());
+        byId.forEach((id, check) -> {
+            if (!id.equals(failingCheckId) && !alsoNotOk.contains(id)) {
+                assertThat(check.ok()).as(id).isTrue();
+            }
+        });
     }
 
     @Test

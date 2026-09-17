@@ -233,6 +233,30 @@ Limits:
 Switch a module off with `HOME_CONTROL_UPNP_ENABLED=false` or `HOME_CONTROL_SONOS_ENABLED=false`
 (without the Sonos module, Sonos players show up as plain UPnP renderers).
 
+## Bluetooth speakers (optional)
+
+Home Control can play music on Bluetooth speakers paired with the machine it runs on. It plays
+the stream itself with `mpv`, through the host's PipeWire or PulseAudio — the speaker never talks
+to the network directly. The module is **off by default**; it needs a host with BlueZ, a
+Bluetooth adapter and an audio server (a Raspberry Pi class machine works; most NAS boxes do
+not).
+
+- Start it with `docker compose -f compose.yaml -f compose.bluetooth.yaml up -d --build`, the
+  image tag `latest-bluetooth`, or `casaos/docker-compose.bluetooth.yml` on CasaOS (instead of the
+  default manifest, not alongside it).
+- Pair a speaker on **Setup → Bluetooth speakers**: put it into pairing mode, **Scan for
+  speakers**, then **Pair and add**.
+
+What works: direct audio links (`.mp3`, `.flac`, `.m4a`, `.ogg` …) and Jellyfin music; Pause,
+Play and Stop, the volume slider and mute; now playing (title, position, duration).
+
+Limits: audio only, no video; the *server* must be able to reach the stream URL (not the
+speaker); the speaker's hardware volume is not changed, only mpv's own; music stops the moment
+the speaker disconnects, so it never continues on the host's own audio output; one stream per
+speaker (no simultaneous playback on the same speaker).
+
+See `docs/bluetooth-speakers.md` for the full host checklist and every failure mode's fix.
+
 ## Discovery does not work
 
 mDNS is multicast and does not cross a Docker bridge network. Either run with
@@ -545,6 +569,13 @@ API key) live in `/data/sports.json`.
 | `HOME_CONTROL_SPORTS_THESPORTSDB_ENABLED` | `true` | Turn TheSportsDB fixtures off; calendars keep working |
 | `HOME_CONTROL_SPORTS_THESPORTSDB_API_BASE_URL` | `https://www.thesportsdb.com/api/v1/json` | TheSportsDB API base URL |
 | `HOME_CONTROL_SPORTS_THESPORTSDB_FIXTURES_TTL` | `24h` | How long a competition's daily fixtures are cached |
+| `home-control.bluetooth.enabled` | `false` | Bluetooth speaker module |
+| `home-control.bluetooth.dbus-address` | `unix:path=/run/dbus/system_bus_socket` | Host D-Bus system bus |
+| `home-control.bluetooth.adapter` | *(first powered)* | Adapter MAC or id such as `hci0` |
+| `home-control.bluetooth.scan-seconds` | `10` | Length of a scan |
+| `home-control.bluetooth.mpv-path` | `mpv` | Player executable |
+| `home-control.bluetooth.audio-device-template` | *(blank: find the speaker's sink)* | e.g. `alsa/bluealsa:DEV={mac},PROFILE=a2dp` |
+| `home-control.bluetooth.default-volume` | `50` | Player volume until changed |
 
 The app only answers to host names that cannot be pointed at it by someone else's DNS
 (DNS rebinding): IP addresses, `localhost`, single-label names such as `nas`, and names
