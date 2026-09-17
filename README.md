@@ -199,7 +199,7 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 Device-only deployments (no content source connected) are unchanged: `/`, `/setup` and the
 remote work with no login, exactly as before this feature.
 
-Connecting a content source — currently Jellyfin — stores a secret, so from that point on a
+Connecting a content source — Jellyfin or YouTube — stores a secret, so from that point on a
 login password guards every page, the live-update stream and artwork, for every client. Set
 the login password on the setup page at the same time you connect the source.
 
@@ -249,6 +249,73 @@ When Jellyfin runs behind Docker bridge networking, the sessions it reports name
 address rather than the device's real LAN address, so Home Control cannot match a paired
 device to its Jellyfin app session automatically. Link them once on the setup page's
 **Jellyfin apps** list; rung 1 above then works normally.
+
+### YouTube
+
+YouTube shows three kinds of rails, all read-only:
+
+- **New from your subscriptions** — the newest uploads across your subscribed channels,
+  refreshed hourly.
+- **Watch Later** (optional, off by default) — YouTube stopped sharing this playlist with other
+  apps for most accounts in 2016; switch it on to find out whether yours still works, otherwise
+  the rail explains why it is empty. Save videos to a playlist of your own instead.
+- **Playlists you choose** — load your playlists on the setup page and pick which ones become
+  rails; they are shown sorted by title (case-insensitive), not in the order you pick them.
+
+Search is on request only, through the **Search YouTube** button next to the unified search
+box, and never runs automatically. There is no recommendations or home-feed rail: YouTube's Data
+API does not expose one.
+
+#### Setting up your own Google Cloud project
+
+YouTube needs its own OAuth client in *your own* Google Cloud project — never a shared one — so
+your quota and consent screen are yours alone. On the setup page, under **YouTube**:
+
+1. Open [console.cloud.google.com](https://console.cloud.google.com/) and create a project, e.g.
+   “Home Control”.
+2. **APIs & Services → Library** → enable “YouTube Data API v3”.
+3. **APIs & Services → OAuth consent screen** (Branding/Audience): user type External, app name
+   “Home Control”, your e-mail as support and developer contact; add the
+   `.../auth/youtube.readonly` scope under Data Access.
+4. **Audience**: add your Google account as a test user, then press **Publish app** so the status
+   is “In production” — in “Testing”, Google ends the authorization after 7 days. Google will
+   warn “Google hasn't verified this app”; that is expected for your own project.
+5. **Clients (Credentials) → Create client**, type “TVs and Limited Input devices”. Copy the
+   client ID and secret into the form.
+6. Press **Connect**; Home Control shows a code — enter it at google.com/device on your phone and
+   allow read-only access.
+7. Usage against your project's quota is shown on the setup page from then on.
+
+Turn the whole module off with `HOME_CONTROL_YOUTUBE_ENABLED=false`.
+
+#### Quota
+
+Google gives each Cloud project 10 000 YouTube Data API units a day, reset at midnight Pacific
+time. With the defaults, refreshing subscriptions costs about 30 units an hour and each search
+costs 100 units, capped at 20 searches a day — comfortably inside the daily budget for one
+household. Usage so far today, and how it resets, is shown on the setup page. Tunable through
+`home-control.youtube.daily-quota-units`, `searches-per-day`, `channels-per-refresh` and
+`refresh-interval`.
+
+#### Privacy
+
+The OAuth client secret and refresh token are encrypted at rest in `/data/secrets.json`, the
+same as other content sources' secrets (see "Secrets" below); the access token itself is never
+written to disk, only kept in memory. Thumbnails are proxied through Home Control, so a browser
+never talks to `i.ytimg.com` directly. Disconnecting revokes the authorization at Google as well
+as removing the stored secrets.
+
+#### Playing
+
+On Android TV, LG webOS and Samsung Tizen, playing a YouTube item opens the real YouTube app
+with that video — the same route as any other app link. Cast-only devices (a plain Chromecast,
+or the Cast side of a merged device) cannot open app links, so for them Home Control offers
+**YouTube Cast**, a **best-effort** route through YouTube's unofficial "Lounge" remote-control
+interface (the one phones use to cast). It is **off by default for every device** — switch it on
+per device under **YouTube Cast (best effort)** on the setup page. Google does not document this
+interface and can change or break it without notice; when it fails, the play sheet reports why
+and never retries automatically. It never replaces the app route: a device that can open the
+YouTube app always tries that first.
 
 ### Secrets
 
@@ -302,6 +369,11 @@ sees, or requests will be refused as cross-site.
 | `HOME_CONTROL_ALLOWED_HOSTS` | empty | Comma-separated extra host names the app answers to: exact names, or `*.example.org` for its subdomains |
 | `HOME_CONTROL_SECURE_COOKIE` | `false` | Mark the login cookie `Secure` when the app is only reached over HTTPS |
 | `HOME_CONTROL_JELLYFIN_ENABLED` | `true` | Turn the Jellyfin module off entirely |
+| `HOME_CONTROL_YOUTUBE_ENABLED` | `true` | Turn the YouTube module off entirely |
+| `home-control.youtube.daily-quota-units` | `10000` | Your Cloud project's daily YouTube Data API budget |
+| `home-control.youtube.searches-per-day` | `20` | On-demand searches allowed per day (100 quota units each) |
+| `home-control.youtube.channels-per-refresh` | `30` | Subscribed channels read per subscriptions refresh |
+| `home-control.youtube.refresh-interval` | `60m` | How often every YouTube rail (subscriptions, Watch Later, chosen playlists) refreshes in the background |
 
 The app only answers to host names that cannot be pointed at it by someone else's DNS
 (DNS rebinding): IP addresses, `localhost`, single-label names such as `nas`, and names

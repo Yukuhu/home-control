@@ -243,6 +243,34 @@ class SubscriptionsFeedTest {
                 .isEqualTo(YouTubeException.Kind.FORBIDDEN);
     }
 
+    @Test
+    void aFailedFirstRefreshIsSpacedTooSoRetryHammersItDoesNot() {
+        fake.respond("GET", "/youtube/v3/subscriptions", FakeGoogleServer.Canned.fixture(403, "error-api-not-enabled.json"));
+        YouTubeApiClient client = api();
+        SubscriptionsFeed feed = feed(client);
+
+        assertThatThrownBy(feed::refresh).isInstanceOf(YouTubeException.class);
+        int requestsAfterFirstFailure = fake.requests("/youtube/v3/subscriptions").size();
+
+        // Within the spacing window: the same failure is rethrown, without asking again.
+        assertThatThrownBy(feed::refresh)
+                .isInstanceOf(YouTubeException.class)
+                .extracting(e -> ((YouTubeException) e).kind())
+                .isEqualTo(YouTubeException.Kind.FORBIDDEN);
+        assertThat(fake.requests("/youtube/v3/subscriptions")).hasSize(requestsAfterFirstFailure);
+
+        // Past the window: it is asked again, and can now succeed.
+        clock.advance(Duration.ofMinutes(15));
+        fake.respondWhen("GET", "/youtube/v3/subscriptions", r -> !r.query().containsKey("pageToken"),
+                FakeGoogleServer.Canned.fixture(200, "subscriptions-page-1.json"));
+        fake.respondWhen("GET", "/youtube/v3/subscriptions", r -> "CAIQAA".equals(r.query().get("pageToken")),
+                FakeGoogleServer.Canned.fixture(200, "subscriptions-page-2.json"));
+        List<YouTubeVideo> videos = feed.refresh();
+
+        assertThat(videos).isNotEmpty();
+        assertThat(fake.requests("/youtube/v3/subscriptions")).hasSizeGreaterThan(requestsAfterFirstFailure);
+    }
+
     private static YouTubeProperties withChannelsPerRefresh(YouTubeProperties p, int channelsPerRefresh) {
         return new YouTubeProperties(p.enabled(), p.oauthBaseUrl(), p.apiBaseUrl(), p.loungeBaseUrl(), p.thumbnailBaseUrl(),
                 p.connectTimeoutSeconds(), p.requestTimeoutSeconds(), p.dailyQuotaUnits(), p.searchesPerDay(), p.railSize(),

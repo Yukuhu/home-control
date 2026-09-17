@@ -23,7 +23,7 @@
            th:text="|Nothing found for “${query}”|">Nothing found</p>
         <div class="search-on-demand" th:each="source : ${onDemand}">
             <button type="button" class="search-more"
-                    th:attr="hx-get=@{/search/results/{id}(id=${source.sourceId()},q=${query})}"
+                    th:attr="hx-post=@{/search/results/{id}(id=${source.sourceId()},q=${query})}"
                     hx-target="closest div" hx-swap="outerHTML"
                     th:text="|Search ${source.sourceName()}|">Search YouTube</button>
             <span class="hint" th:if="${source.note() != null}" th:text="${source.note()}">19 of 20 YouTube searches left today</span>

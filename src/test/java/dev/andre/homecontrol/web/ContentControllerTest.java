@@ -25,6 +25,7 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -289,7 +290,7 @@ class ContentControllerTest {
         SearchOutcome outcome = new SearchOutcome("star", List.of(new SearchOutcome.Hits(youtube, List.of(item))), List.of());
         given(searchService.searchSource("youtube", "star", 20)).willReturn(outcome);
 
-        mockMvc.perform(get("/search").param("q", "star").param("source", "youtube"))
+        mockMvc.perform(post("/search").param("q", "star").param("source", "youtube"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.results[0].sourceId").value("youtube"));
 
@@ -297,8 +298,21 @@ class ContentControllerTest {
 
         given(searchService.searchSource("nope", "star", 20))
                 .willThrow(new IllegalArgumentException("No searchable source nope"));
-        mockMvc.perform(get("/search").param("q", "star").param("source", "nope"))
+        mockMvc.perform(post("/search").param("q", "star").param("source", "nope"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().string("No searchable source nope"));
+    }
+
+    @Test
+    void onDemandSourceSearchIsNoLongerAGet() throws Exception {
+        // A GET must not be able to spend a source's quota; only the POST mapping accepts `source`,
+        // so a `source` param on a GET is simply ignored and falls through to the unified search.
+        given(searchService.search("star", 20)).willReturn(new SearchOutcome("star", List.of(), List.of()));
+
+        mockMvc.perform(get("/search").param("q", "star").param("source", "youtube"))
+                .andExpect(status().isOk());
+
+        verify(searchService, never()).searchSource(any(), any(), anyInt());
+        verify(searchService).search("star", 20);
     }
 }

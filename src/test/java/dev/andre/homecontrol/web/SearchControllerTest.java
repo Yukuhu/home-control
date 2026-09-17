@@ -23,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -139,7 +140,7 @@ class SearchControllerTest {
 
         mockMvc.perform(get("/search/results").param("q", "star"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("hx-get=\"/search/results/youtube?q=star\"")))
+                .andExpect(content().string(containsString("hx-post=\"/search/results/youtube?q=star\"")))
                 .andExpect(content().string(containsString("Search YouTube")))
                 .andExpect(content().string(containsString("19 of 20 YouTube searches left today")));
     }
@@ -172,7 +173,7 @@ class SearchControllerTest {
                 List.of(new SearchOutcome.Hits(youtube, List.of(item("item-1", "youtube", "Star video")))), List.of());
         given(search.searchSource("youtube", "star", 20)).willReturn(outcome);
 
-        mockMvc.perform(get("/search/results/youtube").param("q", "star"))
+        mockMvc.perform(post("/search/results/youtube").param("q", "star"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("class=\"rail search-hits\"")))
                 .andExpect(content().string(containsString("data-item=\"item-1\"")));
@@ -180,19 +181,27 @@ class SearchControllerTest {
         SearchOutcome failed = new SearchOutcome("star", List.of(),
                 List.of(new SearchOutcome.Failure(youtube, "YouTube search failed")));
         given(search.searchSource("youtube", "star", 20)).willReturn(failed);
-        mockMvc.perform(get("/search/results/youtube").param("q", "star"))
+        mockMvc.perform(post("/search/results/youtube").param("q", "star"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("class=\"rail-error\"")))
                 .andExpect(content().string(containsString("YouTube search failed")));
 
         given(search.searchSource("nope", "star", 20)).willThrow(new IllegalArgumentException("No searchable source nope"));
-        mockMvc.perform(get("/search/results/nope").param("q", "star"))
+        mockMvc.perform(post("/search/results/nope").param("q", "star"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("No searchable source nope")));
 
-        mockMvc.perform(get("/search/results/youtube").param("q", "s"))
+        mockMvc.perform(post("/search/results/youtube").param("q", "s"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Type at least 2 characters")));
         verify(search, never()).searchSource("youtube", "s", 20);
+    }
+
+    @Test
+    void onDemandSearchIsNoLongerAGet() throws Exception {
+        // A GET must not be able to spend the on-demand source's quota; only the POST mapping exists.
+        mockMvc.perform(get("/search/results/youtube").param("q", "star"))
+                .andExpect(status().isMethodNotAllowed());
+        verify(search, never()).searchSource(any(), any(), anyInt());
     }
 }

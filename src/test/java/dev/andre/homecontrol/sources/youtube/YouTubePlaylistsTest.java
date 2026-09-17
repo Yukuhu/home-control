@@ -107,13 +107,33 @@ class YouTubePlaylistsTest {
                 .isInstanceOf(ContentSourceException.class)
                 .hasMessage(YouTubePlaylists.WATCH_LATER_UNAVAILABLE);
 
+        clock.advance(Duration.ofMinutes(15));
         fake.respond("GET", "/youtube/v3/playlistItems", FakeGoogleServer.Canned.fixture(404, "error-playlist-not-found.json"));
         assertThatThrownBy(playlists::watchLater)
                 .isInstanceOf(ContentSourceException.class)
                 .hasMessage(YouTubePlaylists.WATCH_LATER_UNAVAILABLE);
 
+        clock.advance(Duration.ofMinutes(15));
         fake.respond("GET", "/youtube/v3/playlistItems", FakeGoogleServer.Canned.fixture(200, "playlist-items-playlist.json"));
         assertThat(playlists.watchLater()).extracting(YouTubeVideo::id).containsExactly("Wq9Ze2Lr5tA", "Kz1aT5nM3pQ");
+    }
+
+    @Test
+    void watchLaterFailuresAreSpacedFifteenMinutes() {
+        assertThatThrownBy(playlists::watchLater).isInstanceOf(ContentSourceException.class);
+        int requestsAfterFirstFailure = fake.requests("/youtube/v3/playlistItems").size();
+
+        // Within the spacing window: the memoized failure is rethrown honestly, at no extra cost.
+        fake.respond("GET", "/youtube/v3/playlistItems", FakeGoogleServer.Canned.fixture(200, "playlist-items-playlist.json"));
+        assertThatThrownBy(playlists::watchLater)
+                .isInstanceOf(ContentSourceException.class)
+                .hasMessage(YouTubePlaylists.WATCH_LATER_UNAVAILABLE);
+        assertThat(fake.requests("/youtube/v3/playlistItems")).hasSize(requestsAfterFirstFailure);
+
+        // Past the window: it is asked again, and can now succeed.
+        clock.advance(Duration.ofMinutes(15));
+        assertThat(playlists.watchLater()).extracting(YouTubeVideo::id).containsExactly("Wq9Ze2Lr5tA", "Kz1aT5nM3pQ");
+        assertThat(fake.requests("/youtube/v3/playlistItems")).hasSizeGreaterThan(requestsAfterFirstFailure);
     }
 
     @Test

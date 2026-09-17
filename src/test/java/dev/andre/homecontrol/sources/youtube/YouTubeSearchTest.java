@@ -7,12 +7,23 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -147,6 +158,54 @@ class YouTubeSearchTest {
 
         assertThat(fake.requests("/youtube/v3/search")).hasSize(1);
         assertThat(second).hasSize(1);
+    }
+
+    @Test
+    void concurrentIdenticalSearchesShareOneUpstreamCall() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger calls = new AtomicInteger();
+        JsonMapper mapper = JsonMapper.builder().build();
+        JsonNode fixture = mapper.readTree(FakeGoogleServer.fixture("search-videos.json"));
+        YouTubeApiClient blocking = new YouTubeApiClient(null, URI.create("http://unused"), null, null) {
+            @Override
+            public JsonNode get(QuotaLedger.Call call, String resource, Map<String, String> query) {
+                calls.incrementAndGet();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return fixture;
+            }
+        };
+        YouTubeSearch blockingSearch = new YouTubeSearch(blocking, known, fake.properties(), clock);
+
+        int callers = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(callers);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<List<YouTubeVideo>>> futures = new ArrayList<>();
+            for (int i = 0; i < callers; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    return blockingSearch.search("bunny", 10);
+                }));
+            }
+            start.countDown();
+            Thread.sleep(200); // let every caller reach search() and queue behind the one in-flight call
+            release.countDown();
+
+            List<List<YouTubeVideo>> results = new ArrayList<>();
+            for (Future<List<YouTubeVideo>> future : futures) {
+                results.add(future.get(5, TimeUnit.SECONDS));
+            }
+
+            assertThat(calls.get()).isEqualTo(1);
+            assertThat(results).allSatisfy(result -> assertThat(result).isEqualTo(results.getFirst()));
+            assertThat(results.getFirst()).extracting(YouTubeVideo::id).containsExactly("aqz-KE-bpKQ", "Hh7Lq2Wv9sE");
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     @Test

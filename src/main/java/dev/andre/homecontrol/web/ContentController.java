@@ -94,8 +94,22 @@ public class ContentController {
 
     /** Used by the unified search box (D5): every enabled searchable source, in parallel, one deadline. */
     @GetMapping(path = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> search(@RequestParam(required = false) String q, @RequestParam(defaultValue = "20") int limit,
-                                    @RequestParam(required = false) String source) {
+    public ResponseEntity<?> search(@RequestParam(required = false) String q, @RequestParam(defaultValue = "20") int limit) {
+        return search(q, limit, null);
+    }
+
+    /**
+     * On demand only (a button press, never as-you-type): a single source's search, which spends
+     * that source's own quota (e.g. a YouTube Data API search.list call). A POST, so
+     * CrossOriginFilter refuses a cross-site request before it can spend anything.
+     */
+    @PostMapping(path = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> searchSource(@RequestParam(required = false) String q, @RequestParam(defaultValue = "20") int limit,
+                                          @RequestParam String source) {
+        return search(q, limit, source);
+    }
+
+    private ResponseEntity<?> search(String q, int limit, String source) {
         String query = q == null ? "" : q.strip();
         if (query.length() < 2 || query.length() > 100) {
             return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body("Search for 2 to 100 characters");

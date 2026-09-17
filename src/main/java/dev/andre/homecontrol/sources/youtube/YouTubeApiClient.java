@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.youtube;
 
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.MissingNode;
 
 import java.net.URI;
 import java.util.Map;
@@ -21,12 +22,11 @@ public class YouTubeApiClient {
     }
 
     public JsonNode get(QuotaLedger.Call call, String resource, Map<String, String> query) {
-        ledger.charge(call);
         URI uri = YouTubeHttp.uri(base, "/" + resource, query);
-        YouTubeHttp.Response response = send(uri);
+        YouTubeHttp.Response response = chargedSend(call, uri);
         if (response.status() == 401) {
             tokens.invalidate();
-            response = send(uri);
+            response = chargedSend(call, uri);
             if (response.status() == 401) {
                 throw new YouTubeException(YouTubeException.Kind.UNAUTHORIZED,
                         "Google rejected the YouTube authorization; reconnect YouTube on the setup page", "authError");
@@ -38,8 +38,16 @@ public class YouTubeApiClient {
         throw failure(response);
     }
 
-    private YouTubeHttp.Response send(URI uri) {
-        return http.get(uri, Map.of("Authorization", "Bearer " + tokens.accessToken(), "Accept", "application/json"));
+    /**
+     * Obtains the access token before charging: a revoked, unconfigured or unreachable-refresh
+     * failure throws here and never reaches the ledger, since no Data API call was made. Only once
+     * a token is in hand is the call charged, then sent — so a retried 401 is charged again too,
+     * one call, one charge.
+     */
+    private YouTubeHttp.Response chargedSend(QuotaLedger.Call call, URI uri) {
+        String accessToken = tokens.accessToken();
+        ledger.charge(call);
+        return http.get(uri, Map.of("Authorization", "Bearer " + accessToken, "Accept", "application/json"));
     }
 
     private YouTubeException failure(YouTubeHttp.Response response) {
@@ -78,7 +86,7 @@ public class YouTubeApiClient {
         try {
             return response.json().path("error");
         } catch (YouTubeException notJson) {
-            return tools.jackson.databind.node.MissingNode.getInstance();
+            return MissingNode.getInstance();
         }
     }
 }

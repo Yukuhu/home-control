@@ -7,6 +7,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
@@ -51,7 +52,12 @@ public class SearchController {
         return "fragments/search :: results";
     }
 
-    @GetMapping("/search/results/{sourceId}")
+    /**
+     * On demand only (a button press, never as-you-type): this spends the source's own quota
+     * (e.g. a YouTube Data API search.list call), so it is a POST — CrossOriginFilter then refuses
+     * a cross-site request before it can spend anything.
+     */
+    @PostMapping("/search/results/{sourceId}")
     public String sourceResults(@PathVariable String sourceId, @RequestParam(required = false) String q, Model model) {
         String query = q == null ? "" : q.strip();
         model.addAttribute("query", query);

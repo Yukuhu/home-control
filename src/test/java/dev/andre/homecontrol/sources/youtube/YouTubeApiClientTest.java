@@ -72,7 +72,24 @@ class YouTubeApiClientTest {
         verify(tokens).invalidate();
         assertThat(fake.requests("/youtube/v3/channels")).hasSize(2);
         assertThat(fake.requests("/youtube/v3/channels").get(1).header("authorization")).isEqualTo("Bearer ya29.second");
-        assertThat(ledger.usage().units()).isEqualTo(1);
+        // Two real calls reached the Data API (the 401 and the retry that succeeded), so both are charged.
+        assertThat(ledger.usage().units()).isEqualTo(2);
+    }
+
+    @Test
+    void revokedAuthorizationLeavesTheLedgerUnchanged() {
+        GoogleTokens revoked = mock(GoogleTokens.class);
+        given(revoked.accessToken()).willThrow(new YouTubeException(YouTubeException.Kind.REVOKED,
+                "YouTube access was revoked; reconnect YouTube on the setup page"));
+        YouTubeApiClient revokedClient = new YouTubeApiClient(new YouTubeHttp(fake.properties()),
+                URI.create(fake.base() + "/youtube/v3"), revoked, ledger);
+
+        assertThatThrownBy(() -> revokedClient.get(QuotaLedger.Call.CHANNELS_LIST, "channels", Map.of()))
+                .isInstanceOf(YouTubeException.class)
+                .extracting(e -> ((YouTubeException) e).kind())
+                .isEqualTo(YouTubeException.Kind.REVOKED);
+        assertThat(ledger.usage().units()).isZero();
+        assertThat(fake.requests("/youtube/v3/channels")).isEmpty();
     }
 
     @Test
