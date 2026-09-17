@@ -46,6 +46,16 @@ class MpvPlayerTest {
     }
 
     @Test
+    void refusesToPlayWhenTheRuntimeDirIsNotPrivate() throws Exception {
+        Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxrwxrwx"));
+
+        assertThatThrownBy(() -> player.play(URI.create("http://nas/a.mp3"), "pulse/x", 40, false))
+                .isInstanceOf(dev.andre.homecontrol.core.ActionFailedException.class)
+                .hasMessageContaining(dir.toString());
+        assertThat(launcher.starts).isEmpty();
+    }
+
+    @Test
     void playsAfterTheFileLoaded() throws Exception {
         player.play(URI.create("http://nas/a.mp3?ApiKey=secret"), "pulse/bluez_output.AA_BB_CC_DD_EE_FF.1", 40, false);
 
@@ -86,6 +96,37 @@ class MpvPlayerTest {
         PlayerStatus second = player.status().orElseThrow();
         assertThat(second.metadataTitle()).isEqualTo("Meta Song");
         assertThat(second.durationSeconds()).isNull();
+    }
+
+    @Test
+    void toleratesOneFailedStatusPollBeforeStopping() throws Exception {
+        MpvPlayer quick = new MpvPlayer(launcher, MpvPlayer.socketFor(dir, "quick"), Duration.ofSeconds(2),
+                Duration.ofSeconds(2), Duration.ofMillis(200));
+        quick.play(URI.create("http://nas/a.mp3"), "pulse/x", 40, false);
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> assertThat(quick.status()).isPresent());
+
+        launcher.latest().dropNextGetProperty(1);
+        assertThat(quick.status()).isEmpty();
+        assertThat(quick.active()).isTrue();
+
+        assertThat(quick.status()).isPresent();
+        assertThat(quick.active()).isTrue();
+        quick.close();
+    }
+
+    @Test
+    void aSecondConsecutiveFailedStatusPollStopsThePlayer() throws Exception {
+        MpvPlayer quick = new MpvPlayer(launcher, MpvPlayer.socketFor(dir, "quick2"), Duration.ofSeconds(2),
+                Duration.ofSeconds(2), Duration.ofMillis(200));
+        quick.play(URI.create("http://nas/a.mp3"), "pulse/x", 40, false);
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> assertThat(quick.status()).isPresent());
+
+        launcher.latest().dropNextGetProperty(2);
+        assertThat(quick.status()).isEmpty();
+        assertThat(quick.active()).isTrue();
+        assertThat(quick.status()).isEmpty();
+        assertThat(quick.active()).isFalse();
+        quick.close();
     }
 
     @Test
