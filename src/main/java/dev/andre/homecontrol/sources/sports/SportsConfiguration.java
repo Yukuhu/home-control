@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.sports;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.content.SourcePreferencesService;
+import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarFetcher;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
@@ -74,7 +75,9 @@ public class SportsConfiguration {
     @Bean
     public SportsContentSource sportsContentSource(SportsSettingsService settings, SportsSchedule schedule,
                                                     SportsTimeZones zones,
-                                                    SourcePreferencesService sourcePreferencesService) {
-        return new SportsContentSource(settings, schedule, zones, sourcePreferencesService::current, Clock.systemUTC());
+                                                    SourcePreferencesService sourcePreferencesService,
+                                                    ObjectProvider<PinnedLinks> pinnedLinks, SportsProperties properties) {
+        return new SportsContentSource(settings, schedule, zones, sourcePreferencesService::current, Clock.systemUTC(),
+                pinnedLinks, properties);
     }
 }

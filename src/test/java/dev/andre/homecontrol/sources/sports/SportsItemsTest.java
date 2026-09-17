@@ -1,10 +1,13 @@
 package dev.andre.homecontrol.sources.sports;
 
+import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.content.StreamingProviders;
+import dev.andre.homecontrol.core.playback.PlayableRef;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -12,8 +15,11 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 
 class SportsItemsTest {
 
@@ -129,5 +135,63 @@ class SportsItemsTest {
         if (subtitle.contains(name)) {
             assertThat(subtitle).endsWith("(your setting)");
         }
+    }
+
+    private static SportsSettings withProvider(String provider) {
+        return SportsSettings.empty().withCalendars(List.of(new SportsSettings.CalendarEntry(
+                "c-3f9a1c2b7d4e", "Bundesliga 2026/27", "calendar.example.org", provider, Instant.EPOCH)));
+    }
+
+    @Test
+    void daznCompetitionsOpenTheDaznApp() {
+        SportsEvent event = event("2026-09-19T13:30:00Z", "2026-09-19T15:25:00Z");
+
+        assertThat(SportsItems.playables(event, withProvider("dazn"), null))
+                .containsExactly(new PlayableRef.AppLink(URI.create("https://www.dazn.com/"), "dazn"));
+        assertThat(SportsItems.playables(event, withProvider("primevideo"), null))
+                .containsExactly(new PlayableRef.AppLink(URI.create("https://app.primevideo.com/"), "primevideo"));
+        assertThat(SportsItems.playables(event, withProvider("netflix"), null))
+                .containsExactly(new PlayableRef.AppLink(URI.create("https://www.netflix.com/browse"), "netflix"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"wowtv", "joyn", "disneyplus", "rtlplus"})
+    void servicesWithoutAnAppHomeHaveNoPlayables(String provider) {
+        SportsEvent event = event("2026-09-19T13:30:00Z", "2026-09-19T15:25:00Z");
+        assertThat(SportsItems.playables(event, withProvider(provider), null)).isEmpty();
+    }
+
+    @Test
+    void unmappedCompetitionHasNoPlayables() {
+        SportsEvent event = event("2026-09-19T13:30:00Z", "2026-09-19T15:25:00Z");
+        assertThat(SportsItems.playables(event, SETTINGS, null)).isEmpty();
+    }
+
+    @Test
+    void aPinnedEventLinkWins() {
+        SportsEvent target = new SportsEvent("tsdb:2508361", "calendar:c-3f9a1c2b7d4e", "Title",
+                Instant.parse("2026-09-19T13:30:00Z"), Instant.parse("2026-09-19T15:30:00Z"), null, null, SportsEvent.Status.SCHEDULED);
+        PlayableRef.AppLink pinnedLink = new PlayableRef.AppLink(
+                URI.create("https://www.dazn.com/de-DE/fixture/ContentId:1a2b3c4d5e6f7g8h9i0j"), "dazn");
+        PinnedLinks pinnedLinks = mock(PinnedLinks.class);
+        given(pinnedLinks.linkFor("sports", "tsdb:2508361")).willReturn(Optional.of(pinnedLink));
+        given(pinnedLinks.linkFor("sports", "tsdb:other")).willReturn(Optional.empty());
+
+        assertThat(SportsItems.playables(target, withProvider("dazn"), pinnedLinks)).containsExactly(pinnedLink);
+        assertThat(SportsItems.playables(target, SETTINGS, pinnedLinks)).containsExactly(pinnedLink);
+
+        SportsEvent other = new SportsEvent("tsdb:other", "calendar:c-3f9a1c2b7d4e", "Title",
+                Instant.parse("2026-09-19T13:30:00Z"), Instant.parse("2026-09-19T15:30:00Z"), null, null, SportsEvent.Status.SCHEDULED);
+        assertThat(SportsItems.playables(other, withProvider("dazn"), pinnedLinks))
+                .containsExactly(new PlayableRef.AppLink(URI.create("https://www.dazn.com/"), "dazn"));
+    }
+
+    @Test
+    void endedEventsStillOpenTheApp() {
+        SportsEvent bayern = new SportsEvent("id", "calendar:c-3f9a1c2b7d4e", "Bayern",
+                Instant.parse("2026-09-18T18:30:00Z"), Instant.parse("2026-09-18T20:25:00Z"),
+                null, null, SportsEvent.Status.SCHEDULED);
+        assertThat(SportsItems.playables(bayern, withProvider("dazn"), null))
+                .containsExactly(new PlayableRef.AppLink(URI.create("https://www.dazn.com/"), "dazn"));
     }
 }
