@@ -1,11 +1,19 @@
 package dev.andre.homecontrol.sources.pinned;
 
 import dev.andre.homecontrol.core.content.ContentChangedEvent;
+import dev.andre.homecontrol.core.content.ContentSource;
+import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.core.content.ContentSources;
+import dev.andre.homecontrol.core.playback.ContentItem;
+import dev.andre.homecontrol.core.playback.ContentKind;
+import dev.andre.homecontrol.core.playback.PlayableRef;
+import dev.andre.homecontrol.core.playback.ServiceLinks;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.net.URI;
@@ -15,9 +23,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -32,14 +42,38 @@ class PinnedShortcutsTest {
 
     JsonFilePinStore store;
     ApplicationEventPublisher events;
+    ContentSources sources;
+    ContentSource tmdbSource;
     PinnedShortcuts shortcuts;
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<ContentSources> providerOf(ContentSources sources) {
+        ObjectProvider<ContentSources> provider = mock(ObjectProvider.class);
+        given(provider.getIfAvailable()).willReturn(sources);
+        return provider;
+    }
 
     @BeforeEach
     void setUp() {
         store = new JsonFilePinStore(dir.resolve("pinned.json"));
         events = mock(ApplicationEventPublisher.class);
+        sources = mock(ContentSources.class);
+        tmdbSource = mock(ContentSource.class);
+        given(sources.find("tmdb")).willReturn(Optional.of(tmdbSource));
+
+        PlayableRef.AppLink netflixHome = new PlayableRef.AppLink(ServiceLinks.appHome("netflix").orElseThrow(), "netflix");
+        ContentItem strangerThings = new ContentItem("tv-66732", "tmdb", ContentKind.VIDEO, "Stranger Things",
+                "On Netflix · 2016", URI.create("https://image.tmdb.org/t/p/w342/49WJfeN0moxb9IPfGn8AIqMGskD.jpg"),
+                List.of(netflixHome));
+        given(tmdbSource.item("tv-66732")).willReturn(Optional.of(strangerThings));
+
+        PlayableRef.AppLink netflixTitleLink = ServiceLinks.appLink(ServiceLinks.netflixTitle("603"));
+        ContentItem alreadyDirect = new ContentItem("movie-9", "tmdb", ContentKind.MOVIE, "Matrix", "Movie · 1999",
+                null, List.of(netflixTitleLink));
+        given(tmdbSource.item("movie-9")).willReturn(Optional.of(alreadyDirect));
+
         shortcuts = new PinnedShortcuts(store, new PinnedProperties(true, 3), events,
-                Clock.fixed(NOW, ZoneOffset.UTC), new SecureRandom());
+                Clock.fixed(NOW, ZoneOffset.UTC), new SecureRandom(), providerOf(sources));
     }
 
     @Test
@@ -165,8 +199,81 @@ class PinnedShortcutsTest {
         shortcuts.add("https://example.org/b", "B");
 
         PinnedShortcuts restarted = new PinnedShortcuts(store, new PinnedProperties(true, 3), events,
-                Clock.fixed(NOW, ZoneOffset.UTC), new SecureRandom());
+                Clock.fixed(NOW, ZoneOffset.UTC), new SecureRandom(), providerOf(sources));
 
         assertThat(restarted.all()).extracting(Pin::title).containsExactly("A", "B");
+    }
+
+    @Test
+    void upgradesAnItemWithItsMetadata() {
+        Pin pin = shortcuts.addUpgrade("https://www.netflix.com/de/title/80057281?s=a", "tmdb/tv-66732");
+
+        assertThat(pin.title()).isEqualTo("Stranger Things");
+        assertThat(pin.subtitle()).isEqualTo("Netflix");
+        assertThat(pin.artwork()).isEqualTo(URI.create("https://image.tmdb.org/t/p/w342/49WJfeN0moxb9IPfGn8AIqMGskD.jpg"));
+        assertThat(pin.kind()).isEqualTo(ContentKind.VIDEO);
+        assertThat(pin.upgradeOf()).isEqualTo("tmdb/tv-66732");
+        assertThat(pin.url()).isEqualTo(URI.create("https://www.netflix.com/title/80057281"));
+
+        verify(events).publishEvent(new ContentChangedEvent("pinned"));
+        verify(events).publishEvent(new ContentChangedEvent("tmdb"));
+
+        assertThat(shortcuts.linkFor("tmdb", "tv-66732"))
+                .contains(new PlayableRef.AppLink(URI.create("https://www.netflix.com/title/80057281"), "netflix"));
+        assertThat(shortcuts.linkFor("tmdb", "tv-1")).isEmpty();
+    }
+
+    @Test
+    void upgradingAgainReplacesThePin() {
+        Pin first = shortcuts.addUpgrade("https://www.netflix.com/title/80057281", "tmdb/tv-66732");
+
+        Pin second = shortcuts.addUpgrade("https://app.primevideo.com/detail?gti=amzn1.dv.gti.8eb3c4a1-1b2c-4d5e-9f60-718293a4b5c6",
+                "tmdb/tv-66732");
+
+        assertThat(second.id()).isEqualTo(first.id());
+        assertThat(second.url()).isEqualTo(URI.create("https://app.primevideo.com/detail?gti=amzn1.dv.gti.8eb3c4a1-1b2c-4d5e-9f60-718293a4b5c6"));
+        assertThat(shortcuts.all()).hasSize(1);
+    }
+
+    @Test
+    void refusesWhatCannotBeUpgraded() {
+        assertThatThrownBy(() -> shortcuts.addUpgrade("https://example.org/x", "tmdb/../x"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("That item cannot be pinned");
+
+        assertThatThrownBy(() -> shortcuts.addUpgrade("https://example.org/x", "nope/tv-1"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("That item is no longer available");
+
+        given(tmdbSource.item("tv-404")).willReturn(Optional.empty());
+        assertThatThrownBy(() -> shortcuts.addUpgrade("https://example.org/x", "tmdb/tv-404"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("That item is no longer available");
+
+        assertThatThrownBy(() -> shortcuts.addUpgrade("https://example.org/x", "tmdb/movie-9"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("This item already opens directly");
+
+        assertThatThrownBy(() -> shortcuts.addUpgrade("javascript:alert(1)", "tmdb/tv-66732"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Only http and https links can be opened on a device");
+
+        assertThat(shortcuts.all()).isEmpty();
+        verifyNoMoreInteractions(events);
+    }
+
+    @Test
+    void refusesWhenTheSourceLookupFails() {
+        given(tmdbSource.item("tv-500")).willThrow(new ContentSourceException("TMDB had a server error"));
+
+        assertThatThrownBy(() -> shortcuts.addUpgrade("https://example.org/x", "tmdb/tv-500"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("TMDB had a server error");
+    }
+
+    @Test
+    void artworkFromTheItemIsKeptOnlyWhenSafe() {
+        given(tmdbSource.item("tv-77")).willReturn(Optional.of(new ContentItem("tv-77", "tmdb", ContentKind.VIDEO,
+                "Insecure Art", null, URI.create("http://example.org/x.jpg"),
+                List.of(new PlayableRef.AppLink(ServiceLinks.appHome("netflix").orElseThrow(), "netflix")))));
+
+        Pin pin = shortcuts.addUpgrade("https://www.netflix.com/title/1", "tmdb/tv-77");
+
+        assertThat(pin.artwork()).isNull();
     }
 }

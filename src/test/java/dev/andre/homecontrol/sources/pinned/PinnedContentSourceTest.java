@@ -1,11 +1,13 @@
 package dev.andre.homecontrol.sources.pinned;
 
+import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.net.URI;
 import java.nio.file.Path;
@@ -28,11 +30,16 @@ class PinnedContentSourceTest {
     PinnedShortcuts shortcuts;
     PinnedContentSource source;
 
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<ContentSources> noSources() {
+        return mock(ObjectProvider.class);
+    }
+
     @BeforeEach
     void setUp() {
         JsonFilePinStore store = new JsonFilePinStore(dir.resolve("pinned.json"));
         shortcuts = new PinnedShortcuts(store, new PinnedProperties(true, 200), mock(org.springframework.context.ApplicationEventPublisher.class),
-                Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC), new SecureRandom());
+                Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC), new SecureRandom(), noSources());
         source = new PinnedContentSource(shortcuts);
     }
 
@@ -90,7 +97,7 @@ class PinnedContentSourceTest {
                 ContentKind.VIDEO, null, Instant.parse("2026-09-16T10:00:00Z"))));
         PinnedShortcuts freshShortcuts = new PinnedShortcuts(store, new PinnedProperties(true, 200),
                 mock(org.springframework.context.ApplicationEventPublisher.class),
-                Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC), new SecureRandom());
+                Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC), new SecureRandom(), noSources());
         PinnedContentSource freshSource = new PinnedContentSource(freshShortcuts);
 
         ContentItem item = freshSource.item("p-aaaaaaaaaaaa").orElseThrow();

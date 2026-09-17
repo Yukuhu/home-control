@@ -7,6 +7,49 @@ const sheet = () => document.getElementById("play-sheet");
 let current = null;   // { source, item, title }
 let target = null;    // device id
 let previewSeq = 0;
+let pinOffer = null;
+
+function showPin(offer) {
+    const form = document.getElementById("sheet-pin");
+    if (!form) return;
+    pinOffer = offer;
+    document.getElementById("sheet-pin-error").hidden = true;
+    if (!offer) { form.hidden = true; return; }
+    document.getElementById("sheet-pin-text").textContent = offer.serviceName
+        ? `This opens the ${offer.serviceName} app, not the title. Paste the ${offer.serviceName} link for this title to open it directly.`
+        : "Home Control cannot open this title on your services. Paste a link to it (Netflix, Prime Video, YouTube, DAZN or any web link) to pin it.";
+    form.hidden = false;
+}
+
+async function submitPin(event) {
+    event.preventDefault();
+    if (!pinOffer) return;
+    const input = document.getElementById("sheet-pin-url");
+    const errorEl = document.getElementById("sheet-pin-error");
+    const button = document.getElementById("sheet-pin-submit");
+    button.disabled = true;
+    try {
+        const response = await fetch("/setup/sources/pinned/upgrade", {
+            method: "POST",
+            headers: { Accept: "application/json" },
+            body: form({ url: input.value, upgradeOf: pinOffer.upgradeOf }),
+        });
+        const data = await readJsonOrText(response);
+        if (!response.ok) {
+            errorEl.textContent = data.message || "Could not pin this link";
+            errorEl.hidden = false;
+            return;
+        }
+        input.value = "";
+        toast(data.message, { ok: true });
+        preview();
+    } catch {
+        errorEl.textContent = "Cannot reach the server";
+        errorEl.hidden = false;
+    } finally {
+        button.disabled = false;
+    }
+}
 
 function form(fields) {
     const body = new URLSearchParams();
@@ -36,6 +79,7 @@ async function preview() {
     routeEl.textContent = "Working out how to play this…";
     routeEl.classList.remove("unroutable");
     play.disabled = true;
+    showPin(null);
     const query = new URLSearchParams({ source: current.source, item: current.item });
     let data;
     try {
@@ -54,11 +98,13 @@ async function preview() {
         routeEl.textContent = `Cannot play on ${data.deviceName}: ${data.reason}`;
         routeEl.classList.add("unroutable");
         play.textContent = "Play";
+        showPin(data.pin);
         return;
     }
     routeEl.textContent = `Play on ${data.deviceName} · ${data.route.description}`;
     play.textContent = `Play on ${data.deviceName}`;
     play.disabled = false;
+    showPin(data.pin);
 }
 
 function watchAppLink(deviceId, deviceName) {
@@ -149,5 +195,6 @@ export function initPlaySheet() {
         if (device) selectDevice(device.dataset.sheetDevice);
     });
     document.getElementById("sheet-play").addEventListener("click", () => attempt(target, []));
+    document.getElementById("sheet-pin")?.addEventListener("submit", submitPin);
     sheet().addEventListener("close", () => { previewSeq++; });
 }

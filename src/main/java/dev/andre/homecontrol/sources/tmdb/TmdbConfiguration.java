@@ -1,11 +1,14 @@
 package dev.andre.homecontrol.sources.tmdb;
 
 import dev.andre.homecontrol.content.SourcePreferencesService;
+import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -39,9 +42,21 @@ public class TmdbConfiguration {
     }
 
     @Bean
+    public ProviderMatcher providerMatcher(TmdbProperties properties) {
+        return new ProviderMatcher(properties.providerIds());
+    }
+
+    @Bean
+    public TmdbPreferencesListener tmdbPreferencesListener(ApplicationEventPublisher events) {
+        return new TmdbPreferencesListener(events);
+    }
+
+    @Bean
     public TmdbContentSource tmdbContentSource(TmdbSetupService setup, TmdbClient client, TmdbImages images,
                                                TmdbWatchProviders providers, TmdbProperties properties,
-                                               SourcePreferencesService preferencesService) {
-        return new TmdbContentSource(setup, client, images, providers, properties, preferencesService::current);
+                                               SourcePreferencesService preferencesService, ProviderMatcher matcher,
+                                               ObjectProvider<PinnedLinks> pinnedLinks) {
+        return new TmdbContentSource(setup, client, images, providers, properties, preferencesService::current,
+                matcher, pinnedLinks);
     }
 }

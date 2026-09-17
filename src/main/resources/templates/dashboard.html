@@ -156,6 +156,14 @@
     </div>
     <p id="sheet-route" class="sheet-route" aria-live="polite">Working out how to play this…</p>
     <button type="button" id="sheet-play" class="primary" disabled>Play</button>
+    <form id="sheet-pin" class="sheet-pin" hidden>
+        <p id="sheet-pin-text" class="hint"></p>
+        <label for="sheet-pin-url" class="visually-hidden">Link to this title</label>
+        <input id="sheet-pin-url" name="url" type="url" inputmode="url" autocomplete="off" required maxlength="2048"
+               placeholder="https://www.netflix.com/title/…">
+        <button type="submit" id="sheet-pin-submit">Pin link</button>
+        <p id="sheet-pin-error" class="error" role="alert" hidden></p>
+    </form>
 </dialog>
 <div id="toast" hidden role="status" aria-live="polite"><span class="toast-text"></span><button type="button" class="toast-action" hidden></button></div>
 </body>

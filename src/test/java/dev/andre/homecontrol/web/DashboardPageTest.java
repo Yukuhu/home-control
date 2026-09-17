@@ -91,6 +91,25 @@ class DashboardPageTest {
     }
 
     @Test
+    void thePlaySheetHasAPinForm() throws Exception {
+        Device living = device("living", "Living Room", Instant.now());
+        given(devices.devices()).willReturn(List.of(living));
+        given(devices.device("living")).willReturn(Optional.of(living));
+        given(devices.defaultDevice()).willReturn(Optional.of(living));
+        given(devices.state("living")).willReturn(DeviceState.unpaired());
+        given(devices.capabilities(any())).willReturn(EnumSet.noneOf(Capability.class));
+        given(rails.snapshots()).willReturn(List.of());
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<form id=\"sheet-pin\"")))
+                .andExpect(content().string(containsString("hidden")))
+                .andExpect(content().string(containsString("id=\"sheet-pin-url\"")))
+                .andExpect(content().string(containsString("type=\"url\"")))
+                .andExpect(content().string(containsString("Pin link")));
+    }
+
+    @Test
     void fallsBackToTheDefaultDeviceWhenNoneIsSelected() throws Exception {
         Device bedroom = device("bedroom", "Bedroom", Instant.now());
         given(devices.devices()).willReturn(List.of(bedroom));
