@@ -80,3 +80,31 @@ CasaOS: import `casaos/docker-compose.bluetooth.yml` **instead of** `casaos/dock
   `HOME_CONTROL_BLUETOOTH_AUDIO_DEVICE_TEMPLATE=alsa/bluealsa:DEV={mac},PROFILE=a2dp`.
 - **A fixed output** (for example a speaker the host always uses): set the speaker's audio device
   on the setup page to one of the ids `mpv --audio-device=help` prints inside the container.
+
+## Failure modes
+
+Every problem below shows up in words on the setup page (**Setup → Bluetooth speakers**, the
+checks at the top) or as the message of a failed command. Nothing here affects the rest of Home
+Control; switching the module off (`HOME_CONTROL_BLUETOOTH_ENABLED=false`) removes it entirely.
+
+| What you see | Cause | Fix |
+|---|---|---|
+| ✗ D-Bus system socket — "No D-Bus system socket (nothing at /run/dbus/system_bus_socket)" | `/run/dbus` is not mounted into the container | Add `/run/dbus:/run/dbus:ro` (use `compose.bluetooth.yaml` or the CasaOS Bluetooth manifest). |
+| ✗ BlueZ — "BlueZ is not running on the host" | `bluez` missing or `bluetooth.service` stopped | `sudo apt install bluez && sudo systemctl enable --now bluetooth` |
+| ✗ BlueZ — "The host's D-Bus refused this container" | Rootless Docker, user-namespace remapping, a non-root container user, or AppArmor denying D-Bus | Run the container as root (default); with AppArmor add `security_opt: [apparmor:unconfined]`. |
+| ✗ Bluetooth adapter — "No Bluetooth adapter found on the host" | No controller (many NAS and virtual machines), USB dongle unplugged, hard-blocked radio | Plug in a dongle; `bluetoothctl list`; `sudo rfkill unblock bluetooth`. |
+| ✗ Bluetooth adapter — "hci0 (…) is powered off" | Soft-blocked or switched off | Scanning switches it on; otherwise `sudo rfkill unblock bluetooth`. |
+| ✗ mpv player — "mpv is not installed in this container" | The default image has no player | Use the tag `latest-bluetooth`, or build with `WITH_MPV=true`. |
+| ✗ Audio output — "No PipeWire or PulseAudio server is reachable from the container" | Socket directory not mounted, wrong uid, audio server not running (no one logged in and no linger), PulseAudio cookie missing | Mount `/run/user/<uid>/pulse` to `/run/pulse`, set `PULSE_SERVER=unix:/run/pulse/native`, `sudo loginctl enable-linger <user>`, mount the cookie for PulseAudio. |
+| Pairing: "The speaker refused pairing" | Speaker not in pairing mode, or a legacy speaker that wants a PIN | Enter pairing mode and retry. PIN speakers: pair once on the host with `bluetoothctl` (`pair`, `trust`), then **Pair and add**. |
+| Pairing: "… is not a speaker or headphones (no A2DP audio sink)" | The device offers no A2DP audio sink (phone, keyboard, hands-free-only headset) | Pick an audio device. |
+| Connect: "The host has no Bluetooth audio service for this speaker (br-connection-profile-unavailable)" | PipeWire/WirePlumber or PulseAudio's Bluetooth module is not running for the audio user — typical on headless hosts | Enable linger and turn off WirePlumber seat monitoring (see the checklist), then connect again. |
+| Connect or play: "The speaker did not answer" | Speaker off, out of range, or connected to a phone | Switch it on, disconnect it from the phone, move it closer. |
+| Play: "JBL Flip 5 is not paired with this server any more" | The pairing was removed on the host (`bluetoothctl remove`) or on the speaker | Forget it on the setup page and pair again. |
+| Play: "No audio output for AA:BB:… was found" | BlueZ connected the speaker but the audio server shows no sink for it (another user's session owns Bluetooth audio, or WirePlumber ignores it) | Fix the audio server as above, or set the speaker's audio output on the setup page to an id from `mpv --audio-device=help`. |
+| Play: "… could not play the stream: mpv exited before opening its control socket (mpv: … Failed to initialize audio output …)" | The chosen audio output does not exist or the audio server refused the stream | Leave the audio output blank (automatic) or correct it. |
+| Play: "… could not play the stream: the stream could not be loaded (…)" | The **server** cannot fetch the URL (wrong Jellyfin address inside the container, link needs a login, unsupported format) | Open the link from the host; check Jellyfin's server address on the setup page. |
+| Play: "… plays audio only" / "a Bluetooth speaker plays audio streams only" | A video or a non-HTTP link | Play music; videos belong on a TV. |
+| Pause/Play: "Nothing is playing on …" | The track ended or the speaker disconnected | Play again. |
+| Music stops when the speaker switches off | Intended: Home Control stops the player so audio never continues on the host's HDMI or headphone output | — |
+| Stuttering audio | 2.4 GHz interference (Wi-Fi on 2.4 GHz, USB 3 ports), weak onboard Bluetooth | Use 5 GHz Wi-Fi or Ethernet, a USB Bluetooth dongle on an extension cable. |

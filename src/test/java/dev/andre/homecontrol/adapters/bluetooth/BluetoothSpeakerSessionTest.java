@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.BLUEZ_NOT_RUNNING;
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.UNREACHABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -70,9 +71,12 @@ class BluetoothSpeakerSessionTest {
     }
 
     private BluetoothSpeakerSession start(BluetoothProperties props) {
+        // Mirrors BluetoothSpeakerAdapter.connect()'s wiring, so a test can widen a timeout via withTimings(...).
         MpvPlayer player = new MpvPlayer(launcher, MpvPlayer.socketFor(runtime, device.id()),
-                Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(1));
-        AudioDeviceResolver resolver = new AudioDeviceResolver(launcher, props.audioDeviceTemplate(), Duration.ofSeconds(2));
+                Duration.ofSeconds(props.playerStartTimeoutSeconds()), Duration.ofSeconds(props.loadTimeoutSeconds()),
+                Duration.ofSeconds(props.commandTimeoutSeconds()));
+        AudioDeviceResolver resolver = new AudioDeviceResolver(launcher, props.audioDeviceTemplate(),
+                Duration.ofSeconds(props.playerStartTimeoutSeconds()));
         session = new BluetoothSpeakerSession(device, props, bluez, player, resolver, states::add);
         session.start();
         return session;
@@ -333,6 +337,83 @@ class BluetoothSpeakerSessionTest {
         assertThatThrownBy(() -> session.execute(new Action.PressKey(RemoteKey.HOME))).isInstanceOf(UnsupportedActionException.class);
         assertThatThrownBy(() -> session.execute(new Action.OpenAppLink(URI.create("https://youtube.com/watch?v=x"))))
                 .isInstanceOf(UnsupportedActionException.class);
+    }
+
+    @Test
+    void aPlayerThatCrashesClearsNowPlaying() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        start();
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+        session.execute(PLAY);
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().nowPlaying()).isNotNull());
+
+        // The fake vanishes without an end-file, like a killed mpv.
+        launcher.latest().close();
+
+        await().atMost(WAIT).untilAsserted(() -> {
+            assertThat(session.state().nowPlaying()).isNull();
+            assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
+        });
+
+        session.execute(PLAY);
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().nowPlaying()).isNotNull());
+        assertThat(launcher.alive()).isEqualTo(1);
+    }
+
+    @Test
+    void aSlowBluezDoesNotPileUpPolls() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        bluez.delay("device", Duration.ofSeconds(2));
+        start(properties.withTimings(1, 1, 5, 5, 2));
+
+        await().pollDelay(Duration.ofSeconds(5)).atMost(Duration.ofSeconds(6))
+                .untilAsserted(() -> assertThat(bluez.reads()).isLessThanOrEqualTo(4));
+    }
+
+    @Test
+    void concurrentPlaysLeaveOnePlayer() throws Exception {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        // A generous command timeout: five concurrent full play cycles (each stopping the previous
+        // mpv and starting a new one) create real scheduling pressure: a tight IPC timeout under that
+        // load throws IOException out of MpvPlayer.status(), which (correctly) stops a healthy player.
+        start(properties.withTimings(1, 1, 5, 5, 5));
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+
+        List<Throwable> failures = new CopyOnWriteArrayList<>();
+        List<Thread> threads = new java.util.ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            Thread thread = Thread.ofVirtual().unstarted(() -> {
+                try {
+                    session.execute(PLAY);
+                } catch (Throwable t) {
+                    failures.add(t);
+                }
+            });
+            threads.add(thread);
+        }
+        threads.forEach(Thread::start);
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        assertThat(failures).isEmpty();
+        await().atMost(WAIT).untilAsserted(() -> assertThat(launcher.alive()).isEqualTo(1));
+    }
+
+    @Test
+    void aBluezOutageDuringPlaybackStopsTheMusic() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        start();
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+        session.execute(PLAY);
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().nowPlaying()).isNotNull());
+
+        bluez.unavailable(BLUEZ_NOT_RUNNING);
+
+        await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            assertThat(launcher.alive()).isZero();
+            assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+        });
     }
 
     @Test
