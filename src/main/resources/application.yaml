@@ -21,6 +21,14 @@ shield:
   reconnect-max-delay-seconds: 60
 
 home-control:
+  ssdp:
+    # One shared listener for smart TVs (and later DLNA/Sonos). Needs host networking.
+    enabled: true
+    multicast-address: 239.255.255.250
+    port: 1900
+    listen-port: 1900
+    search-interval-seconds: 60
+    mx: 2
   cast:
     enabled: true
     # A PING every 5 s; 15 s without any inbound frame means the receiver is gone.

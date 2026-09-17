@@ -322,4 +322,49 @@ class DeviceManagerMergeTest {
         assertThat(registry.findById("10-0-0-5").orElseThrow().hasAdapter("cast")).isTrue();
         assertThat(manager.addable()).isEmpty();
     }
+
+    @Test
+    void attachAddsTheAdapterToTheRegisteredDeviceAtTheSameHostAndReconnectsIt() {
+        StubAdapter alpha = new StubAdapter("alpha", DeviceKind.CAST, false, false, Capability.VOLUME);
+        StubAdapter beta = new StubAdapter("beta", DeviceKind.WEBOS, false, false,
+                Capability.REMOTE_KEYS, Capability.APP_LINK);
+        DeviceRegistry attachRegistry = new JsonFileDeviceRegistry(dir.resolve("attach-devices.json"));
+        attachRegistry.save(new Device("tv", "Living Room TV", DeviceKind.CAST, "10.0.0.60",
+                Map.of("alpha", Map.of()), Instant.EPOCH));
+
+        try (DeviceManager attachManager = new DeviceManager(attachRegistry, List.of(alpha, beta), published::add)) {
+            attachManager.start();
+            StubAdapter.StubHandle firstAlpha = alpha.handles.get("tv");
+
+            Device result = attachManager.attach("10.0.0.60", "[LG] webOS TV", DeviceKind.WEBOS, "beta",
+                    Map.of("clientKey", "k"));
+
+            assertThat(result.id()).isEqualTo("tv");
+            assertThat(attachRegistry.findAll()).hasSize(1);
+            Device saved = attachRegistry.findById("tv").orElseThrow();
+            assertThat(List.copyOf(saved.adapters().keySet())).containsExactly("alpha", "beta");
+            assertThat(saved.adapterSettings("beta")).containsEntry("clientKey", "k");
+            assertThat(firstAlpha.closed).isTrue();
+            assertThat(alpha.handles.get("tv")).isNotSameAs(firstAlpha);
+            assertThat(beta.handles).containsKey("tv");
+            assertThat(attachManager.capabilities("tv")).containsExactlyInAnyOrder(
+                    Capability.VOLUME, Capability.REMOTE_KEYS, Capability.APP_LINK);
+        }
+    }
+
+    @Test
+    void attachRegistersANewDeviceWhenNoHostMatches() {
+        StubAdapter alpha = new StubAdapter("alpha", DeviceKind.CAST, false, false, Capability.VOLUME);
+        StubAdapter beta = new StubAdapter("beta", DeviceKind.WEBOS, false, false,
+                Capability.REMOTE_KEYS, Capability.APP_LINK);
+        DeviceRegistry attachRegistry = new JsonFileDeviceRegistry(dir.resolve("attach-devices-2.json"));
+
+        try (DeviceManager attachManager = new DeviceManager(attachRegistry, List.of(alpha, beta), published::add)) {
+            Device result = attachManager.attach("10.0.0.61", "Samsung", DeviceKind.TIZEN, "beta", Map.of());
+
+            assertThat(result.id()).isEqualTo("beta-10-0-0-61");
+            assertThat(result.kind()).isEqualTo(DeviceKind.TIZEN);
+            assertThat(attachManager.states()).containsKey("beta-10-0-0-61");
+        }
+    }
 }

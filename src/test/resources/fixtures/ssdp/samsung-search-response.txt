@@ -1,0 +1,9 @@
+HTTP/1.1 200 OK
+CACHE-CONTROL: max-age=1800
+DATE: Tue, 16 Sep 2026 10:00:00 GMT
+EXT:
+LOCATION: http://{host}:{port}/samsung/description.xml
+SERVER: SHP, UPnP/1.0, Samsung UPnP SDK/1.0
+ST: urn:samsung.com:device:RemoteControlReceiver:1
+USN: uuid:5d9c0b1a-2c3d-4e5f-8a9b-0c1d2e3f4a5b::urn:samsung.com:device:RemoteControlReceiver:1
+

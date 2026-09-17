@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <specVersion><major>1</major><minor>0</minor></specVersion>
+  <device>
+    <deviceType>urn:schemas-upnp-org:device:Basic:1</deviceType>
+    <friendlyName>[LG] webOS TV OLED55C9PLA</friendlyName>
+    <manufacturer>LG Electronics</manufacturer>
+    <modelName>WEBOS4.5</modelName>
+    <UDN>uuid:e8d7f6a5-1234-4bcd-9ef0-a8b7c6d5e4f3</UDN>
+    <serviceList>
+      <service>
+        <serviceType>urn:lge-com:service:webos-second-screen:1</serviceType>
+        <serviceId>urn:lge-com:serviceId:webos-second-screen-3000-3001</serviceId>
+        <SCPDURL>/WebOS_SecondScreen/scpd.xml</SCPDURL>
+        <controlURL>/WebOS_SecondScreen/control</controlURL>
+        <eventSubURL>/WebOS_SecondScreen/event</eventSubURL>
+      </service>
+    </serviceList>
+  </device>
+</root>

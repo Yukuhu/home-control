@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DeviceHandle;
+import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
@@ -13,6 +14,7 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStates;
 import dev.andre.homecontrol.core.DiscoveredDevice;
+import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -209,6 +211,22 @@ public class DeviceManager implements AutoCloseable {
             registry.delete(id);
         }
         events.publishEvent(new DeviceStateChangedEvent(id, DeviceState.initial()));
+    }
+
+    /**
+     * For prompt-paired adapters (webOS, Tizen): adds {@code adapterId} with {@code settings} to the
+     * registered device at {@code host}, or registers a new device there, and (re)connects it.
+     * Goes through {@link #adopt}, so pairing-free receivers at that address are absorbed as well.
+     */
+    public Device attach(String host, String name, DeviceKind kind, String adapterId, Map<String, String> settings) {
+        Device merged;
+        synchronized (lock) {
+            merged = DeviceMerge.attach(registry.findAll(), host, name, kind, adapterId, settings,
+                    Instant.now(), Hosts::same);
+            adopt(merged);
+            merged = registry.findById(merged.id()).orElse(merged);
+        }
+        return merged;
     }
 
     public List<DiscoveredDevice> discovered() {
