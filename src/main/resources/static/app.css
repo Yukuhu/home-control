@@ -96,6 +96,9 @@ main#content { max-width: none; padding: .5rem 0 5rem; }
 .sheet-route { min-height: 2.8em; }
 .sheet-route.unroutable { color: #f2b8b5; }
 #sheet-play { width: 100%; background: var(--accent); font-weight: 600; min-height: 48px; }
+.sheet-pin { display: grid; gap: .5rem; margin-top: 1rem; border-top: 1px solid var(--border, #333); padding-top: 1rem; }
+#sheet-pin-url { min-height: 44px; }
+#sheet-pin-submit { min-height: 44px; }
 @media (min-width: 40rem) { .sheet { margin: auto; border-radius: 1rem; } }
 #toast { display: flex; gap: .75rem; align-items: center; max-width: calc(100% - 2rem); z-index: 30; }
 #toast[hidden] { display: none; }

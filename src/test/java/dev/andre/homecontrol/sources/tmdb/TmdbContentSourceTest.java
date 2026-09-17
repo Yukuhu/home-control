@@ -1,11 +1,13 @@
 package dev.andre.homecontrol.sources.tmdb;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.content.SourcePreferences;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -24,7 +26,13 @@ class TmdbContentSourceTest {
     TmdbClient client;
     TmdbImages images;
     TmdbWatchProviders providers;
+    ProviderMatcher matcher;
     TmdbCredential bearer;
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<PinnedLinks> noPinnedLinks() {
+        return mock(ObjectProvider.class);
+    }
 
     @BeforeEach
     void setUp() throws IOException {
@@ -34,6 +42,7 @@ class TmdbContentSourceTest {
         client = new TmdbClient(properties);
         images = new TmdbImages(client, properties, Clock.systemUTC());
         providers = new TmdbWatchProviders(client, properties, Clock.systemUTC());
+        matcher = new ProviderMatcher(TmdbProperties.DEFAULT_PROVIDER_IDS);
         bearer = TmdbCredential.parse(FakeTmdbServer.READ_TOKEN);
     }
 
@@ -44,7 +53,7 @@ class TmdbContentSourceTest {
 
     private TmdbContentSource source(TmdbSetupService setup) {
         return new TmdbContentSource(setup, client, images, providers, properties,
-                () -> SourcePreferences.defaults("de-DE", "DE"));
+                () -> SourcePreferences.defaults("de-DE", "DE"), matcher, noPinnedLinks());
     }
 
     private TmdbSetupService connectedSetup() {
@@ -133,11 +142,20 @@ class TmdbContentSourceTest {
     }
 
     @Test
-    void hasNoRailsYetAndRefreshesEverySixHours() {
-        TmdbContentSource source = source(connectedSetup());
+    void offersTheTrendingRailWhenAvailable() {
+        TmdbContentSource unavailable = source(mockUnconnectedSetup());
+        assertThat(unavailable.rails()).isEmpty();
 
-        assertThat(source.rails()).isEmpty();
-        assertThatThrownBy(() -> source.rail("trending")).isInstanceOf(IllegalArgumentException.class);
+        TmdbContentSource source = source(connectedSetup());
+        assertThat(source.rails()).containsExactly(
+                new dev.andre.homecontrol.core.content.RailDescriptor("tmdb", "trending", "Trending on your services"));
+        assertThatThrownBy(() -> source.rail("nope")).isInstanceOf(IllegalArgumentException.class);
         assertThat(source.defaultRefreshInterval()).isEqualTo(Duration.ofHours(6));
+    }
+
+    private TmdbSetupService mockUnconnectedSetup() {
+        TmdbSetupService setup = mock(TmdbSetupService.class);
+        given(setup.credential()).willReturn(java.util.Optional.empty());
+        return setup;
     }
 }

@@ -9,6 +9,7 @@ import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
+import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.PlayAttempt;
@@ -212,6 +213,23 @@ class ContentPlayPreviewTest {
                 .andReturn().getResponse().getContentAsString();
 
         org.assertj.core.api.Assertions.assertThat(body).doesNotContain("tok-123").doesNotContain("urn:x-cast");
+    }
+
+    @Test
+    void noPinWithoutThePinnedModule() throws Exception {
+        known();
+        PlayableRef.AppLink netflixHome = new PlayableRef.AppLink(
+                dev.andre.homecontrol.core.playback.ServiceLinks.appHome("netflix").orElseThrow(), "netflix");
+        ContentItem appHomeItem = new ContentItem(ITEM_ID, "tmdb", ContentKind.VIDEO, "Stranger Things", null, null,
+                List.of(netflixHome));
+        given(sources.find("tmdb")).willReturn(Optional.of(jellyfin));
+        given(jellyfin.item(ITEM_ID)).willReturn(Optional.of(appHomeItem));
+        given(playback.preview(appHomeItem, "living")).willReturn(new PlaybackPreview(living,
+                List.of(new Route.OpenAppLink(netflixHome.uri(), netflixHome.service())), null));
+
+        mockMvc.perform(get("/devices/living/route-preview").param("source", "tmdb").param("item", ITEM_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pin").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

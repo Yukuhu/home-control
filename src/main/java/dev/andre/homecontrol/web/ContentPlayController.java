@@ -6,12 +6,15 @@ import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.ContentSources;
+import dev.andre.homecontrol.core.content.PinOffers;
+import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.PlayAttempt;
 import dev.andre.homecontrol.playback.PlaybackService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -39,11 +42,14 @@ public class ContentPlayController {
     private final DeviceManager devices;
     private final ContentSources sources;
     private final PlaybackService playback;
+    private final ObjectProvider<PinnedLinks> pinnedLinks;
 
-    public ContentPlayController(DeviceManager devices, ContentSources sources, PlaybackService playback) {
+    public ContentPlayController(DeviceManager devices, ContentSources sources, PlaybackService playback,
+                                 ObjectProvider<PinnedLinks> pinnedLinks) {
         this.devices = devices;
         this.sources = sources;
         this.playback = playback;
+        this.pinnedLinks = pinnedLinks;
     }
 
     @PostMapping(path = "/devices/{id}/play", params = {"source", "item"}, produces = MediaType.TEXT_PLAIN_VALUE)
@@ -82,7 +88,9 @@ public class ContentPlayController {
         if (content.isEmpty()) {
             return notFound(source);
         }
-        return ResponseEntity.ok(RoutePreviewView.of(playback.preview(content.get(), id)));
+        PinOfferView pin = pinnedLinks.getIfAvailable() == null ? null
+                : PinOffers.offer(content.get()).map(PinOfferView::of).orElse(null);
+        return ResponseEntity.ok(RoutePreviewView.of(playback.preview(content.get(), id), pin));
     }
 
     @PostMapping(path = "/devices/{id}/play-attempt", params = {"source", "item"}, produces = MediaType.APPLICATION_JSON_VALUE)

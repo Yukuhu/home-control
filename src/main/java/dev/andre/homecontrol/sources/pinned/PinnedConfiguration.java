@@ -1,6 +1,8 @@
 package dev.andre.homecontrol.sources.pinned;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
+import dev.andre.homecontrol.core.content.ContentSources;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
@@ -21,10 +23,11 @@ public class PinnedConfiguration {
         return new JsonFilePinStore(androidTvProperties.dataDir().resolve("pinned.json"));
     }
 
+    /** Also satisfies {@code ObjectProvider<PinnedLinks>} injection points: the interface is implemented here. */
     @Bean
     public PinnedShortcuts pinnedShortcuts(JsonFilePinStore store, PinnedProperties properties,
-                                           ApplicationEventPublisher events) {
-        return new PinnedShortcuts(store, properties, events, Clock.systemUTC(), new SecureRandom());
+                                           ApplicationEventPublisher events, ObjectProvider<ContentSources> sources) {
+        return new PinnedShortcuts(store, properties, events, Clock.systemUTC(), new SecureRandom(), sources);
     }
 
     @Bean
