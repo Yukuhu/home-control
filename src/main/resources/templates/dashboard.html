@@ -122,6 +122,24 @@
         </div>
     </section>
 
+    <section class="renderer" th:if="${rendererControls}" aria-label="Playback">
+        <h2>Playback</h2>
+        <label class="volume" th:unless="${castControls}">Volume
+            <input type="range" name="level" min="0" max="100" step="1" th:id="'volume-' + ${id}"
+                   th:value="${selectedState.volumeMax() > 0 ? T(java.lang.Math).round(selectedState.volumeLevel() * 100.0 / selectedState.volumeMax()) : 0}"
+                   th:attr="hx-post=@{/devices/{id}/volume(id=${id})}" hx-trigger="change">
+        </label>
+        <div class="row">
+            <button th:attr="hx-post=@{/devices/{id}/pause(id=${id})}">Pause</button>
+            <button th:attr="hx-post=@{/devices/{id}/resume(id=${id})}">Play</button>
+            <button th:attr="hx-post=@{/devices/{id}/stop(id=${id})}">Stop</button>
+            <th:block th:unless="${castControls}">
+                <button th:attr="hx-post=@{/devices/{id}/mute(id=${id})}" hx-vals='{"muted": "true"}'>Mute</button>
+                <button th:attr="hx-post=@{/devices/{id}/mute(id=${id})}" hx-vals='{"muted": "false"}'>Unmute</button>
+            </th:block>
+        </div>
+    </section>
+
     <section class="open-link" th:if="${canOpenLinks}">
         <h2>Open a link on this device</h2>
         <form th:attr="hx-post=@{/devices/{id}/play(id=${id})}" hx-target="#open-result" hx-swap="textContent">

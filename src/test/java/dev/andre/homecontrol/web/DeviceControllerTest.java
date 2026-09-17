@@ -109,6 +109,18 @@ class DeviceControllerTest {
     }
 
     @Test
+    void pausesAndResumes() throws Exception {
+        mockMvc.perform(post("/devices/shield/pause")).andExpect(status().isNoContent());
+        verify(devices).execute("shield", new Action.Pause());
+
+        mockMvc.perform(post("/devices/shield/resume")).andExpect(status().isNoContent());
+        verify(devices).execute("shield", new Action.Resume());
+
+        willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
+        mockMvc.perform(post("/devices/ghost/pause")).andExpect(status().isNotFound());
+    }
+
+    @Test
     void reportsAnUnknownDeviceAsNotFound() throws Exception {
         willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
 
