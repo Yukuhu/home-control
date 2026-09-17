@@ -14,6 +14,16 @@ public sealed interface Route {
 
     String describe();
 
+    /**
+     * Same description, but allowed to name what is being opened by the item's kind (e.g. a
+     * {@link ContentKind#LIVE_EVENT} is "this event", not "this title"). Routing itself never
+     * special-cases a kind (spec §5.3); only the wording here does. Defaults to {@link #describe()}
+     * for every route that has nothing kind-specific to say.
+     */
+    default String describe(ContentKind kind) {
+        return describe();
+    }
+
     record OpenAppLink(URI uri, String service) implements Route {
 
         public Action action() {
@@ -22,9 +32,15 @@ public sealed interface Route {
 
         @Override
         public String describe() {
+            return describe(ContentKind.VIDEO);
+        }
+
+        @Override
+        public String describe(ContentKind kind) {
             Optional<String> name = ServiceLinks.displayName(service);
             if (ServiceLinks.isAppHome(uri)) {
-                return "Open the " + name.orElse(uri.getHost()) + " app (not this title)";
+                String noun = kind == ContentKind.LIVE_EVENT ? "event" : "title";
+                return "Open the " + name.orElse(uri.getHost()) + " app (not this " + noun + ")";
             }
             return name.map(n -> "Open in the " + n + " app").orElseGet(() -> "Open " + uri.getHost() + " on the device");
         }

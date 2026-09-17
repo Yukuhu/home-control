@@ -82,7 +82,7 @@ public class DeviceController {
             return text(HttpStatus.BAD_REQUEST, e.getMessage());
         }
         Route route = playback.play(item, id);
-        return text(HttpStatus.OK, route.describe());
+        return text(HttpStatus.OK, route.describe(item.kind()));
     }
 
     @PostMapping("/devices/{id}/volume")

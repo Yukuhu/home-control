@@ -165,15 +165,6 @@ class SportsEndToEndTest {
         return tiles;
     }
 
-    private String railBody(HttpClient client) throws Exception {
-        HttpResponse<String>[] holder = new HttpResponse[1];
-        await().atMost(Duration.ofSeconds(10)).until(() -> {
-            holder[0] = send(client, get("/rails/sports/live-today"));
-            return holder[0].statusCode() == 200 && holder[0].body().contains("data-status=\"READY\"");
-        });
-        return holder[0].body();
-    }
-
     @Test
     @Order(1)
     void mappedEventsOpenDaznAndPastedLinksOpenTheEvent() throws Exception {
@@ -237,19 +228,31 @@ class SportsEndToEndTest {
                         .isEqualTo(302);
                 assertThat(send(browser, page("/setup")).body()).contains("Where you watch it (your setting)");
 
-                // Step 7: refresh the rail and wait for it to be ready with both live matches.
-                assertThat(send(browser, post("/rails/sports/live-today/refresh", Map.of())).statusCode()).isEqualTo(200);
-                String railBody = railBody(browser);
+                // Step 7: refresh the rail and wait for it to be ready with both live matches mapped
+                // to DAZN. RailCache.start() is a no-op while a fetch is already in flight, and a
+                // READY rail keeps serving its last items while a refetch is pending, so a refresh
+                // fired right after Step 6's provider save can be swallowed or can land before that
+                // mapping is visible in the fetched items. Keep refreshing until the tiles actually
+                // show it (mirrors the Step 12/13 awaits below).
+                HttpResponse<String>[] holder = new HttpResponse[1];
+                await().atMost(Duration.ofSeconds(10)).until(() -> {
+                    send(browser, post("/rails/sports/live-today/refresh", Map.of()));
+                    holder[0] = send(browser, get("/rails/sports/live-today"));
+                    return holder[0].statusCode() == 200
+                            && holder[0].body().contains("data-subtitle=\"Live · E2E league · DAZN (your setting)\"")
+                            && holder[0].body().contains("data-subtitle=\"Live · German Bundesliga · DAZN (your setting)\"");
+                });
+                String railBody = holder[0].body();
                 List<Map<String, String>> items = tiles(railBody);
                 assertThat(items.size()).isGreaterThanOrEqualTo(2);
-                Map<String, String> calendarTile = items.get(0);
-                assertThat(calendarTile.get("data-title")).isEqualTo("Calendar Live Match");
+                Map<String, String> calendarTile = items.stream()
+                        .filter(t -> "Calendar Live Match".equals(t.get("data-title"))).findFirst().orElseThrow();
                 assertThat(calendarTile.get("data-subtitle")).isEqualTo("Live · E2E league · DAZN (your setting)");
                 assertThat(calendarTile.get("data-kind")).isEqualTo("LIVE_EVENT");
                 assertThat(calendarTile.get("data-starts-at")).isNotBlank();
                 assertThat(calendarTile.get("data-ends-at")).isNotBlank();
-                Map<String, String> tsdbTile = items.get(1);
-                assertThat(tsdbTile.get("data-title")).isEqualTo("TheSportsDB Live Match");
+                Map<String, String> tsdbTile = items.stream()
+                        .filter(t -> "TheSportsDB Live Match".equals(t.get("data-title"))).findFirst().orElseThrow();
                 assertThat(tsdbTile.get("data-subtitle")).isEqualTo("Live · German Bundesliga · DAZN (your setting)");
                 assertThat(tsdbTile.get("data-item")).isEqualTo("tsdb:9000001");
                 assertThat(railBody).doesNotContain("Calendar Finished Match").doesNotContain(TOKEN)
@@ -258,7 +261,7 @@ class SportsEndToEndTest {
                 // Step 8.
                 HttpResponse<String> preview = send(browser, get("/devices/shield-e2e/route-preview?source=sports&item=tsdb:9000001"));
                 JsonNode previewJson = mapper.readTree(preview.body());
-                assertThat(previewJson.path("route").path("description").asString()).isEqualTo("Open the DAZN app (not this title)");
+                assertThat(previewJson.path("route").path("description").asString()).isEqualTo("Open the DAZN app (not this event)");
                 assertThat(previewJson.path("pin").path("upgradeOf").asString()).isEqualTo("sports/tsdb:9000001");
                 assertThat(previewJson.path("pin").path("serviceName").asString()).isEqualTo("DAZN");
 
@@ -287,7 +290,6 @@ class SportsEndToEndTest {
                 assertThat(send(browser, post("/setup/sources/sports/providers",
                         Map.of("provider:calendar:" + calendarId, ""))).statusCode()).isEqualTo(302);
                 send(browser, post("/rails/sports/live-today/refresh", Map.of()));
-                HttpResponse<String>[] holder = new HttpResponse[1];
                 await().atMost(Duration.ofSeconds(10)).until(() -> {
                     holder[0] = send(browser, get("/rails/sports/live-today"));
                     return holder[0].statusCode() == 200 && holder[0].body().contains("Live · E2E league</span>");

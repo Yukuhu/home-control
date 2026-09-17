@@ -35,7 +35,7 @@ public final class SportsProviders {
         }
         String key = raw.strip();
         if (!StreamingProviders.KNOWN.containsKey(key)) {
-            throw new IllegalArgumentException("Unknown streaming service " + key);
+            throw new IllegalArgumentException("Unknown streaming service");
         }
         return key;
     }
@@ -59,7 +59,7 @@ public final class SportsProviders {
                 competitions.set(competition, new SportsSettings.CompetitionEntry(c.leagueId(), c.name(), c.sport(),
                         c.country(), c.badge(), provider, c.addedAt()));
             } else {
-                throw new IllegalArgumentException("No competition " + key);
+                throw new IllegalArgumentException("Unknown competition");
             }
         }
         return settings.withCalendars(calendars).withCompetitions(competitions);

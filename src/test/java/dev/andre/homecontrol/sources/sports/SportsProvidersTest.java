@@ -25,8 +25,8 @@ class SportsProvidersTest {
         assertThat(SportsProviders.normalise("")).isNull();
         assertThat(SportsProviders.normalise(null)).isNull();
         assertThatThrownBy(() -> SportsProviders.normalise("DAZN"))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("Unknown streaming service DAZN");
-        assertThatThrownBy(() -> SportsProviders.normalise("sky")).hasMessage("Unknown streaming service sky");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Unknown streaming service");
+        assertThatThrownBy(() -> SportsProviders.normalise("sky")).hasMessage("Unknown streaming service");
     }
 
     @Test
@@ -45,11 +45,11 @@ class SportsProvidersTest {
     @Test
     void refusesUnknownKeys() {
         assertThatThrownBy(() -> SportsProviders.apply(SETTINGS, Map.of("thesportsdb:9999", "dazn")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("No competition thesportsdb:9999");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Unknown competition");
         assertThatThrownBy(() -> SportsProviders.apply(SETTINGS, Map.of("calendar:c-ffffffffffff", "dazn")))
-                .hasMessage("No competition calendar:c-ffffffffffff");
+                .hasMessage("Unknown competition");
         assertThatThrownBy(() -> SportsProviders.apply(SETTINGS, Map.of("nope", "dazn")))
-                .hasMessage("No competition nope");
+                .hasMessage("Unknown competition");
         assertThatThrownBy(() -> SportsProviders.apply(SETTINGS, Map.of())).hasMessage("Nothing to save");
 
         assertThat(SETTINGS.calendar("c-3f9a1c2b7d4e").orElseThrow().provider()).isNull();

@@ -18,8 +18,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Pins routing behaviour for {@link ContentKind#LIVE_EVENT} items: they route exactly like any other
- * item with an app-link playable (spec §5.3 does not special-case a kind), which is the point of this
- * test — it should already pass unchanged before any sports-specific production code is touched.
+ * item with an app-link playable (spec §5.3 does not special-case a kind for which route is chosen),
+ * which is the point of this test — it should already pass unchanged before any sports-specific
+ * production code is touched. The one thing that IS kind-aware is the human-facing wording of an
+ * app-home link's description ({@link Route#describe(ContentKind)}: "not this event" vs "not this
+ * title"), asserted separately in {@link #liveEventMatrix}.
  */
 class LiveEventRoutingTest {
 
@@ -47,6 +50,7 @@ class LiveEventRoutingTest {
 
         assertThat(route).isEqualTo(new Route.OpenAppLink(URI.create("https://www.dazn.com/"), "dazn"));
         assertThat(route.describe()).isEqualTo("Open the DAZN app (not this title)");
+        assertThat(route.describe(item.kind())).isEqualTo("Open the DAZN app (not this event)");
         assertThat(planner().routes(item, capabilities)).containsExactly(route);
     }
 
@@ -163,5 +167,18 @@ class LiveEventRoutingTest {
             assertThat(route.describe()).as(item.kind() + ": " + expectedDescribeContains).contains(expectedDescribeContains);
             assertThat(planner().routes(item, capabilities)).as(item.kind().toString()).hasSize(expectedRouteCount);
         }
+
+        // Routing itself never special-cases the kind: the event and the video get the identical
+        // route (already asserted above via expectedRouteCount/expectedDescribeContains on both).
+        // Only Route#describe(ContentKind) does, naming an "event" instead of a "title" for an
+        // app-home link, and only for that one wording — everything else stays the same.
+        Route eventRoute = planner().plan(event, capabilities);
+        Route videoRoute = planner().plan(video, capabilities);
+        assertThat(eventRoute).isEqualTo(videoRoute);
+        String videoDescribe = videoRoute.describe();
+        String expectedEventDescribe = videoDescribe.contains("(not this title)")
+                ? videoDescribe.replace("(not this title)", "(not this event)")
+                : videoDescribe;
+        assertThat(eventRoute.describe(ContentKind.LIVE_EVENT)).isEqualTo(expectedEventDescribe);
     }
 }
