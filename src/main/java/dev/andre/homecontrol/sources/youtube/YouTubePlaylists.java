@@ -36,6 +36,7 @@ public class YouTubePlaylists {
     private final Clock clock;
     private final Map<String, Memo> memos = new HashMap<>();
     private Map<String, PlaylistSummary> loaded = Map.of();
+    private Instant watchLaterUnavailableAt;
 
     public YouTubePlaylists(YouTubeApiClient api, YouTubeProperties properties, Clock clock) {
         this.api = api;
@@ -97,12 +98,20 @@ public class YouTubePlaylists {
     }
 
     public List<YouTubeVideo> watchLater() {
+        Instant now = clock.instant();
+        synchronized (this) {
+            if (watchLaterUnavailableAt != null && now.isBefore(watchLaterUnavailableAt.plus(properties.minRefreshSpacing()))) {
+                // Memoized: an empty or failed Watch Later result is honest and unlikely to change
+                // within the spacing window, so don't spend another call finding that out again.
+                throw new ContentSourceException(WATCH_LATER_UNAVAILABLE);
+            }
+        }
         List<YouTubeVideo> videos;
         try {
             videos = items(WATCH_LATER_ID);
         } catch (YouTubeException e) {
             if (e.kind() == YouTubeException.Kind.NOT_FOUND) {
-                throw new ContentSourceException(WATCH_LATER_UNAVAILABLE);
+                return rethrowWatchLaterUnavailable(now);
             }
             throw e;
         }
@@ -110,14 +119,23 @@ public class YouTubePlaylists {
             synchronized (this) {
                 memos.remove(WATCH_LATER_ID);
             }
-            throw new ContentSourceException(WATCH_LATER_UNAVAILABLE);
+            return rethrowWatchLaterUnavailable(now);
+        }
+        synchronized (this) {
+            watchLaterUnavailableAt = null;
         }
         return videos;
+    }
+
+    private synchronized List<YouTubeVideo> rethrowWatchLaterUnavailable(Instant now) {
+        watchLaterUnavailableAt = now;
+        throw new ContentSourceException(WATCH_LATER_UNAVAILABLE);
     }
 
     public synchronized void clear() {
         memos.clear();
         loaded = Map.of();
+        watchLaterUnavailableAt = null;
     }
 
     public static String railId(String playlistId) {

@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,6 +36,9 @@ public class YouTubeSearch {
             return size() > CACHE_ENTRIES;
         }
     };
+    // Guards concurrent identical searches: whichever thread wins the race becomes the one upstream
+    // call/charge for this key, and every other caller for the same key joins its result instead.
+    private final ConcurrentHashMap<String, CompletableFuture<List<YouTubeVideo>>> inFlight = new ConcurrentHashMap<>();
 
     public YouTubeSearch(YouTubeApiClient api, KnownVideos known, YouTubeProperties properties, Clock clock) {
         this.api = api;
@@ -48,6 +54,31 @@ public class YouTubeSearch {
         if (hit.isPresent()) {
             return hit.get();
         }
+        CompletableFuture<List<YouTubeVideo>> future = new CompletableFuture<>();
+        CompletableFuture<List<YouTubeVideo>> inProgress = inFlight.putIfAbsent(key, future);
+        if (inProgress != null) {
+            return limited(join(inProgress), wanted);
+        }
+        try {
+            // Someone else may have finished and populated the cache between our cached() miss
+            // above and winning putIfAbsent; check once more before spending an upstream call.
+            Optional<List<YouTubeVideo>> raced = cached(key, wanted);
+            if (raced.isPresent()) {
+                future.complete(raced.get());
+                return raced.get();
+            }
+            List<YouTubeVideo> videos = fetch(key, query, wanted);
+            future.complete(videos);
+            return videos.stream().limit(wanted).toList();
+        } catch (RuntimeException e) {
+            future.completeExceptionally(e);
+            throw e;
+        } finally {
+            inFlight.remove(key, future);
+        }
+    }
+
+    private List<YouTubeVideo> fetch(String key, String query, int wanted) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("part", "snippet");
         params.put("type", "video");
@@ -62,7 +93,22 @@ public class YouTubeSearch {
         synchronized (cache) {
             cache.put(key, new Cached(List.copyOf(videos), clock.instant()));
         }
+        return videos;
+    }
+
+    private static List<YouTubeVideo> limited(List<YouTubeVideo> videos, int wanted) {
         return videos.stream().limit(wanted).toList();
+    }
+
+    private static List<YouTubeVideo> join(CompletableFuture<List<YouTubeVideo>> future) {
+        try {
+            return future.join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof RuntimeException re) {
+                throw re;
+            }
+            throw e;
+        }
     }
 
     private Optional<List<YouTubeVideo>> cached(String key, int wanted) {

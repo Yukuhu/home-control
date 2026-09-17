@@ -34,6 +34,8 @@ public class SubscriptionsFeed {
     private final Map<String, Polled> polled = new HashMap<>();
     private List<YouTubeVideo> lastResult;
     private Instant lastRefreshAt;
+    private YouTubeException firstRefreshFailure;
+    private Instant firstRefreshFailedAt;
 
     public SubscriptionsFeed(YouTubeApiClient api, YouTubeProperties properties, Clock clock) {
         this.api = api;
@@ -46,6 +48,12 @@ public class SubscriptionsFeed {
         if (lastResult != null && now.isBefore(lastRefreshAt.plus(properties.minRefreshSpacing()))) {
             return lastResult;
         }
+        // Before ever succeeding once, a failure is memoized with a timestamp too — otherwise
+        // every scheduled refresh tick would hammer a source that is, say, not yet configured.
+        if (lastResult == null && firstRefreshFailure != null
+                && now.isBefore(firstRefreshFailedAt.plus(properties.minRefreshSpacing()))) {
+            throw firstRefreshFailure;
+        }
         try {
             if (subscriptions == null || !now.isBefore(subscriptionsFetchedAt.plus(properties.subscriptionsRefresh()))) {
                 loadSubscriptions(now);
@@ -53,9 +61,13 @@ public class SubscriptionsFeed {
             pollChannels(now);
         } catch (YouTubeException e) {
             if (e.kind() != YouTubeException.Kind.QUOTA_EXHAUSTED || polled.isEmpty()) {
+                firstRefreshFailure = e;
+                firstRefreshFailedAt = now;
                 throw e;
             }
         }
+        firstRefreshFailure = null;
+        firstRefreshFailedAt = null;
         lastResult = merge();
         lastRefreshAt = now;
         return lastResult;
@@ -68,6 +80,8 @@ public class SubscriptionsFeed {
         polled.clear();
         lastResult = null;
         lastRefreshAt = null;
+        firstRefreshFailure = null;
+        firstRefreshFailedAt = null;
     }
 
     private void loadSubscriptions(Instant now) {
