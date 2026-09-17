@@ -136,6 +136,24 @@ public sealed interface Route {
         }
     }
 
+    /** Play an audio stream with the server's own player on a local audio sink such as a Bluetooth speaker (spec §5.3 rung 5). */
+    record PlayLocally(URI url, String mimeType, String title, String subtitle) implements Route {
+
+        public Action action() {
+            return new Action.PlayMedia(url, mimeType, title, subtitle);
+        }
+
+        @Override
+        public String describe() {
+            return "Play through the server on this Bluetooth speaker";
+        }
+
+        @Override
+        public String toString() {
+            return "PlayLocally[url=" + RedactedUris.withoutQuery(url) + ", mimeType=" + mimeType + ", title=" + title + "]";
+        }
+    }
+
     record Unroutable(String reason) implements Route {
         @Override
         public String describe() {

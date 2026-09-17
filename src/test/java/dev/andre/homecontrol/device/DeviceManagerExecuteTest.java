@@ -174,6 +174,34 @@ class DeviceManagerExecuteTest {
     }
 
     @Test
+    void playbackReachesALocalAudioSink() {
+        registry.save(new Device("bluetooth-aa-bb-cc-dd-ee-ff", "JBL Flip 5", DeviceKind.BLUETOOTH, "AA:BB:CC:DD:EE:FF",
+                Map.of("bluetooth", Map.of()), Instant.now()));
+        StubAdapter bluetooth = new StubAdapter("bluetooth", DeviceKind.BLUETOOTH, false, false,
+                Capability.LOCAL_AUDIO_SINK, Capability.VOLUME);
+        DeviceManager speakers = new DeviceManager(registry, List.of(bluetooth), event -> { });
+        speakers.start();
+        try {
+            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.PlayMedia(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null));
+            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Pause());
+            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Resume());
+            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Stop());
+            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.SetVolume(20));
+            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Mute(true));
+
+            assertThat(bluetooth.handles.get("bluetooth-aa-bb-cc-dd-ee-ff").executed).containsExactly(
+                    new Action.PlayMedia(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null),
+                    new Action.Pause(), new Action.Resume(), new Action.Stop(),
+                    new Action.SetVolume(20), new Action.Mute(true));
+
+            assertThatThrownBy(() -> speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.PressKey(RemoteKey.HOME)))
+                    .isInstanceOf(UnsupportedActionException.class);
+        } finally {
+            speakers.close();
+        }
+    }
+
+    @Test
     void stopReachesAMediaRendererWithoutCast() {
         registry.save(new Device("speaker", "Speaker", DeviceKind.UPNP, "10.0.0.30",
                 Map.of("upnp", Map.of()), Instant.now()));

@@ -149,6 +149,45 @@ class JellyfinPlayableResolverTest {
     }
 
     @Test
+    void aLocalAudioSinkStreamsFromTheServersOwnAddress() throws IOException {
+        String trackId = "c0ffee00c0ffee00c0ffee00c0ffee01";
+        connected();
+        fake.respond("GET", "/Items/" + trackId, 200, "item-track.json");
+        fake.respond("POST", "/Items/" + trackId + "/PlaybackInfo", 200, "playback-info-audio.json");
+        Device speaker = new Device("bluetooth-aa-bb-cc-dd-ee-ff", "JBL Flip 5", DeviceKind.BLUETOOTH, "AA:BB:CC:DD:EE:FF",
+                Map.of("bluetooth", Map.of()), Instant.now());
+        PlayableRef.JellyfinItem track = new PlayableRef.JellyfinItem(FakeJellyfinServer.SERVER_ID, trackId, 0);
+        ContentItem song = new ContentItem(trackId, "jellyfin", ContentKind.TRACK, "Bunny Song", "The Rabbits", null, List.of(track));
+
+        PlayableResolver.Resolution resolution = resolver.resolve(track, song, speaker,
+                java.util.EnumSet.of(Capability.LOCAL_AUDIO_SINK, Capability.VOLUME));
+
+        assertThat(resolution.playables()).containsExactly(new PlayableRef.StreamUrl(URI.create("http://nas:8096/Audio/"
+                + trackId + "/stream.flac?static=true&mediaSourceId=" + trackId + "&ApiKey=" + FakeJellyfinServer.ACCESS_TOKEN),
+                "audio/flac"));
+        assertThat(resolution.playables()).noneMatch(ref -> ((PlayableRef.StreamUrl) ref).url().toString().contains("192.0.2.10"));
+        assertThat(resolution.notes()).containsExactly("no Jellyfin app is open on JBL Flip 5");
+    }
+
+    @Test
+    void aMixedDeviceKeepsTheDeviceAddress() throws IOException {
+        String trackId = "c0ffee00c0ffee00c0ffee00c0ffee01";
+        connected();
+        fake.respond("GET", "/Items/" + trackId, 200, "item-track.json");
+        fake.respond("POST", "/Items/" + trackId + "/PlaybackInfo", 200, "playback-info-audio.json");
+        Device speaker = new Device("mixed-1", "Mixed", DeviceKind.UPNP, "10.0.0.31", Map.of(), Instant.now());
+        PlayableRef.JellyfinItem track = new PlayableRef.JellyfinItem(FakeJellyfinServer.SERVER_ID, trackId, 0);
+        ContentItem song = new ContentItem(trackId, "jellyfin", ContentKind.TRACK, "Bunny Song", "The Rabbits", null, List.of(track));
+
+        PlayableResolver.Resolution resolution = resolver.resolve(track, song, speaker,
+                java.util.EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK));
+
+        assertThat(resolution.playables()).hasSize(1);
+        PlayableRef.StreamUrl stream = (PlayableRef.StreamUrl) resolution.playables().getFirst();
+        assertThat(stream.url().toString()).startsWith("http://192.168.1.20:8096/");
+    }
+
+    @Test
     void aDeviceThatCanOnlyOpenLinksGetsOnlyTheNote() throws IOException {
         connected();
         Device kitchen = device("Kitchen", "10.0.0.9");

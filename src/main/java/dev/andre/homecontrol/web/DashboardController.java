@@ -54,12 +54,14 @@ public class DashboardController {
         Set<Capability> capabilities = devices.capabilities(selected.id());
         model.addAttribute("remoteKeys", capabilities.contains(Capability.REMOTE_KEYS));
         model.addAttribute("castControls", capabilities.contains(Capability.CAST_RECEIVER));
-        model.addAttribute("rendererControls", capabilities.contains(Capability.MEDIA_RENDERER));
+        model.addAttribute("rendererControls",
+                capabilities.contains(Capability.MEDIA_RENDERER) || capabilities.contains(Capability.LOCAL_AUDIO_SINK));
+        model.addAttribute("localAudio", capabilities.contains(Capability.LOCAL_AUDIO_SINK));
         model.addAttribute("speakerTopology", devices.speakerTopology(selected.id()).orElse(null));
         model.addAttribute("inputs", devices.inputs(selected.id()));
         model.addAttribute("canOpenLinks",
                 capabilities.contains(Capability.APP_LINK) || capabilities.contains(Capability.CAST_RECEIVER)
-                        || capabilities.contains(Capability.MEDIA_RENDERER));
+                        || capabilities.contains(Capability.MEDIA_RENDERER) || capabilities.contains(Capability.LOCAL_AUDIO_SINK));
         model.addAttribute("rails", rails.snapshots().stream().map(s -> RailView.of(s, contentSources)).toList());
         model.addAttribute("hasSources", !contentSources.all().isEmpty());
         model.addAttribute("remoteOpen", "open".equals(remote));

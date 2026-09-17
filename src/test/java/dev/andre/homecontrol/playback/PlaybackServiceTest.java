@@ -15,6 +15,7 @@ import dev.andre.homecontrol.core.playback.CastMessageStrategy;
 import dev.andre.homecontrol.core.playback.CastStreamStrategy;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
+import dev.andre.homecontrol.core.playback.LocalAudioSinkStrategy;
 import dev.andre.homecontrol.core.playback.MediaRendererStrategy;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlayableResolver;
@@ -86,6 +87,22 @@ class PlaybackServiceTest {
         assertThat(route).isInstanceOf(Route.Render.class);
         verify(devices).execute("upnp-10-0-0-30",
                 new Action.PlayMedia(URI.create("http://nas.local/music/song.flac"), "audio/flac", "song.flac", null));
+    }
+
+    @Test
+    void executesALocalPlaybackRoute() {
+        Device speaker = new Device("bluetooth-aa-bb-cc-dd-ee-ff", "JBL Flip 5", DeviceKind.BLUETOOTH, "AA:BB:CC:DD:EE:FF",
+                Map.of("bluetooth", Map.of()), Instant.now());
+        given(devices.device("bluetooth-aa-bb-cc-dd-ee-ff")).willReturn(Optional.of(speaker));
+        given(devices.capabilities("bluetooth-aa-bb-cc-dd-ee-ff")).willReturn(EnumSet.of(Capability.LOCAL_AUDIO_SINK, Capability.VOLUME));
+        PlaybackService local = new PlaybackService(devices, new PlaybackPlanner(List.of(new AppLinkStrategy(),
+                new CastStreamStrategy(), new MediaRendererStrategy(), new LocalAudioSinkStrategy())));
+
+        Route route = local.play(AppLinks.fromUrl("http://nas.local/music/song.mp3"), "bluetooth-aa-bb-cc-dd-ee-ff");
+
+        assertThat(route).isInstanceOf(Route.PlayLocally.class);
+        verify(devices).execute("bluetooth-aa-bb-cc-dd-ee-ff",
+                new Action.PlayMedia(URI.create("http://nas.local/music/song.mp3"), "audio/mpeg", "song.mp3", null));
     }
 
     @Test
