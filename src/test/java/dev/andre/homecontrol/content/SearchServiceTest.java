@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SearchServiceTest {
 
@@ -35,6 +36,9 @@ class SearchServiceTest {
         private final String id;
         private final String name;
         private final BiFunction<String, Integer, List<ContentItem>> behavior;
+        private boolean onDemand;
+        private boolean available = true;
+        private boolean searchable = true;
         final AtomicInteger calls = new AtomicInteger();
         volatile String lastQuery;
         volatile Integer lastLimit;
@@ -45,12 +49,29 @@ class SearchServiceTest {
             this.behavior = behavior;
         }
 
+        StubSource onDemand() {
+            onDemand = true;
+            return this;
+        }
+
+        StubSource unavailable() {
+            available = false;
+            return this;
+        }
+
+        StubSource notSearchable() {
+            searchable = false;
+            return this;
+        }
+
         @Override public String id() { return id; }
         @Override public String displayName() { return name; }
+        @Override public boolean available() { return available; }
         @Override public List<RailDescriptor> rails() { return List.of(); }
         @Override public Rail rail(String railId) { throw new UnsupportedOperationException(); }
         @Override public Optional<ContentItem> item(String itemId) { return Optional.empty(); }
-        @Override public boolean searchable() { return true; }
+        @Override public boolean searchable() { return searchable; }
+        @Override public boolean searchOnDemand() { return onDemand; }
 
         @Override
         public List<ContentItem> search(String query, int limit) {
@@ -184,5 +205,78 @@ class SearchServiceTest {
 
         assertThat(source.lastQuery).isEqualTo("bunny");
         assertThat(source.lastLimit).isEqualTo(42);
+    }
+
+    @Test
+    void onDemandSourcesAreSkippedInTheUnifiedSearch() {
+        StubSource jellyfin = new StubSource("jellyfin", "Jellyfin", sleepThenReturn(0, List.of(item("i1", "jellyfin", "One"))));
+        StubSource youtube = new StubSource("youtube", "YouTube", sleepThenReturn(0, List.of())).onDemand();
+        ContentSources sources = new ContentSources(List.of(jellyfin, youtube));
+        SearchService service = new SearchService(sources, new TestPreferences(), properties(Duration.ofMillis(300)), executor);
+
+        SearchOutcome outcome = service.search("star", 20);
+
+        assertThat(outcome.hits()).hasSize(1);
+        assertThat(outcome.hits().getFirst().source()).isEqualTo(jellyfin);
+        assertThat(youtube.calls.get()).isZero();
+    }
+
+    @Test
+    void searchSourceRunsOneOnDemandSource() {
+        StubSource youtube = new StubSource("youtube", "YouTube",
+                sleepThenReturn(0, List.of(item("i1", "youtube", "One")))).onDemand();
+        ContentSources sources = new ContentSources(List.of(youtube));
+        SearchService service = new SearchService(sources, new TestPreferences(), properties(Duration.ofMillis(300)), executor);
+
+        SearchOutcome outcome = service.searchSource("youtube", "star", 20);
+
+        assertThat(outcome.hits()).hasSize(1);
+        assertThat(outcome.hits().getFirst().source()).isEqualTo(youtube);
+        assertThat(outcome.failures()).isEmpty();
+
+        StubSource broken = new StubSource("youtube2", "YouTube", (q, l) -> {
+            throw new ContentSourceException("You have used today's 20 YouTube searches. …");
+        }).onDemand();
+        ContentSources brokenSources = new ContentSources(List.of(broken));
+        SearchService brokenService = new SearchService(brokenSources, new TestPreferences(), properties(Duration.ofMillis(300)), executor);
+
+        SearchOutcome failedOutcome = brokenService.searchSource("youtube2", "star", 20);
+
+        assertThat(failedOutcome.hits()).isEmpty();
+        assertThat(failedOutcome.failures()).hasSize(1);
+        assertThat(failedOutcome.failures().getFirst().message()).isEqualTo("You have used today's 20 YouTube searches. …");
+    }
+
+    @Test
+    void searchSourceRefusesUnknownDisabledOrUnavailable() {
+        StubSource disabled = new StubSource("disabled", "Disabled", sleepThenReturn(0, List.of())).onDemand();
+        StubSource unavailable = new StubSource("unavailable", "Unavailable", sleepThenReturn(0, List.of())).unavailable();
+        StubSource notSearchable = new StubSource("plain", "Plain", sleepThenReturn(0, List.of())).notSearchable();
+        ContentSources sources = new ContentSources(List.of(disabled, unavailable, notSearchable));
+        SearchService service = new SearchService(sources, new TestPreferences("disabled"), properties(Duration.ofMillis(300)), executor);
+
+        assertThatThrownBy(() -> service.searchSource("nope", "q", 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("No searchable source nope");
+        assertThatThrownBy(() -> service.searchSource("disabled", "q", 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("No searchable source disabled");
+        assertThatThrownBy(() -> service.searchSource("unavailable", "q", 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("No searchable source unavailable");
+        assertThatThrownBy(() -> service.searchSource("plain", "q", 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("No searchable source plain");
+    }
+
+    @Test
+    void onDemandSourcesListsEligibleOnes() {
+        StubSource jellyfin = new StubSource("jellyfin", "Jellyfin", sleepThenReturn(0, List.of()));
+        StubSource youtube = new StubSource("youtube", "YouTube", sleepThenReturn(0, List.of())).onDemand();
+        StubSource disabledYoutube = new StubSource("youtube2", "YouTube2", sleepThenReturn(0, List.of())).onDemand();
+        ContentSources sources = new ContentSources(List.of(jellyfin, youtube, disabledYoutube));
+        SearchService service = new SearchService(sources, new TestPreferences("youtube2"), properties(Duration.ofMillis(300)), executor);
+
+        assertThat(service.onDemandSources()).containsExactly(youtube);
     }
 }

@@ -3,6 +3,7 @@ package dev.andre.homecontrol.sources.youtube;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
+import dev.andre.homecontrol.core.playback.PlayableRef;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,8 @@ class YouTubeContentSourceTest {
     private SubscriptionsFeed feed;
     private YouTubeApiClient api;
     private YouTubePlaylists playlists;
+    private YouTubeSearch search;
+    private QuotaLedger ledger;
     private KnownVideos known;
     private YouTubeContentSource source;
 
@@ -45,13 +49,14 @@ class YouTubeContentSourceTest {
         setup = mock(YouTubeSetupService.class);
         given(setup.settings()).willReturn(YouTubeSettings.EMPTY);
         feed = mock(SubscriptionsFeed.class);
-        QuotaLedger ledger = new QuotaLedger(tempDir.resolve("quota.json"), clock, 10000, 20);
+        ledger = new QuotaLedger(tempDir.resolve("quota.json"), clock, 10000, 20);
         GoogleTokens tokens = mock(GoogleTokens.class);
         given(tokens.accessToken()).willReturn("ya29.t");
         api = new YouTubeApiClient(new YouTubeHttp(fake.properties()), URI.create(fake.base() + "/youtube/v3"), tokens, ledger);
         playlists = new YouTubePlaylists(api, fake.properties(), clock);
         known = new KnownVideos(1000);
-        source = new YouTubeContentSource(setup, feed, api, playlists, known, fake.properties(), clock);
+        search = new YouTubeSearch(api, known, fake.properties(), clock);
+        source = new YouTubeContentSource(setup, feed, api, playlists, search, ledger, known, fake.properties(), clock);
     }
 
     @AfterEach
@@ -192,5 +197,35 @@ class YouTubeContentSourceTest {
         assertThatThrownBy(() -> source.rail("watch-later"))
                 .isInstanceOf(ContentSourceException.class)
                 .hasMessage(YouTubePlaylists.WATCH_LATER_UNAVAILABLE);
+    }
+
+    @Test
+    void searchIsOnDemandWithANote() {
+        assertThat(source.searchable()).isTrue();
+        assertThat(source.searchOnDemand()).isTrue();
+
+        MutableClock berlin = new MutableClock(Instant.parse("2026-09-16T10:00:00Z"), ZoneId.of("Europe/Berlin"));
+        QuotaLedger berlinLedger = new QuotaLedger(tempDir.resolve("quota-berlin.json"), berlin, 10000, 20);
+        YouTubeContentSource berlinSource =
+                new YouTubeContentSource(setup, feed, api, playlists, search, berlinLedger, known, fake.properties(), berlin);
+
+        berlinLedger.charge(QuotaLedger.Call.SEARCH_LIST);
+        assertThat(berlinSource.searchNote()).contains("19 of 20 YouTube searches left today");
+
+        for (int i = 0; i < 19; i++) {
+            berlinLedger.charge(QuotaLedger.Call.SEARCH_LIST);
+        }
+        assertThat(berlinSource.searchNote()).contains("YouTube searches used up until 09:00");
+    }
+
+    @Test
+    void searchMapsItems() {
+        fake.respond("GET", "/youtube/v3/search", FakeGoogleServer.Canned.fixture(200, "search-videos.json"));
+
+        List<dev.andre.homecontrol.core.playback.ContentItem> items = source.search("bunny", 20);
+
+        assertThat(items).extracting(i -> i.id()).containsExactly("aqz-KE-bpKQ", "Hh7Lq2Wv9sE");
+        assertThat(items.getFirst().playables()).containsExactly(
+                new PlayableRef.AppLink(YouTubeVideo.watchUrl("aqz-KE-bpKQ"), "youtube"));
     }
 }

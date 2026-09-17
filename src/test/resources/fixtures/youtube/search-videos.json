@@ -1,0 +1,54 @@
+{
+  "kind": "youtube#searchListResponse",
+  "etag": "c2VhcmNoLXZpZGVvcw",
+  "nextPageToken": "CAUQAA",
+  "regionCode": "DE",
+  "pageInfo": { "totalResults": 1000000, "resultsPerPage": 3 },
+  "items": [
+    {
+      "kind": "youtube#searchResult",
+      "etag": "c2VhcmNoLTE",
+      "id": { "kind": "youtube#video", "videoId": "aqz-KE-bpKQ" },
+      "snippet": {
+        "publishedAt": "2014-11-10T14:05:47Z",
+        "channelId": "UCSMOQeBJ2RAnuFungnQOxLg",
+        "title": "Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film",
+        "description": "Big Buck Bunny tells the story of a giant rabbit with a heart bigger than himself.",
+        "thumbnails": { "medium": { "url": "https://i.ytimg.com/vi/aqz-KE-bpKQ/mqdefault.jpg", "width": 320, "height": 180 } },
+        "channelTitle": "Blender",
+        "liveBroadcastContent": "none",
+        "publishTime": "2014-11-10T14:05:47Z"
+      }
+    },
+    {
+      "kind": "youtube#searchResult",
+      "etag": "c2VhcmNoLTI",
+      "id": { "kind": "youtube#video", "videoId": "Hh7Lq2Wv9sE" },
+      "snippet": {
+        "publishedAt": "2026-09-01T14:00:00Z",
+        "channelId": "UCsXVk37bltHxD1rDPwtNM8Q",
+        "title": "Bunnies &amp; Black Holes: &quot;Why&quot; It&#39;s Not Fine",
+        "description": "",
+        "thumbnails": { "medium": { "url": "https://i.ytimg.com/vi/Hh7Lq2Wv9sE/mqdefault.jpg", "width": 320, "height": 180 } },
+        "channelTitle": "Kurzgesagt &ndash; In a Nutshell",
+        "liveBroadcastContent": "none",
+        "publishTime": "2026-09-01T14:00:00Z"
+      }
+    },
+    {
+      "kind": "youtube#searchResult",
+      "etag": "c2VhcmNoLTM",
+      "id": { "kind": "youtube#video", "videoId": "Rt4Yb8Nc1xZ" },
+      "snippet": {
+        "publishedAt": "2026-09-20T18:00:00Z",
+        "channelId": "UCLA_DiR1FfKNvjuUpBHmylQ",
+        "title": "Bunny Nebula Live Premiere",
+        "description": "",
+        "thumbnails": {},
+        "channelTitle": "NASA",
+        "liveBroadcastContent": "upcoming",
+        "publishTime": "2026-09-20T18:00:00Z"
+      }
+    }
+  ]
+}

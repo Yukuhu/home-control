@@ -91,10 +91,15 @@ public class YouTubeConfiguration {
     }
 
     @Bean
+    public YouTubeSearch youTubeSearch(YouTubeApiClient api, KnownVideos known, YouTubeProperties properties, Clock clock) {
+        return new YouTubeSearch(api, known, properties, clock);
+    }
+
+    @Bean
     public YouTubeContentSource youTubeContentSource(YouTubeSetupService setup, SubscriptionsFeed feed, YouTubeApiClient api,
-                                                     YouTubePlaylists playlists, KnownVideos known,
-                                                     YouTubeProperties properties, Clock clock) {
-        return new YouTubeContentSource(setup, feed, api, playlists, known, properties, clock);
+                                                     YouTubePlaylists playlists, YouTubeSearch search, QuotaLedger ledger,
+                                                     KnownVideos known, YouTubeProperties properties, Clock clock) {
+        return new YouTubeContentSource(setup, feed, api, playlists, search, ledger, known, properties, clock);
     }
 
     @Bean

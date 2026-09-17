@@ -36,10 +36,12 @@ final class YouTubeVideoMapper {
         if (channelTitle.isBlank()) {
             channelTitle = snippet.path("channelTitle").asString("");
         }
-        String primaryPublished = contentDetails.path("videoPublishedAt").asString("");
-        Instant published = primaryPublished.isBlank()
-                ? instantOrEpoch(snippet.path("publishedAt").asString(""))
-                : instantOrEpoch(primaryPublished);
+        // A malformed (not just missing) contentDetails.videoPublishedAt still falls back to
+        // snippet.publishedAt before giving up on Instant.EPOCH — a bad-but-present primary field
+        // shouldn't be treated any differently from an absent one.
+        Instant published = parseInstant(contentDetails.path("videoPublishedAt").asString(""))
+                .or(() -> parseInstant(snippet.path("publishedAt").asString("")))
+                .orElse(Instant.EPOCH);
         return Optional.of(new YouTubeVideo(id, title, channelTitle, published));
     }
 
@@ -55,6 +57,21 @@ final class YouTubeVideoMapper {
         return Optional.of(new YouTubeVideo(id, title, channelTitle, published));
     }
 
+    static Optional<YouTubeVideo> fromSearchResult(JsonNode item) {
+        String id = item.path("id").path("videoId").asString("");
+        if (!YouTubeVideo.validId(id)) {
+            return Optional.empty();
+        }
+        JsonNode snippet = item.path("snippet");
+        if ("upcoming".equals(snippet.path("liveBroadcastContent").asString(""))) {
+            return Optional.empty();
+        }
+        String title = YouTubeSearch.unescapeHtml(snippet.path("title").asString(""));
+        String channelTitle = YouTubeSearch.unescapeHtml(snippet.path("channelTitle").asString(""));
+        Instant published = instantOrEpoch(snippet.path("publishedAt").asString(""));
+        return Optional.of(new YouTubeVideo(id, title, channelTitle, published));
+    }
+
     static List<YouTubeVideo> playlistItems(JsonNode response) {
         List<YouTubeVideo> videos = new ArrayList<>();
         for (JsonNode item : response.path("items")) {
@@ -64,13 +81,17 @@ final class YouTubeVideoMapper {
     }
 
     private static Instant instantOrEpoch(String value) {
+        return parseInstant(value).orElse(Instant.EPOCH);
+    }
+
+    private static Optional<Instant> parseInstant(String value) {
         if (value == null || value.isBlank()) {
-            return Instant.EPOCH;
+            return Optional.empty();
         }
         try {
-            return Instant.parse(value);
+            return Optional.of(Instant.parse(value));
         } catch (DateTimeParseException e) {
-            return Instant.EPOCH;
+            return Optional.empty();
         }
     }
 }

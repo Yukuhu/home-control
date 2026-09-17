@@ -53,7 +53,18 @@ class YouTubeThumbnailControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "image/jpeg"))
                 .andExpect(header().string("Cache-Control", "max-age=86400, private"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(content().bytes(JPEG));
+    }
+
+    @Test
+    void aNonImageUpstreamResponseIs502() throws Exception {
+        given(http.get(URI.create("http://thumbs.test/vi/aqz-KE-bpKQ/mqdefault.jpg"), Map.of()))
+                .willReturn(new YouTubeHttp.Response(200, "text/html; charset=UTF-8", "<html></html>".getBytes()));
+
+        mockMvc.perform(get("/sources/youtube/thumbnails/aqz-KE-bpKQ"))
+                .andExpect(status().isBadGateway())
+                .andExpect(content().string("Could not load the thumbnail"));
     }
 
     @Test

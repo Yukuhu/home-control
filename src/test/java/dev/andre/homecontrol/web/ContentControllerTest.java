@@ -281,4 +281,24 @@ class ContentControllerTest {
         mockMvc.perform(get("/search").param("q", "bunny").param("limit", "0")).andExpect(status().isOk());
         verify(searchService).search("bunny", 1);
     }
+
+    @Test
+    void searchWithSourceUsesSearchSource() throws Exception {
+        ContentSource youtube = searchableMock("youtube", "YouTube");
+        ContentItem item = new ContentItem("item-1", "youtube", ContentKind.VIDEO, "Bunny", null, null, List.of());
+        SearchOutcome outcome = new SearchOutcome("star", List.of(new SearchOutcome.Hits(youtube, List.of(item))), List.of());
+        given(searchService.searchSource("youtube", "star", 20)).willReturn(outcome);
+
+        mockMvc.perform(get("/search").param("q", "star").param("source", "youtube"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.results[0].sourceId").value("youtube"));
+
+        verify(searchService).searchSource("youtube", "star", 20);
+
+        given(searchService.searchSource("nope", "star", 20))
+                .willThrow(new IllegalArgumentException("No searchable source nope"));
+        mockMvc.perform(get("/search").param("q", "star").param("source", "nope"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("No searchable source nope"));
+    }
 }

@@ -40,6 +40,19 @@ public interface ContentSource {
         throw new UnsupportedOperationException(displayName() + " cannot search");
     }
 
+    /**
+     * True when each search costs a scarce budget (e.g. YouTube's 100 quota units). Such sources are left out of
+     * the as-you-type search and searched only when the user asks for them (spec §6.1 "quota-aware").
+     */
+    default boolean searchOnDemand() {
+        return false;
+    }
+
+    /** A short note next to the on-demand search button, e.g. "17 of 20 YouTube searches left today". */
+    default Optional<String> searchNote() {
+        return Optional.empty();
+    }
+
     /** How long a loaded rail stays fresh. Users override it per source (D4). */
     default Duration defaultRefreshInterval() {
         return Duration.ofMinutes(15);
