@@ -111,6 +111,8 @@
         <section th:replace="~{fragments/jellyfin-setup :: section}"></section>
     </th:block>
 
+    <section th:if="${sourcesSetup != null}" th:replace="~{fragments/sources-setup :: sources(${sourcesSetup})}"></section>
+
     <section th:if="${loginRequired}">
         <h2>Login password</h2>
         <p class="error" th:if="${loginError}" th:text="${loginError}">Wrong password</p>

@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.SmartLifecycle;
+import org.springframework.context.event.EventListener;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -168,6 +169,11 @@ public class RailCache implements SmartLifecycle {
         if (keys != null) {
             events.publishEvent(new RailsChangedEvent(keys));
         }
+    }
+
+    @EventListener
+    public void onPreferencesChanged(SourcePreferencesChangedEvent event) {
+        reschedule();
     }
 
     /** Re-evaluates due times after preferences changed (Task 4 calls this through an event). */

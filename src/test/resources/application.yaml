@@ -49,3 +49,5 @@ home-control:
       retry-after-failure: 1m
       max-concurrent-fetches: 4
       refresh-intervals: {}
+    locale: de-DE
+    region: DE

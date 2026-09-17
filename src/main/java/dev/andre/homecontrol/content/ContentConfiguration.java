@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.content;
 
 import dev.andre.homecontrol.core.content.ContentSources;
+import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -14,8 +15,14 @@ import java.util.concurrent.Executors;
 public class ContentConfiguration {
 
     @Bean
-    public RailPreferences railPreferences(ContentProperties properties) {
-        return new DefaultRailPreferences(properties);
+    public SourcePreferencesService sourcePreferencesService(JsonFileSourceSettings settings, ContentProperties properties,
+                                                             ApplicationEventPublisher events) {
+        return new SourcePreferencesService(settings, properties, events);
+    }
+
+    @Bean
+    public StoredRailPreferences railPreferences(SourcePreferencesService preferences, ContentProperties properties) {
+        return new StoredRailPreferences(preferences, properties);
     }
 
     @Bean
