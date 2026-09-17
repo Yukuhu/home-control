@@ -92,6 +92,9 @@ async function attempt(deviceId, skip) {
         });
         data = await readJsonOrText(response);
     } catch {
+        // Same reasoning as the outcome branches below: the modal sheet would otherwise sit in
+        // front of this toast too.
+        sheet().close();
         toast("Cannot reach the server");
         play.disabled = false;
         return;

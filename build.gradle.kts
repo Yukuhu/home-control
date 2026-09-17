@@ -39,3 +39,45 @@ tasks.withType<Test> {
     useJUnitPlatform()
     testLogging { showExceptions = true }
 }
+
+// Browser tests (Playwright for Java) live in their own source set so `build` never resolves
+// Playwright (~200 MB driver bundle) and never needs installed browsers. Run: ./gradlew e2eTest
+val playwrightVersion = "1.63.0"
+
+sourceSets {
+    create("e2e") {
+        compileClasspath += sourceSets["main"].output + sourceSets["test"].output
+        runtimeClasspath += sourceSets["main"].output + sourceSets["test"].output
+    }
+}
+
+configurations["e2eImplementation"].extendsFrom(configurations["testImplementation"])
+configurations["e2eRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
+
+dependencies {
+    "e2eImplementation"("com.microsoft.playwright:playwright:$playwrightVersion") {
+        // Spring Boot's Logback is the SLF4J provider; two providers only produce warnings.
+        exclude(group = "org.slf4j", module = "slf4j-simple")
+    }
+}
+
+val e2eTest by tasks.registering(Test::class) {
+    description = "Runs the Playwright browser tests (needs installed browsers, see installPlaywrightBrowsers)."
+    group = "verification"
+    testClassesDirs = sourceSets["e2e"].output.classesDirs
+    classpath = sourceSets["e2e"].runtimeClasspath
+    shouldRunAfter(tasks.test)
+    // Fail fast with a clear error instead of downloading browsers in the middle of a test run.
+    environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
+    systemProperty("e2e.browsers", (findProperty("e2eBrowsers") as String?) ?: "chromium,webkit")
+    systemProperty("e2e.artifacts", layout.buildDirectory.dir("e2e-artifacts").get().asFile.absolutePath)
+    maxParallelForks = 1
+}
+
+val installPlaywrightBrowsers by tasks.registering(JavaExec::class) {
+    description = "Installs Playwright's Chromium and WebKit plus their OS packages (needs root or passwordless sudo)."
+    group = "verification"
+    classpath = configurations["e2eRuntimeClasspath"]
+    mainClass = "com.microsoft.playwright.CLI"
+    args("install", "--with-deps", "chromium", "webkit")
+}

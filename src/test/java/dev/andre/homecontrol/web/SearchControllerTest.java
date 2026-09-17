@@ -13,8 +13,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.hamcrest.Matchers.blankOrNullString;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.emptyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
@@ -47,9 +47,12 @@ class SearchControllerTest {
 
     @Test
     void blankQueryRendersNothing() throws Exception {
+        // Truly empty, not just blank: #search-results must be CSS :empty for the dashboard's
+        // "hide the rails while search results are showing" rule to let them back through once
+        // the query is cleared (see fragments/search.html's th:if on the fragment's own root).
         mockMvc.perform(get("/search/results"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(blankOrNullString()));
+                .andExpect(content().string(emptyString()));
 
         verify(search, never()).search(any(), anyInt());
     }

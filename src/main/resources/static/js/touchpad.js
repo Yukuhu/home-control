@@ -23,10 +23,18 @@ export function initTouchpad(root = document) {
     const pad = root.getElementById("touchpad");
     if (!drawer || !pad) return;
     const deviceId = pad.dataset.device;
-    let gesture = null;          // { id, x, y, holdTimer, holding }
+    let gesture = null;          // { id, x, y, holdTimer, holding, start }
     let available = true;
 
     const fail = (error) => toast(error.message);
+
+    // END must never reach the device before START: releasing (or cancelling) a hold waits for
+    // START's own request to settle — success or failure — before even sending END's, so a quick
+    // release right after the hold fires can never let END's response outrun START's.
+    function sendEndLong(start, keepalive) {
+        return (start ?? Promise.resolve()).catch(() => {})
+            .finally(() => sendKey(deviceId, "DPAD_CENTER", { press: "end_long", keepalive }).catch(fail));
+    }
 
     function setMode(mode) {
         cancel();
@@ -37,11 +45,12 @@ export function initTouchpad(root = document) {
         writeMode(mode);
     }
 
-    function cancel() {
+    function cancel({ keepalive = false } = {}) {
         if (!gesture) return;
+        const { start, holding, id } = gesture;
         clearTimeout(gesture.holdTimer);
-        if (gesture.holding) sendKey(deviceId, "DPAD_CENTER", { press: "end_long" }).catch(fail);
-        try { pad.releasePointerCapture(gesture.id); } catch { /* already released */ }
+        if (holding) sendEndLong(start, keepalive);
+        try { pad.releasePointerCapture(id); } catch { /* already released */ }
         gesture = null;
         pad.classList.remove("active");
     }
@@ -66,7 +75,8 @@ export function initTouchpad(root = document) {
         gesture.holdTimer = setTimeout(() => {
             if (!gesture) return;
             gesture.holding = true;
-            sendKey(deviceId, "DPAD_CENTER", { press: "start_long" }).catch(fail);
+            gesture.start = sendKey(deviceId, "DPAD_CENTER", { press: "start_long" });
+            gesture.start.catch(fail);
         }, HOLD_MS);
     });
 
@@ -77,12 +87,12 @@ export function initTouchpad(root = document) {
 
     pad.addEventListener("pointerup", (event) => {
         if (!gesture || event.pointerId !== gesture.id) return;
-        const { x, y, holding } = gesture;
+        const { x, y, holding, start } = gesture;
         clearTimeout(gesture.holdTimer);
         gesture = null;
         pad.classList.remove("active");
         if (holding) {
-            sendKey(deviceId, "DPAD_CENTER", { press: "end_long" }).catch(fail);
+            sendEndLong(start, false);
             return;
         }
         const result = classify(event.clientX - x, event.clientY - y);
@@ -90,7 +100,7 @@ export function initTouchpad(root = document) {
         if (result.kind === "swipe") sendKey(deviceId, result.key, { repeat: result.repeat }).catch(fail);
     });
 
-    pad.addEventListener("pointercancel", cancel);
+    pad.addEventListener("pointercancel", () => cancel());
     pad.addEventListener("lostpointercapture", (event) => { if (gesture && event.pointerId === gesture.id) cancel(); });
 
     // Keyboard path without gestures (vNext §5.7).
@@ -117,9 +127,10 @@ export function initTouchpad(root = document) {
     // A backgrounded or locked screen never delivers pointerup: without this a hold started
     // just before that would stay open forever, so the device never sees the long press end.
     // cancel() is idempotent (a no-op without an active gesture), so both listeners are safe
-    // to fire on the same tab switch.
+    // to fire on the same tab switch. pagehide's END_LONG needs keepalive: the page may already
+    // be gone by the time a normal fetch would otherwise be aborted mid-flight.
     document.addEventListener("visibilitychange", () => { if (document.hidden) cancel(); });
-    window.addEventListener("pagehide", () => cancel());
+    window.addEventListener("pagehide", () => cancel({ keepalive: true }));
 
     setMode(readMode());
 }
