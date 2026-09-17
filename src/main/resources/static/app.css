@@ -139,3 +139,4 @@ button, a { touch-action: manipulation; }
 }
 @media (forced-colors: active) { .touchpad { border: 2px solid CanvasText; } }
 .user-code { font: 600 2rem/1.2 ui-monospace, monospace; letter-spacing: .1em; }
+@media (max-width: 40rem) { #sports-providers td { display: block; } }

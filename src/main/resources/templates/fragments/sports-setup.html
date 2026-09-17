@@ -150,4 +150,44 @@
 
         <p class="hint">Data from <a href="https://www.thesportsdb.com" rel="noopener noreferrer">TheSportsDB</a>.</p>
     </th:block>
+
+    <th:block th:if="${!#lists.isEmpty(sports.calendars()) or !#lists.isEmpty(sports.competitions())}">
+        <form id="sports-providers" method="post" th:action="@{/setup/sources/sports/providers}">
+            <h3>Where you watch it</h3>
+            <p>Tell Home Control where you watch each competition. This is your own setting: Home Control does not know broadcast rights and does not use TheSportsDB's TV listings.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Competition</th>
+                        <th>From</th>
+                        <th>Where you watch it (your setting)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="calendar : ${sports.calendars()}">
+                        <td th:text="${calendar.label()}">Bundesliga 2026/27</td>
+                        <td>Calendar</td>
+                        <td>
+                            <select th:name="'provider:calendar:' + ${calendar.id()}" th:attr="aria-label='Where you watch ' + ${calendar.label()} + ' (your setting)'">
+                                <option value="" th:selected="${calendar.provider() == ''}">Not set</option>
+                                <option th:each="option : ${sports.providers()}" th:value="${option.key()}" th:text="${option.name()}" th:selected="${option.key() == calendar.provider()}">DAZN</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr th:each="competition : ${sports.competitions()}">
+                        <td th:text="${competition.name()}">German Bundesliga</td>
+                        <td>TheSportsDB</td>
+                        <td>
+                            <select th:name="'provider:thesportsdb:' + ${competition.leagueId()}" th:attr="aria-label='Where you watch ' + ${competition.name()} + ' (your setting)'">
+                                <option value="" th:selected="${competition.provider() == ''}">Not set</option>
+                                <option th:each="option : ${sports.providers()}" th:value="${option.key()}" th:text="${option.name()}" th:selected="${option.key() == competition.provider()}">DAZN</option>
+                            </select>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>Events of a competition set to DAZN, Netflix or Prime Video open that app. For other services, paste a link to the event in the play sheet.</p>
+            <button type="submit">Save your settings</button>
+        </form>
+    </th:block>
 </section>

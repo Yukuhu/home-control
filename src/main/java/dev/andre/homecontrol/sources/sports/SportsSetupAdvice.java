@@ -21,17 +21,18 @@ import java.util.List;
 @ConditionalOnProperty(name = "home-control.sports.enabled", havingValue = "true", matchIfMissing = true)
 public class SportsSetupAdvice {
 
-    public record CalendarView(String id, String label, String host, String status) {
+    public record CalendarView(String id, String label, String host, String status, String provider) {
     }
 
-    public record CompetitionView(String leagueId, String name, String sport, String country, String status) {
+    public record CompetitionView(String leagueId, String name, String sport, String country, String status,
+                                  String provider) {
     }
 
     /** What the setup page shows about the sports source. */
     public record View(String timeZone, String storedTimeZone, boolean timeZoneLooksUnset,
                        List<CalendarView> calendars, int maxCalendars, boolean needsLoginPassword,
                        boolean theSportsDbEnabled, String keyKind, List<CompetitionView> competitions,
-                       int maxCompetitions) {
+                       int maxCompetitions, List<SportsProviders.Option> providers) {
     }
 
     private final ObjectProvider<SportsSettingsService> settingsProvider;
@@ -73,7 +74,7 @@ public class SportsSetupAdvice {
         for (SportsSettings.CalendarEntry entry : current.calendars()) {
             FeedStatus status = schedule.status(entry.id()).orElse(null);
             calendarViews.add(new CalendarView(entry.id(), entry.label(), entry.host(),
-                    statusText(status, entry.label(), zone)));
+                    statusText(status, entry.label(), zone), entry.provider() == null ? "" : entry.provider()));
         }
 
         TheSportsDbSchedule tsdbSchedule = theSportsDbScheduleProvider.getIfAvailable();
@@ -83,14 +84,14 @@ public class SportsSetupAdvice {
             for (SportsSettings.CompetitionEntry entry : current.competitions()) {
                 FeedStatus status = tsdbSchedule.status(entry.leagueId()).orElse(null);
                 competitionViews.add(new CompetitionView(entry.leagueId(), entry.name(), entry.sport(), entry.country(),
-                        statusText(status, entry.name(), zone)));
+                        statusText(status, entry.name(), zone), entry.provider() == null ? "" : entry.provider()));
             }
         }
 
         return new View(zone.getId(), current.timeZone() == null ? "" : current.timeZone(), looksUnset,
                 List.copyOf(calendarViews), properties.maxCalendars(), !login.loginRequired(), theSportsDbEnabled,
                 current.keyKind() == SportsSettings.KeyKind.PERSONAL ? "personal" : "free",
-                List.copyOf(competitionViews), properties.maxCompetitions());
+                List.copyOf(competitionViews), properties.maxCompetitions(), SportsProviders.options());
     }
 
     static String statusText(FeedStatus status, String label, ZoneId zone) {
