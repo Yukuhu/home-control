@@ -44,6 +44,19 @@ home-control:
     connect-timeout-seconds: 5
     request-timeout-seconds: 15
     rail-size: 20
+  tmdb:
+    enabled: true
+    api-base-url: http://127.0.0.1:9/3
+    image-base-url:
+    connect-timeout-seconds: 1
+    request-timeout-seconds: 2
+    rail-size: 20
+    trending-candidates: 40
+    provider-cache-ttl: 24h
+    configuration-cache-ttl: 24h
+    provider-ids:
+      netflix: [8, 1796]
+      primevideo: [9, 119, 2100]
   youtube:
     enabled: true
     oauth-base-url: http://127.0.0.1:9

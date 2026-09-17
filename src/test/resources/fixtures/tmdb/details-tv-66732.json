@@ -1,0 +1,12 @@
+{
+  "adult": false, "id": 66732, "name": "Stranger Things", "original_name": "Stranger Things",
+  "first_air_date": "2016-07-15", "number_of_seasons": 5, "poster_path": "/49WJfeN0moxb9IPfGn8AIqMGskD.jpg",
+  "watch/providers": {
+    "results": {
+      "DE": {
+        "link": "https://www.themoviedb.org/tv/66732-stranger-things/watch?locale=DE",
+        "flatrate": [ { "logo_path": "/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg", "provider_id": 8, "provider_name": "Netflix", "display_priority": 0 } ]
+      }
+    }
+  }
+}

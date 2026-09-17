@@ -1,0 +1,34 @@
+<section id="tmdb" th:fragment="section">
+    <h2>TMDB (movies and series)</h2>
+    <p class="error" th:if="${tmdbError}" th:text="${tmdbError}">TMDB rejected the request</p>
+    <p class="hint" th:if="${tmdbMessage}" th:text="${tmdbMessage}">TMDB connected</p>
+
+    <p>TMDB supplies titles, artwork, trending lists and where a title streams. Netflix, Prime Video and DAZN have
+        no public APIs, so Home Control opens their apps — it cannot see what you watch there.</p>
+
+    <th:block th:if="${tmdb.configured()}">
+        <p th:text="'Connected (' + ${tmdb.credentialKind()} + ')'">Connected (read access token)</p>
+        <form method="post" th:action="@{/setup/sources/tmdb/test}">
+            <button type="submit">Test connection</button>
+        </form>
+        <form method="post" th:action="@{/setup/sources/tmdb/disconnect}">
+            <button type="submit">Disconnect</button>
+        </form>
+    </th:block>
+
+    <form method="post" th:action="@{/setup/sources/tmdb}">
+        <label>API Read Access Token (recommended) or API key
+            <input type="password" name="credential" autocomplete="off" required>
+        </label>
+        <p class="hint">Find it under <a href="https://www.themoviedb.org/settings/api" target="_blank"
+                                          rel="noreferrer">your TMDB account settings</a>.</p>
+        <th:block th:if="${tmdb.needsLoginPassword()}">
+            <p>Connecting a content source stores a secret, so Home Control will require this login password from now on.</p>
+            <input type="password" name="loginPassword" minlength="10" autocomplete="new-password" placeholder="New login password">
+            <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password" placeholder="Repeat login password">
+        </th:block>
+        <button type="submit" th:text="${tmdb.configured()} ? 'Reconnect' : 'Connect'">Connect</button>
+    </form>
+
+    <p class="hint">This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability data by JustWatch.</p>
+</section>

@@ -1,0 +1,11 @@
+{
+  "id": 603,
+  "results": {
+    "DE": {
+      "link": "https://www.themoviedb.org/movie/603-the-matrix/watch?locale=DE",
+      "flatrate": [ { "logo_path": "/1UP7ysjs5zvtSXBf8TXDmR9TUCu.jpg", "provider_id": 30, "provider_name": "WOW", "display_priority": 12 } ],
+      "rent": [ { "logo_path": "/9ghgSC0MA082EL6HLCW3GalykFD.jpg", "provider_id": 2, "provider_name": "Apple TV", "display_priority": 4 } ],
+      "buy": [ { "logo_path": "/seGSXajazLMCKGB5hnRCidtjay1.jpg", "provider_id": 10, "provider_name": "Amazon Video", "display_priority": 20 } ]
+    }
+  }
+}

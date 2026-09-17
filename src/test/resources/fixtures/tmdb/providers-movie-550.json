@@ -1,0 +1,10 @@
+{
+  "id": 550,
+  "results": {
+    "DE": {
+      "link": "https://www.themoviedb.org/movie/550-fight-club/watch?locale=DE",
+      "rent": [ { "logo_path": "/seGSXajazLMCKGB5hnRCidtjay1.jpg", "provider_id": 10, "provider_name": "Amazon Video", "display_priority": 20 } ],
+      "buy": [ { "logo_path": "/9ghgSC0MA082EL6HLCW3GalykFD.jpg", "provider_id": 2, "provider_name": "Apple TV", "display_priority": 4 } ]
+    }
+  }
+}

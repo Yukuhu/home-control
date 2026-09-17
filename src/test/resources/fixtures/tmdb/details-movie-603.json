@@ -1,0 +1,12 @@
+{
+  "adult": false, "id": 603, "title": "Matrix", "original_title": "The Matrix", "release_date": "1999-03-30",
+  "runtime": 136, "poster_path": "/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg",
+  "watch/providers": {
+    "results": {
+      "DE": {
+        "link": "https://www.themoviedb.org/movie/603-the-matrix/watch?locale=DE",
+        "flatrate": [ { "logo_path": "/1UP7ysjs5zvtSXBf8TXDmR9TUCu.jpg", "provider_id": 30, "provider_name": "WOW", "display_priority": 12 } ]
+      }
+    }
+  }
+}

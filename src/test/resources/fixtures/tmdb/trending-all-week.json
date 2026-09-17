@@ -1,0 +1,18 @@
+{
+  "page": 1,
+  "results": [
+    { "adult": false, "id": 66732, "name": "Stranger Things", "original_name": "Stranger Things", "media_type": "tv",
+      "poster_path": "/49WJfeN0moxb9IPfGn8AIqMGskD.jpg", "first_air_date": "2016-07-15", "origin_country": ["US"] },
+    { "adult": false, "id": 603, "title": "Matrix", "original_title": "The Matrix", "media_type": "movie",
+      "poster_path": "/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg", "release_date": "1999-03-30" },
+    { "adult": false, "id": 500, "name": "Tom Cruise", "media_type": "person", "profile_path": "/eOh4ubpOm2Igdg0QH2ghj0mFtC.jpg" },
+    { "adult": false, "id": 76479, "name": "The Boys", "original_name": "The Boys", "media_type": "tv",
+      "poster_path": "/2zmTngn1tYC1AvfnrFLhxeD82hz.jpg", "first_air_date": "2019-07-25" },
+    { "adult": false, "id": 550, "title": "Fight Club", "original_title": "Fight Club", "media_type": "movie",
+      "poster_path": "/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg", "release_date": "1999-10-15" },
+    { "adult": false, "id": 94997, "name": "House of the Dragon", "original_name": "House of the Dragon", "media_type": "tv",
+      "poster_path": "/z2yahl2uefxDCl0nogcRBstwruJ.jpg", "first_air_date": "2022-08-21" }
+  ],
+  "total_pages": 1,
+  "total_results": 6
+}
