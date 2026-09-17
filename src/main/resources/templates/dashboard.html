@@ -162,7 +162,7 @@
         <p id="open-result" class="hint" aria-live="polite"></p>
         <p class="hint">The device opens whichever app claims the link. If nothing happens, that app may not be installed.</p>
         <p class="hint">Direct media links (.mp4, .m4v, .mkv, .webm, .m3u8, .mp3, .flac …) play on Cast devices through the Default Media Receiver; the receiver must be able to reach the URL.</p>
-        <p class="hint" th:if="${rendererControls}">Direct audio links (.mp3, .flac, .m4a, .ogg …) play on speakers as a direct stream; the speaker must be able to reach the URL.</p>
+        <p class="hint" th:if="${rendererControls and !localAudio}">Direct audio links (.mp3, .flac, .m4a, .ogg …) play on speakers as a direct stream; the speaker must be able to reach the URL.</p>
         <p class="hint" th:if="${localAudio}">This speaker plays through the server: direct audio links (.mp3, .flac, .m4a, .ogg …) and Jellyfin music work; the server must be able to reach the URL.</p>
     </section>
 </aside>
