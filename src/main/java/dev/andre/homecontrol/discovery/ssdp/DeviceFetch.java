@@ -2,15 +2,24 @@ package dev.andre.homecontrol.discovery.ssdp;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.List;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 
 /**
@@ -83,51 +92,112 @@ public final class DeviceFetch {
 
     /**
      * GETs {@code url} and returns its body, or throws: any status but 200 (redirects included —
-     * clients built for devices never follow them), a declared or actual body over {@code maxBytes}.
-     * The caller has already decided {@code url} is safe to fetch.
+     * clients built for devices never follow them), a declared or actual body over {@code maxBytes},
+     * or no complete answer within {@code timeout}. The caller has already decided {@code url} is safe.
      */
     public static byte[] get(HttpClient http, URI url, Duration timeout, long maxBytes)
             throws IOException, InterruptedException {
-        HttpResponse<InputStream> response = http.send(
+        HttpResponse<byte[]> response = send(http,
                 HttpRequest.newBuilder(url).timeout(timeout).header("User-Agent", USER_AGENT).GET().build(),
-                HttpResponse.BodyHandlers.ofInputStream());
-        try (InputStream body = response.body()) {
-            if (response.statusCode() != 200) {
-                throw new IOException("HTTP " + response.statusCode());
+                maxBytes, timeout);
+        if (response.statusCode() != 200) {
+            throw new IOException("HTTP " + response.statusCode());
+        }
+        return response.body();
+    }
+
+    /**
+     * Sends {@code request} with a hard cap on the answer: a body declared or actually larger than
+     * {@code maxBytes} fails with an {@link IOException} without being buffered, and the whole
+     * exchange — headers and body — must finish within {@code deadline}, so a device that trickles
+     * bytes cannot hold the caller either ({@link HttpTimeoutException} otherwise).
+     */
+    public static HttpResponse<byte[]> send(HttpClient http, HttpRequest request, long maxBytes, Duration deadline)
+            throws IOException, InterruptedException {
+        CompletableFuture<HttpResponse<byte[]>> exchange = http.sendAsync(request, info -> new BoundedBody(
+                maxBytes, contentLength(info.headers())));
+        try {
+            return exchange.get(deadline.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            exchange.cancel(true);
+            throw new HttpTimeoutException("no complete answer within " + deadline.toMillis() + " ms");
+        } catch (InterruptedException e) {
+            exchange.cancel(true);
+            throw e;
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof IOException io) {
+                throw io;
             }
-            OptionalLong contentLength = contentLength(response);
-            if (contentLength.isPresent() && contentLength.getAsLong() > maxBytes) {
-                throw new IOException("declares " + contentLength.getAsLong() + " bytes, over the " + maxBytes + "-byte cap");
-            }
-            byte[] bytes = readAtMost(body, maxBytes);
-            if (bytes == null) {
-                throw new IOException("exceeds the " + maxBytes + "-byte cap");
-            }
-            return bytes;
+            throw new IOException(String.valueOf(e.getCause() == null ? e.getMessage() : e.getCause().getMessage()), e.getCause());
         }
     }
 
-    public static OptionalLong contentLength(HttpResponse<?> response) {
+    public static OptionalLong contentLength(HttpHeaders headers) {
         try {
-            return response.headers().firstValueAsLong("Content-Length");
+            return headers.firstValueAsLong("Content-Length");
         } catch (NumberFormatException e) {
             return OptionalLong.empty();
         }
     }
 
-    /** Reads at most {@code maxBytes} from {@code in}; {@code null} if the stream had more than that. */
-    public static byte[] readAtMost(InputStream in, long maxBytes) throws IOException {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        byte[] chunk = new byte[8192];
-        long total = 0;
-        int read;
-        while ((read = in.read(chunk)) != -1) {
-            total += read;
-            if (total > maxBytes) {
-                return null;
-            }
-            buffer.write(chunk, 0, read);
+    /** Collects a response body up to a cap; past it, cancels the stream and fails. */
+    private static final class BoundedBody implements HttpResponse.BodySubscriber<byte[]> {
+
+        private final long maxBytes;
+        private final OptionalLong declared;
+        private final CompletableFuture<byte[]> result = new CompletableFuture<>();
+        private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        private Flow.Subscription subscription;
+        private long total;
+
+        BoundedBody(long maxBytes, OptionalLong declared) {
+            this.maxBytes = maxBytes;
+            this.declared = declared;
         }
-        return buffer.toByteArray();
+
+        @Override
+        public CompletionStage<byte[]> getBody() {
+            return result;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.subscription = subscription;
+            if (declared.isPresent() && declared.getAsLong() > maxBytes) {
+                subscription.cancel();
+                result.completeExceptionally(new IOException(
+                        "declares " + declared.getAsLong() + " bytes, over the " + maxBytes + "-byte cap"));
+                return;
+            }
+            subscription.request(Long.MAX_VALUE);
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> items) {
+            if (result.isDone()) {
+                return;
+            }
+            for (ByteBuffer item : items) {
+                total += item.remaining();
+                if (total > maxBytes) {
+                    subscription.cancel();
+                    result.completeExceptionally(new IOException("exceeds the " + maxBytes + "-byte cap"));
+                    return;
+                }
+                byte[] chunk = new byte[item.remaining()];
+                item.get(chunk);
+                buffer.write(chunk, 0, chunk.length);
+            }
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+            result.completeExceptionally(throwable);
+        }
+
+        @Override
+        public void onComplete() {
+            result.complete(buffer.toByteArray());
+        }
     }
 }
