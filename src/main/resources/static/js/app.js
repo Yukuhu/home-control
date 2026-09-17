@@ -1,9 +1,23 @@
 import { applyState, subscribe } from "./state-view.js";
 import { sendKey } from "./remote-transport.js";
+import { watchRails } from "./rails.js";
 
 const selectedDevice = () => document.body.dataset.device;
 
 subscribe(applyState);
+watchRails();
+
+function setDrawer(open) {
+    const drawer = document.getElementById("remote-drawer");
+    if (!drawer) return;
+    drawer.hidden = !open;
+    document.querySelectorAll('[aria-controls="remote-drawer"].drawer-toggle')
+        .forEach((b) => b.setAttribute("aria-expanded", String(open)));
+}
+document.addEventListener("click", (event) => {
+    if (event.target.closest(".drawer-toggle")) setDrawer(document.getElementById("remote-drawer").hidden);
+    if (event.target.closest(".drawer-close")) setDrawer(false);
+});
 
 function toast(message) {
     const el = document.getElementById("toast");
@@ -27,7 +41,7 @@ const KEYS = {
 };
 
 document.addEventListener("keydown", (event) => {
-    if (event.target.tagName === "INPUT") return;
+    if (event.target.closest("input, textarea, select, dialog")) return;
     const key = KEYS[event.key];
     if (!key) return;
     event.preventDefault();

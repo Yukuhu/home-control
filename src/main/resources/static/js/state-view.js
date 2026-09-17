@@ -1,3 +1,11 @@
+import { on } from "./events.js";
+
+const lastStates = new Map();
+
+export function stateOf(deviceId) {
+    return lastStates.get(deviceId);
+}
+
 // Paints one device's live state into whichever elements the page has for it. The device
 // strip has a badge and app label per device; the drawer additionally has a volume label
 // and, for Cast receivers, a volume slider for the selected device. Missing elements are
@@ -9,6 +17,13 @@ export function applyState(deviceId, state) {
         status.classList.toggle("ok", state.status === "CONNECTED");
         status.classList.toggle("off", state.status !== "CONNECTED");
     }
+    // The play sheet (Task 3) shows a device's status wherever it marks the element up
+    // this way, independent of the strip's fixed status-<id> ids.
+    document.querySelectorAll(`[data-status-for="${CSS.escape(deviceId)}"]`).forEach((el) => {
+        el.textContent = state.status;
+        el.classList.toggle("ok", state.status === "CONNECTED");
+        el.classList.toggle("off", state.status !== "CONNECTED");
+    });
     const app = document.getElementById(`app-${deviceId}`);
     if (app) app.textContent = describePlaying(state);
     const volume = document.getElementById(`vol-${deviceId}`);
@@ -39,10 +54,9 @@ function formatTime(seconds) {
 }
 
 export function subscribe(onState) {
-    const source = new EventSource("/events");
-    source.addEventListener("state", (event) => {
-        const { deviceId, state } = JSON.parse(event.data);
+    on("state", ({ deviceId, state }) => {
+        lastStates.set(deviceId, state);
         onState(deviceId, state);
+        document.dispatchEvent(new CustomEvent("homecontrol:state", { detail: { deviceId, state } }));
     });
-    return source;
 }
