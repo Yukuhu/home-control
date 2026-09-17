@@ -76,6 +76,16 @@ class ZoneGroupStateTest {
     }
 
     @Test
+    void loopbackMembersAreKeptOnlyWhenAskedForByALoopbackDevice() {
+        String xml = "<ZoneGroups><ZoneGroup Coordinator=\"A\" ID=\"A:1\">"
+                + "<ZoneGroupMember UUID=\"A\" Location=\"http://127.0.0.2:1400/xml/device_description.xml\" ZoneName=\"Local\"/>"
+                + "</ZoneGroup></ZoneGroups>";
+
+        assertThat(ZoneGroupState.parse(xml).visibleMembers()).isEmpty();
+        assertThat(ZoneGroupState.parse(xml, true).visibleMembers()).extracting(ZoneGroupState.Member::uuid).containsExactly("A");
+    }
+
+    @Test
     void membersOutsideTheLanOrNamedByHostNameAreSkipped() {
         // The topology is device-supplied: only http locations at private IP literals become members we may call.
         ZoneGroupState state = ZoneGroupState.parse("<ZoneGroups><ZoneGroup Coordinator=\"A\" ID=\"A:1\">"

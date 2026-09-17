@@ -195,8 +195,8 @@ Speakers (and TVs or AV receivers with a DLNA renderer inside) are found over SS
 multicast, so the container needs `network_mode: host`.
 
 - Open **Setup**. Renderers and Sonos rooms appear under **Devices on this network**; press
-  **Add**. No pairing is needed. A renderer inside a TV that is already registered is added to
-  that TV instead of appearing twice.
+  **Add**. No pairing is needed. A renderer inside a TV that is already registered (same address)
+  is merged into that TV automatically as soon as it is discovered — no Add needed.
 - Sonos rooms appear once by room name; the partner of a stereo pair, subs and surrounds are
   part of their room, not devices of their own. Any one announcing player lists the whole
   household.
@@ -217,14 +217,18 @@ Limits:
 - The speaker fetches the stream itself, so it must reach the URL. For Jellyfin set the address
   TVs and speakers should use when connecting Jellyfin (the setup page shows "TVs and speakers
   use …").
-- Only formats the speaker lists are sent; anything else is refused with "cannot play <type>".
+- A speaker that lists its formats (ConnectionManager) is only sent those; anything else is
+  refused with "cannot play <type>". A speaker that does not list them is sent every stream, and
+  may then stay silent or report its own error.
 - Now playing refreshes every 2 s while something plays and every 10 s when idle (speakers are
   polled; UPnP eventing is not used).
 - Bonded Sonos speakers show as one room; group volume, queues and Sonos music services are not
   supported.
 - Two renderers on one IP address are not supported.
-- Device descriptions are only read from the address a speaker announced itself from, and a
-  speaker's control addresses must be on that same host.
+- Device descriptions are only read from the registered speaker's own address (and must name
+  its UDN), and its control addresses must be on that same host. A renderer whose IP address
+  changed is added again from **Setup**. Of a Sonos household, only the announcing player itself
+  is merged automatically; the other rooms it lists wait for **Add**.
 
 Switch a module off with `HOME_CONTROL_UPNP_ENABLED=false` or `HOME_CONTROL_SONOS_ENABLED=false`
 (without the Sonos module, Sonos players show up as plain UPnP renderers).

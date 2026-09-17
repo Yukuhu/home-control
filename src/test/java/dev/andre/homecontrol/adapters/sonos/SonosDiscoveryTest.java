@@ -18,6 +18,13 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
+import org.junit.jupiter.api.io.TempDir;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -75,13 +82,56 @@ class SonosDiscoveryTest {
     }
 
     @Test
-    void publishesOneEventPerPlayer() {
+    void publishesAnEventOnlyForTheAnnouncingPlayer() {
         search();
-        await().atMost(Duration.ofSeconds(5)).until(() -> events.size() >= 2);
+        await().atMost(Duration.ofSeconds(5)).until(() -> discovery.devices().size() == 2 && !events.isEmpty());
         int searches = responder.searches();
         await().atMost(Duration.ofSeconds(10)).until(() -> responder.searches() >= searches + 4);
 
-        assertThat(events).containsExactlyInAnyOrder(new DeviceDiscoveredEvent(kitchenRoom()), new DeviceDiscoveredEvent(livingRoom()));
+        // The living room speaks only for itself; the kitchen is listed for Setup but never auto-merged.
+        assertThat(events).containsExactly(new DeviceDiscoveredEvent(livingRoom()));
+    }
+
+    @Test
+    void aForgedMemberAtARegisteredHostMergesNothing(@TempDir Path dir) {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        Device tv = new Device("tv", "TV", DeviceKind.WEBOS, "127.0.0.3", Map.of("webos", Map.of()), Instant.EPOCH);
+        registry.save(tv);
+        assertRegistryUntouchedBy(registry, tv);
+    }
+
+    @Test
+    void aForgedMemberCannotRepointARegisteredRoom(@TempDir Path dir) {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        Device room = new Device("sonos-kitchen", "Kitchen", DeviceKind.SONOS, "127.0.0.3",
+                Map.of("sonos", Map.of("uuid", KITCHEN, "port", "1400")), Instant.EPOCH);
+        registry.save(room);
+        assertRegistryUntouchedBy(registry, room);
+    }
+
+    /** Runs a real device manager fed by this discovery's events and checks {@code registered} stays as it was. */
+    private void assertRegistryUntouchedBy(DeviceRegistry registry, Device registered) {
+        SonosProperties properties = new SonosProperties(true, 1, 1, 0, 1, 1, 1, 2);
+        DeviceManager[] manager = new DeviceManager[1];
+        List<Object> managerEvents = new CopyOnWriteArrayList<>();
+        SonosDiscovery fed = new SonosDiscovery(ssdp, properties, event -> {
+            managerEvents.add(event);
+            if (event instanceof DeviceDiscoveredEvent discovered && manager[0] != null) {
+                manager[0].onDiscovered(discovered);
+            }
+        });
+        manager[0] = new DeviceManager(registry, List.of(new SonosAdapter(properties, fed)), event -> { });
+        try {
+            search();
+            await().atMost(Duration.ofSeconds(5)).until(() -> fed.devices().size() == 2 && !managerEvents.isEmpty());
+            int searches = responder.searches();
+            await().atMost(Duration.ofSeconds(10)).until(() -> responder.searches() >= searches + 3);
+
+            assertThat(registry.findAll()).containsExactly(registered);
+        } finally {
+            manager[0].close();
+            fed.close();
+        }
     }
 
     @Test

@@ -328,6 +328,30 @@ class UpnpSessionTest {
     }
 
     @Test
+    void anAnnouncedLocationOffTheDevicesHostIsRefused() throws Exception {
+        // A datagram from 127.0.0.2 claiming this renderer's UDN must not move the session there.
+        FakeUpnpRenderer impostor = track(new FakeUpnpRenderer("127.0.0.2", FakeUpnpRenderer.Layout.GENERIC));
+        Device kitchen = withLocation(fake.device("kitchen"), "http://127.0.0.1:9/description.xml");
+        session = start(kitchen, udn -> Optional.of(impostor.location()));
+
+        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3))
+                .until(() -> session.state().status() != DeviceStatus.CONNECTED);
+        assertThat(impostor.requestedPaths()).isEmpty();
+        assertThat(impostor.calls()).isEmpty();
+    }
+
+    @Test
+    void aDescriptionOfAnotherDeviceIsRefused() throws Exception {
+        fake.overrideDescription(Files.readString(Path.of("src/test/resources/fixtures/upnp/renderer-description.xml"))
+                .replace(FakeUpnpRenderer.UDN, "uuid:00000000-0000-0000-0000-000000000bad"));
+        session = start(fake.device("kitchen"), udn -> Optional.empty());
+
+        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3))
+                .until(() -> session.state().status() != DeviceStatus.CONNECTED);
+        assertThat(fake.calls()).isEmpty();
+    }
+
+    @Test
     void closeStopsPolling() throws InterruptedException {
         startConnected();
 

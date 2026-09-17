@@ -58,7 +58,8 @@ public class UpnpAdapter implements DeviceAdapter {
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
         AtomicReference<UpnpSession> self = new AtomicReference<>();
-        UpnpSession session = new UpnpSession(device, properties, http, discovery::location, onChange,
+        // Only announcements from the registered address may point the session at a (new) description port.
+        UpnpSession session = new UpnpSession(device, properties, http, udn -> discovery.location(udn, device.host()), onChange,
                 () -> sessions.remove(device.id(), self.get()));
         self.set(session);
         sessions.put(device.id(), session);

@@ -90,6 +90,16 @@ class RendererCommandsTest {
     }
 
     @Test
+    void aMalformedServiceTypeIsAFailedCommand() {
+        ServiceEndpoint bad = new ServiceEndpoint("urn:x\"/>", av.controlUrl(), null);
+
+        assertThatThrownBy(() -> commands.transport(bad, UpnpActions.play(bad.serviceType()), "resume playback"))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessageContaining("Kitchen Speaker refused to resume playback");
+        assertThat(fake.calls()).isEmpty();
+    }
+
+    @Test
     void readsTransportVolumeAndSink() throws Exception {
         TransportInfo info = commands.transportInfo(av);
         assertThat(info.state()).isEqualTo("NO_MEDIA_PRESENT");

@@ -33,6 +33,7 @@ import java.util.Optional;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -167,6 +168,24 @@ class DashboardPageTest {
         mockMvc.perform(get("/remote/living"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/?device=living&remote=open"));
+    }
+
+    @Test
+    void aCastReceiverThatIsAlsoARendererGetsOneStopButton() throws Exception {
+        Device tv = new Device("tv", "TV", DeviceKind.CAST, "10.0.0.31",
+                Map.of("cast", Map.of("port", "8009"), "upnp", Map.of("udn", "uuid:tv")), Instant.now());
+        given(devices.devices()).willReturn(List.of(tv));
+        given(devices.defaultDevice()).willReturn(Optional.of(tv));
+        given(devices.device("tv")).willReturn(Optional.of(tv));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any()))
+                .willReturn(EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER, Capability.VOLUME));
+        given(rails.snapshots()).willReturn(List.of());
+
+        String page = mockMvc.perform(get("/")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(page.split("/devices/tv/stop", -1)).hasSize(2);
+        assertThat(page).contains("/devices/tv/pause").contains("/devices/tv/resume");
     }
 
     @Test

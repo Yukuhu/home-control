@@ -181,6 +181,18 @@ class SoapClientTest {
     }
 
     @Test
+    void aMalformedServiceTypeIsRefusedBeforeSending() {
+        SoapRequest injected = new SoapRequest("urn:x\"><evil/><u:x xmlns:u=\"urn:y", "Play", Map.of("InstanceID", "0"));
+
+        assertThatThrownBy(() -> client.call(control(), injected))
+                .isInstanceOfSatisfying(SoapFault.class, fault -> assertThat(fault.getMessage()).contains("service type"));
+        assertThat(method).isNull();
+        assertThat(SoapClient.isValidServiceType("urn:schemas-upnp-org:service:AVTransport:1")).isTrue();
+        assertThat(SoapClient.isValidServiceType("urn:schemas upnp")).isFalse();
+        assertThat(SoapClient.isValidServiceType(null)).isFalse();
+    }
+
+    @Test
     void requestsNeverPrintTheirArguments() {
         assertThat(UpnpActions.setAvTransportUri(AV, "http://h/x?ApiKey=secret-key", "").toString())
                 .doesNotContain("secret-key")

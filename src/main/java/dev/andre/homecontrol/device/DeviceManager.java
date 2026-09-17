@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
@@ -154,6 +155,10 @@ public class DeviceManager implements AutoCloseable {
         Device device = registry.findById(id)
                 .orElseThrow(() -> new DeviceNotFoundException("No device with id " + id));
         Map<String, DeviceHandle> deviceHandles = handles.getOrDefault(id, Map.of());
+        if (action instanceof Action.Stop) {
+            stopEverywhere(device, deviceHandles, action);
+            return;
+        }
         DeviceOfflineException firstOffline = null;
         UnsupportedActionException lastUnsupported = null;
         for (String adapterId : device.adapters().keySet()) {
@@ -186,6 +191,62 @@ public class DeviceManager implements AutoCloseable {
             throw lastUnsupported;
         }
         throw new UnsupportedActionException(device.name() + " cannot perform " + action);
+    }
+
+    /**
+     * Stop is sent to every adapter that accepts it (a TV that is both a Cast receiver and a media
+     * renderer may be playing through either): done when any of them stopped. Otherwise the first
+     * refusal wins, then the first offline reason, then the last unsupported one.
+     */
+    private void stopEverywhere(Device device, Map<String, DeviceHandle> deviceHandles, Action stop) {
+        boolean stopped = false;
+        boolean accepted = false;
+        ActionFailedException firstRefusal = null;
+        DeviceOfflineException firstOffline = null;
+        UnsupportedActionException lastUnsupported = null;
+        for (String adapterId : device.adapters().keySet()) {
+            DeviceAdapter adapter = adapters.get(adapterId);
+            if (adapter == null || !stop.acceptedBy(adapter.capabilities(device))) {
+                continue;
+            }
+            accepted = true;
+            DeviceHandle handle = deviceHandles.get(adapterId);
+            if (handle == null) {
+                if (firstOffline == null) {
+                    firstOffline = new DeviceOfflineException(device.name() + " is not connected");
+                }
+                continue;
+            }
+            try {
+                handle.execute(stop);
+                stopped = true;
+            } catch (ActionFailedException e) {
+                if (firstRefusal == null) {
+                    firstRefusal = e;
+                }
+            } catch (DeviceOfflineException e) {
+                if (firstOffline == null) {
+                    firstOffline = e;
+                }
+            } catch (UnsupportedActionException e) {
+                lastUnsupported = e;
+            }
+        }
+        if (stopped) {
+            return;
+        }
+        if (firstRefusal != null) {
+            throw firstRefusal;
+        }
+        if (firstOffline != null) {
+            throw firstOffline;
+        }
+        if (lastUnsupported != null) {
+            throw lastUnsupported;
+        }
+        if (!accepted) {
+            throw new UnsupportedActionException(device.name() + " cannot perform " + stop);
+        }
     }
 
     /**

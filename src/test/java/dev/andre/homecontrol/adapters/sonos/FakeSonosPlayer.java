@@ -77,7 +77,7 @@ public class FakeSonosPlayer extends FakeUpnpRenderer {
             }
             boolean coordinator = household.isCoordinator(uuid);
             if (!coordinator && COORDINATOR_ONLY.contains(action)) {
-                throw new Fault(701, "Transition not available"); // what a member answers; sessions must never hit it
+                throw new Fault(800, "Command not supported or not a coordinator"); // what a member answers
             }
             if (!coordinator && action.equals("GetPositionInfo")) {
                 return ordered("Track", "1", "TrackDuration", "0:00:00", "TrackMetaData", "",
