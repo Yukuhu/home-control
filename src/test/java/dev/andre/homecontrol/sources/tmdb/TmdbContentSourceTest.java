@@ -115,8 +115,13 @@ class TmdbContentSourceTest {
         TmdbContentSource source = source(connectedSetup());
 
         assertThat(source.item("movie-1")).isEmpty();
+        int requestsAfterTheNotFoundLookup = fake.requests().size();
+
+        // "person-1" never names a movie or a series, so TmdbMediaRef.parse rejects it before any
+        // HTTP call is made — assert that directly (a request count for a made-up path would be
+        // trivially zero regardless of whether the code under test does the right thing).
         assertThat(source.item("person-1")).isEmpty();
-        assertThat(fake.count("GET", "/3/movie/person")).isZero();
+        assertThat(fake.requests()).hasSize(requestsAfterTheNotFoundLookup);
     }
 
     @Test
