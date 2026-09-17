@@ -44,6 +44,24 @@ home-control:
     connect-timeout-seconds: 5
     request-timeout-seconds: 15
     rail-size: 20
+  youtube:
+    enabled: true
+    oauth-base-url: http://127.0.0.1:9
+    api-base-url: http://127.0.0.1:9
+    lounge-base-url: http://127.0.0.1:9
+    thumbnail-base-url: http://127.0.0.1:9
+    connect-timeout-seconds: 5
+    request-timeout-seconds: 15
+    daily-quota-units: 10000
+    searches-per-day: 20
+    rail-size: 30
+    channels-per-refresh: 30
+    videos-per-channel: 5
+    subscriptions-refresh: 24h
+    max-subscription-pages: 20
+    refresh-interval: 60m
+    min-refresh-spacing: 15m
+    search-cache-ttl: 6h
   content:
     rails:
       scheduler-enabled: false

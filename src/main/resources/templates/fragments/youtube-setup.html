@@ -1,0 +1,87 @@
+<section th:fragment="section" id="youtube">
+    <h2>YouTube</h2>
+    <p class="error" th:if="${youtubeError}" th:text="${youtubeError}">YouTube rejected the request</p>
+    <p class="hint" th:if="${youtubeMessage}" th:text="${youtubeMessage}">Connected</p>
+
+    <th:block th:if="${youtube.connected()}">
+        <p th:text="${(youtube.channelTitle() != null and !youtube.channelTitle().isEmpty()) ? 'Connected as ' + youtube.channelTitle() : 'Connected'}">Connected as Andre</p>
+        <p class="error" th:if="${youtube.revoked()}">Google no longer accepts the saved authorization. Connect again below.</p>
+        <form method="post" th:action="@{/setup/sources/youtube/test}">
+            <button type="submit">Test connection</button>
+        </form>
+        <form method="post" th:action="@{/setup/sources/youtube/disconnect}">
+            <button type="submit">Disconnect</button>
+        </form>
+    </th:block>
+
+    <th:block th:with="authorization=${youtube.authorization()}">
+        <div id="youtube-authorization" th:replace="~{fragments/youtube-setup :: authorization}"></div>
+    </th:block>
+
+    <details th:open="${!youtube.hasClient()}">
+        <summary>How to create your own Google OAuth client (about 10 minutes)</summary>
+        <ol>
+            <li>Open https://console.cloud.google.com/ and create a project, for example &ldquo;Home Control&rdquo;.</li>
+            <li>APIs &amp; Services &rarr; Library &rarr; &ldquo;YouTube Data API v3&rdquo; &rarr; Enable.</li>
+            <li>APIs &amp; Services &rarr; OAuth consent screen (Google Auth Platform &rarr; Branding/Audience): user
+                type External, app name &ldquo;Home Control&rdquo;, your e-mail as support and developer contact. Add
+                the scope &hellip;/auth/youtube.readonly under Data Access.</li>
+            <li>Audience: add your Google account as a test user, then press &ldquo;Publish app&rdquo; so the status
+                is &ldquo;In production&rdquo;. In &ldquo;Testing&rdquo;, Google ends the authorization after 7 days.
+                Google will show &ldquo;Google hasn&rsquo;t verified this app&rdquo; &mdash; that is expected for your
+                own project; continue with &ldquo;Advanced&rdquo;.</li>
+            <li>Clients (Credentials) &rarr; Create client &rarr; Application type &ldquo;TVs and Limited Input
+                devices&rdquo; &rarr; Create. Copy the client ID and client secret into the form below.</li>
+            <li>Press Connect. Home Control shows a code; open google.com/device on your phone, enter the code and
+                allow read-only access to YouTube.</li>
+            <li>Quota: the project gets 10&nbsp;000 units a day. Home Control refreshes subscriptions hourly (about
+                30 units) and allows 20 searches a day (100 units each). Usage is shown here.</li>
+        </ol>
+    </details>
+
+    <h3 th:text="${youtube.connected()} ? 'Reconnect' : 'Connect'">Connect</h3>
+    <form method="post" th:action="@{/setup/sources/youtube/connect}">
+        <label>OAuth client ID
+            <input name="clientId" required placeholder="123456789012-abc&hellip;.apps.googleusercontent.com"
+                   th:value="${youtubeForm?.clientId}">
+        </label>
+        <label>OAuth client secret
+            <input type="password" name="clientSecret" autocomplete="off" th:required="${!youtube.hasClient()}">
+        </label>
+        <p class="hint" th:if="${youtube.hasClient()}">Leave empty to keep the saved secret</p>
+        <th:block th:if="${youtube.needsLoginPassword()}">
+            <p>Connecting a content source stores a secret, so Home Control will require this login password from now on.</p>
+            <input type="password" name="loginPassword" minlength="10" autocomplete="new-password" placeholder="New login password">
+            <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password" placeholder="Repeat login password">
+        </th:block>
+        <button type="submit" th:text="${youtube.connected()} ? 'Reconnect' : 'Connect'">Connect</button>
+    </form>
+
+    <form method="post" th:action="@{/setup/sources/youtube/authorize}"
+          th:if="${youtube.hasClient() and !youtube.connected() and youtube.authorization().state().name() != 'PENDING'}">
+        <button type="submit">Show a new code</button>
+    </form>
+</section>
+<div th:fragment="authorization" id="youtube-authorization"
+     th:with="pending=${authorization.state().name() == 'PENDING'}"
+     th:attr="hx-get=${pending} ? @{/setup/sources/youtube/authorization} : null,
+              hx-trigger=${pending} ? 'every 3s' : null,
+              hx-swap=${pending} ? 'outerHTML' : null">
+    <th:block th:if="${pending}">
+        <p>On your phone, open
+            <a th:href="${authorization.verificationUrl()}" th:text="${authorization.verificationUrl()}"
+               target="_blank" rel="noopener">https://www.google.com/device</a> and enter</p>
+        <p class="user-code" th:text="${authorization.userCode()}">GQVQ-JKEC</p>
+        <p class="hint">The code is valid until
+            <time th:text="${T(java.time.format.DateTimeFormatter).ofPattern('HH:mm').withZone(T(java.time.ZoneId).systemDefault()).format(authorization.expiresAt())}">10:30</time>.
+        </p>
+        <p class="hint" th:if="${authorization.message()}" th:text="${authorization.message()}">Still trying</p>
+        <form method="post" th:action="@{/setup/sources/youtube/cancel}">
+            <button type="submit">Cancel</button>
+        </form>
+    </th:block>
+    <p class="error"
+       th:if="${authorization.state().name() == 'DENIED' or authorization.state().name() == 'EXPIRED' or authorization.state().name() == 'FAILED'}"
+       th:text="${authorization.message()}">Access was denied</p>
+    <p class="hint" th:if="${authorization.state().name() == 'CONNECTED'}">YouTube connected</p>
+</div>

@@ -119,6 +119,10 @@
         <section th:replace="~{fragments/jellyfin-setup :: section}"></section>
     </th:block>
 
+    <th:block th:if="${youtube != null}">
+        <section th:replace="~{fragments/youtube-setup :: section}"></section>
+    </th:block>
+
     <section th:if="${sourcesSetup != null}" th:replace="~{fragments/sources-setup :: sources(${sourcesSetup})}"></section>
 
     <section th:if="${loginRequired}">

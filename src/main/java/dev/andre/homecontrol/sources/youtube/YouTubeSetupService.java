@@ -1,0 +1,129 @@
+package dev.andre.homecontrol.sources.youtube;
+
+import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.storage.JsonFileSourceSettings;
+import dev.andre.homecontrol.storage.SecretStore;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+/** Connects, checks and disconnects the Google account; the only writer of YouTube's settings and secrets. */
+public class YouTubeSetupService {
+
+    private static final Logger log = LoggerFactory.getLogger(YouTubeSetupService.class);
+
+    private static final Pattern CLIENT_ID_PATTERN =
+            Pattern.compile("^[0-9]{6,20}-[a-z0-9]{8,64}\\.apps\\.googleusercontent\\.com$", Pattern.CASE_INSENSITIVE);
+    private static final int MAX_CLIENT_SECRET_LENGTH = 200;
+
+    public record ConnectRequest(String clientId, String clientSecret, String loginPassword,
+                                 String loginPasswordConfirmation) {
+        @Override
+        public String toString() {
+            return "ConnectRequest[clientId=" + clientId + "]";
+        }
+    }
+
+    private final SecretStore secrets;
+    private final LoginService login;
+    private final JsonFileSourceSettings sourceSettings;
+    private final GoogleOAuthClient oauth;
+    private final GoogleTokens tokens;
+    private final YouTubeAuthorizationService authorization;
+
+    public YouTubeSetupService(SecretStore secrets, LoginService login, JsonFileSourceSettings sourceSettings,
+                               GoogleOAuthClient oauth, GoogleTokens tokens, YouTubeAuthorizationService authorization) {
+        this.secrets = secrets;
+        this.login = login;
+        this.sourceSettings = sourceSettings;
+        this.oauth = oauth;
+        this.tokens = tokens;
+        this.authorization = authorization;
+    }
+
+    public YouTubeSettings settings() {
+        return YouTubeSettings.from(sourceSettings.get(YouTubeSettings.SOURCE_ID));
+    }
+
+    public void save(YouTubeSettings settings) {
+        sourceSettings.put(YouTubeSettings.SOURCE_ID, settings.toMap());
+    }
+
+    public boolean hasClient() {
+        return tokens.hasClient();
+    }
+
+    public boolean connected() {
+        return tokens.hasClient() && tokens.hasRefreshToken();
+    }
+
+    public boolean revoked() {
+        return tokens.revoked();
+    }
+
+    public YouTubeAuthorizationService.Status connect(ConnectRequest request, HttpServletRequest http) {
+        String clientId = request.clientId() == null ? "" : request.clientId().strip();
+        if (!CLIENT_ID_PATTERN.matcher(clientId).matches()) {
+            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT,
+                    "That does not look like an OAuth client ID (it ends in .apps.googleusercontent.com)");
+        }
+        String clientSecret = request.clientSecret() == null ? "" : request.clientSecret().strip();
+        boolean hadSecret = secrets.secret(YouTubeSettings.CLIENT_SECRET).isPresent();
+        if (clientSecret.isBlank() && !hadSecret) {
+            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Enter the client secret");
+        }
+        if (clientSecret.length() > MAX_CLIENT_SECRET_LENGTH) {
+            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "That client secret is too long");
+        }
+        boolean clientIdChanged = !clientId.equals(secrets.secret(YouTubeSettings.CLIENT_ID).orElse(null));
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put(YouTubeSettings.CLIENT_ID, clientId);
+        if (!clientSecret.isBlank()) {
+            values.put(YouTubeSettings.CLIENT_SECRET, clientSecret);
+        }
+        login.storeSecrets(values, request.loginPassword(), request.loginPasswordConfirmation(), http);
+        if (clientIdChanged && secrets.secret(YouTubeSettings.REFRESH_TOKEN).isPresent()
+                && secrets.names().size() > 1) {
+            login.removeSecrets(List.of(YouTubeSettings.REFRESH_TOKEN));
+            tokens.reset();
+        }
+        return authorization.start();
+    }
+
+    public YouTubeAuthorizationService.Status authorize() {
+        return authorization.start();
+    }
+
+    public YouTubeAuthorizationService.Status authorizationStatus() {
+        return authorization.status();
+    }
+
+    public void cancel() {
+        authorization.cancel();
+    }
+
+    public String check() {
+        tokens.invalidate();
+        tokens.accessToken();
+        return "Google accepted the saved authorization";
+    }
+
+    public void disconnect() {
+        authorization.cancel();
+        secrets.secret(YouTubeSettings.REFRESH_TOKEN).ifPresent(token -> {
+            try {
+                oauth.revoke(token);
+            } catch (YouTubeException e) {
+                log.info("Could not revoke the YouTube authorization at Google: {}", e.getMessage());
+            }
+        });
+        login.removeSecrets(List.of(YouTubeSettings.CLIENT_ID, YouTubeSettings.CLIENT_SECRET, YouTubeSettings.REFRESH_TOKEN));
+        save(settings().withoutAccount());
+        tokens.reset();
+    }
+}

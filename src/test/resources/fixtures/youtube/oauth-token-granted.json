@@ -1,0 +1,7 @@
+{
+  "access_token": "ya29.a0AfB_byFixtureAccessTokenGranted0001",
+  "expires_in": 3599,
+  "refresh_token": "1//0gFixtureRefreshTokenGranted-0001",
+  "scope": "https://www.googleapis.com/auth/youtube.readonly",
+  "token_type": "Bearer"
+}
