@@ -115,6 +115,21 @@ public class JellyfinSetupService {
         sources.put(JellyfinSettings.SOURCE_ID, settings.toMap());
     }
 
+    /** Pins a Jellyfin app (by its DeviceId) to one device; a blank device id unlinks it. */
+    public void link(String jellyfinDeviceId, String deviceId) {
+        JellyfinSettings settings = settings().orElseThrow(() ->
+                new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
+        for (Map.Entry<String, String> entry : settings.sessionLinks().entrySet()) {
+            if (entry.getValue().equals(jellyfinDeviceId)) {
+                settings = settings.withSessionLink(entry.getKey(), null);
+            }
+        }
+        if (deviceId != null && !deviceId.isBlank()) {
+            settings = settings.withSessionLink(deviceId, jellyfinDeviceId);
+        }
+        save(settings);
+    }
+
     public String check() {
         JellyfinSettings settings = settings().orElseThrow(() ->
                 new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Jellyfin is not connected"));

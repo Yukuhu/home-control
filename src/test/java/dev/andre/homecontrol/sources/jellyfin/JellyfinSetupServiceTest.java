@@ -15,6 +15,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.SecureRandom;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -175,5 +176,17 @@ class JellyfinSetupServiceTest {
         setup.disconnect();
 
         assertThat(setup.settings()).isEmpty();
+    }
+
+    @Test
+    void linkingASessionReplacesItsPreviousDeviceAndBlankUnlinks() {
+        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new MockHttpServletRequest());
+
+        setup.link("jf-1", "shield");
+        setup.link("jf-1", "bedroom");
+        assertThat(setup.settings().orElseThrow().sessionLinks()).containsExactlyEntriesOf(Map.of("bedroom", "jf-1"));
+
+        setup.link("jf-1", "");
+        assertThat(setup.settings().orElseThrow().sessionLinks()).isEmpty();
     }
 }

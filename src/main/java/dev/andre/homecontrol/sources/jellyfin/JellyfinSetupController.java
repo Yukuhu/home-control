@@ -68,4 +68,16 @@ public class JellyfinSetupController {
         redirect.addFlashAttribute("jellyfinMessage", "Jellyfin disconnected");
         return "redirect:/setup";
     }
+
+    @PostMapping("/setup/sources/jellyfin/links")
+    public String link(@RequestParam String session, @RequestParam(required = false) String device,
+                       RedirectAttributes redirect) {
+        try {
+            setup.link(session, device);
+            redirect.addFlashAttribute("jellyfinMessage", "Link saved");
+        } catch (JellyfinException e) {
+            redirect.addFlashAttribute("jellyfinError", e.getMessage());
+        }
+        return "redirect:/setup";
+    }
 }

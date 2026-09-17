@@ -114,4 +114,15 @@ class JellyfinSetupControllerTest {
 
         verify(setup).disconnect();
     }
+
+    @Test
+    void linksASessionToADevice() throws Exception {
+        mockMvc.perform(post("/setup/sources/jellyfin/links")
+                        .param("session", "jf-1")
+                        .param("device", "shield"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/setup"));
+
+        verify(setup).link("jf-1", "shield");
+    }
 }
