@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -207,5 +209,74 @@ class ContentControllerTest {
                 .andExpect(status().isBadGateway())
                 .andExpect(content().contentTypeCompatibleWith("text/plain"))
                 .andExpect(content().string(message));
+    }
+
+    private static ContentSource searchableMock(String id, String name) {
+        ContentSource source = mock(ContentSource.class);
+        given(source.id()).willReturn(id);
+        given(source.displayName()).willReturn(name);
+        return source;
+    }
+
+    @Test
+    void searchesEverySearchableSource() throws Exception {
+        ContentSource jellyfin = searchableMock("jellyfin", "Jellyfin");
+        ContentItem item = new ContentItem("item-1", "jellyfin", ContentKind.MOVIE, "Big Buck Bunny", null, null, List.of());
+        given(jellyfin.search("bunny", 20)).willReturn(List.of(item));
+        given(sources.searchable()).willReturn(List.of(jellyfin));
+
+        String body = mockMvc.perform(get("/search").param("q", "bunny"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.query").value("bunny"))
+                .andExpect(jsonPath("$.results[0].sourceId").value("jellyfin"))
+                .andExpect(jsonPath("$.results[0].sourceName").value("Jellyfin"))
+                .andExpect(jsonPath("$.results[0].items[0].title").value("Big Buck Bunny"))
+                .andReturn().getResponse().getContentAsString();
+
+        verify(jellyfin).search("bunny", 20);
+        org.assertj.core.api.Assertions.assertThat(body).doesNotContain("playables");
+    }
+
+    @Test
+    void aFailingSourceIsReportedBesideTheOthers() throws Exception {
+        ContentSource jellyfin = searchableMock("jellyfin", "Jellyfin");
+        ContentItem item = new ContentItem("item-1", "jellyfin", ContentKind.MOVIE, "Big Buck Bunny", null, null, List.of());
+        given(jellyfin.search("bunny", 20)).willReturn(List.of(item));
+        ContentSource tmdb = searchableMock("tmdb", "TMDB");
+        given(tmdb.search("bunny", 20)).willThrow(new ContentSourceException("TMDB is unreachable"));
+        given(sources.searchable()).willReturn(List.of(jellyfin, tmdb));
+
+        mockMvc.perform(get("/search").param("q", "bunny"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.results.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].sourceId").value("tmdb"))
+                .andExpect(jsonPath("$.errors[0].message").value("TMDB is unreachable"));
+    }
+
+    @Test
+    void rejectsQueriesThatAreTooShortOrTooLong() throws Exception {
+        mockMvc.perform(get("/search").param("q", " a "))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Search for 2 to 100 characters"));
+
+        mockMvc.perform(get("/search").param("q", "a".repeat(101)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Search for 2 to 100 characters"));
+
+        mockMvc.perform(get("/search"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Search for 2 to 100 characters"));
+    }
+
+    @Test
+    void clampsTheLimit() throws Exception {
+        ContentSource jellyfin = searchableMock("jellyfin", "Jellyfin");
+        given(sources.searchable()).willReturn(List.of(jellyfin));
+
+        mockMvc.perform(get("/search").param("q", "bunny").param("limit", "500")).andExpect(status().isOk());
+        verify(jellyfin).search("bunny", 50);
+
+        mockMvc.perform(get("/search").param("q", "bunny").param("limit", "0")).andExpect(status().isOk());
+        verify(jellyfin).search("bunny", 1);
     }
 }
