@@ -1,0 +1,5 @@
+{"data":{"data":[
+ {"appId":"111299001912","app_type":2,"icon":"/opt/share/webappservice/apps_icon/FirstScreen/111299001912/250x250.png","is_lock":0,"name":"YouTube"},
+ {"appId":"3201907018807","app_type":2,"icon":"/opt/share/webappservice/apps_icon/FirstScreen/3201907018807/250x250.png","is_lock":0,"name":"Netflix"},
+ {"appId":"org.tizen.browser","app_type":4,"icon":"/usr/share/icons/default/small/org.tizen.browser.png","is_lock":0,"name":"Internet"}
+]},"event":"ed.installedApp.get","from":"host"}

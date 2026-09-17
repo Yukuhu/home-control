@@ -86,6 +86,14 @@ public final class FakeWebSocketServer implements AutoCloseable {
             }
         }
 
+        /**
+         * Starts a server-initiated close handshake (status 1000) as a real server does; the socket
+         * closes once the client answers. Unlike {@link #close()}, nothing already sent can be lost.
+         */
+        public void closeNormally() {
+            sendFrame(0x8, new byte[]{0x03, (byte) 0xE8});
+        }
+
         public void close() {
             try {
                 socket.close();
