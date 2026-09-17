@@ -2,10 +2,12 @@ package dev.andre.homecontrol.playback;
 
 import dev.andre.homecontrol.HomeControlConfiguration;
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
+import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.playback.AppLinkStrategy;
 import dev.andre.homecontrol.core.playback.AppLinks;
 import dev.andre.homecontrol.core.playback.CastLoadStrategy;
@@ -18,6 +20,7 @@ import dev.andre.homecontrol.core.playback.PlayableResolver;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
+import dev.andre.homecontrol.core.playback.RouteKeys;
 import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.Test;
@@ -33,7 +36,9 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -158,6 +163,155 @@ class PlaybackServiceTest {
             assertThat(cast.receiverAppId()).isEqualTo("CC1AD845");
             verify(devices).execute("kitchen", cast.action());
         });
+    }
+
+    @Test
+    void previewResolvesOnceAndListsRoutesWithoutExecuting() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
+        PlaybackService service = new PlaybackService(devices,
+                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy())));
+        URI uri = URI.create("https://www.youtube.com/watch?v=abc");
+        ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
+                List.of(new PlayableRef.AppLink(uri, "youtube"),
+                        new PlayableRef.StreamUrl(URI.create("http://nas/x.mp4"), "video/mp4")));
+
+        PlaybackPreview preview = service.preview(item, "shield");
+
+        assertThat(preview.routes()).extracting(RouteKeys::key).containsExactly("app-link", "cast:CC1AD845");
+        assertThat(preview.reason()).isNull();
+        verify(devices, never()).execute(any(), any());
+    }
+
+    @Test
+    void previewExplainsWhenNothingRoutes() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.noneOf(Capability.class));
+        PlaybackService service = new PlaybackService(devices, new PlaybackPlanner(List.of(new AppLinkStrategy())));
+        ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
+                List.of(new PlayableRef.AppLink(URI.create("https://x"), "web")));
+
+        PlaybackPreview preview = service.preview(item, "shield");
+
+        assertThat(preview.routes()).isEmpty();
+        assertThat(preview.reason()).contains("cannot open app links");
+    }
+
+    @Test
+    void attemptPlaysTheFirstRouteAndReportsTheRest() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
+        PlaybackService service = new PlaybackService(devices,
+                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy())));
+        URI uri = URI.create("https://www.youtube.com/watch?v=abc");
+        ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
+                List.of(new PlayableRef.AppLink(uri, "youtube"),
+                        new PlayableRef.StreamUrl(URI.create("http://nas/x.mp4"), "video/mp4")));
+
+        PlayAttempt attempt = service.attempt(item, "shield", Set.of());
+
+        assertThat(attempt).isInstanceOfSatisfying(PlayAttempt.Played.class, played -> {
+            assertThat(RouteKeys.key(played.route())).isEqualTo("app-link");
+            assertThat(played.remaining()).extracting(RouteKeys::key).containsExactly("cast:CC1AD845");
+        });
+        verify(devices).execute("shield", new Action.OpenAppLink(uri));
+    }
+
+    @Test
+    void attemptReportsTheFailedRouteAndTheNextOne() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
+        PlaybackService service = new PlaybackService(devices,
+                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy())));
+        ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
+                List.of(new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube"),
+                        new PlayableRef.StreamUrl(URI.create("http://nas/x.mp4"), "video/mp4")));
+        willThrow(new ActionFailedException("Shield refused to open the link"))
+                .given(devices).execute(eq("shield"), any(Action.OpenAppLink.class));
+
+        PlayAttempt attempt = service.attempt(item, "shield", Set.of());
+
+        assertThat(attempt).isInstanceOfSatisfying(PlayAttempt.Failed.class, failed -> {
+            assertThat(RouteKeys.key(failed.route())).isEqualTo("app-link");
+            assertThat(failed.remaining()).extracting(RouteKeys::key).containsExactly("cast:CC1AD845");
+            assertThat(failed.cause()).hasMessage("Shield refused to open the link");
+        });
+        verify(devices, never()).execute(eq("shield"), any(Action.CastLoad.class));
+    }
+
+    @Test
+    void attemptSkipsRoutesByKey() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
+        PlaybackService service = new PlaybackService(devices,
+                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy())));
+        ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
+                List.of(new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube"),
+                        new PlayableRef.StreamUrl(URI.create("http://nas/x.mp4"), "video/mp4")));
+
+        PlayAttempt attempt = service.attempt(item, "shield", Set.of("app-link"));
+
+        assertThat(attempt).isInstanceOfSatisfying(PlayAttempt.Played.class,
+                played -> assertThat(played.route()).isInstanceOf(Route.Cast.class));
+        verify(devices).execute(eq("shield"), any(Action.CastLoad.class));
+    }
+
+    @Test
+    void attemptWithEverythingSkippedIsUnroutable() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
+        PlaybackService service = new PlaybackService(devices,
+                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy())));
+        ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
+                List.of(new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube"),
+                        new PlayableRef.StreamUrl(URI.create("http://nas/x.mp4"), "video/mp4")));
+
+        PlayAttempt attempt = service.attempt(item, "shield", Set.of("app-link", "cast:CC1AD845"));
+
+        assertThat(attempt).isEqualTo(new PlayAttempt.Unroutable(shield, "no other way to play this"));
+    }
+
+    @Test
+    void offlineAndUnsupportedAreFailuresToo() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
+        PlaybackService service = new PlaybackService(devices, new PlaybackPlanner(List.of(new AppLinkStrategy())));
+        ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
+                List.of(new PlayableRef.AppLink(URI.create("https://x"), "web")));
+        willThrow(new DeviceOfflineException("Shield is not connected"))
+                .given(devices).execute(eq("shield"), any(Action.OpenAppLink.class));
+
+        assertThat(service.attempt(item, "shield", Set.of()))
+                .isInstanceOfSatisfying(PlayAttempt.Failed.class,
+                        failed -> assertThat(failed.cause()).isInstanceOf(DeviceOfflineException.class));
+
+        willThrow(new IllegalStateException("boom")).given(devices).execute(eq("shield"), any(Action.OpenAppLink.class));
+
+        assertThatThrownBy(() -> service.attempt(item, "shield", Set.of())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void sourceSideRoutesUseTheirExecutor() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
+        given(executor.executes(any())).willReturn(true);
+        PlaybackService service = new PlaybackService(devices, new HomeControlConfiguration().playbackPlanner(),
+                List.of(resolverReturning(new PlayableResolver.Resolution(
+                        List.of(new PlayableRef.JellyfinSession("s1", "item-1", 600L, "Android TV")),
+                        Set.of(Capability.JELLYFIN_CLIENT), List.of()))),
+                List.of(executor));
+
+        PlayAttempt attempt = service.attempt(JELLYFIN_ITEM, "shield", Set.of());
+
+        assertThat(attempt).isInstanceOfSatisfying(PlayAttempt.Played.class,
+                played -> assertThat(played.route()).isEqualTo(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV")));
+        verify(executor).execute(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV"), shield);
+
+        willThrow(new ActionFailedException("Jellyfin refused")).given(executor).execute(any(), any());
+
+        assertThat(service.attempt(JELLYFIN_ITEM, "shield", Set.of()))
+                .isInstanceOfSatisfying(PlayAttempt.Failed.class,
+                        failed -> assertThat(failed.cause()).hasMessage("Jellyfin refused"));
     }
 
     @Test

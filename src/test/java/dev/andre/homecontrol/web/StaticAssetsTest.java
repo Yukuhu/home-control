@@ -46,6 +46,11 @@ class StaticAssetsTest {
                 .andExpect(content().string(containsString("export function on")));
         mockMvc.perform(get("/js/rails.js")).andExpect(status().isOk())
                 .andExpect(content().string(containsString("export function watchRails")));
+        mockMvc.perform(get("/js/play-sheet.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("export function openPlaySheet")))
+                .andExpect(content().string(containsString("route-preview")));
+        mockMvc.perform(get("/js/toast.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("export function toast")));
         mockMvc.perform(get("/app.js")).andExpect(status().isNotFound());
     }
 }

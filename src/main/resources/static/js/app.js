@@ -1,11 +1,14 @@
 import { applyState, subscribe } from "./state-view.js";
 import { sendKey } from "./remote-transport.js";
 import { watchRails } from "./rails.js";
+import { toast } from "./toast.js";
+import { initPlaySheet } from "./play-sheet.js";
 
 const selectedDevice = () => document.body.dataset.device;
 
 subscribe(applyState);
 watchRails();
+initPlaySheet();
 
 function setDrawer(open) {
     const drawer = document.getElementById("remote-drawer");
@@ -18,14 +21,6 @@ document.addEventListener("click", (event) => {
     if (event.target.closest(".drawer-toggle")) setDrawer(document.getElementById("remote-drawer").hidden);
     if (event.target.closest(".drawer-close")) setDrawer(false);
 });
-
-function toast(message) {
-    const el = document.getElementById("toast");
-    el.textContent = message;
-    el.hidden = false;
-    clearTimeout(toast.timer);
-    toast.timer = setTimeout(() => (el.hidden = true), 3000);
-}
 
 // htmx drives the buttons and the open-link form; failures carry the server's reason.
 document.body.addEventListener("htmx:responseError", (event) => {

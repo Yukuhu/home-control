@@ -284,6 +284,26 @@ class DashboardPageTest {
     }
 
     @Test
+    void rendersThePlaySheetWithADeviceSwitcher() throws Exception {
+        Device living = device("living", "Living Room", Instant.now());
+        Device bedroom = device("bedroom", "Bedroom", Instant.now());
+        given(devices.devices()).willReturn(List.of(living, bedroom));
+        given(devices.defaultDevice()).willReturn(Optional.of(living));
+        given(devices.device("living")).willReturn(Optional.of(living));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.REMOTE_KEYS));
+        given(rails.snapshots()).willReturn(List.of());
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<dialog id=\"play-sheet\"")))
+                .andExpect(content().string(containsString("data-sheet-device=\"living\"")))
+                .andExpect(content().string(containsString("data-sheet-device=\"bedroom\"")))
+                .andExpect(content().string(containsString("data-status-for=\"living\"")))
+                .andExpect(content().string(containsString("type=\"module\"")));
+    }
+
+    @Test
     void pointsToSetupWhenNoSourceIsConfigured() throws Exception {
         Device bedroom = device("bedroom", "Bedroom", Instant.now());
         given(devices.devices()).willReturn(List.of(bedroom));
