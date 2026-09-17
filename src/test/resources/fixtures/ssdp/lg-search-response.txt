@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+CACHE-CONTROL: max-age=1800
+DATE: Tue, 16 Sep 2026 10:00:00 GMT
+EXT:
+LOCATION: http://{host}:{port}/lg/description.xml
+SERVER: WebOS/4.1.0 UPnP/1.0 webOSTV/1.0
+ST: urn:lge-com:service:webos-second-screen:1
+USN: uuid:e8d7f6a5-1234-4bcd-9ef0-a8b7c6d5e4f3::urn:lge-com:service:webos-second-screen:1
+DLNADeviceName.lge.com: %5BLG%5D%20webOS%20TV%20OLED55C9PLA
+

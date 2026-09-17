@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <specVersion><major>1</major><minor>0</minor></specVersion>
+  <device>
+    <deviceType>urn:schemas-upnp-org:device:ZonePlayer:1</deviceType>
+    <friendlyName>192.168.1.70 - Sonos One</friendlyName>
+    <manufacturer>Sonos, Inc.</manufacturer>
+    <modelName>Sonos One</modelName>
+    <UDN>uuid:RINCON_000E58A0B1C201400</UDN>
+    <deviceList>
+      <device>
+        <deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
+        <friendlyName>Living Room - Sonos One Media Renderer</friendlyName>
+        <UDN>uuid:RINCON_000E58A0B1C201400_MR</UDN>
+        <serviceList>
+          <service>
+            <serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>
+            <serviceId>urn:upnp-org:serviceId:AVTransport</serviceId>
+            <controlURL>/MediaRenderer/AVTransport/Control</controlURL>
+            <eventSubURL>/MediaRenderer/AVTransport/Event</eventSubURL>
+            <SCPDURL>/xml/AVTransport1.xml</SCPDURL>
+          </service>
+        </serviceList>
+      </device>
+    </deviceList>
+  </device>
+</root>

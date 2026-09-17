@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0" xmlns:sec="http://www.sec.co.kr/dlna">
+  <specVersion><major>1</major><minor>0</minor></specVersion>
+  <device>
+    <deviceType>urn:samsung.com:device:RemoteControlReceiver:1</deviceType>
+    <friendlyName>[TV] Samsung 8 Series (55)</friendlyName>
+    <manufacturer>Samsung Electronics</manufacturer>
+    <modelName>UE55TU8079</modelName>
+    <UDN>uuid:5d9c0b1a-2c3d-4e5f-8a9b-0c1d2e3f4a5b</UDN>
+    <sec:deviceID>M3CDVZ4LWVXQE</sec:deviceID>
+    <serviceList>
+      <service>
+        <serviceType>urn:samsung.com:service:MultiScreenService:1</serviceType>
+        <serviceId>urn:samsung.com:serviceId:MultiScreenService</serviceId>
+        <SCPDURL>MultiScreenService.xml</SCPDURL>
+        <controlURL>/smp_4_</controlURL>
+        <eventSubURL>/smp_5_</eventSubURL>
+      </service>
+    </serviceList>
+  </device>
+</root>
