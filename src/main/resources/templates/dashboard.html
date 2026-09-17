@@ -101,6 +101,29 @@
     </section>
 </aside>
 
-<div id="toast" hidden></div>
+<dialog id="play-sheet" class="sheet" aria-labelledby="sheet-title">
+    <form method="dialog" class="sheet-close-form">
+        <button class="sheet-close" aria-label="Close">✕</button>
+    </form>
+    <div class="sheet-item">
+        <img id="sheet-art" alt="" hidden>
+        <div>
+            <h2 id="sheet-title">Title</h2>
+            <p id="sheet-subtitle" class="hint"></p>
+        </div>
+    </div>
+    <div class="sheet-devices" role="radiogroup" aria-label="Play on">
+        <button type="button" role="radio" class="sheet-device" th:each="device : ${devices}"
+                th:attr="data-sheet-device=${device.id()},aria-checked=${device.id() == selected.id()}">
+            <span th:text="${device.name()}">Shield</span>
+            <span class="badge" th:attr="data-status-for=${device.id()}"
+                  th:classappend="${states[device.id()].connected()} ? 'ok' : 'off'"
+                  th:text="${states[device.id()].status()}">CONNECTED</span>
+        </button>
+    </div>
+    <p id="sheet-route" class="sheet-route" aria-live="polite">Working out how to play this…</p>
+    <button type="button" id="sheet-play" class="primary" disabled>Play</button>
+</dialog>
+<div id="toast" hidden role="status" aria-live="polite"><span class="toast-text"></span><button type="button" class="toast-action" hidden></button></div>
 </body>
 </html>

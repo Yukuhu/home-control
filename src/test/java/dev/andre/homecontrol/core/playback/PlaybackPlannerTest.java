@@ -170,6 +170,23 @@ class PlaybackPlannerTest {
     }
 
     @Test
+    void listsEveryApplicableRouteInSpecOrder() {
+        List<Route> routes = planner.routes(item(STREAM, JELLYFIN_MESSAGE, LINK, OPEN_APP),
+                EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK, Capability.CAST_RECEIVER));
+
+        assertThat(routes).extracting(RouteKeys::key)
+                .containsExactly("jellyfin-session", "app-link", "cast-message:F007D354", "cast:CC1AD845");
+        assertThat(planner.plan(item(STREAM, LINK), EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)))
+                .isEqualTo(routes.get(1));
+    }
+
+    @Test
+    void noApplicableRouteIsAnEmptyListNotUnroutable() {
+        assertThat(planner.routes(item(LINK), EnumSet.of(Capability.MEDIA_RENDERER))).isEmpty();
+        assertThat(planner.routes(item(), EnumSet.allOf(Capability.class))).isEmpty();
+    }
+
+    @Test
     void anItemWithNothingPlayableIsUnroutable() {
         Route route = planner.plan(item(), Set.of(Capability.APP_LINK));
 

@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.playback.PlayAttempt;
 import dev.andre.homecontrol.playback.PlaybackService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,7 +22,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Plays a source item on a device. The browser sends only {@code source} and {@code item}; the server
@@ -29,6 +32,9 @@ import java.util.Optional;
  */
 @RestController
 public class ContentPlayController {
+
+    private static final int MAX_SKIP = 8;
+    private static final int MAX_SKIP_LENGTH = 64;
 
     private final DeviceManager devices;
     private final ContentSources sources;
@@ -65,6 +71,56 @@ public class ContentPlayController {
         return route instanceof Route.Unroutable unroutable
                 ? text(HttpStatus.UNPROCESSABLE_CONTENT, unroutable.reason())
                 : text(HttpStatus.OK, route.describe());
+    }
+
+    @GetMapping(path = "/devices/{id}/route-preview", params = {"source", "item"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> preview(@PathVariable String id, @RequestParam String source, @RequestParam String item) {
+        if (devices.device(id).isEmpty()) {
+            return text(HttpStatus.NOT_FOUND, "No device with id " + id);
+        }
+        Optional<ContentItem> content = find(source, item);
+        if (content.isEmpty()) {
+            return notFound(source);
+        }
+        return ResponseEntity.ok(RoutePreviewView.of(playback.preview(content.get(), id)));
+    }
+
+    @PostMapping(path = "/devices/{id}/play-attempt", params = {"source", "item"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> attempt(@PathVariable String id, @RequestParam String source, @RequestParam String item,
+                                     @RequestParam(name = "skip", required = false) List<String> skip) {
+        List<String> skips = skip == null ? List.of() : skip.stream().filter(s -> !s.isBlank()).toList();
+        if (skips.size() > MAX_SKIP || skips.stream().anyMatch(s -> s.length() > MAX_SKIP_LENGTH)) {
+            return text(HttpStatus.BAD_REQUEST, "Too many or too long route keys to skip");
+        }
+        if (devices.device(id).isEmpty()) {
+            return text(HttpStatus.NOT_FOUND, "No device with id " + id);
+        }
+        Optional<ContentItem> content = find(source, item);
+        if (content.isEmpty()) {
+            return notFound(source);
+        }
+        return switch (playback.attempt(content.get(), id, Set.copyOf(skips))) {
+            case PlayAttempt.Played played -> ResponseEntity.ok(new PlayResultView(true, id, played.device().name(),
+                    RouteView.of(played.route()), RouteView.of(first(played.remaining())), played.route().describe()));
+            case PlayAttempt.Failed failed -> ResponseEntity.status(statusOf(failed.cause())).body(new PlayResultView(false, id,
+                    failed.device().name(), RouteView.of(failed.route()), RouteView.of(first(failed.remaining())),
+                    failed.cause().getMessage()));
+            case PlayAttempt.Unroutable unroutable -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(
+                    new PlayResultView(false, id, unroutable.device().name(), null, null,
+                            unroutable.device().name() + ": " + unroutable.reason()));
+        };
+    }
+
+    private static Route first(List<Route> routes) {
+        return routes.isEmpty() ? null : routes.getFirst();
+    }
+
+    private static HttpStatus statusOf(RuntimeException cause) {
+        return switch (cause) {
+            case DeviceOfflineException ignored -> HttpStatus.CONFLICT;
+            case UnsupportedActionException ignored -> HttpStatus.UNPROCESSABLE_CONTENT;
+            default -> HttpStatus.BAD_GATEWAY;
+        };
     }
 
     private Optional<ContentItem> find(String source, String item) {

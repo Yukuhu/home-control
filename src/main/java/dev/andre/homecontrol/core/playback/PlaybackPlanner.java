@@ -3,6 +3,7 @@ package dev.andre.homecontrol.core.playback;
 import dev.andre.homecontrol.core.Capability;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -24,13 +25,21 @@ public class PlaybackPlanner {
         if (item.playables().isEmpty()) {
             return new Route.Unroutable("This item has nothing playable");
         }
+        return routes(item, capabilities).stream().findFirst()
+                .orElseGet(() -> new Route.Unroutable(String.join("; ", explain(item, capabilities))));
+    }
+
+    /** Every route the strategies offer, in preference order (spec §5.3). Pure. */
+    public List<Route> routes(ContentItem item, Set<Capability> capabilities) {
+        List<Route> routes = new ArrayList<>();
+        Set<String> keys = new HashSet<>();
         for (RouteStrategy strategy : strategies) {
-            Optional<Route> route = strategy.route(item, capabilities);
-            if (route.isPresent()) {
-                return route.get();
-            }
+            strategy.route(item, capabilities)
+                    .filter(route -> !(route instanceof Route.Unroutable))
+                    .filter(route -> keys.add(RouteKeys.key(route)))
+                    .ifPresent(routes::add);
         }
-        return new Route.Unroutable(String.join("; ", explain(item, capabilities)));
+        return routes;
     }
 
     /**
