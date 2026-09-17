@@ -2,8 +2,8 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.RailSnapshot;
-import dev.andre.homecontrol.core.content.ContentSource;
-import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.content.SearchOutcome;
+import dev.andre.homecontrol.content.SearchService;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import org.springframework.http.HttpStatus;
@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 
 /** Content sources and their rails, read from the {@link RailCache} that keeps them fresh in the background. */
@@ -40,10 +39,12 @@ public class ContentController {
 
     private final ContentSources sources;
     private final RailCache rails;
+    private final SearchService searchService;
 
-    public ContentController(ContentSources sources, RailCache rails) {
+    public ContentController(ContentSources sources, RailCache rails, SearchService searchService) {
         this.sources = sources;
         this.rails = rails;
+        this.searchService = searchService;
     }
 
     @GetMapping("/sources")
@@ -91,7 +92,7 @@ public class ContentController {
     public record SearchResponse(String query, List<SearchResult> results, List<SearchError> errors) {
     }
 
-    /** Used by the unified search box (D5). Sequential for now; a slow source delays the answer. */
+    /** Used by the unified search box (D5): every enabled searchable source, in parallel, one deadline. */
     @GetMapping(path = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> search(@RequestParam(required = false) String q, @RequestParam(defaultValue = "20") int limit) {
         String query = q == null ? "" : q.strip();
@@ -99,16 +100,14 @@ public class ContentController {
             return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body("Search for 2 to 100 characters");
         }
         int clamped = Math.max(1, Math.min(50, limit));
-        List<SearchResult> results = new ArrayList<>();
-        List<SearchError> errors = new ArrayList<>();
-        for (ContentSource source : sources.searchable()) {
-            try {
-                results.add(new SearchResult(source.id(), source.displayName(),
-                        source.search(query, clamped).stream().map(ContentItemView::of).toList()));
-            } catch (ContentSourceException e) {
-                errors.add(new SearchError(source.id(), e.getMessage()));
-            }
-        }
+        SearchOutcome outcome = searchService.search(query, clamped);
+        List<SearchResult> results = outcome.hits().stream()
+                .map(h -> new SearchResult(h.source().id(), h.source().displayName(),
+                        h.items().stream().map(ContentItemView::of).toList()))
+                .toList();
+        List<SearchError> errors = outcome.failures().stream()
+                .map(f -> new SearchError(f.source().id(), f.message()))
+                .toList();
         return ResponseEntity.ok(new SearchResponse(query, results, errors));
     }
 

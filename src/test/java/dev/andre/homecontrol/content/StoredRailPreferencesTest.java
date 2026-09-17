@@ -53,7 +53,7 @@ class StoredRailPreferencesTest {
 
     final ContentProperties properties = new ContentProperties(
             new ContentProperties.Rails(false, Duration.ofSeconds(15), Duration.ofMinutes(1), 4, Map.of()),
-            "de-DE", "DE");
+            new ContentProperties.Search(Duration.ofSeconds(8)), "de-DE", "DE");
 
     private SourcePreferencesService service(Path file, ContentProperties props) {
         return new SourcePreferencesService(new JsonFileSourceSettings(file), props, event -> { });
@@ -126,7 +126,7 @@ class StoredRailPreferencesTest {
         ContentProperties withPropertyOverride = new ContentProperties(
                 new ContentProperties.Rails(false, Duration.ofSeconds(15), Duration.ofMinutes(1), 4,
                         Map.of("tube", Duration.ofMinutes(2))),
-                "de-DE", "DE");
+                new ContentProperties.Search(Duration.ofSeconds(8)), "de-DE", "DE");
         StoredRailPreferences withoutStored = new StoredRailPreferences(
                 service(dir.resolve("other.json"), withPropertyOverride), withPropertyOverride);
         assertThat(withoutStored.refreshInterval(tube)).isEqualTo(Duration.ofMinutes(2));

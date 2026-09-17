@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<body>
+<th:block th:fragment="results">
+    <p class="hint" th:if="${state == 'short'}">Type at least 2 characters</p>
+    <p class="hint" th:if="${state == 'long'}">Search for 2 to 100 characters</p>
+    <th:block th:if="${state == 'done'}">
+        <section class="rail search-hits" th:each="hit : ${hits}" th:attr="data-source=${hit.sourceId()}">
+            <header><h2 th:text="${hit.sourceName()}">Jellyfin</h2></header>
+            <div class="tiles" role="list">
+                <div role="listitem" th:each="item : ${hit.items()}">
+                    <button th:replace="~{fragments/rails :: tile(${item})}"></button>
+                </div>
+            </div>
+        </section>
+        <p class="rail-error" role="alert" th:each="failure : ${failures}"
+           th:text="${failure.message()}">Jellyfin did not answer in time</p>
+        <p class="hint" th:if="${#lists.isEmpty(hits) and #lists.isEmpty(failures)}"
+           th:text="|Nothing found for “${query}”|">Nothing found</p>
+    </th:block>
+</th:block>
+</body>
+</html>

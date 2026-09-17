@@ -304,6 +304,25 @@ class DashboardPageTest {
     }
 
     @Test
+    void hasADebouncedSearchBox() throws Exception {
+        Device bedroom = device("bedroom", "Bedroom", Instant.now());
+        given(devices.devices()).willReturn(List.of(bedroom));
+        given(devices.defaultDevice()).willReturn(Optional.of(bedroom));
+        given(devices.device("bedroom")).willReturn(Optional.of(bedroom));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.REMOTE_KEYS));
+        given(rails.snapshots()).willReturn(List.of());
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("role=\"search\"")))
+                .andExpect(content().string(containsString("hx-get=\"/search/results\"")))
+                .andExpect(content().string(containsString("delay:350ms")))
+                .andExpect(content().string(containsString("hx-sync=\"this:replace\"")))
+                .andExpect(content().string(containsString("id=\"search-results\"")));
+    }
+
+    @Test
     void pointsToSetupWhenNoSourceIsConfigured() throws Exception {
         Device bedroom = device("bedroom", "Bedroom", Instant.now());
         given(devices.devices()).willReturn(List.of(bedroom));

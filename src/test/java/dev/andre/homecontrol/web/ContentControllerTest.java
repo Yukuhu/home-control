@@ -3,8 +3,9 @@ package dev.andre.homecontrol.web;
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.RailSnapshot;
 import dev.andre.homecontrol.content.RailStatus;
+import dev.andre.homecontrol.content.SearchOutcome;
+import dev.andre.homecontrol.content.SearchService;
 import dev.andre.homecontrol.core.content.ContentSource;
-import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
@@ -45,6 +46,9 @@ class ContentControllerTest {
 
     @MockitoBean
     RailCache rails;
+
+    @MockitoBean
+    SearchService searchService;
 
     private static ContentSource jellyfin(boolean available, boolean searchable, List<RailDescriptor> rails) {
         return new ContentSource() {
@@ -220,8 +224,8 @@ class ContentControllerTest {
     void searchesEverySearchableSource() throws Exception {
         ContentSource jellyfin = searchableMock("jellyfin", "Jellyfin");
         ContentItem item = new ContentItem("item-1", "jellyfin", ContentKind.MOVIE, "Big Buck Bunny", null, null, List.of());
-        given(jellyfin.search("bunny", 20)).willReturn(List.of(item));
-        given(sources.searchable()).willReturn(List.of(jellyfin));
+        SearchOutcome outcome = new SearchOutcome("bunny", List.of(new SearchOutcome.Hits(jellyfin, List.of(item))), List.of());
+        given(searchService.search("bunny", 20)).willReturn(outcome);
 
         String body = mockMvc.perform(get("/search").param("q", "bunny"))
                 .andExpect(status().isOk())
@@ -231,7 +235,7 @@ class ContentControllerTest {
                 .andExpect(jsonPath("$.results[0].items[0].title").value("Big Buck Bunny"))
                 .andReturn().getResponse().getContentAsString();
 
-        verify(jellyfin).search("bunny", 20);
+        verify(searchService).search("bunny", 20);
         org.assertj.core.api.Assertions.assertThat(body).doesNotContain("playables");
     }
 
@@ -239,10 +243,10 @@ class ContentControllerTest {
     void aFailingSourceIsReportedBesideTheOthers() throws Exception {
         ContentSource jellyfin = searchableMock("jellyfin", "Jellyfin");
         ContentItem item = new ContentItem("item-1", "jellyfin", ContentKind.MOVIE, "Big Buck Bunny", null, null, List.of());
-        given(jellyfin.search("bunny", 20)).willReturn(List.of(item));
         ContentSource tmdb = searchableMock("tmdb", "TMDB");
-        given(tmdb.search("bunny", 20)).willThrow(new ContentSourceException("TMDB is unreachable"));
-        given(sources.searchable()).willReturn(List.of(jellyfin, tmdb));
+        SearchOutcome outcome = new SearchOutcome("bunny", List.of(new SearchOutcome.Hits(jellyfin, List.of(item))),
+                List.of(new SearchOutcome.Failure(tmdb, "TMDB is unreachable")));
+        given(searchService.search("bunny", 20)).willReturn(outcome);
 
         mockMvc.perform(get("/search").param("q", "bunny"))
                 .andExpect(status().isOk())
@@ -268,13 +272,13 @@ class ContentControllerTest {
 
     @Test
     void clampsTheLimit() throws Exception {
-        ContentSource jellyfin = searchableMock("jellyfin", "Jellyfin");
-        given(sources.searchable()).willReturn(List.of(jellyfin));
+        given(searchService.search("bunny", 50)).willReturn(new SearchOutcome("bunny", List.of(), List.of()));
+        given(searchService.search("bunny", 1)).willReturn(new SearchOutcome("bunny", List.of(), List.of()));
 
         mockMvc.perform(get("/search").param("q", "bunny").param("limit", "500")).andExpect(status().isOk());
-        verify(jellyfin).search("bunny", 50);
+        verify(searchService).search("bunny", 50);
 
         mockMvc.perform(get("/search").param("q", "bunny").param("limit", "0")).andExpect(status().isOk());
-        verify(jellyfin).search("bunny", 1);
+        verify(searchService).search("bunny", 1);
     }
 }
