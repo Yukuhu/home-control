@@ -15,6 +15,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -83,6 +84,12 @@ public class FakeUpnpRenderer implements AutoCloseable {
     private volatile String trackDuration = "0:00:00";
     private volatile boolean echoMetadata = true;
     private volatile boolean hangUp;
+    private volatile Duration answerDelay = Duration.ZERO;
+    private volatile String descriptionOverride;
+    private final Map<String, RawAnswer> rawAnswers = new ConcurrentHashMap<>();
+
+    private record RawAnswer(int status, String body) {
+    }
 
     public FakeUpnpRenderer() throws IOException {
         this("127.0.0.1", Layout.GENERIC);
@@ -123,6 +130,25 @@ public class FakeUpnpRenderer implements AutoCloseable {
 
     public void fail(String action, int code, String description, int times) {
         faults.put(action, new PlannedFault(code, description, times));
+    }
+
+    /** Every SOAP answer waits this long before replying; {@link Duration#ZERO} switches it off. */
+    public void delayAnswers(Duration delay) {
+        this.answerDelay = delay == null ? Duration.ZERO : delay;
+    }
+
+    /** Every later call of {@code action} is recorded and answered with exactly this; {@code (action, 0, null)} clears it. */
+    public void answerRaw(String action, int status, String body) {
+        if (body == null) {
+            rawAnswers.remove(action);
+        } else {
+            rawAnswers.put(action, new RawAnswer(status, body));
+        }
+    }
+
+    /** The device description is this text instead of the fixture while non-null. */
+    public void overrideDescription(String xml) {
+        this.descriptionOverride = xml;
     }
 
     public void hangUp(boolean hangUp) {
@@ -225,6 +251,10 @@ public class FakeUpnpRenderer implements AutoCloseable {
     }
 
     protected String document(String path) throws IOException {
+        String override = descriptionOverride;
+        if (override != null && path.equals(layout.descriptionPath())) {
+            return override;
+        }
         if (path.equals(layout.descriptionPath())) {
             return resource(layout.descriptionFixture());
         }
@@ -255,6 +285,20 @@ public class FakeUpnpRenderer implements AutoCloseable {
         UpnpXml.childElements(request).forEach(argument -> arguments.put(UpnpXml.localName(argument), argument.getTextContent()));
         calls.add(new Call(path, exchange.getRequestHeaders().getFirst("SOAPACTION"), action,
                 Collections.unmodifiableMap(arguments)));
+        Duration delay = answerDelay;
+        if (!delay.isZero()) {
+            try {
+                Thread.sleep(delay);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+        RawAnswer raw = rawAnswers.get(action);
+        if (raw != null) {
+            reply(exchange, raw.status(), raw.body());
+            return;
+        }
         try {
             PlannedFault planned = faults.get(action);
             if (planned != null) {
