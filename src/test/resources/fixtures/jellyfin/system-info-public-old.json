@@ -1,0 +1,9 @@
+{
+  "LocalAddress": "http://192.168.1.20:8096",
+  "ServerName": "nas",
+  "Version": "10.8.13",
+  "ProductName": "Jellyfin Server",
+  "OperatingSystem": "",
+  "Id": "4e1a2b3c4d5e4f60718293a4b5c6d7e8",
+  "StartupWizardCompleted": true
+}

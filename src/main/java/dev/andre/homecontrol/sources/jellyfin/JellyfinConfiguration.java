@@ -1,0 +1,27 @@
+package dev.andre.homecontrol.sources.jellyfin;
+
+import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.storage.JsonFileSourceSettings;
+import dev.andre.homecontrol.storage.SecretStore;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/** The Jellyfin module. {@code home-control.jellyfin.enabled=false} removes all of it. */
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnProperty(name = "home-control.jellyfin.enabled", havingValue = "true", matchIfMissing = true)
+@EnableConfigurationProperties(JellyfinProperties.class)
+public class JellyfinConfiguration {
+
+    @Bean
+    public JellyfinClient jellyfinClient(JellyfinProperties properties) {
+        return new JellyfinClient(properties);
+    }
+
+    @Bean
+    public JellyfinSetupService jellyfinSetupService(JellyfinClient client, JsonFileSourceSettings sources,
+                                                     SecretStore secrets, LoginService login) {
+        return new JellyfinSetupService(client, sources, secrets, login);
+    }
+}
