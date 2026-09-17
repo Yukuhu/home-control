@@ -51,6 +51,28 @@ public sealed interface Route {
         }
     }
 
+    /** Run a Cast receiver app and send it a custom message (spec §5.3 rung 3). */
+    record CastMessage(String receiverAppId, String namespace, Map<String, Object> message, String receiverLabel)
+            implements Route {
+        public CastMessage {
+            message = message == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(message));
+        }
+
+        public Action action() {
+            return new Action.CastMessage(receiverAppId, namespace, message);
+        }
+
+        @Override
+        public String describe() {
+            return "Cast with " + receiverLabel;
+        }
+
+        @Override
+        public String toString() {
+            return "CastMessage[receiverAppId=" + receiverAppId + ", namespace=" + namespace + "]";
+        }
+    }
+
     record Unroutable(String reason) implements Route {
         @Override
         public String describe() {

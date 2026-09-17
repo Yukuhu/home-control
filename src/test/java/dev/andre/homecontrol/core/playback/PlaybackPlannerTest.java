@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PlaybackPlannerTest {
 
     private final PlaybackPlanner planner = new PlaybackPlanner(
-            List.of(new AppLinkStrategy(), new CastLoadStrategy(), new CastStreamStrategy()));
+            List.of(new AppLinkStrategy(), new CastMessageStrategy(), new CastLoadStrategy(), new CastStreamStrategy()));
 
     private static final PlayableRef.CastLoad JELLYFIN_LOAD =
             new PlayableRef.CastLoad("F007D354", Map.of("media", Map.of("contentId", "item-1")));
@@ -23,6 +23,8 @@ class PlaybackPlannerTest {
             new PlayableRef.StreamUrl(URI.create("http://nas.local/films/bunny.mp4"), "video/mp4");
     private static final PlayableRef.AppLink LINK =
             new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube");
+    private static final PlayableRef.CastMessage JELLYFIN_MESSAGE = new PlayableRef.CastMessage(
+            "F007D354", "urn:x-cast:com.connectsdk", Map.of("command", "PlayNow", "accessToken", "tok-1"), "the Jellyfin receiver");
 
     private static ContentItem item(PlayableRef... playables) {
         return new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null, List.of(playables));
@@ -66,6 +68,25 @@ class PlaybackPlannerTest {
     }
 
     @Test
+    void castsACustomMessageBeforeACastLoadOrAStream() {
+        Route route = planner.plan(item(STREAM, JELLYFIN_LOAD, JELLYFIN_MESSAGE), EnumSet.of(Capability.CAST_RECEIVER));
+
+        assertThat(route).isEqualTo(new Route.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
+                JELLYFIN_MESSAGE.message(), "the Jellyfin receiver"));
+        assertThat(route.describe()).isEqualTo("Cast with the Jellyfin receiver");
+        assertThat(((Route.CastMessage) route).action()).isEqualTo(new dev.andre.homecontrol.core.Action.CastMessage("F007D354",
+                "urn:x-cast:com.connectsdk", JELLYFIN_MESSAGE.message()));
+        assertThat(route.toString()).doesNotContain("tok-1");
+        assertThat(JELLYFIN_MESSAGE.toString()).doesNotContain("tok-1");
+    }
+
+    @Test
+    void aCustomMessageNeedsACastReceiver() {
+        assertThat(planner.plan(item(JELLYFIN_MESSAGE), EnumSet.of(Capability.APP_LINK)))
+                .isInstanceOfSatisfying(Route.Unroutable.class, u -> assertThat(u.reason()).contains("this device is not a Cast receiver"));
+    }
+
+    @Test
     void castsAStreamThroughTheDefaultMediaReceiverWithTheItemTitle() {
         Route route = planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER));
 
@@ -104,6 +125,8 @@ class PlaybackPlannerTest {
                 .isInstanceOf(Route.OpenAppLink.class);
         assertThat(configured.plan(everything, EnumSet.of(Capability.CAST_RECEIVER)))
                 .isEqualTo(new Route.Cast("F007D354", JELLYFIN_LOAD.payload()));
+        assertThat(configured.plan(item(JELLYFIN_LOAD, JELLYFIN_MESSAGE), EnumSet.of(Capability.CAST_RECEIVER)))
+                .isInstanceOf(Route.CastMessage.class);
     }
 
     @Test

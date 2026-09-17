@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -102,6 +103,7 @@ public class CastSession implements DeviceHandle {
             case Action.Mute mute -> receiverCommand(CastPayloads.setMuted(mute.muted()), mute.muted() ? "mute" : "unmute");
             case Action.Stop ignored -> stopForegroundApp();
             case Action.CastLoad load -> load(load.receiverAppId(), load.load());
+            case Action.CastMessage message -> customMessage(message.receiverAppId(), message.namespace(), message.message());
         }
     }
 
@@ -143,6 +145,61 @@ public class CastSession implements DeviceHandle {
         if (!"MEDIA_STATUS".equals(reply.type())) {
             throw new ActionFailedException(device.name() + " could not play it (" + reply.describeFailure() + ")");
         }
+    }
+
+    private static final Set<String> CUSTOM_ERROR_TYPES = Set.of("error", "connectionerror", "playbackerror");
+    /** Receivers validate a custom request synchronously; media loading continues after we return. */
+    private static final Duration CUSTOM_MESSAGE_ERROR_WINDOW = Duration.ofMillis(750);
+
+    /** Launch the app unless it runs, wait until it speaks {@code namespace}, connect, send; a quick error reply fails. */
+    private void customMessage(String appId, String namespace, Map<String, Object> message) {
+        CastConnection current = requireConnected();
+        ReceiverStatus.ReceiverApp running = Optional.ofNullable(receiver)
+                .flatMap(status -> status.app(appId))
+                .orElseGet(() -> launch(current, appId));
+        ReceiverStatus.ReceiverApp app = running.speaks(namespace) ? running : awaitNamespace(current, appId, namespace);
+        call(() -> {
+            current.connect(app.transportId());
+            return null;
+        }, "reach " + describe(app));
+        CastConnection.Waiter rejection = current.expect(incoming -> namespace.equals(incoming.namespace())
+                && app.transportId().equals(incoming.sourceId())
+                && CUSTOM_ERROR_TYPES.contains(incoming.type()));
+        try {
+            call(() -> {
+                current.send(namespace, app.transportId(), CastPayloads.custom(message));
+                return null;
+            }, "send the request to " + describe(app));
+            CastIncoming error;
+            try {
+                error = rejection.await(CUSTOM_MESSAGE_ERROR_WINDOW);
+            } catch (CastTimeoutException quiet) {
+                return; // no rejection: the receiver took the request
+            } catch (IOException e) {
+                throw new DeviceOfflineException(device.name() + " dropped the connection while starting playback");
+            }
+            String reason = error.payload().path("message").asString("");
+            throw new ActionFailedException(device.name() + " refused to play it (" + (reason.isBlank() ? error.type() : reason) + ")");
+        } finally {
+            rejection.cancel();
+        }
+    }
+
+    /** A freshly launched custom receiver announces its namespaces in a later RECEIVER_STATUS. */
+    private ReceiverStatus.ReceiverApp awaitNamespace(CastConnection current, String appId, String namespace) {
+        CastConnection.Waiter ready = current.expect(incoming -> RECEIVER.equals(incoming.namespace())
+                && "RECEIVER_STATUS".equals(incoming.type())
+                && ReceiverStatus.parse(incoming.payload().path("status")).app(appId)
+                        .filter(candidate -> candidate.speaks(namespace)).isPresent());
+        CastIncoming status = call(() -> {
+            try {
+                current.send(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus());
+                return ready.await(loadTimeout());
+            } finally {
+                ready.cancel();
+            }
+        }, "start receiver app " + appId);
+        return ReceiverStatus.parse(status.payload().path("status")).app(appId).orElseThrow();
     }
 
     private ReceiverStatus.ReceiverApp launch(CastConnection current, String appId) {

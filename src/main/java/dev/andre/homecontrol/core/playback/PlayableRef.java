@@ -1,6 +1,8 @@
 package dev.andre.homecontrol.core.playback;
 
 import java.net.URI;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -39,6 +41,24 @@ public sealed interface PlayableRef {
         @Override
         public String kindLabel() {
             return "direct stream";
+        }
+    }
+
+    /** A custom-namespace message for a Cast receiver app. Built at play time only: it may carry a token. */
+    record CastMessage(String receiverAppId, String namespace, Map<String, Object> message, String receiverLabel)
+            implements PlayableRef {
+        public CastMessage {
+            message = message == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(message));
+        }
+
+        @Override
+        public String kindLabel() {
+            return "cast";
+        }
+
+        @Override
+        public String toString() {
+            return "CastMessage[receiverAppId=" + receiverAppId + ", namespace=" + namespace + "]";
         }
     }
 }

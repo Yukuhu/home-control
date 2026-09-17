@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.playback.AppLinkStrategy;
 import dev.andre.homecontrol.core.playback.CastLoadStrategy;
+import dev.andre.homecontrol.core.playback.CastMessageStrategy;
 import dev.andre.homecontrol.core.playback.CastStreamStrategy;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
@@ -30,9 +31,10 @@ public class HomeControlConfiguration {
     @Bean
     public PlaybackPlanner playbackPlanner() {
         // Strategy order is the preference order of spec §5.3: app link, then Cast (a
-        // source-built CastLoad before a bare stream on the Default Media Receiver).
-        // Sub-project C puts the Jellyfin session strategy first; I appends media renderers.
-        return new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastLoadStrategy(), new CastStreamStrategy()));
+        // custom receiver message such as Jellyfin's, then a source-built CastLoad, then a
+        // bare stream on the Default Media Receiver). I appends media renderers.
+        return new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastMessageStrategy(),
+                new CastLoadStrategy(), new CastStreamStrategy()));
     }
 
     /** The one mDNS browser every adapter's discovery shares (spec §7). */

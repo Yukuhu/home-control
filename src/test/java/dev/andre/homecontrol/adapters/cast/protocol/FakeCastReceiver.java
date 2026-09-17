@@ -30,6 +30,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -63,6 +64,8 @@ public class FakeCastReceiver implements AutoCloseable {
     private final Set<String> virtualConnections = ConcurrentHashMap.newKeySet();
     private final Set<String> ignoredTypes = ConcurrentHashMap.newKeySet();
     private final Set<String> refusedApps = ConcurrentHashMap.newKeySet();
+    private final Map<String, Set<String>> appNamespaces = new ConcurrentHashMap<>();
+    private final Map<String, ObjectNode> customReplies = new ConcurrentHashMap<>();
     private final AtomicInteger connections = new AtomicInteger();
     private final AtomicInteger pings = new AtomicInteger();
     private final AtomicInteger pongs = new AtomicInteger();
@@ -152,6 +155,16 @@ public class FakeCastReceiver implements AutoCloseable {
 
     public void failNextLoad() {
         failNextLoad = true;
+    }
+
+    /** Apps with this id also list {@code namespace} in RECEIVER_STATUS (custom receivers such as Jellyfin's). */
+    public void appSpeaks(String appId, String namespace) {
+        appNamespaces.computeIfAbsent(appId, id -> ConcurrentHashMap.newKeySet()).add(namespace);
+    }
+
+    /** Answer every message on {@code namespace} sent to the running app's transport with {@code reply}. */
+    public void answerCustom(String namespace, ObjectNode reply) {
+        customReplies.put(namespace, reply);
     }
 
     /** A string message whose payload is not JSON, as a broken receiver might send. */
@@ -282,6 +295,12 @@ public class FakeCastReceiver implements AutoCloseable {
             case CastNamespaces.RECEIVER -> receiver(incoming, type, incoming.requestId());
             case CastNamespaces.MEDIA -> media(incoming, type, incoming.requestId());
             default -> {
+                App current = app;
+                ObjectNode reply = customReplies.get(incoming.namespace());
+                if (reply != null && current.transportId().equals(incoming.destinationId())
+                        && virtualConnections.contains(incoming.destinationId())) {
+                    send(incoming.namespace(), current.transportId(), incoming.sourceId(), reply.deepCopy());
+                }
             }
         }
     }
@@ -385,6 +404,8 @@ public class FakeCastReceiver implements AutoCloseable {
         if (current.speaksMedia()) {
             namespaces.addObject().put("name", CastNamespaces.MEDIA);
         }
+        appNamespaces.getOrDefault(current.appId(), Set.of())
+                .forEach(namespace -> namespaces.addObject().put("name", namespace));
         status.put("isActiveInput", true);
         status.put("isStandBy", false);
         ObjectNode volume = status.putObject("volume");
