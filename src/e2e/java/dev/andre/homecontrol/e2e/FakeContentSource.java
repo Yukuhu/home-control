@@ -35,7 +35,7 @@ public class FakeContentSource implements ContentSource {
 
     private static final RailDescriptor PICKS = new RailDescriptor("e2e", "picks", "Picks");
     private static final String LAUNCHER_ID = "launcher-1";
-    static final List<String> FLAKY_RAIL_IDS = List.of("flaky", "flaky-2", "flaky-3");
+    static final List<String> FLAKY_RAIL_IDS = List.of("flaky", "flaky-2", "flaky-3", "flaky-4", "flaky-5");
 
     private final Map<String, ContentItem> items = new LinkedHashMap<>();
     private final ContentItem launcherBase;
