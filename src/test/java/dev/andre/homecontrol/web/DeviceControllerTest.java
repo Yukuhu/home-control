@@ -197,6 +197,15 @@ class DeviceControllerTest {
     }
 
     @Test
+    void describesALocalPlaybackRoute() throws Exception {
+        given(playback.play(any(), eq("shield"))).willReturn(new Route.PlayLocally(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null));
+
+        mockMvc.perform(post("/devices/shield/play").param("uri", "http://nas/a.mp3"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Play through the server on this Bluetooth speaker"));
+    }
+
+    @Test
     void rejectsALinkThatIsNotHttp() throws Exception {
         mockMvc.perform(post("/devices/shield/play").param("uri", "ftp://nope"))
                 .andExpect(status().isBadRequest())

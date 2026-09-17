@@ -7,6 +7,7 @@ import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlayableResolver;
 import tools.jackson.databind.JsonNode;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +59,8 @@ public class JellyfinPlayableResolver implements PlayableResolver {
         }
         boolean cast = capabilities.contains(Capability.CAST_RECEIVER);
         boolean renderer = capabilities.contains(Capability.MEDIA_RENDERER);
-        if (!cast && !renderer) {
+        boolean local = capabilities.contains(Capability.LOCAL_AUDIO_SINK);
+        if (!cast && !renderer && !local) {
             return new Resolution(List.of(), Set.of(), notes);
         }
         JsonNode fetched;
@@ -75,11 +77,13 @@ public class JellyfinPlayableResolver implements PlayableResolver {
                     wanted.resumeTicks(), device.name()));
         }
         // The direct stream is unreachable on a Cast device (the receiver message always wins in the
-        // planner), so it is only worth asking Jellyfin for one on a plain media renderer (spec §5.3,
-        // groundwork for Wi-Fi speakers, sub-project I).
-        if (!cast && renderer) {
+        // planner), so it is only worth asking Jellyfin for one on a plain media renderer or a local
+        // audio sink (spec §5.3, groundwork for Wi-Fi speakers and Bluetooth speakers, sub-projects I/J).
+        if (!cast && (renderer || local)) {
+            // The server's own player fetches the stream for a local sink; TVs and speakers need the device-facing address.
+            URI streamBase = renderer ? settings.get().deviceServerUrl() : settings.get().serverUrl();
             try {
-                streams.directStream(connection.get(), settings.get().deviceServerUrl(), fetched).ifPresentOrElse(playables::add,
+                streams.directStream(connection.get(), streamBase, fetched).ifPresentOrElse(playables::add,
                         () -> notes.add("Jellyfin reports no format this device can play directly"));
             } catch (JellyfinException e) {
                 notes.add("could not ask Jellyfin how to stream the item (" + e.getMessage() + ")");

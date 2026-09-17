@@ -16,7 +16,8 @@ class PlaybackPlannerTest {
 
     private final PlaybackPlanner planner = new PlaybackPlanner(
             List.of(new JellyfinSessionStrategy(), new AppLinkStrategy(), new CastMessageStrategy(),
-                    new CastLoadStrategy(), new CastStreamStrategy(), new MediaRendererStrategy()));
+                    new CastLoadStrategy(), new CastStreamStrategy(), new MediaRendererStrategy(),
+                    new LocalAudioSinkStrategy()));
 
     private static final PlayableRef.JellyfinSession OPEN_APP =
             new PlayableRef.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV");
@@ -27,6 +28,10 @@ class PlaybackPlannerTest {
             new PlayableRef.StreamUrl(URI.create("http://nas.local/films/bunny.mp4"), "video/mp4");
     private static final PlayableRef.StreamUrl STREAM_WITH_KEY =
             new PlayableRef.StreamUrl(URI.create("http://nas.local/films/bunny.mp4?ApiKey=tok-2"), "video/mp4");
+    private static final PlayableRef.StreamUrl AUDIO =
+            new PlayableRef.StreamUrl(URI.create("http://nas/a.mp3"), "audio/mpeg");
+    private static final PlayableRef.StreamUrl VIDEO =
+            new PlayableRef.StreamUrl(URI.create("http://nas/f.mp4"), "video/mp4");
     private static final PlayableRef.AppLink LINK =
             new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube");
     private static final PlayableRef.CastMessage JELLYFIN_MESSAGE = new PlayableRef.CastMessage(
@@ -214,6 +219,46 @@ class PlaybackPlannerTest {
                 .isInstanceOf(Route.Cast.class);
         assertThat(configured.routes(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)))
                 .extracting(RouteKeys::key).containsExactly("cast:CC1AD845", "render");
+    }
+
+    @Test
+    void aLocalAudioSinkGetsTheAudioStream() {
+        assertThat(planner.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK, Capability.VOLUME)))
+                .isInstanceOfSatisfying(Route.PlayLocally.class, local -> assertThat(local.url()).isEqualTo(AUDIO.url()));
+    }
+
+    @Test
+    void everyOtherRungComesFirst() {
+        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)))
+                .isInstanceOf(Route.Render.class);
+        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.LOCAL_AUDIO_SINK)))
+                .isInstanceOf(Route.Cast.class);
+        assertThat(planner.routes(item(AUDIO), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)))
+                .extracting(RouteKeys::key).containsExactly("render", "local-audio");
+    }
+
+    @Test
+    void explainsVideoOnABluetoothSpeaker() {
+        assertThat(planner.plan(item(VIDEO), EnumSet.of(Capability.LOCAL_AUDIO_SINK, Capability.VOLUME)))
+                .isInstanceOfSatisfying(Route.Unroutable.class,
+                        unroutable -> assertThat(unroutable.reason()).contains("a Bluetooth speaker plays audio streams only"));
+
+        PlaybackPlanner withoutLocalAudio = new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy()));
+        assertThat(withoutLocalAudio.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK)))
+                .isInstanceOfSatisfying(Route.Unroutable.class,
+                        unroutable -> assertThat(unroutable.reason()).contains("the stream was not accepted"));
+        assertThat(withoutLocalAudio.plan(item(AUDIO), EnumSet.of(Capability.REMOTE_KEYS)))
+                .isInstanceOfSatisfying(Route.Unroutable.class,
+                        unroutable -> assertThat(unroutable.reason()).contains("this device cannot play a direct stream"));
+    }
+
+    @Test
+    void theApplicationsPlannerEndsWithTheLocalAudioSink() {
+        PlaybackPlanner configured = new dev.andre.homecontrol.HomeControlConfiguration().playbackPlanner();
+
+        assertThat(configured.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK))).isInstanceOf(Route.PlayLocally.class);
+        assertThat(configured.plan(item(AUDIO), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)))
+                .isInstanceOf(Route.Render.class);
     }
 
     @Test

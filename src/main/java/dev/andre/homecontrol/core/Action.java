@@ -17,6 +17,11 @@ public sealed interface Action {
         return capabilities.contains(requires());
     }
 
+    /** Actions that drive a stream: renderers play it on the device, local sinks through the server. */
+    private static boolean playsStreams(Set<Capability> capabilities) {
+        return capabilities.contains(Capability.MEDIA_RENDERER) || capabilities.contains(Capability.LOCAL_AUDIO_SINK);
+    }
+
     record PressKey(RemoteKey key, KeyPress press) implements Action {
         public PressKey {
             press = press == null ? KeyPress.SHORT : press;
@@ -76,10 +81,10 @@ public sealed interface Action {
             return Capability.CAST_RECEIVER;
         }
 
-        /** Cast receivers and media renderers both stop playback (B kept requires() for its tests). */
+        /** Cast receivers, media renderers and local audio sinks all stop playback (B kept requires() for its tests). */
         @Override
         public boolean acceptedBy(Set<Capability> capabilities) {
-            return capabilities.contains(Capability.CAST_RECEIVER) || capabilities.contains(Capability.MEDIA_RENDERER);
+            return capabilities.contains(Capability.CAST_RECEIVER) || Action.playsStreams(capabilities);
         }
     }
 
@@ -97,6 +102,11 @@ public sealed interface Action {
             return Capability.MEDIA_RENDERER;
         }
 
+        @Override
+        public boolean acceptedBy(Set<Capability> capabilities) {
+            return Action.playsStreams(capabilities);
+        }
+
         /** The query can hold a Jellyfin ApiKey; never print it. */
         @Override
         public String toString() {
@@ -104,19 +114,29 @@ public sealed interface Action {
         }
     }
 
-    /** Pause what a media renderer plays. */
+    /** Pause what a media renderer, or the server's own player on a local audio sink, plays. */
     record Pause() implements Action {
         @Override
         public Capability requires() {
             return Capability.MEDIA_RENDERER;
         }
+
+        @Override
+        public boolean acceptedBy(Set<Capability> capabilities) {
+            return Action.playsStreams(capabilities);
+        }
     }
 
-    /** Resume what a media renderer paused. */
+    /** Resume what a media renderer, or the server's own player on a local audio sink, paused. */
     record Resume() implements Action {
         @Override
         public Capability requires() {
             return Capability.MEDIA_RENDERER;
+        }
+
+        @Override
+        public boolean acceptedBy(Set<Capability> capabilities) {
+            return Action.playsStreams(capabilities);
         }
     }
 

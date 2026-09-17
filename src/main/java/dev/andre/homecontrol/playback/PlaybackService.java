@@ -149,6 +149,7 @@ public class PlaybackService {
             case Route.Cast cast -> devices.execute(device.id(), cast.action());
             case Route.CastMessage message -> devices.execute(device.id(), message.action());
             case Route.Render render -> devices.execute(device.id(), render.action());
+            case Route.PlayLocally local -> devices.execute(device.id(), local.action());
             case Route.JellyfinSession session -> executors.stream()
                     .filter(executor -> executor.executes(session))
                     .findFirst()

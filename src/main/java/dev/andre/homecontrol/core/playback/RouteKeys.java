@@ -14,6 +14,7 @@ public final class RouteKeys {
             case Route.JellyfinSession ignored -> "jellyfin-session";
             case Route.YouTubeLounge ignored -> "youtube-lounge";
             case Route.Render ignored -> "render";
+            case Route.PlayLocally ignored -> "local-audio";
             case Route.Unroutable ignored -> "unroutable";
         };
     }

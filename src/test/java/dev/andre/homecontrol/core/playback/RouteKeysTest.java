@@ -30,6 +30,13 @@ class RouteKeysTest {
     }
 
     @Test
+    void localPlaybackHasAKey() {
+        Route.PlayLocally local = new Route.PlayLocally(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null);
+        assertThat(RouteKeys.key(local)).isEqualTo("local-audio");
+        assertThat(RouteKeys.optimistic(local)).isFalse();
+    }
+
+    @Test
     void onlyAppLinksAreOptimistic() {
         assertThat(RouteKeys.optimistic(new Route.OpenAppLink(URI.create("https://x"), "web"))).isTrue();
         assertThat(RouteKeys.optimistic(new Route.Cast("CC1AD845", Map.of()))).isFalse();

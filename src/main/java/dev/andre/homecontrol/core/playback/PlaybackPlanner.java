@@ -66,9 +66,13 @@ public class PlaybackPlanner {
                 case PlayableRef.CastLoad ignored -> reasons.add("this device is not a Cast receiver");
                 case PlayableRef.CastMessage ignored -> reasons.add("this device is not a Cast receiver");
                 case PlayableRef.YouTubeLounge ignored -> reasons.add("this device is not a Cast receiver");
-                case PlayableRef.StreamUrl ignored -> reasons.add(
-                        capabilities.contains(Capability.CAST_RECEIVER) || capabilities.contains(Capability.MEDIA_RENDERER)
-                                ? "the stream was not accepted" : "this device cannot play a direct stream");
+                case PlayableRef.StreamUrl stream -> reasons.add(
+                        capabilities.contains(Capability.LOCAL_AUDIO_SINK) && !LocalAudioSinkStrategy.playable(stream)
+                                && !capabilities.contains(Capability.CAST_RECEIVER) && !capabilities.contains(Capability.MEDIA_RENDERER)
+                                ? "a Bluetooth speaker plays audio streams only"
+                                : capabilities.contains(Capability.CAST_RECEIVER) || capabilities.contains(Capability.MEDIA_RENDERER)
+                                        || capabilities.contains(Capability.LOCAL_AUDIO_SINK)
+                                        ? "the stream was not accepted" : "this device cannot play a direct stream");
                 case PlayableRef.JellyfinItem ignored -> reasons.add("Jellyfin is switched off on this server");
                 case PlayableRef.JellyfinSession ignored -> reasons.add("the open Jellyfin app cannot be controlled");
             }

@@ -259,6 +259,29 @@ class DashboardPageTest {
     }
 
     @Test
+    void aBluetoothSpeakerGetsPlaybackControlsAndTheLinkForm() throws Exception {
+        Device speaker = new Device("bluetooth-aa-bb-cc-dd-ee-ff", "JBL Flip 5", DeviceKind.BLUETOOTH, "AA:BB:CC:DD:EE:FF",
+                Map.of("bluetooth", Map.of("address", "AA:BB:CC:DD:EE:FF")), Instant.now());
+        given(devices.devices()).willReturn(List.of(speaker));
+        given(devices.defaultDevice()).willReturn(Optional.of(speaker));
+        given(devices.device("bluetooth-aa-bb-cc-dd-ee-ff")).willReturn(Optional.of(speaker));
+        given(devices.state(any())).willReturn(DeviceState.initial());
+        given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.LOCAL_AUDIO_SINK, Capability.VOLUME));
+        given(rails.snapshots()).willReturn(List.of());
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/pause")))
+                .andExpect(content().string(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/resume")))
+                .andExpect(content().string(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/stop")))
+                .andExpect(content().string(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/volume")))
+                .andExpect(content().string(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/mute")))
+                .andExpect(content().string(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/play")))
+                .andExpect(content().string(containsString("This speaker plays through the server")))
+                .andExpect(content().string(not(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/key/"))));
+    }
+
+    @Test
     void theVolumeSliderIsScaledToTheDevicesOwnVolumeRange() throws Exception {
         // A Shield merged with its Cast entry: Android TV's own volume steps (max 15) are the
         // composed volumeMax, but the slider is always 0-100 (what SetVolume takes).

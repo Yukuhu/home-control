@@ -123,6 +123,27 @@ class ActionTest {
     }
 
     @Test
+    void localAudioSinksAcceptPlaybackActions() {
+        var sink = EnumSet.of(Capability.LOCAL_AUDIO_SINK);
+        assertThat(new Action.PlayMedia(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null).acceptedBy(sink)).isTrue();
+        assertThat(new Action.Pause().acceptedBy(sink)).isTrue();
+        assertThat(new Action.Resume().acceptedBy(sink)).isTrue();
+        assertThat(new Action.Stop().acceptedBy(sink)).isTrue();
+        assertThat(new Action.SetVolume(10).acceptedBy(sink)).isFalse();
+        assertThat(new Action.SetVolume(10).acceptedBy(EnumSet.of(Capability.LOCAL_AUDIO_SINK, VOLUME))).isTrue();
+        assertThat(new Action.PressKey(RemoteKey.HOME).acceptedBy(sink)).isFalse();
+
+        assertThat(new Action.PlayMedia(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null).requires()).isEqualTo(MEDIA_RENDERER);
+        assertThat(new Action.Pause().requires()).isEqualTo(MEDIA_RENDERER);
+        assertThat(new Action.Resume().requires()).isEqualTo(MEDIA_RENDERER);
+        assertThat(new Action.Stop().requires()).isEqualTo(CAST_RECEIVER);
+
+        // I's renderer and Cast assertions still hold.
+        assertThat(new Action.Stop().acceptedBy(EnumSet.of(MEDIA_RENDERER))).isTrue();
+        assertThat(new Action.Stop().acceptedBy(EnumSet.of(CAST_RECEIVER))).isTrue();
+    }
+
+    @Test
     void groupingRequiresAMediaRenderer() {
         assertThat(new Action.JoinGroup("RINCON_1").requires()).isEqualTo(MEDIA_RENDERER);
         assertThat(new Action.LeaveGroup().requires()).isEqualTo(MEDIA_RENDERER);
