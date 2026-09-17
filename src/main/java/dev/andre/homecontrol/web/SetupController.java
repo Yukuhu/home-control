@@ -1,26 +1,41 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.PromptPairing;
+import dev.andre.homecontrol.core.PromptPairingResult;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.adapters.androidtv.PairingService;
 import dev.andre.homecontrol.adapters.androidtv.PairingOutcome;
 import dev.andre.homecontrol.storage.StorageException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Controller
 public class SetupController {
 
     private final PairingService pairing;
     private final DeviceManager devices;
+    private final List<PromptPairing> promptPairings;
 
-    public SetupController(PairingService pairing, DeviceManager devices) {
+    /** {@code promptPairings}: one per enabled smart-TV module; empty when none is. */
+    public SetupController(PairingService pairing, DeviceManager devices, List<PromptPairing> promptPairings) {
         this.pairing = pairing;
         this.devices = devices;
+        this.promptPairings = List.copyOf(promptPairings);
     }
 
     @GetMapping("/setup")
@@ -69,11 +84,56 @@ public class SetupController {
         return "setup";
     }
 
+    /**
+     * Pairing by accepting a prompt on the TV. Blocks this request until the TV answers or the
+     * module's pairing timeout elapses; the page says so next to the form.
+     */
+    @PostMapping("/setup/prompt-pair")
+    public String promptPair(@RequestParam String adapter, @RequestParam String host,
+                             @RequestParam(required = false) String name, Model model) {
+        Optional<PromptPairing> chosen = promptPairings.stream()
+                .filter(candidate -> candidate.adapterId().equals(adapter)).findFirst();
+        if (chosen.isEmpty()) {
+            model.addAttribute("error", "Unknown device type " + adapter);
+            populateSetupModel(model, false);
+            return "setup";
+        }
+        switch (chosen.get().pair(host.trim(), name)) {
+            case PromptPairingResult.Paired paired -> {
+                return "redirect:" + UriComponentsBuilder.fromPath("/").queryParam("device", paired.device().id())
+                        .encode().build().toUriString();
+            }
+            case PromptPairingResult.Declined declined -> model.addAttribute("error", declined.reason());
+            case PromptPairingResult.Failed failed -> model.addAttribute("error", failed.reason());
+        }
+        populateSetupModel(model, false);
+        return "setup";
+    }
+
+    /** A hand-entered Wake-on-LAN MAC address; blank clears it so the TV's own report is learned again. */
+    @PostMapping("/setup/devices/{id}/mac")
+    public String wakeOnLanMac(@PathVariable String id, @RequestParam(required = false) String mac, Model model) {
+        if (devices.device(id).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No device with id " + id);
+        }
+        return refusable(model, () -> devices.setWakeOnLanMac(id, mac));
+    }
+
     private void populateSetupModel(Model model, boolean awaitingCode) {
         model.addAttribute("awaitingCode", awaitingCode);
         model.addAttribute("discovered", devices.pairable());
         model.addAttribute("addable", devices.addable());
-        model.addAttribute("paired", devices.devices());
+        List<Device> paired = devices.devices();
+        model.addAttribute("paired", paired);
+        model.addAttribute("promptPairings", promptPairings);
+        model.addAttribute("promptAdapterIds", promptPairings.stream()
+                .map(PromptPairing::adapterId).collect(Collectors.toSet()));
+        model.addAttribute("promptInstructions", promptPairings.stream()
+                .collect(Collectors.toMap(PromptPairing::adapterId, PromptPairing::instructions, (first, second) -> first)));
+        Map<String, String> wakeMacs = new LinkedHashMap<>();
+        paired.stream().filter(device -> devices.wakesOnLan(device.id()))
+                .forEach(device -> wakeMacs.put(device.id(), devices.wakeOnLanMac(device.id()).orElse("")));
+        model.addAttribute("wakeMacs", wakeMacs);
     }
 
     @PostMapping("/setup/forget")

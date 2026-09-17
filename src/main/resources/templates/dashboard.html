@@ -103,6 +103,11 @@
         </div>
     </th:block>
 
+    <section class="row inputs" th:if="${!#lists.isEmpty(inputs)}" aria-label="Inputs">
+        <button th:each="input : ${inputs}" th:text="${input.label()}"
+                th:attr="hx-post=@{/devices/{id}/input/{input}(id=${id},input=${input.id()})}">HDMI 1</button>
+    </section>
+
     <section class="cast" th:if="${castControls}">
         <h2>Cast</h2>
         <label class="volume">Volume

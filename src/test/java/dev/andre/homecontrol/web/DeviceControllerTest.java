@@ -264,6 +264,29 @@ class DeviceControllerTest {
     }
 
     @Test
+    void switchesTheInputOfTheAddressedDevice() throws Exception {
+        mockMvc.perform(post("/devices/shield/input/HDMI_2")).andExpect(status().isNoContent());
+
+        verify(devices).execute("shield", new Action.SelectInput("HDMI_2"));
+    }
+
+    @Test
+    void anInputOfAnUnknownDeviceIsNotFound() throws Exception {
+        willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
+
+        mockMvc.perform(post("/devices/ghost/input/HDMI_1")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void anInputOfAnOfflineTvIsAConflictAndOfADeviceWithoutInputsUnprocessable() throws Exception {
+        willThrow(new DeviceOfflineException("LG TV is not connected")).given(devices).execute(eq("lg"), any());
+        willThrow(new UnsupportedActionException("Android TV does not list its inputs")).given(devices).execute(eq("shield"), any());
+
+        mockMvc.perform(post("/devices/lg/input/HDMI_1")).andExpect(status().isConflict());
+        mockMvc.perform(post("/devices/shield/input/HDMI_1")).andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
     void anIllegalArgumentFromTheDeviceIsNotReportedAsABadVolume() throws Exception {
         willThrow(new IllegalArgumentException("programming error")).given(devices).execute(eq("shield"), any());
 

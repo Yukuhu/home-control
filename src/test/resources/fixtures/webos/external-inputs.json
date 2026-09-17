@@ -1,0 +1,4 @@
+{"returnValue":true,"devices":[
+ {"id":"HDMI_1","label":"HDMI 1","port":1,"appId":"com.webos.app.hdmi1","icon":"http://127.0.0.1:3000/resources/hdmi.png","modified":false,"autoav":false,"currentTVStatus":"","subList":[],"subCount":0,"connected":true,"favorite":false},
+ {"id":"HDMI_2","label":"PlayStation","port":2,"appId":"com.webos.app.hdmi2","icon":"http://127.0.0.1:3000/resources/hdmi.png","modified":true,"autoav":false,"currentTVStatus":"","subList":[],"subCount":0,"connected":false,"favorite":false}
+]}

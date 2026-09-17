@@ -29,6 +29,23 @@ home-control:
     listen-port: 1900
     search-interval-seconds: 60
     mx: 2
+  webos:
+    enabled: true
+    # SSAP over ws:// first, then wss:// (newer firmware) with the TV's self-signed certificate.
+    port: 3000
+    secure-port: 3001
+    connect-timeout-seconds: 3
+    request-timeout-seconds: 10
+    # How long the setup page waits for someone to accept the prompt on the TV.
+    pairing-timeout-seconds: 60
+    reconnect-initial-delay-seconds: 1
+    reconnect-max-delay-seconds: 30
+    # After a Wake-on-LAN packet, how long the TV gets before the first reconnect.
+    wake-grace-seconds: 3
+  wake-on-lan:
+    # Use the subnet broadcast (e.g. 192.168.1.255) if the host has several networks.
+    broadcast-address: 255.255.255.255
+    port: 9
   cast:
     enabled: true
     # A PING every 5 s; 15 s without any inbound frame means the receiver is gone.
