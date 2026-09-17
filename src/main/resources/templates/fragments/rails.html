@@ -21,9 +21,12 @@
         <span class="source" th:text="${rail.sourceName()}">Jellyfin</span>
         <th:block th:if="${failed and hasItems}">
             <span class="rail-stale" role="status">Couldn't refresh</span>
+            <!-- hx-swap="none": the response here is a snapshot from before the refresh finished
+                 (see the sibling button's comment below); the real update always comes through
+                 the version-guarded SSE `rail` watcher (rails.js), which cannot go stale like this. -->
             <button type="button" class="retry"
                     th:attr="hx-post=@{/rails/{s}/{r}/refresh(s=${rail.sourceId()},r=${rail.railId()})}"
-                    hx-target="closest section" hx-swap="outerHTML">Retry</button>
+                    hx-swap="none">Retry</button>
         </th:block>
     </header>
 
@@ -41,9 +44,16 @@
 
     <div class="rail-error" role="alert" th:if="${failed and !hasItems}">
         <p th:text="|Couldn't load ${rail.title()}: ${rail.error()}|">Couldn't load</p>
+        <!-- This POST's own response only ever carries the "still refreshing" snapshot taken the
+             instant the refresh started (RailCache.start marks it before the fetch that could
+             finish it even begins) — swapping it in unconditionally raced the SSE `rail` watcher:
+             on a fast source the fetch can finish, publish, and reach the browser as READY before
+             this response comes back, and the late FAILED swap then overwrote the correct READY
+             DOM. hx-swap="none" leaves rendering entirely to that version-guarded watcher, which
+             always re-reads the rail's current state and only ever moves forward. -->
         <button type="button" class="retry"
                 th:attr="hx-post=@{/rails/{s}/{r}/refresh(s=${rail.sourceId()},r=${rail.railId()})}"
-                hx-target="closest section" hx-swap="outerHTML">Retry</button>
+                hx-swap="none">Retry</button>
     </div>
 </section>
 

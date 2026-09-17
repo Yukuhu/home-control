@@ -107,3 +107,28 @@ main#content { max-width: none; padding: .5rem 0 5rem; }
 #search-results:not(:empty) { display: grid; gap: 1rem; margin: .75rem 0 1.25rem; }
 main#content:has(#search-results:not(:empty)) #rails { display: none; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:root { --safe-top: env(safe-area-inset-top, 0px); --safe-right: env(safe-area-inset-right, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px); }
+body { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+.strip { padding-top: calc(.75rem + var(--safe-top)); }
+.drawer { padding-bottom: calc(1rem + var(--safe-bottom)); }
+.sheet { padding-bottom: calc(1.5rem + var(--safe-bottom)); }
+#toast { bottom: calc(1rem + var(--safe-bottom)); }
+main#content { padding-bottom: calc(5rem + var(--safe-bottom)); }
+button, a { touch-action: manipulation; }
+.mode-switch { display: flex; gap: .5rem; margin: .5rem 0 1rem; }
+.mode-switch [aria-selected="true"] { border-color: var(--accent); }
+.touchpad { display: none; position: relative; height: min(55vh, 22rem); border-radius: 1rem;
+            background: #1b1e24; border: 1px solid #313640; touch-action: none; user-select: none;
+            -webkit-user-select: none; -webkit-touch-callout: none; margin-bottom: 1rem; }
+.touchpad .hint { position: absolute; bottom: .75rem; left: 0; right: 0; text-align: center; pointer-events: none; }
+.touchpad.active { border-color: var(--accent); }
+.touchpad[aria-disabled="true"] { opacity: .45; }
+.drawer[data-mode="touchpad"] .touchpad { display: block; }
+.drawer[data-mode="touchpad"] .remote-controls > :not(.essential) { display: none; }
+.remote-controls[aria-disabled="true"] button { opacity: .55; }
+@media (min-width: 48rem) and (orientation: landscape) {
+    .drawer[data-mode="touchpad"] .remote-body { display: grid; grid-template-columns: 3fr 2fr; gap: 1rem; align-items: start; }
+    .drawer[data-mode="touchpad"] .touchpad { height: 60vh; }
+}
+@media (forced-colors: active) { .touchpad { border: 2px solid CanvasText; } }

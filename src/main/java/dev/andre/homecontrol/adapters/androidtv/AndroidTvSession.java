@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
@@ -84,9 +85,13 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     }
 
     public void sendKey(RemoteKey key) {
+        sendKey(key, KeyPress.SHORT);
+    }
+
+    public void sendKey(RemoteKey key, KeyPress press) {
         RemoteConnection current = requireConnected();
         try {
-            current.sendKey(key);
+            current.sendKey(key, press);
         } catch (IOException e) {
             throw new DeviceOfflineException("The device dropped the connection while sending " + key);
         }
@@ -104,7 +109,7 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     @Override
     public void execute(Action action) {
         switch (action) {
-            case Action.PressKey press -> sendKey(press.key());
+            case Action.PressKey press -> sendKey(press.key(), press.press());
             case Action.OpenAppLink open -> openAppLink(open.uri());
             case Action.SetVolume ignored -> throw new UnsupportedActionException(
                     "Android TV Remote v2 has no absolute volume; use the volume keys");

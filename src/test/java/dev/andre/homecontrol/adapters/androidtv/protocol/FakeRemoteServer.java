@@ -2,6 +2,7 @@ package dev.andre.homecontrol.adapters.androidtv.protocol;
 
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteAppInfo;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteConfigure;
+import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteDirection;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteImeKeyInject;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteMessage;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemotePingRequest;
@@ -15,9 +16,13 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 
 import java.security.SecureRandom;
+import java.util.AbstractMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +39,7 @@ public class FakeRemoteServer implements AutoCloseable {
     private final CountDownLatch handshakeComplete = new CountDownLatch(1);
 
     private final BlockingQueue<Integer> keyPresses = new LinkedBlockingQueue<>();
+    private final List<Map.Entry<Integer, RemoteDirection>> keyPressesWithDirection = new CopyOnWriteArrayList<>();
     private final BlockingQueue<Integer> pongs = new LinkedBlockingQueue<>();
     private final BlockingQueue<String> appLinks = new LinkedBlockingQueue<>();
 
@@ -165,6 +171,11 @@ public class FakeRemoteServer implements AutoCloseable {
         return keyPresses.poll(5, TimeUnit.SECONDS);
     }
 
+    /** Every key press received so far, in order, with the direction the client sent it as. */
+    public List<Map.Entry<Integer, RemoteDirection>> receivedKeyPresses() {
+        return List.copyOf(keyPressesWithDirection);
+    }
+
     public Integer nextPong() throws InterruptedException {
         return pongs.poll(5, TimeUnit.SECONDS);
     }
@@ -220,10 +231,9 @@ public class FakeRemoteServer implements AutoCloseable {
                 clientActiveFeatures.set(message.getRemoteSetActive().getActive());
                 handshakeComplete.countDown();
             } else if (message.hasRemoteKeyInject()) {
-                if (message.getRemoteKeyInject().getDirectionValue() != 3) {
-                    throw new IllegalStateException("expected SHORT direction");
-                }
                 keyPresses.add(message.getRemoteKeyInject().getKeyCodeValue());
+                keyPressesWithDirection.add(new AbstractMap.SimpleImmutableEntry<>(
+                        message.getRemoteKeyInject().getKeyCodeValue(), message.getRemoteKeyInject().getDirection()));
             } else if (message.hasRemoteAppLinkLaunchRequest()) {
                 appLinks.add(message.getRemoteAppLinkLaunchRequest().getAppLink());
             } else if (message.hasRemotePingResponse()) {

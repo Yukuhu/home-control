@@ -2,7 +2,15 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#14161a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Home">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <title>Home Control</title>
     <link rel="stylesheet" th:href="@{/app.css}">
     <script th:src="@{/vendor/htmx.min.js}" defer></script>
@@ -42,7 +50,7 @@
 </main>
 
 <aside id="remote-drawer" class="drawer" hx-swap="none" th:with="id=${selected.id()}"
-       th:attr="hidden=${!remoteOpen} ? 'hidden'" aria-label="Remote">
+       th:attr="hidden=${!remoteOpen} ? 'hidden'" data-mode="buttons" aria-label="Remote">
     <header class="drawer-header">
         <h2 th:text="${selected.name()}">Shield</h2>
         <button type="button" class="drawer-close" aria-controls="remote-drawer" aria-label="Close the remote">✕</button>
@@ -52,34 +60,47 @@
     </p>
 
     <th:block th:if="${remoteKeys}">
-        <section class="dpad">
-            <button th:attr="hx-post=@{/devices/{id}/key/DPAD_UP(id=${id})}" class="up" aria-label="Up">▲</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/DPAD_LEFT(id=${id})}" class="left" aria-label="Left">◀</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/DPAD_CENTER(id=${id})}" class="ok">OK</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/DPAD_RIGHT(id=${id})}" class="right" aria-label="Right">▶</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/DPAD_DOWN(id=${id})}" class="down" aria-label="Down">▼</button>
-        </section>
+        <div class="mode-switch" role="tablist" aria-label="Remote layout" data-mode-switch>
+            <button type="button" role="tab" data-mode="buttons" aria-selected="true">Buttons</button>
+            <button type="button" role="tab" data-mode="touchpad" aria-selected="false">Touchpad</button>
+        </div>
+        <div class="remote-body">
+            <div id="touchpad" class="touchpad" tabindex="0" role="application" th:attr="data-device=${id}"
+                 aria-label="Touchpad: tap for OK, swipe to move, hold for a long press"
+                 aria-describedby="touchpad-help">
+                <span id="touchpad-help" class="hint">Tap = OK · Swipe = move (longer swipe, more steps) · Hold = long press</span>
+            </div>
+            <div class="remote-controls" data-remote th:attr="data-device=${id}">
+                <section class="dpad">
+                    <button th:attr="hx-post=@{/devices/{id}/key/DPAD_UP(id=${id})}" class="up" aria-label="Up">▲</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/DPAD_LEFT(id=${id})}" class="left" aria-label="Left">◀</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/DPAD_CENTER(id=${id})}" class="ok">OK</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/DPAD_RIGHT(id=${id})}" class="right" aria-label="Right">▶</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/DPAD_DOWN(id=${id})}" class="down" aria-label="Down">▼</button>
+                </section>
 
-        <section class="row">
-            <button th:attr="hx-post=@{/devices/{id}/key/BACK(id=${id})}">Back</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/HOME(id=${id})}">Home</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/MENU(id=${id})}">Menu</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/POWER(id=${id})}">Power</button>
-        </section>
+                <section class="row essential">
+                    <button th:attr="hx-post=@{/devices/{id}/key/BACK(id=${id})}">Back</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/HOME(id=${id})}">Home</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/MENU(id=${id})}">Menu</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/POWER(id=${id})}">Power</button>
+                </section>
 
-        <section class="row">
-            <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_PREVIOUS(id=${id})}" aria-label="Previous">⏮</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/REWIND(id=${id})}" aria-label="Rewind">⏪</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/PLAY_PAUSE(id=${id})}" aria-label="Play or pause">⏯</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/FAST_FORWARD(id=${id})}" aria-label="Fast forward">⏩</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_NEXT(id=${id})}" aria-label="Next">⏭</button>
-        </section>
+                <section class="row">
+                    <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_PREVIOUS(id=${id})}" aria-label="Previous">⏮</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/REWIND(id=${id})}" aria-label="Rewind">⏪</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/PLAY_PAUSE(id=${id})}" aria-label="Play or pause">⏯</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/FAST_FORWARD(id=${id})}" aria-label="Fast forward">⏩</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_NEXT(id=${id})}" aria-label="Next">⏭</button>
+                </section>
 
-        <section class="row">
-            <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_DOWN(id=${id})}">Vol −</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_MUTE(id=${id})}">Mute</button>
-            <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_UP(id=${id})}">Vol +</button>
-        </section>
+                <section class="row essential">
+                    <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_DOWN(id=${id})}">Vol −</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_MUTE(id=${id})}">Mute</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_UP(id=${id})}">Vol +</button>
+                </section>
+            </div>
+        </div>
     </th:block>
 
     <section class="cast" th:if="${castControls}">

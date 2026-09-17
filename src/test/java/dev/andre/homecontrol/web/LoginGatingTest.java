@@ -231,6 +231,35 @@ class LoginGatingTest {
     }
 
     @Test
+    void manifestAndIconsStayOpenWhenALoginIsRequired() throws Exception {
+        storeAFirstSecret();
+
+        mockMvc.perform(get("/manifest.webmanifest")).andExpect(status().isOk());
+        mockMvc.perform(get("/icons/icon-192.png")).andExpect(status().isOk());
+        mockMvc.perform(get("/icons/icon.svg")).andExpect(status().isOk());
+        mockMvc.perform(get("/offline.html")).andExpect(status().isOk());
+
+        mockMvc.perform(get("/sw.js")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/js/touchpad.js")).andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * The open list is exact raw-URI matches, never a prefix — {@code OPEN_PREFIXES} was the
+     * bug C1 already fixed once (a {@code ;param}/percent-encoding segment can make a container
+     * normalise a traversal back onto an allowed prefix while the raw URI still starts with it).
+     * Re-adding a prefix for the PWA assets would reopen exactly that hole.
+     */
+    @Test
+    void iconLookalikePathsStayGatedEvenThoughIconsAreOpen() throws Exception {
+        storeAFirstSecret();
+
+        mockMvc.perform(get(URI.create("/icons/..;/setup"))).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(URI.create("/icons/icon-192.png;x"))).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(URI.create("/icons/icon.svg;x"))).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(URI.create("/icons/other.png"))).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void aRejectedNewPasswordIsNotAGuess() throws Exception {
         storeAFirstSecret();
         MockHttpSession session = loggedIn();

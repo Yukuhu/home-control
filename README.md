@@ -84,6 +84,26 @@ connection context. Remote v2 does not expose a reliable way to derive a launcha
 from that package — see "Opening links on a device" below for how to start an app
 from the remote instead.
 
+## On your phone
+
+The dashboard at `/` shows rails of content from every connected source; tap a tile to see
+how it will play and on which device before committing. The remote for the currently selected
+device opens from the chevron next to it in the device strip.
+
+The remote drawer has a **Touchpad** mode alongside the usual buttons: tap the pad for OK,
+swipe to move (a longer swipe sends more steps, up to four at once), and hold for a long press
+where the device supports one. The choice between Buttons and Touchpad is remembered per
+browser.
+
+To install Home Control on a phone or tablet's home screen, open **Setup** and use the
+**Install on this phone or tablet** section — the exact wording depends on the browser. Over
+plain HTTP the installed icon opens the dashboard like a bookmark; offline support and the
+installed app's own icon need HTTPS, typically through a reverse proxy.
+
+Keyboard shortcuts on a desktop browser are unchanged: arrow keys and Enter drive the D-pad,
+Backspace is Back, Space is Play/Pause, `h` is Home and `m` toggles mute, aimed at whichever
+device is selected.
+
 ## Opening links on a device
 
 Paste an `https://` link into the **Open a link on this device** box and press Play. The

@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.androidtv.protocol;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteAppLinkLaunchRequest;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteConfigure;
@@ -96,11 +97,23 @@ public class RemoteConnection implements AutoCloseable {
     }
 
     public void sendKey(RemoteKey key) throws IOException {
+        sendKey(key, KeyPress.SHORT);
+    }
+
+    public void sendKey(RemoteKey key, KeyPress press) throws IOException {
         stream.write(RemoteMessage.newBuilder()
                 .setRemoteKeyInject(RemoteKeyInject.newBuilder()
                         .setKeyCode(RemoteKeyCode.forNumber(key.code()))
-                        .setDirection(RemoteDirection.SHORT))
+                        .setDirection(direction(press)))
                 .build());
+    }
+
+    private static RemoteDirection direction(KeyPress press) {
+        return switch (press) {
+            case SHORT -> RemoteDirection.SHORT;
+            case START_LONG -> RemoteDirection.START_LONG;
+            case END_LONG -> RemoteDirection.END_LONG;
+        };
     }
 
     /**

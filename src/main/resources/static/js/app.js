@@ -3,12 +3,16 @@ import { sendKey } from "./remote-transport.js";
 import { watchRails } from "./rails.js";
 import { toast } from "./toast.js";
 import { initPlaySheet } from "./play-sheet.js";
+import { initTouchpad } from "./touchpad.js";
+import { initPwa } from "./pwa.js";
 
 const selectedDevice = () => document.body.dataset.device;
 
 subscribe(applyState);
 watchRails();
 initPlaySheet();
+initTouchpad();
+initPwa();
 
 function setDrawer(open) {
     const drawer = document.getElementById("remote-drawer");
@@ -36,7 +40,7 @@ const KEYS = {
 };
 
 document.addEventListener("keydown", (event) => {
-    if (event.target.closest("input, textarea, select, dialog")) return;
+    if (event.target.closest("input, textarea, select, dialog, #touchpad")) return;
     const key = KEYS[event.key];
     if (!key) return;
     event.preventDefault();

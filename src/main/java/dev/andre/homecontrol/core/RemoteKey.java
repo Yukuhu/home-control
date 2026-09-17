@@ -34,4 +34,12 @@ public enum RemoteKey {
     public int code() {
         return code;
     }
+
+    /** Whether this key accepts a start/end long press instead of just a short tap. */
+    public boolean supportsLongPress() {
+        return switch (this) {
+            case DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT, DPAD_CENTER, BACK, HOME -> true;
+            default -> false;
+        };
+    }
 }

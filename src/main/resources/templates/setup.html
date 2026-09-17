@@ -2,7 +2,15 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#14161a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Home">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <title>Home Control · Setup</title>
     <link rel="stylesheet" th:href="@{/app.css}">
 </head>
@@ -127,6 +135,16 @@
             <button type="submit">Log out</button>
         </form>
     </section>
+
+    <section id="install" class="setup">
+        <h2>Install on this phone or tablet</h2>
+        <p id="install-done" class="hint" hidden>Home Control is already running as an installed app.</p>
+        <button type="button" id="install-button" hidden>Install Home Control</button>
+        <p id="install-ios" class="hint" hidden>In Safari, tap the Share button, then <strong>Add to Home Screen</strong>.</p>
+        <p id="install-other" class="hint" hidden>Open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>
+        <p id="install-http-note" class="hint" hidden>Over plain HTTP the home-screen icon opens the dashboard like a bookmark; offline support needs HTTPS through your reverse proxy.</p>
+    </section>
+    <script type="module">import { initPwa } from "/js/pwa.js"; initPwa();</script>
 </main>
 </body>
 </html>

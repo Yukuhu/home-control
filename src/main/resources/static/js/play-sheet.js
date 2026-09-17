@@ -102,6 +102,11 @@ async function attempt(deviceId, skip) {
         if (data.route.optimistic) watchAppLink(deviceId, data.deviceName);
         return;
     }
+    // The sheet is a modal <dialog>: while it stays open, everything outside it — including this
+    // toast and, worse, its own "Try …" retry button — sits behind the dialog's top layer and
+    // is inert (unclickable) in every browser. Close it before reporting any outcome, exactly
+    // like the success path above, so the retry toast is actually usable.
+    sheet().close();
     play.disabled = false;
     if (!data.route) {
         toast(data.message || "Cannot play this");

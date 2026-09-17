@@ -53,4 +53,20 @@ class StaticAssetsTest {
                 .andExpect(content().string(containsString("export function toast")));
         mockMvc.perform(get("/app.js")).andExpect(status().isNotFound());
     }
+
+    @Test
+    void servesTheTouchpadAndPwaModulesAndTheOfflinePage() throws Exception {
+        mockMvc.perform(get("/js/touchpad-gestures.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("export const TAP_SLOP_PX = 12")))
+                .andExpect(content().string(containsString("export const SWIPE_THRESHOLD_PX = 24")))
+                .andExpect(content().string(containsString("export const STEP_PX = 56")))
+                .andExpect(content().string(containsString("export const MAX_STEPS = 4")))
+                .andExpect(content().string(containsString("export const HOLD_MS = 450")));
+        mockMvc.perform(get("/js/touchpad.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("homecontrol.remote.mode.v1")));
+        mockMvc.perform(get("/js/pwa.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("beforeinstallprompt")))
+                .andExpect(content().string(containsString("location.protocol === \"https:\"")));
+        mockMvc.perform(get("/offline.html")).andExpect(status().isOk());
+    }
 }
