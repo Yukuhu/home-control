@@ -32,4 +32,9 @@ public class JellyfinConfiguration {
                                                         JellyfinProperties properties) {
         return new JellyfinContentSource(client, setup, properties, Clock.systemUTC());
     }
+
+    @Bean
+    public JellyfinSessions jellyfinSessions(JellyfinClient client, JellyfinSetupService setup) {
+        return new JellyfinSessions(client, setup);
+    }
 }
