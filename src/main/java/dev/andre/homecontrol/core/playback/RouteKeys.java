@@ -13,6 +13,7 @@ public final class RouteKeys {
             case Route.CastMessage message -> "cast-message:" + message.receiverAppId();
             case Route.JellyfinSession ignored -> "jellyfin-session";
             case Route.YouTubeLounge ignored -> "youtube-lounge";
+            case Route.Render ignored -> "render";
             case Route.Unroutable ignored -> "unroutable";
         };
     }

@@ -78,6 +78,10 @@ public final class RendererCommands {
         }
     }
 
+    public PositionInfo positionInfo(ServiceEndpoint avTransport) throws IOException, SoapFault {
+        return PositionInfo.from(soap.call(avTransport.controlUrl(), UpnpActions.getPositionInfo(avTransport.serviceType())));
+    }
+
     public ProtocolInfo sink(ServiceEndpoint connectionManager) throws IOException, SoapFault {
         return ProtocolInfo.parseSink(soap.call(connectionManager.controlUrl(),
                 UpnpActions.getProtocolInfo(connectionManager.serviceType())).getOrDefault("Sink", ""));

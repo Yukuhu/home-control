@@ -16,7 +16,7 @@ class PlaybackPlannerTest {
 
     private final PlaybackPlanner planner = new PlaybackPlanner(
             List.of(new JellyfinSessionStrategy(), new AppLinkStrategy(), new CastMessageStrategy(),
-                    new CastLoadStrategy(), new CastStreamStrategy()));
+                    new CastLoadStrategy(), new CastStreamStrategy(), new MediaRendererStrategy()));
 
     private static final PlayableRef.JellyfinSession OPEN_APP =
             new PlayableRef.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV");
@@ -177,6 +177,43 @@ class PlaybackPlannerTest {
                 .isInstanceOf(Route.CastMessage.class);
         assertThat(configured.plan(item(LINK, OPEN_APP), EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK)))
                 .isInstanceOf(Route.JellyfinSession.class);
+    }
+
+    @Test
+    void aMediaRendererGetsTheStream() {
+        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME)))
+                .isInstanceOfSatisfying(Route.Render.class, render -> assertThat(render.url()).isEqualTo(STREAM.url()));
+    }
+
+    @Test
+    void castComesBeforeTheMediaRenderer() {
+        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)))
+                .isInstanceOfSatisfying(Route.Cast.class, cast -> assertThat(cast.receiverAppId()).isEqualTo("CC1AD845"));
+        assertThat(planner.plan(item(STREAM, LINK), EnumSet.of(Capability.APP_LINK, Capability.MEDIA_RENDERER)))
+                .isInstanceOf(Route.OpenAppLink.class);
+    }
+
+    @Test
+    void explainsThatAStreamWasNotAcceptedByARenderer() {
+        PlaybackPlanner withoutRenderers = new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy()));
+
+        assertThat(withoutRenderers.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER)))
+                .isInstanceOfSatisfying(Route.Unroutable.class,
+                        unroutable -> assertThat(unroutable.reason()).contains("the stream was not accepted"));
+        assertThat(withoutRenderers.plan(item(STREAM), EnumSet.of(Capability.REMOTE_KEYS)))
+                .isInstanceOfSatisfying(Route.Unroutable.class,
+                        unroutable -> assertThat(unroutable.reason()).contains("this device cannot play a direct stream"));
+    }
+
+    @Test
+    void theApplicationsPlannerEndsWithTheMediaRenderer() {
+        PlaybackPlanner configured = new dev.andre.homecontrol.HomeControlConfiguration().playbackPlanner();
+
+        assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER))).isInstanceOf(Route.Render.class);
+        assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)))
+                .isInstanceOf(Route.Cast.class);
+        assertThat(configured.routes(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)))
+                .extracting(RouteKeys::key).containsExactly("cast:CC1AD845", "render");
     }
 
     @Test

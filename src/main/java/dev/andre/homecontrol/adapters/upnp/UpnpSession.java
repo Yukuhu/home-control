@@ -1,6 +1,9 @@
 package dev.andre.homecontrol.adapters.upnp;
 
 import dev.andre.homecontrol.adapters.upnp.protocol.DidlLite;
+import dev.andre.homecontrol.adapters.upnp.protocol.NowPlayings;
+import dev.andre.homecontrol.adapters.upnp.protocol.PlayedItem;
+import dev.andre.homecontrol.adapters.upnp.protocol.PositionInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ReconnectingPoller;
 import dev.andre.homecontrol.adapters.upnp.protocol.RendererCommands;
@@ -17,6 +20,7 @@ import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.discovery.ssdp.DeviceDescription;
 import dev.andre.homecontrol.discovery.ssdp.DeviceDescriptions;
@@ -53,6 +57,7 @@ public class UpnpSession implements DeviceHandle {
 
     private volatile Endpoints endpoints;
     private volatile TransportInfo transport = TransportInfo.NONE;
+    private volatile PlayedItem lastPlayed;
     private volatile DeviceState state = DeviceState.initial();
 
     public UpnpSession(Device device, UpnpProperties properties, HttpClient http,
@@ -97,7 +102,10 @@ public class UpnpSession implements DeviceHandle {
         String av = current.avTransport().serviceType();
         try {
             switch (action) {
-                case Action.PlayMedia play -> commands.playUri(current.avTransport(), current.sink(), play, DidlLite.DLNA_STREAMING);
+                case Action.PlayMedia play -> {
+                    commands.playUri(current.avTransport(), current.sink(), play, DidlLite.DLNA_STREAMING);
+                    lastPlayed = new PlayedItem(play.url().toString(), play.title());
+                }
                 case Action.Pause ignored -> commands.transport(current.avTransport(), UpnpActions.pause(av), "pause");
                 case Action.Resume ignored -> commands.transport(current.avTransport(), UpnpActions.play(av), "resume playback");
                 case Action.Stop ignored -> commands.transport(current.avTransport(), UpnpActions.stop(av), "stop playback");
@@ -135,7 +143,8 @@ public class UpnpSession implements DeviceHandle {
     private Endpoints resolve() throws IOException, InterruptedException {
         Optional<URI> announced = Optional.ofNullable(settings.udn()).flatMap(locator);
         URI location = announced.orElse(settings.location());
-        // The locator only hands out locations already checked against their announcing address.
+        // The locator only hands out locations already checked against their announcing address, so for
+        // those isSafeToFetch(location, location.getHost()) re-validates only the URI's shape (http, IP literal, port).
         String expectedHost = announced.isPresent() ? location.getHost() : device.host();
         if (location == null || !DeviceFetch.isSafeToFetch(location, expectedHost)) {
             throw new IOException(device.id() + " has no description address on its own host");
@@ -199,7 +208,17 @@ public class UpnpSession implements DeviceHandle {
     private void readState(Endpoints current) throws IOException, SoapFault {
         TransportInfo info = commands.transportInfo(current.avTransport());
         transport = info;
-        DeviceState next = state.withStatus(DeviceStatus.CONNECTED).withPower(true);
+        NowPlaying nowPlaying = null;
+        if (info.active()) {
+            PositionInfo position;
+            try {
+                position = commands.positionInfo(current.avTransport());
+            } catch (SoapFault fault) {
+                position = new PositionInfo("", "", null, null);
+            }
+            nowPlaying = NowPlayings.of(info, position, lastPlayed);
+        }
+        DeviceState next = state.withStatus(DeviceStatus.CONNECTED).withPower(true).withNowPlaying(nowPlaying);
         if (current.renderingControl() != null) {
             try {
                 VolumeReading volume = commands.volume(current.renderingControl(), current.volumeMax());

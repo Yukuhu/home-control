@@ -7,6 +7,8 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.NowPlaying;
+import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import org.junit.jupiter.api.AfterEach;
@@ -15,6 +17,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -202,6 +206,59 @@ class UpnpSessionTest {
         assertThat(redirecting.requestedPaths()).isNotEmpty();
         assertThat(victim.calls()).isEmpty();
         assertThat(victim.requestedPaths()).isEmpty();
+    }
+
+    @Test
+    void reportsWhatIsPlaying() {
+        startConnected();
+        fake.setPosition("0:00:42", "0:03:07");
+
+        session.execute(new Action.PlayMedia(URI.create("http://127.0.0.1:9/music/song.flac"), "audio/flac", "Bunny Song", "The Rabbits"));
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().nowPlaying())
+                .isEqualTo(new NowPlaying("Bunny Song", PlaybackState.PLAYING, 42.0, 187.0)));
+
+        session.execute(new Action.Pause());
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().nowPlaying().state()).isEqualTo(PlaybackState.PAUSED));
+
+        session.execute(new Action.Stop());
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().nowPlaying()).isNull());
+    }
+
+    @Test
+    void usesTheTitleItSentWhenTheRendererForgetsMetadata() {
+        startConnected();
+        fake.echoMetadata(false);
+
+        session.execute(new Action.PlayMedia(URI.create("http://127.0.0.1:9/music/song.flac"), "audio/flac", "Bunny Song", "The Rabbits"));
+
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().nowPlaying()).isNotNull()
+                .extracting(NowPlaying::title).isEqualTo("Bunny Song"));
+    }
+
+    @Test
+    void showsPlaybackStartedByAnotherController() throws IOException {
+        startConnected();
+
+        fake.playElsewhere("http://192.168.1.20:8096/Audio/c0ffee00c0ffee00c0ffee00c0ffee02/stream.flac?static=true&ApiKey=t",
+                Files.readString(Path.of("src/test/resources/fixtures/upnp/position-metadata.xml")));
+
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().nowPlaying()).isNotNull()
+                .extracting(NowPlaying::title).isEqualTo("Carrot Waltz"));
+        assertThat(states).allSatisfy(state -> assertThat(state.toString()).doesNotContain("ApiKey"));
+    }
+
+    @Test
+    void pollsFasterWhilePlaying() throws IOException {
+        session = track(new UpnpSession(fake.device("kitchen"), new UpnpProperties(true, 1, 30, 1, 1, 1, 2),
+                SoapClient.httpClient(Duration.ofSeconds(1)), udn -> Optional.empty(), states::add, () -> { }));
+        session.start();
+        await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
+
+        fake.playElsewhere("http://127.0.0.1:9/elsewhere.flac", "");
+        session.execute(new Action.Pause()); // forces an immediate poll, which sees an active transport
+        int before = fake.calls("GetPositionInfo").size();
+
+        await().atMost(Duration.ofSeconds(3)).until(() -> fake.calls("GetPositionInfo").size() >= before + 2);
     }
 
     @Test

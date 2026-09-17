@@ -35,4 +35,16 @@ class DidlLiteTest {
         assertThat(DidlLite.item(URI.create("http://h/a.mp3"), "audio/mpeg", " ", null, "*"))
                 .contains("<dc:title>Home Control</dc:title>");
     }
+
+    @Test
+    void readsTheTitleFromMetadata() throws IOException {
+        assertThat(DidlLite.title(Files.readString(Path.of("src/test/resources/fixtures/upnp/position-metadata.xml"))))
+                .contains("Carrot Waltz");
+        assertThat(DidlLite.title(Files.readString(Path.of("src/test/resources/fixtures/upnp/didl-track.xml")))).contains("Bunny Song");
+        assertThat(DidlLite.title("NOT_IMPLEMENTED")).isEmpty();
+        assertThat(DidlLite.title("")).isEmpty();
+        assertThat(DidlLite.title(null)).isEmpty();
+        assertThat(DidlLite.title("<DIDL-Lite")).isEmpty();
+        assertThat(DidlLite.title("<!DOCTYPE x><x/>")).isEmpty();
+    }
 }

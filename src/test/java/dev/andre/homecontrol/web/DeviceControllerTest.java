@@ -188,6 +188,15 @@ class DeviceControllerTest {
     }
 
     @Test
+    void describesARenderRoute() throws Exception {
+        given(playback.play(any(), eq("shield"))).willReturn(new Route.Render(URI.create("http://nas/a.flac"), "audio/flac", "A", null));
+
+        mockMvc.perform(post("/devices/shield/play").param("uri", "http://nas/a.flac"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Stream directly to this device (DLNA/UPnP)"));
+    }
+
+    @Test
     void rejectsALinkThatIsNotHttp() throws Exception {
         mockMvc.perform(post("/devices/shield/play").param("uri", "ftp://nope"))
                 .andExpect(status().isBadRequest())

@@ -53,7 +53,8 @@ class JellyfinFixtureContractTest {
 
     /** {@code fixture:field} — field is the array property to map, empty for a root array. */
     @ParameterizedTest
-    @ValueSource(strings = {"resume.json:Items", "next-up.json:Items", "latest.json:", "search.json:Items"})
+    @ValueSource(strings = {"resume.json:Items", "next-up.json:Items", "latest.json:", "search.json:Items",
+            "music-recent.json:Items", "music-latest.json:"})
     void railAndSearchFixturesProduceWellFormedItems(String spec) {
         int colon = spec.indexOf(':');
         String fixtureName = spec.substring(0, colon);
@@ -96,7 +97,8 @@ class JellyfinFixtureContractTest {
     void noMappedItemCarriesACredential() {
         String injectedAccessToken = "leaked-access-token-c0ffee00";
         String injectedApiKey = "leaked-api-key-babe1234";
-        List<String> fixtures = List.of("resume.json:Items", "next-up.json:Items", "latest.json:", "search.json:Items");
+        List<String> fixtures = List.of("resume.json:Items", "next-up.json:Items", "latest.json:", "search.json:Items",
+                "music-recent.json:Items", "music-latest.json:");
         for (String spec : fixtures) {
             int colon = spec.indexOf(':');
             JsonNode root = fixture(spec.substring(0, colon));
@@ -116,6 +118,19 @@ class JellyfinFixtureContractTest {
                         .doesNotContain("ApiKey");
             }
         }
+    }
+
+    @Test
+    void theTrackFixtureMapsWithoutACredential() {
+        ObjectNode track = (ObjectNode) fixture("item-track.json");
+        track.put("AccessToken", "leaked-access-token-c0ffee00");
+        track.put("ApiKey", "leaked-api-key-babe1234");
+
+        ContentItem item = JellyfinItemMapper.toItem(track).orElseThrow();
+
+        assertThat(item.title()).isEqualTo("Bunny Song");
+        assertThat(item.toString()).doesNotContain("leaked-access-token-c0ffee00").doesNotContain("leaked-api-key-babe1234")
+                .doesNotContain("ApiKey");
     }
 
     @Test

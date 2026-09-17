@@ -9,6 +9,7 @@ import dev.andre.homecontrol.core.playback.CastLoadStrategy;
 import dev.andre.homecontrol.core.playback.CastMessageStrategy;
 import dev.andre.homecontrol.core.playback.CastStreamStrategy;
 import dev.andre.homecontrol.core.playback.JellyfinSessionStrategy;
+import dev.andre.homecontrol.core.playback.MediaRendererStrategy;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.YouTubeLoungeStrategy;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
@@ -37,10 +38,10 @@ public class HomeControlConfiguration {
     public PlaybackPlanner playbackPlanner() {
         // Preference order of spec §5.3: an open Jellyfin app, an app link, Cast (a video through the
         // receiver's best-effort remote pairing, custom-message receivers, then LOADs, then bare streams
-        // on the Default Media Receiver). Sub-project I appends media renderers.
+        // on the Default Media Receiver), then media renderers (DLNA/UPnP/Sonos).
         return new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), new AppLinkStrategy(),
                 new YouTubeLoungeStrategy(), new CastMessageStrategy(), new CastLoadStrategy(),
-                new CastStreamStrategy()));
+                new CastStreamStrategy(), new MediaRendererStrategy()));
     }
 
     /** The one mDNS browser every adapter's discovery shares (spec §7). */

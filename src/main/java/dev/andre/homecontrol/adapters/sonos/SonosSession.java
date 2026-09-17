@@ -4,6 +4,9 @@ import dev.andre.homecontrol.adapters.sonos.protocol.SonosActions;
 import dev.andre.homecontrol.adapters.sonos.protocol.SonosEndpoints;
 import dev.andre.homecontrol.adapters.sonos.protocol.SonosUris;
 import dev.andre.homecontrol.adapters.sonos.protocol.ZoneGroupState;
+import dev.andre.homecontrol.adapters.upnp.protocol.NowPlayings;
+import dev.andre.homecontrol.adapters.upnp.protocol.PlayedItem;
+import dev.andre.homecontrol.adapters.upnp.protocol.PositionInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ReconnectingPoller;
 import dev.andre.homecontrol.adapters.upnp.protocol.RendererCommands;
@@ -22,6 +25,7 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.GroupListing;
 import dev.andre.homecontrol.core.GroupMember;
+import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.SpeakerGroup;
 import dev.andre.homecontrol.core.SpeakerTopology;
 import dev.andre.homecontrol.core.UnsupportedActionException;
@@ -64,6 +68,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
     private volatile Instant topologyReadAt = Instant.EPOCH;
     private volatile ProtocolInfo sink = ProtocolInfo.UNKNOWN;
     private volatile TransportInfo transport = TransportInfo.NONE;
+    private volatile PlayedItem lastPlayed;
     private volatile DeviceState state = DeviceState.initial();
     /** True from a completed connect until a disconnect or close; commands and topology need it. */
     private volatile boolean live;
@@ -129,9 +134,12 @@ public class SonosSession implements DeviceHandle, GroupListing {
         }
         try {
             switch (action) {
-                case Action.PlayMedia play -> commands.playUri(coordinatorAvTransport(), sink,
-                        new Action.PlayMedia(SonosUris.forPlayback(play.url(), play.mimeType()), play.mimeType(), play.title(), play.subtitle()),
-                        "*");
+                case Action.PlayMedia play -> {
+                    Action.PlayMedia forSonos = new Action.PlayMedia(SonosUris.forPlayback(play.url(), play.mimeType()),
+                            play.mimeType(), play.title(), play.subtitle());
+                    commands.playUri(coordinatorAvTransport(), sink, forSonos, "*");
+                    lastPlayed = new PlayedItem(forSonos.url().toString(), play.title());
+                }
                 case Action.Pause ignored -> commands.transport(coordinatorAvTransport(), UpnpActions.pause(AV_TRANSPORT), "pause");
                 case Action.Resume ignored -> commands.transport(coordinatorAvTransport(), UpnpActions.play(AV_TRANSPORT), "resume playback");
                 case Action.Stop ignored -> commands.transport(coordinatorAvTransport(), UpnpActions.stop(AV_TRANSPORT), "stop playback");
@@ -214,10 +222,23 @@ public class SonosSession implements DeviceHandle, GroupListing {
     }
 
     private void readState() throws IOException, SoapFault {
-        TransportInfo info = commands.transportInfo(coordinatorAvTransport());
+        ServiceEndpoint coordinator = coordinatorAvTransport();
+        TransportInfo info = commands.transportInfo(coordinator);
         VolumeReading volume = commands.volume(renderingControl(), 100);
         transport = info;
-        publish(state.withStatus(DeviceStatus.CONNECTED).withPower(true).withVolume(volume.percent(), 100, volume.muted()));
+        NowPlaying nowPlaying = null;
+        if (info.active()) {
+            // A grouped room shows its coordinator's track; its title comes from the coordinator's metadata.
+            PositionInfo position;
+            try {
+                position = commands.positionInfo(coordinator);
+            } catch (SoapFault fault) {
+                position = new PositionInfo("", "", null, null);
+            }
+            nowPlaying = NowPlayings.of(info, position, lastPlayed);
+        }
+        publish(state.withStatus(DeviceStatus.CONNECTED).withPower(true).withVolume(volume.percent(), 100, volume.muted())
+                .withNowPlaying(nowPlaying));
     }
 
     private synchronized void publish(DeviceState next) {

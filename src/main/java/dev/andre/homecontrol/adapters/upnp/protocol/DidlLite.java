@@ -1,7 +1,9 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Optional;
 
 /** DIDL-Lite metadata for SetAVTransportURI. Built unescaped; SoapClient escapes it once more on the wire. */
 public final class DidlLite {
@@ -27,6 +29,21 @@ public final class DidlLite {
                 .append(UpnpXml.escape(url.toString()))
                 .append("</res></item></DIDL-Lite>")
                 .toString();
+    }
+
+    /** The first non-blank title of a DIDL-Lite document; empty for NOT_IMPLEMENTED, blanks or unreadable XML. */
+    public static Optional<String> title(String didl) {
+        if (didl == null || didl.isBlank() || didl.strip().equalsIgnoreCase("NOT_IMPLEMENTED")) {
+            return Optional.empty();
+        }
+        try {
+            return UpnpXml.descendants(UpnpXml.parse(didl.getBytes(StandardCharsets.UTF_8)), "title").stream()
+                    .map(element -> element.getTextContent().strip())
+                    .filter(text -> !text.isEmpty())
+                    .findFirst();
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
     }
 
     public static String upnpClass(String contentFormat) {
