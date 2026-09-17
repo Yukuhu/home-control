@@ -33,7 +33,7 @@ public final class AppLinks {
     }
 
     public static ContentItem fromUrl(String url) {
-        URI uri = parse(url);
+        URI uri = parseHttpUrl(url);
         String service = serviceOf(uri.getHost().toLowerCase(Locale.ROOT), uri.getPath());
         List<PlayableRef> playables = new ArrayList<>();
         playables.add(new PlayableRef.AppLink(uri, service));
@@ -89,7 +89,8 @@ public final class AppLinks {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
     }
 
-    private static URI parse(String url) {
+    /** Validates a user-supplied link: http or https with a host. */
+    public static URI parseHttpUrl(String url) {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("Enter a link to open");
         }

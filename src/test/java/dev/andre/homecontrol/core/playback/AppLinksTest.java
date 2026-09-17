@@ -132,4 +132,16 @@ class AppLinksTest {
         assertThat(AppLinks.fromUrl("https://www.youtube.com/watch?v=abc").playables()).singleElement()
                 .isInstanceOf(PlayableRef.AppLink.class);
     }
+
+    @Test
+    void parseHttpUrlAcceptsHttpAndHttps() {
+        assertThat(AppLinks.parseHttpUrl("HTTPS://Example.org/a")).isEqualTo(URI.create("HTTPS://Example.org/a"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ftp://x/y", "not a url", "", "   ", "javascript:alert(1)", "file:///etc/passwd",
+            "intent://x#Intent;end", "//example.org/a", "http:opaque"})
+    void parseHttpUrlRejectsTheSameInputsAsFromUrl(String url) {
+        assertThatThrownBy(() -> AppLinks.parseHttpUrl(url)).isInstanceOf(IllegalArgumentException.class);
+    }
 }
