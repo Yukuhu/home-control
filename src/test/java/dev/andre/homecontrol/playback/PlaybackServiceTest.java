@@ -22,6 +22,7 @@ import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
 import dev.andre.homecontrol.core.playback.RouteKeys;
 import dev.andre.homecontrol.core.playback.UnroutableException;
+import dev.andre.homecontrol.core.playback.YouTubeLoungeStrategy;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.Test;
 
@@ -329,5 +330,63 @@ class PlaybackServiceTest {
 
         assertThat(route).isInstanceOfSatisfying(Route.CastMessage.class,
                 cast -> verify(devices).execute("kitchen", cast.action()));
+    }
+
+    private final Device kitchen = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9",
+            Map.of("cast", Map.of()), Instant.now());
+    private static final URI WATCH = URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ");
+    private static final ContentItem LOUNGE_ITEM = new ContentItem("aqz-KE-bpKQ", "youtube", ContentKind.VIDEO,
+            "Big Buck Bunny", null, null, List.of(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")));
+
+    @Test
+    void aLoungeRouteRunsThroughItsExecutor() {
+        given(devices.device("kitchen")).willReturn(Optional.of(kitchen));
+        given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
+        given(executor.executes(any())).willReturn(true);
+        PlaybackService service = new PlaybackService(devices,
+                new PlaybackPlanner(List.of(new YouTubeLoungeStrategy())), List.of(), List.of(executor));
+
+        Route route = service.play(LOUNGE_ITEM, "kitchen");
+
+        assertThat(route).isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ"));
+        verify(executor).execute(route, kitchen);
+        verify(devices, never()).execute(any(), any());
+    }
+
+    @Test
+    void withoutAnExecutorTheLoungeRouteIsSwitchedOff() {
+        given(devices.device("kitchen")).willReturn(Optional.of(kitchen));
+        given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
+        PlaybackService service = new PlaybackService(devices,
+                new PlaybackPlanner(List.of(new YouTubeLoungeStrategy())), List.of(), List.of());
+
+        assertThatThrownBy(() -> service.play(LOUNGE_ITEM, "kitchen"))
+                .isInstanceOf(UnroutableException.class)
+                .hasMessage("Kitchen: YouTube is switched off on this server");
+    }
+
+    @Test
+    void attemptFallsThroughToLoungeAfterAFailedAppLink() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
+        given(executor.executes(any())).willReturn(true);
+        PlaybackService service = new PlaybackService(devices,
+                new HomeControlConfiguration().playbackPlanner(), List.of(), List.of(executor));
+        ContentItem item = LOUNGE_ITEM.withPlayables(List.of(new PlayableRef.AppLink(WATCH, "youtube"),
+                new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")));
+        willThrow(new ActionFailedException("Shield refused to open the link"))
+                .given(devices).execute(eq("shield"), any(Action.OpenAppLink.class));
+
+        assertThat(service.attempt(item, "shield", Set.of()))
+                .isInstanceOfSatisfying(PlayAttempt.Failed.class, failed -> {
+                    assertThat(RouteKeys.key(failed.route())).isEqualTo("app-link");
+                    assertThat(failed.remaining()).containsExactly(new Route.YouTubeLounge("aqz-KE-bpKQ"));
+                });
+        verify(executor, never()).execute(any(), any());
+
+        assertThat(service.attempt(item, "shield", Set.of("app-link")))
+                .isInstanceOfSatisfying(PlayAttempt.Played.class,
+                        played -> assertThat(played.route()).isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ")));
+        verify(executor).execute(new Route.YouTubeLounge("aqz-KE-bpKQ"), shield);
     }
 }

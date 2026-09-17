@@ -54,6 +54,22 @@
         </ul>
     </th:block>
 
+    <fieldset class="youtube-lounge">
+        <legend>YouTube Cast (best effort)</legend>
+        <p class="hint">Chromecasts and other Cast-only screens cannot open the YouTube app link. For them Home Control
+            can start videos through YouTube&rsquo;s unofficial &ldquo;Lounge&rdquo; interface that phones use. Google
+            does not document it and changes it without notice, so it can stop working at any time. It is off until
+            you switch it on for a device, and needs no Google account. Devices that can open the YouTube app always
+            try the app first.</p>
+        <p class="hint" th:if="${#lists.isEmpty(youtube.loungeDevices())}">No Cast devices are registered.</p>
+        <form method="post" th:action="@{/setup/sources/youtube/lounge}" th:each="d : ${youtube.loungeDevices()}">
+            <input type="hidden" name="device" th:value="${d.id()}">
+            <input type="hidden" name="enabled" th:value="${!d.enabled()}">
+            <span th:text="|${d.name()}: YouTube Cast ${d.enabled() ? 'on' : 'off'}|">Kitchen: YouTube Cast off</span>
+            <button type="submit" th:text="${d.enabled()} ? 'Switch YouTube Cast off' : 'Switch YouTube Cast on'">Switch YouTube Cast on</button>
+        </form>
+    </fieldset>
+
     <details th:open="${!youtube.hasClient()}">
         <summary>How to create your own Google OAuth client (about 10 minutes)</summary>
         <ol>

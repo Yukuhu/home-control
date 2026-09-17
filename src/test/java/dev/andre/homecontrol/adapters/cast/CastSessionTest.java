@@ -4,6 +4,7 @@ import dev.andre.homecontrol.adapters.cast.protocol.CastIncoming;
 import dev.andre.homecontrol.adapters.cast.protocol.FakeCastReceiver;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
+import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -511,5 +512,65 @@ class CastSessionTest {
 
         assertThatThrownBy(() -> session.execute(playNow()))
                 .isInstanceOf(DeviceOfflineException.class);
+    }
+
+    private static final String MDX = "urn:x-cast:com.google.youtube.mdx";
+    private static final CastAppQuery MDX_STATUS = new CastAppQuery("233637DE", MDX,
+            Map.of("type", "getMdxSessionStatus"), "mdxSessionStatus");
+
+    private static ObjectNode mdxFixture() throws Exception {
+        try (var in = CastSessionTest.class.getResourceAsStream("/fixtures/youtube/cast-mdx-session-status.json")) {
+            return (ObjectNode) JsonMapper.builder().build().readTree(in);
+        }
+    }
+
+    @Test
+    void aQueryLaunchesTheAppAndReturnsItsReply() throws Exception {
+        receiver.appSpeaks("233637DE", MDX);
+        receiver.answerCustom(MDX, mdxFixture());
+        start(receiver.port());
+        awaitStatus();
+
+        Map<String, Object> reply = session.query(MDX_STATUS);
+
+        assertThat(reply).containsEntry("type", "mdxSessionStatus");
+        assertThat(reply.get("data")).isInstanceOfSatisfying(Map.class,
+                data -> assertThat(data.get("screenId")).isEqualTo("fixture-screen-6hq3r1ukd0n5mc3t2v8p"));
+        assertThat(receiver.last(RECEIVER, "LAUNCH").orElseThrow().payload().path("appId").asString("")).isEqualTo("233637DE");
+        List<CastIncoming> sent = receiver.received(MDX, "getMdxSessionStatus");
+        assertThat(sent).hasSize(1);
+        assertThat(sent.getFirst().payload().size()).isEqualTo(1);
+    }
+
+    @Test
+    void anErrorReplyFailsTheQuery() {
+        receiver.appSpeaks("233637DE", MDX);
+        receiver.answerCustom(MDX, (ObjectNode) JsonMapper.builder().build().readTree("""
+                {"type":"error","message":"nope"}
+                """));
+        start(receiver.port());
+        awaitStatus();
+
+        assertThatThrownBy(() -> session.query(MDX_STATUS))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessageContaining("refused the request (nope)");
+    }
+
+    @Test
+    void noReplyTimesOut() {
+        receiver.appSpeaks("233637DE", MDX);
+        start(receiver.port());
+        awaitStatus();
+
+        assertThatThrownBy(() -> session.query(MDX_STATUS))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessage("Living Room TV did not answer in time when asked to answer mdxSessionStatus");
+    }
+
+    @Test
+    void aDisconnectedSessionIsOffline() {
+        session = new CastSession(device(receiver.port()), PROPERTIES, seen::add);
+
+        assertThatThrownBy(() -> session.query(MDX_STATUS)).isInstanceOf(DeviceOfflineException.class);
     }
 }

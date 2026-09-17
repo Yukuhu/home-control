@@ -1,0 +1,14 @@
+{
+  "screens": [
+    {
+      "screenId": "fixture-screen-6hq3r1ukd0n5mc3t2v8p",
+      "refreshIntervalInMillis": 1123200000,
+      "remoteRefreshIntervalMs": 79200000,
+      "refreshIntervalMs": 1123200000,
+      "loungeTokenLifespanMs": 1209600000,
+      "loungeToken": "AGdO5p8FixtureLoungeToken-xYz0123456789",
+      "remoteRefreshIntervalInMillis": 79200000,
+      "expiration": 1789372800000
+    }
+  ]
+}

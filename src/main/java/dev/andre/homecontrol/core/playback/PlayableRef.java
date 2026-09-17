@@ -77,4 +77,16 @@ public sealed interface PlayableRef {
             return "CastMessage[receiverAppId=" + receiverAppId + ", namespace=" + namespace + "]";
         }
     }
+
+    /**
+     * A video to start on a Cast receiver through the receiver's own remote-control pairing (an
+     * unofficial, best-effort interface). Created at play time by a resolver, only for devices whose
+     * switch is on.
+     */
+    record YouTubeLounge(String videoId) implements PlayableRef {
+        @Override
+        public String kindLabel() {
+            return "YouTube Cast";
+        }
+    }
 }

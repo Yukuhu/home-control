@@ -122,6 +122,19 @@ public class YouTubeSetupController {
         return REDIRECT;
     }
 
+    /** Best-effort YouTube Cast per Cast device; off unless switched on here. */
+    @PostMapping("/setup/sources/youtube/lounge")
+    public String lounge(@RequestParam(required = false) String device, @RequestParam boolean enabled,
+                         RedirectAttributes redirect) {
+        try {
+            String name = setup.setLounge(device, enabled);
+            redirect.addFlashAttribute("youtubeMessage", "YouTube Cast switched " + (enabled ? "on" : "off") + " for " + name);
+        } catch (YouTubeException e) {
+            redirect.addFlashAttribute("youtubeError", e.getMessage());
+        }
+        return REDIRECT;
+    }
+
     @GetMapping("/setup/sources/youtube/authorization")
     public String authorization(Model model, HttpServletResponse response) {
         YouTubeAuthorizationService.Status status = setup.authorizationStatus();

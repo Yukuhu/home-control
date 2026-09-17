@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
@@ -183,6 +184,48 @@ public class DeviceManager implements AutoCloseable {
             throw lastUnsupported;
         }
         throw new UnsupportedActionException(device.name() + " cannot perform " + action);
+    }
+
+    /**
+     * Like {@link #execute}, for a question with an answer: only adapters declaring
+     * {@link Capability#CAST_RECEIVER} are asked, with the same fall-through (offline or unsupported
+     * hands over; a refusal or no answer, {@link dev.andre.homecontrol.core.ActionFailedException}, ends it).
+     */
+    public Map<String, Object> query(String id, CastAppQuery query) {
+        Device device = registry.findById(id)
+                .orElseThrow(() -> new DeviceNotFoundException("No device with id " + id));
+        Map<String, DeviceHandle> deviceHandles = handles.getOrDefault(id, Map.of());
+        DeviceOfflineException firstOffline = null;
+        UnsupportedActionException lastUnsupported = null;
+        for (String adapterId : device.adapters().keySet()) {
+            DeviceAdapter adapter = adapters.get(adapterId);
+            if (adapter == null || !adapter.capabilities(device).contains(Capability.CAST_RECEIVER)) {
+                continue;
+            }
+            DeviceHandle handle = deviceHandles.get(adapterId);
+            if (handle == null) {
+                if (firstOffline == null) {
+                    firstOffline = new DeviceOfflineException(device.name() + " is not connected");
+                }
+                continue;
+            }
+            try {
+                return handle.query(query);
+            } catch (DeviceOfflineException e) {
+                if (firstOffline == null) {
+                    firstOffline = e;
+                }
+            } catch (UnsupportedActionException e) {
+                lastUnsupported = e;
+            }
+        }
+        if (firstOffline != null) {
+            throw firstOffline;
+        }
+        if (lastUnsupported != null) {
+            throw lastUnsupported;
+        }
+        throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
     }
 
     /**

@@ -110,6 +110,16 @@ class PlaybackPlannerTest {
     }
 
     @Test
+    void loungeNeedsACastReceiver() {
+        PlaybackPlanner withLounge = new PlaybackPlanner(List.of(new AppLinkStrategy(), new YouTubeLoungeStrategy()));
+
+        assertThat(withLounge.plan(item(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")), EnumSet.of(Capability.APP_LINK)))
+                .isEqualTo(new Route.Unroutable("this device is not a Cast receiver"));
+        assertThat(withLounge.plan(item(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")), EnumSet.of(Capability.CAST_RECEIVER)))
+                .isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ"));
+    }
+
+    @Test
     void aCustomMessageNeedsACastReceiver() {
         assertThat(planner.plan(item(JELLYFIN_MESSAGE), EnumSet.of(Capability.APP_LINK)))
                 .isInstanceOfSatisfying(Route.Unroutable.class, u -> assertThat(u.reason()).contains("this device is not a Cast receiver"));
