@@ -22,7 +22,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * The five checks the setup page shows under "Bluetooth speakers": is the D-Bus socket there, does
+ * The checks the setup page shows under "Bluetooth speakers": is the D-Bus socket there, does
  * BlueZ answer, is there a usable adapter, is mpv installed, is there an audio output for it.
  * Cached for {@code hostCheckCacheSeconds} so the setup page does not hit D-Bus/mpv on every render.
  */
