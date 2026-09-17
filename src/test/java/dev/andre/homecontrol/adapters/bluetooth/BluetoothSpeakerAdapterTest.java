@@ -2,11 +2,13 @@ package dev.andre.homecontrol.adapters.bluetooth;
 
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluetoothDeviceInfo;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.FakeBluezClient;
+import dev.andre.homecontrol.adapters.bluetooth.player.InProcessMpvLauncher;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceState;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -22,7 +24,13 @@ import static org.awaitility.Awaitility.await;
 class BluetoothSpeakerAdapterTest {
 
     private final FakeBluezClient bluez = new FakeBluezClient();
-    private final BluetoothSpeakerAdapter adapter = new BluetoothSpeakerAdapter(BluetoothProperties.defaults(), bluez);
+    private final InProcessMpvLauncher launcher = new InProcessMpvLauncher();
+    private final BluetoothSpeakerAdapter adapter = new BluetoothSpeakerAdapter(BluetoothProperties.defaults(), bluez, launcher);
+
+    @AfterEach
+    void tearDown() {
+        launcher.close();
+    }
 
     private Device speaker(String address) {
         return new Device(BluetoothSettings.deviceId(address), "JBL Flip 5", DeviceKind.BLUETOOTH, address,

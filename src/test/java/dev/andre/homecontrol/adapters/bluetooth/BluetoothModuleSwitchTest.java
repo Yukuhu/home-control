@@ -3,6 +3,8 @@ package dev.andre.homecontrol.adapters.bluetooth;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezClient;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezException;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure;
+import dev.andre.homecontrol.adapters.bluetooth.player.MpvLauncher;
+import dev.andre.homecontrol.adapters.bluetooth.player.ProcessMpvLauncher;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -37,6 +39,7 @@ class BluetoothModuleSwitchTest {
             assertThat(context.getBeansOfType(BluetoothSpeakerAdapter.class)).isEmpty();
             assertThat(context.getBeansOfType(BluetoothPairingService.class)).isEmpty();
             assertThat(context.getBeansOfType(BluetoothHostChecks.class)).isEmpty();
+            assertThat(context.getBeansOfType(MpvLauncher.class)).isEmpty();
         });
     }
 
@@ -49,7 +52,9 @@ class BluetoothModuleSwitchTest {
                             .hasSingleBean(BluezClient.class)
                             .hasSingleBean(BluetoothSpeakerAdapter.class)
                             .hasSingleBean(BluetoothPairingService.class)
-                            .hasSingleBean(BluetoothHostChecks.class);
+                            .hasSingleBean(BluetoothHostChecks.class)
+                            .hasSingleBean(MpvLauncher.class);
+                    assertThat(context.getBean(MpvLauncher.class)).isInstanceOf(ProcessMpvLauncher.class);
                     BluetoothProperties properties = context.getBean(BluetoothProperties.class);
                     assertThat(properties.dbusAddress()).isEqualTo("unix:path=/nonexistent/hc-bus.sock");
                     assertThat(properties.scanSeconds()).isEqualTo(10);

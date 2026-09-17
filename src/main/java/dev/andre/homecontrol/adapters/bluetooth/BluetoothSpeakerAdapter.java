@@ -2,6 +2,9 @@ package dev.andre.homecontrol.adapters.bluetooth;
 
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezClient;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezException;
+import dev.andre.homecontrol.adapters.bluetooth.player.AudioDeviceResolver;
+import dev.andre.homecontrol.adapters.bluetooth.player.MpvLauncher;
+import dev.andre.homecontrol.adapters.bluetooth.player.MpvPlayer;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
@@ -12,6 +15,7 @@ import dev.andre.homecontrol.core.DiscoveredDevice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -24,10 +28,12 @@ public class BluetoothSpeakerAdapter implements DeviceAdapter {
 
     private final BluetoothProperties properties;
     private final BluezClient bluez;
+    private final MpvLauncher launcher;
 
-    public BluetoothSpeakerAdapter(BluetoothProperties properties, BluezClient bluez) {
+    public BluetoothSpeakerAdapter(BluetoothProperties properties, BluezClient bluez, MpvLauncher launcher) {
         this.properties = properties;
         this.bluez = bluez;
+        this.launcher = launcher;
     }
 
     @Override
@@ -47,7 +53,12 @@ public class BluetoothSpeakerAdapter implements DeviceAdapter {
 
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
-        BluetoothSpeakerSession session = new BluetoothSpeakerSession(device, properties, bluez, onChange);
+        MpvPlayer player = new MpvPlayer(launcher, MpvPlayer.socketFor(properties.runtimeDir(), device.id()),
+                Duration.ofSeconds(properties.playerStartTimeoutSeconds()), Duration.ofSeconds(properties.loadTimeoutSeconds()),
+                Duration.ofSeconds(properties.commandTimeoutSeconds()));
+        AudioDeviceResolver audioDevices = new AudioDeviceResolver(launcher, properties.audioDeviceTemplate(),
+                Duration.ofSeconds(properties.playerStartTimeoutSeconds()));
+        BluetoothSpeakerSession session = new BluetoothSpeakerSession(device, properties, bluez, player, audioDevices, onChange);
         session.start();
         return session;
     }

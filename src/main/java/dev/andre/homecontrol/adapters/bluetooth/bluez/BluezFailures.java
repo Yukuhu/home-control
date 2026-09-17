@@ -15,7 +15,7 @@ public final class BluezFailures {
 
     public static BluezFailure classify(String errorName, String message) {
         String text = ((errorName == null ? "" : errorName) + " " + (message == null ? "" : message)).toLowerCase(Locale.ROOT);
-        if (has(text, "serviceunknown", "namehasnoowner", "org.bluez was not provided")) {
+        if (has(text, "serviceunknown", "namehasnoowner", "was not provided by any")) {
             return BLUEZ_NOT_RUNNING;
         }
         if (has(text, "accessdenied", "failed to auth", "rejected send message")) {
