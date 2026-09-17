@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
@@ -67,6 +68,7 @@ public final class FakeMpv implements AutoCloseable {
     private final Options options;
     private final Consumer<String> log;
     private final List<List<String>> commands = new CopyOnWriteArrayList<>();
+    private final AtomicInteger dropNextGetProperty = new AtomicInteger();
     private final List<SocketChannel> clients = new CopyOnWriteArrayList<>();
     private final CountDownLatch quit = new CountDownLatch(1);
 
@@ -109,6 +111,11 @@ public final class FakeMpv implements AutoCloseable {
 
     public List<List<String>> commands() {
         return List.copyOf(commands);
+    }
+
+    /** The next {@code count} {@code get_property} requests get no reply at all, like a busy/slow poll. */
+    public void dropNextGetProperty(int count) {
+        dropNextGetProperty.set(count);
     }
 
     public boolean hasQuit() {
@@ -223,6 +230,10 @@ public final class FakeMpv implements AutoCloseable {
         request.path("command").forEach(argument -> command.add(argument.isString() ? argument.asString("") : argument.toString()));
         commands.add(List.copyOf(command));
         log.accept(JSON.writeValueAsString(Map.of("type", "command", "command", command)));
+        if (!command.isEmpty() && "get_property".equals(command.getFirst())
+                && dropNextGetProperty.getAndUpdate(remaining -> remaining > 0 ? remaining - 1 : 0) > 0) {
+            return;
+        }
         ObjectNode response = JSON.createObjectNode();
         List<ObjectNode> events = new ArrayList<>();
         boolean quitAfter = false;

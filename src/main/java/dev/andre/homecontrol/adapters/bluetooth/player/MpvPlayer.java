@@ -2,12 +2,16 @@ package dev.andre.homecontrol.adapters.bluetooth.player;
 
 import tools.jackson.databind.JsonNode;
 
+import dev.andre.homecontrol.core.ActionFailedException;
+
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -19,11 +23,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** One speaker's player: at most one mpv process, started per play, the URL sent over IPC. */
 public final class MpvPlayer implements AutoCloseable {
 
-    private record Running(MpvProcess process, MpvIpc ipc) {
+    private record Running(MpvProcess process, MpvIpc ipc, AtomicInteger consecutiveStatusFailures) {
+        Running(MpvProcess process, MpvIpc ipc) {
+            this(process, ipc, new AtomicInteger());
+        }
+
         boolean alive() {
             return process.alive() && ipc.open();
         }
@@ -44,6 +53,30 @@ public final class MpvPlayer implements AutoCloseable {
         this.commandTimeout = commandTimeout;
     }
 
+    /**
+     * The IPC socket carries mpv's own control protocol, including the {@code loadfile} URL (which can hold
+     * a Jellyfin ApiKey): it must never land in a directory another user could read or write. Creating with
+     * {@code rwx------} attributes only sets the mode when the directory does not already exist, so a
+     * pre-existing directory left behind with looser permissions or a different owner is checked here and
+     * rejected rather than silently reused.
+     */
+    private static void ensureRuntimeDirIsPrivate(Path dir) throws IOException {
+        PosixFileAttributeView view = Files.getFileAttributeView(dir, PosixFileAttributeView.class);
+        if (view == null) {
+            throw new ActionFailedException("the mpv IPC runtime directory " + dir
+                    + " is not on a POSIX filesystem; refusing to start mpv there");
+        }
+        PosixFileAttributes attributes = view.readAttributes();
+        boolean ownedByUs = attributes.owner().getName().equals(System.getProperty("user.name"));
+        boolean isPrivate = attributes.permissions().equals(PosixFilePermissions.fromString("rwx------"));
+        if (!ownedByUs || !isPrivate) {
+            throw new ActionFailedException("the mpv IPC runtime directory " + dir
+                    + " is not private to this process (owner " + attributes.owner().getName() + ", permissions "
+                    + PosixFilePermissions.toString(attributes.permissions())
+                    + "); refusing to start mpv there, since its IPC socket could leak the stream ApiKey");
+        }
+    }
+
     /** Unix socket paths are limited to 108 bytes; device ids are free text. */
     public static Path socketFor(Path runtimeDir, String deviceId) {
         try {
@@ -56,12 +89,9 @@ public final class MpvPlayer implements AutoCloseable {
 
     public synchronized void play(URI url, String audioDevice, int volume, boolean muted) throws IOException, MpvException {
         stop();
-        Files.createDirectories(socket.getParent());
-        try {
-            Files.setPosixFilePermissions(socket.getParent(), PosixFilePermissions.fromString("rwx------"));
-        } catch (UnsupportedOperationException | IOException ignored) {
-            // best effort
-        }
+        Path runtimeDir = socket.getParent();
+        Files.createDirectories(runtimeDir, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+        ensureRuntimeDirIsPrivate(runtimeDir);
         Files.deleteIfExists(socket);
         MpvProcess process = launcher.start(MpvCommandLine.arguments(socket, audioDevice, volume));
         CompletableFuture<Void> loaded = new CompletableFuture<>();
@@ -149,15 +179,23 @@ public final class MpvPlayer implements AutoCloseable {
         }
         try {
             if (flag(current, "idle-active")) {
+                current.consecutiveStatusFailures().set(0);
                 return Optional.empty();
             }
-            return Optional.of(new PlayerStatus(flag(current, "pause"), flag(current, "paused-for-cache"),
+            PlayerStatus status = new PlayerStatus(flag(current, "pause"), flag(current, "paused-for-cache"),
                     number(current, "time-pos").orElse(0.0),
                     number(current, "duration").filter(duration -> duration > 0).orElse(null),
                     metadataTitle(current),
                     (int) Math.round(number(current, "volume").orElse(0.0)),
-                    flag(current, "mute")));
+                    flag(current, "mute"));
+            current.consecutiveStatusFailures().set(0);
+            return Optional.of(status);
         } catch (IOException e) {
+            // A single failed poll can be a transient IPC hiccup under concurrent access; only tear the
+            // player down once a second poll in a row also fails.
+            if (current.consecutiveStatusFailures().incrementAndGet() < 2) {
+                return Optional.empty();
+            }
             stopIfCurrent(current);
             return Optional.empty();
         }
