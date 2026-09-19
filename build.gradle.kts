@@ -22,9 +22,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("com.google.protobuf:protobuf-java:4.36.1")
     implementation("org.jmdns:jmdns:3.6.3")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.86")
     // Argon2id for the login hash and the HOME_CONTROL_SECRET key (already transitive via bcpkix; used directly now).
-    implementation("org.bouncycastle:bcprov-jdk18on:1.85")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.86")
     // Bluetooth speakers (optional module, off by default). Only adapters/bluetooth/bluez/DbusBluezClient imports these.
     implementation("com.github.hypfvieh:bluez-dbus:0.3.5")
     implementation("com.github.hypfvieh:dbus-java-core:5.2.1")
