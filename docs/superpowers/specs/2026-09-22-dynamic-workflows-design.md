@@ -2,7 +2,7 @@
 
 Date: 2026-09-22
 
-Status: Written specification for review; conversational design approved.
+Status: Accepted by the user on 2026-09-22.
 
 ## Purpose and agreed scope
 
