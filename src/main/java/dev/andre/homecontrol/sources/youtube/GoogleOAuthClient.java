@@ -10,7 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
-/** Google's OAuth 2.0 device authorization grant for "TVs and Limited Input devices". */
+/** Google's OAuth 2.0 device and browser authorization grants. */
 public class GoogleOAuthClient {
 
     public static final String SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
@@ -84,6 +84,38 @@ public class GoogleOAuthClient {
                 url.isBlank() ? DEFAULT_VERIFICATION_URL : URI.create(url),
                 clock.instant().plusSeconds(json.path("expires_in").asLong(1800)),
                 Duration.ofSeconds(Math.max(1, json.path("interval").asLong(5))));
+    }
+
+    public URI authorizationUrl(String clientId, URI redirectUri, String state, String challenge) {
+        return YouTubeHttp.uri(URI.create("https://accounts.google.com"), "/o/oauth2/v2/auth", Map.of(
+                "client_id", clientId, "redirect_uri", redirectUri.toString(), "response_type", "code",
+                "scope", SCOPE, "access_type", "offline", "prompt", "consent select_account",
+                "state", state, "code_challenge", challenge, "code_challenge_method", "S256"));
+    }
+
+    public TokenPoll.Granted exchangeCode(String clientId, String clientSecret, String code,
+                                          URI redirectUri, String verifier) {
+        YouTubeHttp.Response response = http.postForm(URI.create(base + "/token"), Map.of(
+                "client_id", clientId, "client_secret", clientSecret, "code", code,
+                "redirect_uri", redirectUri.toString(), "code_verifier", verifier,
+                "grant_type", "authorization_code"), Map.of());
+        if (!response.ok()) {
+            // Never echo Google error descriptions or codes: they may contain submitted credentials.
+            throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE,
+                    "Google could not complete sign-in. Check the Web application client and callback URL, then try again.");
+        }
+        JsonNode json = response.json();
+        String scope = json.path("scope").asString("");
+        if (!scope.isBlank() && java.util.Arrays.stream(scope.split("\\s+")).noneMatch(SCOPE::equals)) {
+            throw new YouTubeException(YouTubeException.Kind.UNAUTHORIZED,
+                    "YouTube read-only access was not granted. Sign in again and allow access to YouTube.");
+        }
+        String refresh = json.path("refresh_token").asString("");
+        if (refresh.isBlank()) {
+            throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE,
+                    "Google did not return offline access. Sign in again and accept the consent request.");
+        }
+        return new TokenPoll.Granted(accessToken(json), refresh);
     }
 
     public TokenPoll poll(String clientId, String clientSecret, String deviceCode) {

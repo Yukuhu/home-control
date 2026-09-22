@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.LinkedHashMap;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -87,6 +88,33 @@ public class YouTubeSetupService {
     }
 
     public YouTubeAuthorizationService.Status connect(ConnectRequest request, HttpServletRequest http) {
+        synchronized (authorization) {
+            saveClient(request, http);
+            return authorization.start();
+        }
+    }
+
+    public URI connectBrowser(ConnectRequest request, HttpServletRequest http) {
+        YouTubeOAuthCallback.requireSupported(YouTubeOAuthCallback.uri(http));
+        synchronized (authorization) {
+            saveClient(request, http);
+            return authorizeBrowser(http);
+        }
+    }
+
+    public URI authorizeBrowser(HttpServletRequest http) {
+        URI callback = YouTubeOAuthCallback.uri(http);
+        YouTubeOAuthCallback.requireSupported(callback);
+        return authorization.startBrowser(callback, http.getSession().getId());
+    }
+
+    public YouTubeAuthorizationService.Status completeBrowser(HttpServletRequest http, String state, String code, String error) {
+        var session = http.getSession(false);
+        authorization.completeBrowser(session == null ? null : session.getId(), state, code, error);
+        return authorization.status();
+    }
+
+    private void saveClient(ConnectRequest request, HttpServletRequest http) {
         String clientId = request.clientId() == null ? "" : request.clientId().strip();
         if (!CLIENT_ID_PATTERN.matcher(clientId).matches()) {
             throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT,
@@ -107,12 +135,12 @@ public class YouTubeSetupService {
             values.put(YouTubeSettings.CLIENT_SECRET, clientSecret);
         }
         login.storeSecrets(values, request.loginPassword(), request.loginPasswordConfirmation(), http);
+        authorization.cancel();
         if (clientIdChanged && secrets.secret(YouTubeSettings.REFRESH_TOKEN).isPresent()
                 && secrets.names().size() > 1) {
             login.removeSecrets(List.of(YouTubeSettings.REFRESH_TOKEN));
             tokens.reset();
         }
-        return authorization.start();
     }
 
     public YouTubeAuthorizationService.Status authorize() {
@@ -192,6 +220,12 @@ public class YouTubeSetupService {
     }
 
     public void disconnect() {
+        synchronized (authorization) {
+            disconnectAccount();
+        }
+    }
+
+    private void disconnectAccount() {
         authorization.cancel();
         secrets.secret(YouTubeSettings.REFRESH_TOKEN).ifPresent(token -> {
             try {

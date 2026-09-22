@@ -15,7 +15,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.List;
 import java.util.Map;
 
-/** Connects, authorizes, tests and disconnects YouTube from the setup page; always a redirect back to it. */
+/** YouTube setup, including the browser OAuth redirect and callback. */
 @Controller
 @ConditionalOnProperty(name = "home-control.youtube.enabled", havingValue = "true", matchIfMissing = true)
 public class YouTubeSetupController {
@@ -26,6 +26,56 @@ public class YouTubeSetupController {
 
     public YouTubeSetupController(YouTubeSetupService setup) {
         this.setup = setup;
+    }
+
+    @PostMapping("/setup/sources/youtube/browser/connect")
+    public String connectBrowser(@RequestParam(required = false) String clientId,
+                                 @RequestParam(required = false) String clientSecret,
+                                 @RequestParam(required = false) String loginPassword,
+                                 @RequestParam(required = false) String loginPasswordConfirmation,
+                                 HttpServletRequest request, HttpServletResponse response, RedirectAttributes redirect) {
+        privateResponse(response);
+        try {
+            return "redirect:" + setup.connectBrowser(new YouTubeSetupService.ConnectRequest(
+                    clientId, clientSecret, loginPassword, loginPasswordConfirmation), request);
+        } catch (YouTubeException | PasswordRejectedException | LoginRequiredException e) {
+            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute("youtubeForm", Map.of("clientId", clientId == null ? "" : clientId));
+            return REDIRECT;
+        }
+    }
+
+    @PostMapping("/setup/sources/youtube/browser/authorize")
+    public String authorizeBrowser(HttpServletRequest request, HttpServletResponse response, RedirectAttributes redirect) {
+        privateResponse(response);
+        try {
+            return "redirect:" + setup.authorizeBrowser(request);
+        } catch (YouTubeException e) {
+            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            return REDIRECT;
+        }
+    }
+
+    @GetMapping(YouTubeOAuthCallback.PATH)
+    public String callback(@RequestParam(required = false) String state, @RequestParam(required = false) String code,
+                           @RequestParam(required = false) String error, HttpServletRequest request,
+                           HttpServletResponse response, RedirectAttributes redirect) {
+        privateResponse(response);
+        // Spring also maps HEAD to GET. Only a real callback navigation may consume a grant.
+        if (!"GET".equals(request.getMethod())) return REDIRECT;
+        try {
+            var status = setup.completeBrowser(request, state, code, error);
+            redirect.addFlashAttribute(status.state() == YouTubeAuthorizationService.State.CONNECTED
+                    ? "youtubeMessage" : "youtubeError", status.message());
+        } catch (YouTubeException e) {
+            redirect.addFlashAttribute("youtubeError", e.getMessage());
+        }
+        return REDIRECT;
+    }
+
+    private static void privateResponse(HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Referrer-Policy", "no-referrer");
     }
 
     @PostMapping("/setup/sources/youtube/connect")

@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.youtube;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
@@ -127,12 +128,13 @@ public class YouTubeConfiguration {
         return new YouTubeLoungeRouteExecutor(devices, lounge, setup);
     }
 
-    /** After a successful device authorization, the account's own channel is looked up once and cached settings cleared. */
+    /** After either grant, clear both cache layers and look up the newly authorized channel. */
     @Bean
     public ApplicationRunner youTubeConnectHook(YouTubeAuthorizationService authorization, YouTubeAccount account,
-                                                YouTubeContentSource source) {
+                                                YouTubeContentSource source, RailCache rails) {
         return args -> authorization.onConnected(() -> {
             source.forgetAccount();
+            rails.invalidateSource(YouTubeSettings.SOURCE_ID);
             account.refreshChannel();
         });
     }

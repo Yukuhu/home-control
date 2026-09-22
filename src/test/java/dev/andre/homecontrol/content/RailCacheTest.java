@@ -156,6 +156,22 @@ class RailCacheTest {
     }
 
     @Test
+    void forgettingAnAccountDropsSnapshotsAndRejectsOldInflightResults() {
+        cache.snapshots();
+        executor.runAll();
+        assertThat(a().items()).isNotEmpty();
+        cache.refresh("stub", "a");
+        cache.invalidateSource("stub");
+        assertThat(cache.peek()).isEmpty();
+        executor.runAll();
+        assertThat(cache.peek()).isEmpty();
+        assertThat(a().status()).isEqualTo(RailStatus.LOADING);
+        assertThat(a().items()).isEmpty();
+        executor.runAll();
+        assertThat(a().status()).isEqualTo(RailStatus.READY);
+    }
+
+    @Test
     void aPageReadNeverWaitsAndStartsLoadingNeverLoadedRails() {
         List<RailSnapshot> first = cache.snapshots();
 

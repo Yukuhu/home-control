@@ -8,6 +8,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +42,16 @@ public class YouTubeSetupAdvice {
     }
 
     private static final QuotaView EMPTY_QUOTA = new QuotaView(0, 0, 0, 0, "", List.of());
+
+    @ModelAttribute("youtubeCallbackUrl")
+    public String callbackUrl(HttpServletRequest request) {
+        return YouTubeOAuthCallback.uri(request).toString();
+    }
+
+    @ModelAttribute("youtubeBrowserSupported")
+    public boolean browserSupported(HttpServletRequest request) {
+        return YouTubeOAuthCallback.supported(YouTubeOAuthCallback.uri(request));
+    }
 
     private final ObjectProvider<YouTubeSetupService> setup;
     private final ObjectProvider<LoginService> login;

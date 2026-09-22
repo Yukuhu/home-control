@@ -403,11 +403,41 @@ your quota and consent screen are yours alone. On the setup page, under **YouTub
 4. **Audience**: add your Google account as a test user, then press **Publish app** so the status
    is “In production” — in “Testing”, Google ends the authorization after 7 days. Google will
    warn “Google hasn't verified this app”; that is expected for your own project.
-5. **Clients (Credentials) → Create client**, type “TVs and Limited Input devices”. Copy the
-   client ID and secret into the form.
-6. Press **Connect**; Home Control shows a code — enter it at google.com/device on your phone and
-   allow read-only access.
+5. For browser sign-in, open Home Control through an HTTPS domain (or `http://localhost:8080`
+   when the browser runs on the server). In **Clients → Create client**, choose **Web application**.
+   Add the exact **Authorized redirect URI** displayed in **Setup → YouTube**, for example
+   `https://home.example.com/setup/sources/youtube/callback`. Copy the client ID and secret into
+   the form, then press **Sign in with Google**. Google requires the callback to match exactly,
+   including its scheme, hostname, port and path.
+6. Choose the household Google account and allow read-only YouTube access. Google returns you
+   to Setup, which shows the connected channel. This connects one account for the whole household;
+   sign in again to replace it. Choosing a new account clears the previous account's selected
+   playlists and cached library. **Sign in with saved Web client** reuses the stored credentials.
 7. Usage against your project's quota is shown on the setup page from then on.
+
+**LAN-only alternative:** Google does not accept a plain HTTP LAN address such as
+`http://192.168.1.10:8080` as a browser callback. Create an OAuth client of type **TVs and Limited
+Input devices**, paste that client's ID and secret, and press **Use a device code**. Enter the
+displayed code at [google.com/device](https://www.google.com/device) and grant access. The two
+buttons require their matching Google client type; a Web client cannot request device codes.
+
+**HTTPS reverse proxy:** open Setup at the same external address you will use to sign in.
+Set `SERVER_FORWARD_HEADERS_STRATEGY=framework` so the displayed callback uses the proxy's
+external scheme, host and port, and `HOME_CONTROL_SECURE_COOKIE=true`. Configure the proxy to
+overwrite forwarded headers, and allow only that trusted proxy to reach the backend when
+forwarded-header support is enabled. Add the external hostname to `HOME_CONTROL_ALLOWED_HOSTS`.
+Register the displayed callback in Google Cloud. A public HTTPS hostname may resolve only on
+your LAN: the browser needs to reach the callback, not Google's servers.
+
+**Troubleshooting:** `redirect_uri_mismatch` means the displayed callback is missing or differs
+from the one registered on the Web client. `access_denied` may mean your account is not an
+allowed test user. An expired, cancelled or already-used sign-in must be started again from
+Setup in the same browser; browser requests expire after 10 minutes and also end on server
+restart. If Google does not return a refresh token, accept the consent request when retrying.
+The household login password protects Home Control; it is never sent to Google.
+
+The flows follow Google's [web-server OAuth guide](https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps)
+and [device authorization guide](https://developers.google.com/youtube/v3/guides/auth/devices).
 
 Turn the whole module off with `HOME_CONTROL_YOUTUBE_ENABLED=false`.
 

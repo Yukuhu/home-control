@@ -97,6 +97,16 @@ public class RailCache implements SmartLifecycle {
         return entries.values().stream().map(entry -> entry.snapshot).toList();
     }
 
+    /** An account changed: discard its snapshots, including results from fetches already in flight. */
+    public void invalidateSource(String sourceId) {
+        List<String> keys;
+        synchronized (this) {
+            if (!entries.values().removeIf(entry -> entry.descriptor.sourceId().equals(sourceId))) return;
+            keys = List.copyOf(entries.keySet());
+        }
+        events.publishEvent(new RailsChangedEvent(keys));
+    }
+
     public Optional<RailSnapshot> snapshot(String sourceId, String railId) {
         reconcile();
         Entry entry;
