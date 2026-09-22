@@ -31,7 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Local-only, managed fixture with request recording and deterministic blocking hooks. */
-final class FakeWorkflowServer implements AutoCloseable {
+public final class FakeWorkflowServer implements AutoCloseable {
     record Recorded(String path, Map<String, List<String>> headers) {
         String header(String name) {
             var values = headers.get(name.toLowerCase(Locale.ROOT));
@@ -44,7 +44,7 @@ final class FakeWorkflowServer implements AutoCloseable {
     private final Map<String, HttpHandler> routes = new ConcurrentHashMap<>();
     private final List<Recorded> requests = new CopyOnWriteArrayList<>();
 
-    FakeWorkflowServer() throws IOException {
+    public FakeWorkflowServer() throws IOException {
         this(HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0));
     }
 
@@ -83,11 +83,11 @@ final class FakeWorkflowServer implements AutoCloseable {
         return new FakeWorkflowServer(server);
     }
 
-    URI url(String path) {
+    public URI url(String path) {
         return URI.create((server instanceof HttpsServer ? "https" : "http") + "://127.0.0.1:" + server.getAddress().getPort() + path);
     }
 
-    void respond(String path, int status, String body) {
+    public void respond(String path, int status, String body) {
         route(path, e -> {
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
             e.getResponseHeaders().set("Content-Type", "application/json");
@@ -118,7 +118,7 @@ final class FakeWorkflowServer implements AutoCloseable {
     }
 
     void route(String path, HttpHandler handler) { routes.put(path, handler); }
-    int count(String path) { return (int) requests.stream().filter(r -> r.path().equals(path)).count(); }
+    public int count(String path) { return (int) requests.stream().filter(r -> r.path().equals(path)).count(); }
     List<Recorded> requests(String path) { return requests.stream().filter(r -> r.path().equals(path)).toList(); }
 
     @Override public void close() {
