@@ -10,6 +10,19 @@ import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
 public final class WorkflowFixtures {
     private WorkflowFixtures() {}
 
+    public static final String CHANNELS = """
+            {"auth":{"token":"example-token"},"channels":[
+              {"id":"news","title":"News","quality":"hd"},
+              {"id":"music","title":"Music","quality":"sd"}
+            ]}
+            """;
+    public static final String REORDERED_CHANNELS = """
+            {"auth":{"token":"fresh-token"},"channels":[
+              {"id":"music","title":"Renamed Music","quality":"sd"},
+              {"id":"news","title":"Renamed News","quality":"hd"}
+            ]}
+            """;
+
     public static WorkflowDraft single(URI source) {
         return new WorkflowDraft("News", true, Mode.SINGLE, ContentKind.VIDEO,
                 new Fetch(source.toString(), List.of(new Header("Authorization", "Bearer saved-secret"))),

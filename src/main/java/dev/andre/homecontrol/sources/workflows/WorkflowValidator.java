@@ -7,7 +7,6 @@ import java.net.URISyntaxException;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
@@ -18,7 +17,6 @@ public final class WorkflowValidator {
     private static final Pattern NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,31}");
     private static final Pattern MIME = Pattern.compile("[A-Za-z0-9!#$&^_.+*-]+/[A-Za-z0-9!#$&^_.+*-]+");
     private static final Pattern HEADER_NAME = Pattern.compile("[!#$%&'*+.^_`|~0-9A-Za-z-]+");
-    private static final Pattern PLACEHOLDER = Pattern.compile("\\{([A-Za-z][A-Za-z0-9_]{0,31})\\}");
     private static final Set<String> DENIED_HEADERS = Set.of("host", "cookie", "connection", "content-length",
             "transfer-encoding", "te", "trailer", "upgrade", "keep-alive", "expect", "accept-encoding", "proxy");
 
@@ -82,35 +80,7 @@ public final class WorkflowValidator {
 
     private static void cast(Cast cast, Set<String> names) {
         if (cast == null) fail("Cast action is required");
-        String template = cast.template();
-        if (template == null || template.length() > MAX_URL) fail("invalid media URL template length");
-        Matcher matcher = PLACEHOLDER.matcher(template);
-        StringBuilder parsed = new StringBuilder();
-        int previous = 0;
-        int query = template.indexOf('?');
-        int authority = template.indexOf("://");
-        int path = authority < 0 ? -1 : template.indexOf('/', authority + 3);
-        while (matcher.find()) {
-            String literal = template.substring(previous, matcher.start());
-            if (literal.indexOf('{') >= 0 || literal.indexOf('}') >= 0) fail("invalid media URL placeholder");
-            String name = matcher.group(1);
-            if (!names.contains(name)) fail("unknown media URL placeholder: " + name);
-            int start = matcher.start();
-            if (query < 0 || start < query) {
-                if (path < 0 || start < path) fail("media URL placeholder must be in a path or query value");
-            } else {
-                int fieldStart = template.lastIndexOf('&', start);
-                fieldStart = Math.max(fieldStart, query);
-                int equals = template.indexOf('=', fieldStart + 1);
-                if (equals < 0 || equals >= start) fail("media URL placeholder must be in a query value");
-            }
-            parsed.append(literal).append('x');
-            previous = matcher.end();
-        }
-        String tail = template.substring(previous);
-        if (tail.indexOf('{') >= 0 || tail.indexOf('}') >= 0) fail("invalid media URL placeholder");
-        parsed.append(tail);
-        url(parsed.toString(), "media URL template");
+        new WorkflowTemplate(cast.template(), names);
         String mime = cast.mimeType();
         if (mime == null || mime.length() > 100 || !MIME.matcher(mime).matches()) fail("invalid media type");
     }
@@ -133,8 +103,7 @@ public final class WorkflowValidator {
     }
 
     private static void artwork(String value) {
-        URI uri = url(value, "artwork URL");
-        if (!uri.getScheme().equalsIgnoreCase("https") || uri.getRawQuery() != null) fail("invalid artwork URL");
+        if (WorkflowJson.artwork(value) == null) fail("invalid artwork URL");
     }
 
     private static void pointer(String value, String field, boolean required) {
