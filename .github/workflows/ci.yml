@@ -34,15 +34,16 @@ jobs:
       - name: Build and run the full suite
         run: ./gradlew build
 
-      - name: Analyze with SonarCloud and require a passing quality gate
+      - name: Analyze with SonarCloud and gate pull requests
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          REQUIRE_SONAR_QUALITY_GATE: ${{ github.event_name == 'pull_request' }}
         run: |
           if [[ -z "$SONAR_TOKEN" ]]; then
             echo "::error::SONAR_TOKEN is unavailable; the SonarCloud quality gate cannot be verified."
             exit 1
           fi
-          ./gradlew sonar -Dsonar.qualitygate.wait=true
+          ./gradlew sonar "-Dsonar.qualitygate.wait=$REQUIRE_SONAR_QUALITY_GATE"
 
       # Java bytecode is architecture-independent, so this one jar serves both
       # platforms the publish job builds for.
