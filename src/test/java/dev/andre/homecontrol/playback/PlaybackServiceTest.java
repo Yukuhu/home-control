@@ -74,6 +74,25 @@ class PlaybackServiceTest {
     }
 
     @Test
+    void workflowPlansWithoutExecutingAndPlayDelegatesExactlyOnce() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(Set.of(Capability.CAST_RECEIVER));
+        var route = new Route.WorkflowCast("w-0123456789ab", 1, "single");
+        var item = new ContentItem("w-0123456789ab", "workflows", ContentKind.VIDEO, "News", null, null,
+                List.of(new PlayableRef.WorkflowCast("w-0123456789ab", 1, "single")));
+        given(executor.executes(route)).willReturn(true);
+        var workflows = new PlaybackService(devices,
+                new PlaybackPlanner(List.of(new dev.andre.homecontrol.core.playback.WorkflowCastStrategy())),
+                List.of(), List.of(executor));
+        assertThat(workflows.plan(item, "shield")).isEqualTo(route);
+        assertThat(workflows.preview(item, "shield").routes()).containsExactly(route);
+        verify(executor, never()).execute(any(), any());
+        assertThat(workflows.play(item, "shield")).isEqualTo(route);
+        verify(executor).execute(route, shield);
+        verify(devices, never()).execute(any(), any());
+    }
+
+    @Test
     void executesARenderRoute() {
         Device speaker = new Device("upnp-10-0-0-30", "Kitchen Speaker", DeviceKind.UPNP, "10.0.0.30",
                 Map.of("upnp", Map.of()), Instant.now());

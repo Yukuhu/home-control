@@ -9,6 +9,7 @@ public final class RouteKeys {
     public static String key(Route route) {
         return switch (route) {
             case Route.OpenAppLink ignored -> "app-link";
+            case Route.WorkflowCast ignored -> "workflow-cast";
             case Route.Cast cast -> "cast:" + cast.receiverAppId();
             case Route.CastMessage message -> "cast-message:" + message.receiverAppId();
             case Route.JellyfinSession ignored -> "jellyfin-session";

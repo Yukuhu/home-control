@@ -13,6 +13,7 @@ import dev.andre.homecontrol.core.playback.LocalAudioSinkStrategy;
 import dev.andre.homecontrol.core.playback.MediaRendererStrategy;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.YouTubeLoungeStrategy;
+import dev.andre.homecontrol.core.playback.WorkflowCastStrategy;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.discovery.MdnsBrowser;
 import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
@@ -41,7 +42,7 @@ public class HomeControlConfiguration {
         // receiver's best-effort remote pairing, custom-message receivers, then LOADs, then bare streams
         // on the Default Media Receiver), then media renderers (DLNA/UPnP/Sonos), then the server's own
         // player for local audio sinks (Bluetooth).
-        return new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), new AppLinkStrategy(),
+        return new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), new AppLinkStrategy(), new WorkflowCastStrategy(),
                 new YouTubeLoungeStrategy(), new CastMessageStrategy(), new CastLoadStrategy(),
                 new CastStreamStrategy(), new MediaRendererStrategy(), new LocalAudioSinkStrategy()));
     }

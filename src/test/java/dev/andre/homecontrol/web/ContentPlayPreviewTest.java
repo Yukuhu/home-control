@@ -87,6 +87,26 @@ class ContentPlayPreviewTest {
     }
 
     @Test
+    void workflowPreviewExposesOnlySafeRouteMetadata() throws Exception {
+        var workflow = mock(ContentSource.class);
+        var item = new ContentItem("w-0123456789ab", "workflows", ContentKind.VIDEO,
+                "News", null, null, List.of(new PlayableRef.WorkflowCast("w-0123456789ab", 1, "single")));
+        given(devices.device("living")).willReturn(Optional.of(living));
+        given(sources.find("workflows")).willReturn(Optional.of(workflow));
+        given(workflow.item(item.id())).willReturn(Optional.of(item));
+        given(playback.preview(item, "living")).willReturn(new PlaybackPreview(living,
+                List.of(new Route.WorkflowCast("w-0123456789ab", 1, "single")), null));
+        mockMvc.perform(get("/devices/living/route-preview").param("source", "workflows").param("item", item.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.route.key").value("workflow-cast"))
+                .andExpect(jsonPath("$.route.description").value("Cast with the Default Media Receiver"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("http"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("token"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("w-0123456789ab"))));
+        verify(playback, never()).attempt(any(), any(), any());
+    }
+
+    @Test
     void anUnroutablePreviewIsStill200() throws Exception {
         known();
         given(playback.preview(theItem, "living")).willReturn(new PlaybackPreview(living, List.of(), "x"));

@@ -155,6 +155,11 @@ public class PlaybackService {
                     .findFirst()
                     .orElseThrow(() -> new UnroutableException(device.name() + ": Jellyfin is switched off on this server"))
                     .execute(session, device);
+            case Route.WorkflowCast workflow -> executors.stream()
+                    .filter(executor -> executor.executes(workflow))
+                    .findFirst()
+                    .orElseThrow(() -> new UnroutableException(device.name() + ": Workflows are switched off on this server"))
+                    .execute(workflow, device);
             case Route.YouTubeLounge lounge -> executors.stream()
                     .filter(executor -> executor.executes(lounge))
                     .findFirst()

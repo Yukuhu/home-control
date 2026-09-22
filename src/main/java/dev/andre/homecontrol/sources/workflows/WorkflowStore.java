@@ -181,7 +181,10 @@ public final class WorkflowStore {
         changed();
     }
 
-    /** Keeps an authorized catalog publication or final Cast dispatch atomic with edits/removal. */
+    /**
+     * Keeps an authorized catalog publication or final Cast dispatch atomic with edits/removal.
+     * The callback must not fetch upstream data or invoke store mutation methods.
+     */
     public void ifCurrent(String id, long revision, Runnable operation) {
         ReentrantLock stripe = stripe(id);
         stripe.lock();

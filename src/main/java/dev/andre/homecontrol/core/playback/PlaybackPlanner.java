@@ -63,6 +63,7 @@ public class PlaybackPlanner {
                         reasons.add("this device cannot open app links");
                     }
                 }
+                case PlayableRef.WorkflowCast ignored -> reasons.add("this device is not a Cast receiver");
                 case PlayableRef.CastLoad ignored -> reasons.add("this device is not a Cast receiver");
                 case PlayableRef.CastMessage ignored -> reasons.add("this device is not a Cast receiver");
                 case PlayableRef.YouTubeLounge ignored -> reasons.add("this device is not a Cast receiver");

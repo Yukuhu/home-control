@@ -46,6 +46,11 @@ public sealed interface Route {
         }
     }
 
+    /** Deferred workflow execution, available only to Cast receivers. */
+    record WorkflowCast(String workflowId, long revision, String entryKey) implements Route {
+        @Override public String describe() { return "Cast with the Default Media Receiver"; }
+    }
+
     /** Run a Cast receiver app and send it a LOAD (spec §5.3 rung 3). */
     record Cast(String receiverAppId, Map<String, Object> load) implements Route {
 

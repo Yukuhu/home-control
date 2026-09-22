@@ -23,6 +23,11 @@ public sealed interface PlayableRef {
         }
     }
 
+    /** Opaque workflow identity; never contains a resolved URL or credentials. */
+    record WorkflowCast(String workflowId, long revision, String entryKey) implements PlayableRef {
+        @Override public String kindLabel() { return "workflow Cast"; }
+    }
+
     record CastLoad(String receiverAppId, Map<String, Object> payload) implements PlayableRef {
         @Override
         public String kindLabel() {
