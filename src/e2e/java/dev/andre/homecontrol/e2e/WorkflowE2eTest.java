@@ -77,7 +77,8 @@ class WorkflowE2eTest extends E2eApplicationTest {
         row.getByLabel("Variable name").fill(name);
         row.getByLabel("Read from").selectOption(scope);
         row.getByLabel("JSON Pointer").fill(pointer);
-        if (sensitive) row.getByLabel("Sensitive value").check();
+        assertThat(row.getByLabel("Sensitive value")).isChecked();
+        if (!sensitive) row.getByLabel("Sensitive value").uncheck();
     }
 
     private static void fillNew(Page page, FakeWorkflowServer upstream, boolean generated) {
@@ -133,6 +134,32 @@ class WorkflowE2eTest extends E2eApplicationTest {
     }
 
     @BrowserTest
+    void mappingScopesFollowModeIncludingNewRowsAndTransitions(String browser) {
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+            page.navigate("/setup/workflows/new");
+            button(page, "Add mapping").click();
+            assertThat(mapping(page, 0).getByLabel("Sensitive value")).isChecked();
+            assertThat(mapping(page, 0).locator("select[data-field='scope'] option")).hasCount(1);
+            assertThat(mapping(page, 0).getByLabel("Read from")).hasValue("ROOT");
+            label(page, "Tile mode").selectOption("GENERATED");
+            assertThat(mapping(page, 0).locator("select[data-field='scope'] option")).hasCount(2);
+            mapping(page, 0).getByLabel("Read from").selectOption("ENTRY");
+            label(page, "Tile mode").selectOption("SINGLE");
+            assertThat(mapping(page, 0).getByLabel("Read from")).hasValue("ROOT");
+            assertThat(mapping(page, 0).locator("select[data-field='scope'] option")).hasCount(1);
+            assertThat(page.locator("#workflow-mappings")).containsText("Switching to one tile changes all mappings to Whole response");
+            button(page, "Add mapping").click();
+            assertThat(mapping(page, 1).locator("select[data-field='scope'] option")).hasCount(1);
+            label(page, "Tile mode").selectOption("GENERATED");
+            assertThat(mapping(page, 0).getByLabel("Read from")).hasValue("ROOT");
+            assertThat(mapping(page, 1).locator("select[data-field='scope'] option")).hasCount(2);
+            mapping(page, 1).getByLabel("Read from").selectOption("ENTRY");
+            assertThat(mapping(page, 1).getByLabel("Read from")).hasValue("ENTRY");
+        }
+    }
+
+    @BrowserTest
     void singleSaveKeepTestTileAndExplicitRetry(String browser) {
         try (FakeWorkflowServer upstream = upstream(); BrowserSession session = open(browser)) {
             feed(upstream, TOKEN, false);
@@ -163,9 +190,27 @@ class WorkflowE2eTest extends E2eApplicationTest {
                 assertFits(page, width);
                 if (width != 320) screenshot(page, browser, width, "editor");
             }
-            button(page, "Test workflow").click();
+            assertThat(mapping(page, 0).getByLabel("Sensitive value")).not().isChecked();
+            assertThat(mapping(page, 1).getByLabel("Sensitive value")).isChecked();
+            page.navigate("/setup#workflows");
+            Locator setup = page.locator("#workflows");
+            assertThat(setup).containsText("Single tile");
+            assertThat(setup.getByRole(AriaRole.LINK, new Locator.GetByRoleOptions().setName("Edit").setExact(true))).isVisible();
+            assertThat(setup).containsText("Fetches fresh data");
+            assertThat(setup).containsText("without playback");
+            Locator testForm = setup.locator("form[action$='/test']");
+            assertThat(testForm).hasAttribute("method", "post");
+            assertThat(testForm.locator("input[name='expectedRevision']")).hasValue(Long.toString(workflows.all().getFirst().revision()));
+            org.assertj.core.api.Assertions.assertThat(upstream.count("/feed")).isZero();
+            for (int width : new int[]{390, 1440}) {
+                page.setViewportSize(width, width == 1440 ? 1000 : 844);
+                assertFits(page, width);
+                screenshot(page, browser, width, "setup-final");
+            }
+            testForm.getByRole(AriaRole.BUTTON, new Locator.GetByRoleOptions().setName("Test workflow")).click();
             assertThat(page.locator(".workflow-stages")).containsText("Fetch JSON");
             assertThat(page.locator(".workflow-sample")).containsText("News");
+            assertThat(page.locator(".workflow-sample")).containsText("C = •••");
             assertPrivate(page);
             org.assertj.core.api.Assertions.assertThat(upstream.count("/feed")).isEqualTo(1);
             org.assertj.core.api.Assertions.assertThat(fakeDevices.recorded()).isEmpty();

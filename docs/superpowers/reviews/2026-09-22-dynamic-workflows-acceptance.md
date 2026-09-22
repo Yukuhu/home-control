@@ -23,6 +23,56 @@ Synthetic visual artifacts from the workflow browser test:
 
 The five identically titled “Flaky rail” sections in dashboard screenshots are intentional, distinct browser-test fixture rails with IDs `e2e/flaky` through `e2e/flaky-5`. The workflow browser scenario checks that all five `data-rail` values are unique; their shared title is not duplicate rendering of one rail.
 
+## Final review fixes — amended-code evidence
+
+The preceding full-build and 42-case browser results describe the pre-fix implementation
+(`d686d29`); the binder correction was verified separately at `61d5d13`. The combined final
+review fixes were then verified on the amended code with:
+
+```bash
+./gradlew --offline --console=plain test --tests '*Workflow*' \
+  e2eTest -Pe2eBrowsers=chromium,webkit \
+  --tests '*WorkflowE2eTest' --tests '*PlaySheetE2eTest' \
+  --tests '*LoginGatingE2eTest' --tests '*InterfaceE2eTest'
+```
+
+Result: **189 workflow unit/MVC tests and 44 browser cases passed**, with zero failures,
+errors or skips, in 49 seconds. Browser coverage comprises Workflow 6, Play sheet 8,
+Login 6 and Interface 24 across Chromium and WebKit. This run used the same local
+Playwright browser/runtime environment described above. The baseline full build was
+not repeated: the fixes were confined to workflow parsing, editor/results and Setup,
+and the amended suites exercised those changes and their surrounding UI integrations.
+
+The initial 61-case focused Java/MVC run reproduced seven failures: numeric identity
+precision, numeric mapping precision, exponent bounds, disappearing numeric ID selecting
+its rounded neighbor at Play, the Sensitive default, missing Setup controls and safe Test
+diagnostics. All 61 passed after the fixes. The new Chromium tests first failed on the
+unchecked mapping default; an independent run with the original JavaScript then failed
+on single mode offering two contexts. Both engines now pass the corrected behavior.
+
+Verified outcomes:
+
+- Exact decimal parsing distinguishes neighboring large integral IDs, rejects truly
+  fractional IDs, preserves numeric `1`/`1.0` equivalence and text `"1"` distinction,
+  and retains exact numeric URL substitutions. Missing precise IDs send no Cast action.
+- Huge exponents are handled without expanding unbounded integers or plain decimal
+  strings. Boundary, overflow, fractional and scientific-notation regressions pass.
+- Untouched new mappings start Sensitive and mask Test output. Explicitly unchecked
+  mappings and saved false values remain false across browser Save and MVC binding.
+- Test distinguishes safe HTTP status, busy, timeout, missing mapping and duplicate-entry
+  diagnostics; unexpected exceptions, causes, parser excerpts and sensitive values stay hidden.
+- Setup displays both modes, Edit and a Test POST containing the saved revision and a
+  fresh-fetch/no-playback explanation. Setup GET does not fetch the single-workflow feed;
+  pressing Test fetches once and sends no device action.
+- Single mode offers only Whole response, including dynamically added mappings. Mode
+  changes reset entry scopes explicitly; switching back permits deliberate entry selection.
+  Existing server-side scope validation remains in place.
+
+Updated synthetic editor and Dashboard screenshots use the filenames listed above.
+New Setup screenshots are `/tmp/workflow-setup-final-{390,1440}-{chromium,webkit}.png`.
+The mobile editor and desktop Setup were visually inspected; browser layout assertions
+also passed at the tested widths. Physical Cast acceptance below remains unchecked.
+
 ## Physical Cast acceptance — unchecked
 
 - [ ] On a real household installation, save one single-tile workflow against a reachable JSON feed and inspect its Dashboard tile.
@@ -52,3 +102,7 @@ These decisions and costs are carried from the root execution ledger so they rem
 - **Ruling:** Allow explicit authenticated Test of disabled saved workflows, with revision checks before and after. Cost: pressing Test can deliberately fetch even while the workflow is disabled.
 - **Ruling:** Add optional subtitle/artwork pointer toggles and exact binder marker allowances so omitted pointers and empty-root pointers both round-trip. Cost: two additional controls.
 - **Ruling:** Describe Save as never starting playback while explaining that generated catalog refresh can fetch after a content change. Cost: users must distinguish persistence from background refresh; the copy no longer promises zero requests for generated saves.
+
+- **Ruling:** Parse JSON decimals exactly; explicitly retain Jackson's 1,000-character numeric-token limit and cap expanded whole-number entry IDs at 1,000 decimal digits before integer conversion. Preserve existing typed integer hashes, including numeric `1`/`1.0` equivalence. Numeric mappings can use scientific notation without losing precision. Cost: extreme-exponent integral IDs are rejected, and downstream media endpoints must accept the exact numeric representation used in substitutions.
+- **Ruling:** Switching generated workflows to one tile resets ENTRY mappings to ROOT and shows a pointer-review explanation. Switching back requires deliberately selecting Current entry again. Cost: previous per-entry scope choices are not automatically restored; users must review their pointers.
+- **Ruling:** Reuse only the locally authored safe `WorkflowException` message in Test results; retain generic fallback for unexpected exceptions. Cost: new exception producers must maintain that safe-context contract and never include upstream text, URLs or causes.
