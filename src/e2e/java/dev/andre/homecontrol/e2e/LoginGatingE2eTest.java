@@ -44,6 +44,9 @@ class LoginGatingE2eTest extends E2eApplicationTest {
             Page page = session.page();
             page.navigate("/?device=living");
             assertThat(page).hasURL(Pattern.compile(".*/login.*"));
+            page.screenshot(new Page.ScreenshotOptions().setPath(java.nio.file.Path.of(
+                    System.getProperty("e2e.artifacts", "build/e2e-artifacts"), "ui-login-" + browser + ".png")));
+
 
             page.locator("input[name=password]").fill("wrong");
             page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Log in")).click();

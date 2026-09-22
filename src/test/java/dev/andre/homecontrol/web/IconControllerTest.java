@@ -60,7 +60,7 @@ class IconControllerTest {
     private void assertOpaqueBackground(BufferedImage image, int x, int y) {
         int rgb = image.getRGB(x, y);
         assertThat((rgb >>> 24) & 0xFF).isEqualTo(255);
-        assertThat(rgb & 0xFFFFFF).isEqualTo(0x14161a);
+        assertThat(rgb & 0xFFFFFF).isEqualTo(0x101917);
     }
 
     @Test
@@ -68,7 +68,7 @@ class IconControllerTest {
         int size = 512;
         BufferedImage image = IconRenderer.render(size, IconRenderer.Shape.ROUNDED);
         int rgb = image.getRGB((int) Math.round(0.50 * size), (int) Math.round(0.46 * size));
-        int expected = 0x3d7dff;
+        int expected = 0xb7e6a0;
         assertThat(Math.abs(((rgb >> 16) & 0xFF) - ((expected >> 16) & 0xFF))).isLessThanOrEqualTo(8);
         assertThat(Math.abs(((rgb >> 8) & 0xFF) - ((expected >> 8) & 0xFF))).isLessThanOrEqualTo(8);
         assertThat(Math.abs((rgb & 0xFF) - (expected & 0xFF))).isLessThanOrEqualTo(8);
@@ -80,7 +80,7 @@ class IconControllerTest {
         BufferedImage image = IconRenderer.render(size, IconRenderer.Shape.MASKABLE);
         double centre = size / 2.0;
         double radius = 0.4 * size;
-        int background = 0xFF000000 | 0x14161a;
+        int background = 0xFF000000 | 0x101917;
         for (int y = 0; y < size; y++) {
             for (int x = 0; x < size; x++) {
                 if (image.getRGB(x, y) == background) continue;

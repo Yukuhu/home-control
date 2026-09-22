@@ -23,8 +23,8 @@ public class PwaController {
         manifest.put("start_url", "/");
         manifest.put("scope", "/");
         manifest.put("display", "standalone");
-        manifest.put("background_color", "#14161a");
-        manifest.put("theme_color", "#14161a");
+        manifest.put("background_color", "#101917");
+        manifest.put("theme_color", "#101917");
         manifest.put("icons", List.of(
                 icon("/icons/icon.svg", "any", "image/svg+xml", "any"),
                 icon("/icons/icon-192.png", "192x192", "image/png", "any"),

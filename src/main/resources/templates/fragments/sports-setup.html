@@ -1,4 +1,5 @@
 <section id="sports" th:fragment="section">
+    <p class="eyebrow">DON'T MISS A MOMENT</p>
     <h2>Sports</h2>
     <p class="error" role="alert" th:if="${sportsError}" th:text="${sportsError}">Could not save</p>
     <p class="ok" th:if="${sportsMessage}" th:text="${sportsMessage}">Added</p>
@@ -35,7 +36,7 @@
             <code th:text="${calendar.host()}">calendar.example.org</code>
             <span class="hint" th:text="${calendar.status()}">Not loaded yet</span>
             <form method="post" th:action="@{/setup/sources/sports/calendars/{id}/remove(id=${calendar.id()})}">
-                <button type="submit" th:attr="aria-label=|Remove ${calendar.label()}|">Remove</button>
+                <button type="submit" class="danger" th:attr="aria-label=|Remove ${calendar.label()}|">Remove</button>
             </form>
         </li>
     </ul>
@@ -51,12 +52,16 @@
         <th:block th:if="${sports.needsLoginPassword()}">
             <p>A calendar link can contain a private token, so Home Control stores it as a secret and will
                 require this login password from now on.</p>
-            <input type="password" name="loginPassword" minlength="10" autocomplete="new-password"
+            <label>Home Control password (at least 10 characters)
+                <input type="password" name="loginPassword" minlength="10" autocomplete="new-password"
                    placeholder="New login password">
-            <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password"
+            </label>
+            <label>Confirm Home Control password
+                <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password"
                    placeholder="Repeat login password">
+            </label>
         </th:block>
-        <button type="submit">Add calendar</button>
+        <button type="submit" class="primary">Add calendar</button>
         <p class="hint">Links starting with webcal:// work too. Home Control only reads the calendar; it never
             changes it.</p>
     </form>
@@ -81,10 +86,14 @@
                 <input type="password" name="key" autocomplete="off">
             </label>
             <th:block th:if="${sports.needsLoginPassword()}">
+                <label>Home Control password (at least 10 characters)
                 <input type="password" name="loginPassword" minlength="10" autocomplete="new-password"
                        placeholder="New login password">
+            </label>
+                <label>Confirm Home Control password
                 <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password"
                        placeholder="Repeat login password">
+            </label>
             </th:block>
             <button type="submit">Use my key</button>
         </form>
@@ -143,7 +152,7 @@
                 <span th:text="${competition.name()}">German Bundesliga</span>
                 <span class="hint" th:text="${competition.status()}">Not loaded yet</span>
                 <form method="post" th:action="@{/setup/sources/sports/competitions/{id}/remove(id=${competition.leagueId()})}">
-                    <button type="submit" th:attr="aria-label=|Remove ${competition.name()}|">Remove</button>
+                    <button type="submit" class="danger" th:attr="aria-label=|Remove ${competition.name()}|">Remove</button>
                 </form>
             </li>
         </ul>
@@ -155,6 +164,7 @@
         <form id="sports-providers" method="post" th:action="@{/setup/sources/sports/providers}">
             <h3>Where you watch it</h3>
             <p>Tell Home Control where you watch each competition. This is your own setting: Home Control does not know broadcast rights and does not use TheSportsDB's TV listings.</p>
+            <div class="table-scroll">
             <table>
                 <thead>
                     <tr>
@@ -168,24 +178,29 @@
                         <td th:text="${calendar.label()}">Bundesliga 2026/27</td>
                         <td>Calendar</td>
                         <td>
+                            <label><span class="field-label">Streaming service</span>
                             <select th:name="'provider:calendar:' + ${calendar.id()}" th:attr="aria-label='Where you watch ' + ${calendar.label()} + ' (your setting)'">
                                 <option value="" th:selected="${calendar.provider() == ''}">Not set</option>
                                 <option th:each="option : ${sports.providers()}" th:value="${option.key()}" th:text="${option.name()}" th:selected="${option.key() == calendar.provider()}">DAZN</option>
                             </select>
+                            </label>
                         </td>
                     </tr>
                     <tr th:each="competition : ${sports.competitions()}">
                         <td th:text="${competition.name()}">German Bundesliga</td>
                         <td>TheSportsDB</td>
                         <td>
+                            <label><span class="field-label">Streaming service</span>
                             <select th:name="'provider:thesportsdb:' + ${competition.leagueId()}" th:attr="aria-label='Where you watch ' + ${competition.name()} + ' (your setting)'">
                                 <option value="" th:selected="${competition.provider() == ''}">Not set</option>
                                 <option th:each="option : ${sports.providers()}" th:value="${option.key()}" th:text="${option.name()}" th:selected="${option.key() == competition.provider()}">DAZN</option>
                             </select>
+                            </label>
                         </td>
                     </tr>
                 </tbody>
             </table>
+            </div>
             <p>Events of a competition set to DAZN, Netflix or Prime Video open that app. For other services, paste a link to the event in the play sheet.</p>
             <button type="submit">Save your settings</button>
         </form>

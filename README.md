@@ -88,7 +88,9 @@ from the remote instead.
 
 The dashboard at `/` shows rails of content from every connected source; tap a tile to see
 how it will play and on which device before committing. The remote for the currently selected
-device opens from the chevron next to it in the device strip.
+device opens from its **Remote** button in the device strip. On a desktop it opens beside
+the library; on a phone it opens as a bottom panel. Press Escape or use the close button to
+return to browsing.
 
 The remote drawer has a **Touchpad** mode alongside the usual buttons: tap the pad for OK,
 swipe to move (a longer swipe sends more steps, up to four at once), and hold for a long press
@@ -100,7 +102,10 @@ To install Home Control on a phone or tablet's home screen, open **Setup** and u
 plain HTTP the installed icon opens the dashboard like a bookmark; offline support and the
 installed app's own icon need HTTPS, typically through a reverse proxy.
 
-Keyboard shortcuts on a desktop browser are unchanged: arrow keys and Enter drive the D-pad,
+The **Setup** page groups devices, content connections, dashboard preferences, and app
+installation with section navigation. Forms stack on smaller screens and have visible labels.
+
+Keyboard shortcuts on a desktop browser work when no button or form field is focused: arrow keys and Enter drive the D-pad,
 Backspace is Back, Space is Play/Pause, `h` is Home and `m` toggles mute, aimed at whichever
 device is selected.
 

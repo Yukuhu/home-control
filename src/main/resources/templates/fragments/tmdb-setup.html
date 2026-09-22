@@ -1,6 +1,8 @@
 <section id="tmdb" th:fragment="section">
-    <h2>TMDB (movies and series)</h2>
-    <p class="error" th:if="${tmdbError}" th:text="${tmdbError}">TMDB rejected the request</p>
+    <p class="eyebrow">FIND YOUR NEXT FAVORITE</p>
+    <h2>Movies &amp; series</h2>
+    <p class="hint">Powered by TMDB: discover trending titles, artwork, and where to watch.</p>
+    <p class="error" role="alert" th:if="${tmdbError}" th:text="${tmdbError}">TMDB rejected the request</p>
     <p class="hint" th:if="${tmdbMessage}" th:text="${tmdbMessage}">TMDB connected</p>
 
     <p>TMDB supplies titles, artwork, trending lists and where a title streams. Netflix, Prime Video and DAZN have
@@ -12,7 +14,7 @@
             <button type="submit">Test connection</button>
         </form>
         <form method="post" th:action="@{/setup/sources/tmdb/disconnect}">
-            <button type="submit">Disconnect</button>
+            <button type="submit" class="danger">Disconnect</button>
         </form>
     </th:block>
 
@@ -23,11 +25,15 @@
         <p class="hint">Find it under <a href="https://www.themoviedb.org/settings/api" target="_blank"
                                           rel="noreferrer">your TMDB account settings</a>.</p>
         <th:block th:if="${tmdb.needsLoginPassword()}">
-            <p>Connecting a content source stores a secret, so Home Control will require this login password from now on.</p>
-            <input type="password" name="loginPassword" minlength="10" autocomplete="new-password" placeholder="New login password">
-            <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password" placeholder="Repeat login password">
+            <p>Create a Home Control password to keep your connected accounts private. You will use it to log in from now on.</p>
+            <label>Home Control password (at least 10 characters)
+                <input type="password" name="loginPassword" minlength="10" autocomplete="new-password" placeholder="New login password">
+            </label>
+            <label>Confirm Home Control password
+                <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password" placeholder="Repeat login password">
+            </label>
         </th:block>
-        <button type="submit" th:text="${tmdb.configured()} ? 'Reconnect' : 'Connect'">Connect</button>
+        <button type="submit" class="primary" th:text="${tmdb.configured()} ? 'Reconnect' : 'Connect'">Connect</button>
     </form>
 
     <p class="hint">This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability data by JustWatch.</p>

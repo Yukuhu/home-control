@@ -1,5 +1,6 @@
 import { stateOf } from "./state-view.js";
 import { toast } from "./toast.js";
+import { bindChoiceKeys } from "./choice-keys.js";
 
 export const APP_LINK_HINT_MS = 5000;
 
@@ -74,6 +75,7 @@ function selectDevice(deviceId) {
     target = deviceId;
     for (const button of sheet().querySelectorAll("[data-sheet-device]")) {
         button.setAttribute("aria-checked", String(button.dataset.sheetDevice === deviceId));
+        button.tabIndex = button.dataset.sheetDevice === deviceId ? 0 : -1;
     }
     preview();
 }
@@ -195,6 +197,8 @@ export function openPlaySheet(tile) {
 
 export function initPlaySheet() {
     if (!sheet()) return;
+    bindChoiceKeys(sheet().querySelector(".sheet-devices"), "[data-sheet-device]",
+        (button) => selectDevice(button.dataset.sheetDevice));
     document.addEventListener("click", (event) => {
         const tile = event.target.closest("button.tile");
         if (tile && tile.dataset.item) openPlaySheet(tile);

@@ -74,7 +74,7 @@ class LoginGatingTest {
     void aDeviceOnlyDeploymentIsUnchanged() throws Exception {
         mockMvc.perform(get("/setup").accept("text/html"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString("Login password"))))
+                .andExpect(content().string(not(containsString("Current password"))))
                 .andExpect(header().doesNotExist("Set-Cookie"))
                 .andExpect(header().doesNotExist("X-Frame-Options"));
         mockMvc.perform(post("/devices/nope/key/HOME").header("Host", "localhost").header("Origin", "http://localhost"))
@@ -132,7 +132,7 @@ class LoginGatingTest {
 
         mockMvc.perform(get("/setup").session(session).accept("text/html"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Login password")))
+                .andExpect(content().string(containsString("Current password")))
                 .andExpect(content().string(not(containsString("0123456789abcdef"))))
                 .andExpect(content().string(not(containsString("argon2id"))));
         mockMvc.perform(post("/logout").session(session)).andExpect(redirectedUrl("/login"));

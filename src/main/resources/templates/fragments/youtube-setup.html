@@ -1,26 +1,28 @@
 <section th:fragment="section" id="youtube">
+    <p class="eyebrow">SOMETHING WORTH WATCHING</p>
     <h2>YouTube</h2>
-    <p class="error" th:if="${youtubeError}" th:text="${youtubeError}">YouTube rejected the request</p>
+    <p class="hint">Bring your household subscriptions and favorite playlists to the big screen.</p>
+    <p class="error" role="alert" th:if="${youtubeError}" th:text="${youtubeError}">YouTube rejected the request</p>
     <p class="hint" th:if="${youtubeMessage}" th:text="${youtubeMessage}">Connected</p>
 
     <th:block th:if="${youtube.connected()}">
         <p th:text="${(youtube.channelTitle() != null and !youtube.channelTitle().isEmpty()) ? 'Connected as ' + youtube.channelTitle() : 'Connected'}">Connected as Andre</p>
-        <p class="error" th:if="${youtube.revoked()}">Google no longer accepts the saved authorization. Connect again below.</p>
+        <p class="error" role="alert" th:if="${youtube.revoked()}">Google no longer accepts the saved authorization. Connect again below.</p>
         <form method="post" th:action="@{/setup/sources/youtube/test}">
             <button type="submit">Test connection</button>
         </form>
         <form method="post" th:action="@{/setup/sources/youtube/disconnect}">
-            <button type="submit">Disconnect</button>
+            <button type="submit" class="danger">Disconnect</button>
         </form>
 
         <fieldset>
-            <legend>Rails</legend>
+            <legend>Playlists on your dashboard</legend>
             <form method="post" th:action="@{/setup/sources/youtube/watch-later}">
                 <input type="hidden" name="enabled" th:value="${!youtube.watchLater()}">
                 <button type="submit" th:text="${youtube.watchLater()} ? 'Hide Watch Later' : 'Show Watch Later'">Show Watch Later</button>
             </form>
             <p class="hint">YouTube stopped sharing Watch Later with other apps for most accounts in 2016. If the
-                rail says so, save videos to a playlist of your own and show that instead.</p>
+                content row says so, save videos to a playlist of your own and show that instead.</p>
 
             <form method="post" th:action="@{/setup/sources/youtube/playlists/load}">
                 <button type="submit">Load my playlists</button>
@@ -35,7 +37,7 @@
                 <button type="submit">Save playlists</button>
             </form>
             <p class="hint" th:if="${!#lists.isEmpty(youtube.playlists())}">Each shown playlist refreshes hourly and
-                costs 1 unit per refresh. Order rails in &ldquo;Sources&rdquo; above.</p>
+                costs 1 unit per refresh. Arrange these rows in <a href="#sources">Dashboard preferences</a>.</p>
         </fieldset>
     </th:block>
 
@@ -54,8 +56,8 @@
         </ul>
     </th:block>
 
-    <fieldset class="youtube-lounge">
-        <legend>YouTube Cast (best effort)</legend>
+    <details class="youtube-lounge">
+        <summary>YouTube on Cast devices (experimental)</summary>
         <p class="hint">Chromecasts and other Cast-only screens cannot open the YouTube app link. For them Home Control
             can start videos through YouTube&rsquo;s unofficial &ldquo;Lounge&rdquo; interface that phones use. Google
             does not document it and changes it without notice, so it can stop working at any time. It is off until
@@ -68,9 +70,9 @@
             <span th:text="|${d.name()}: YouTube Cast ${d.enabled() ? 'on' : 'off'}|">Kitchen: YouTube Cast off</span>
             <button type="submit" th:text="${d.enabled()} ? 'Switch YouTube Cast off' : 'Switch YouTube Cast on'">Switch YouTube Cast on</button>
         </form>
-    </fieldset>
+    </details>
 
-    <details th:open="${!youtube.hasClient()}">
+    <details>
         <summary>How to create your own Google OAuth client (about 10 minutes)</summary>
         <ol>
             <li>Open https://console.cloud.google.com/ and create a project, for example &ldquo;Home Control&rdquo;.</li>
@@ -108,11 +110,15 @@
         </label>
         <p class="hint" th:if="${youtube.hasClient()}">Leave empty to keep the saved secret</p>
         <th:block th:if="${youtube.needsLoginPassword()}">
-            <p>Connecting a content source stores a secret, so Home Control will require this login password from now on.</p>
-            <input type="password" name="loginPassword" minlength="10" autocomplete="new-password" placeholder="New login password">
-            <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password" placeholder="Repeat login password">
+            <p>Create a Home Control password to keep your connected accounts private. You will use it to log in from now on.</p>
+            <label>Home Control password (at least 10 characters)
+                <input type="password" name="loginPassword" minlength="10" autocomplete="new-password" placeholder="New login password">
+            </label>
+            <label>Confirm Home Control password
+                <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password" placeholder="Repeat login password">
+            </label>
         </th:block>
-        <button type="submit" th:formaction="@{/setup/sources/youtube/browser/connect}"
+        <button type="submit" class="primary" th:formaction="@{/setup/sources/youtube/browser/connect}"
                 th:disabled="${!youtubeBrowserSupported}">Sign in with Google</button>
         <button type="submit">Use a device code</button>
     </form>

@@ -1,12 +1,14 @@
-<section th:fragment="sources(view)" th:if="${view != null}" id="sources" class="setup">
-    <h2>Content sources</h2>
+<section th:fragment="sources(view)" th:if="${view != null}" id="sources">
+    <p class="eyebrow">DASHBOARD PREFERENCES</p>
+    <h2>Make room for your favorites</h2>
+    <p class="hint">Choose which content sources appear at home and arrange them in the order you like.</p>
     <p class="hint" th:if="${sourcesMessage}" th:text="${sourcesMessage}">Jellyfin is shown on the dashboard</p>
-    <p class="error" th:if="${sourcesError}" th:text="${sourcesError}">No content source nope</p>
+    <p class="error" role="alert" th:if="${sourcesError}" th:text="${sourcesError}">No content source nope</p>
 
-    <ul>
+    <ul class="source-preferences">
         <li th:each="row : ${view.sources()}">
-            <span th:text="${row.name()}">Jellyfin</span> —
-            <span th:text="${row.available()} ? 'Connected' : 'Not connected'">Connected</span>
+            <strong th:text="${row.name()}">Jellyfin</strong>
+            <span class="badge" th:classappend="${row.available()} ? 'ok' : ''" th:text="${row.available()} ? 'Connected' : 'Not connected'">Connected</span>
 
             <form method="post" th:action="@{'/setup/sources/preferences/' + ${row.id()} + '/enabled'}">
                 <input type="hidden" name="enabled" th:value="${!row.enabled()}">
@@ -24,8 +26,9 @@
         </li>
     </ul>
 
-    <h3>Rails</h3>
-    <ol>
+    <h3>Content row order</h3>
+    <p class="hint">Move your most-used rows to the top, or hide the ones you do not need.</p>
+    <ol class="rail-preferences">
         <li th:each="rail : ${view.rails()}">
             <span th:text="${rail.title()} + ' · ' + ${rail.sourceName()}">Continue watching · Jellyfin</span>
 
@@ -49,12 +52,13 @@
 
     <h3>Language and services</h3>
     <form method="post" th:action="@{/setup/sources/preferences/locale}">
-        <label>Language tag
+        <label>Language
             <input name="locale" th:value="${view.locale()}" placeholder="de-DE" required>
         </label>
-        <label>Country
+        <label>Country code
             <input name="region" th:value="${view.region()}" maxlength="2" placeholder="DE" required>
         </label>
+        <p class="hint">Use a language code such as en-US or de-DE, and a two-letter country code such as US or DE.</p>
         <fieldset>
             <legend>Streaming services</legend>
             <label th:each="provider : ${view.providers()}">

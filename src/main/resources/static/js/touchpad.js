@@ -1,6 +1,7 @@
 import { classify, withinSlop, HOLD_MS } from "./touchpad-gestures.js";
 import { sendKey } from "./remote-transport.js";
 import { toast } from "./toast.js";
+import { bindChoiceKeys } from "./choice-keys.js";
 
 const MODE_KEY = "homecontrol.remote.mode.v1";
 const MODES = ["buttons", "touchpad"];
@@ -41,6 +42,7 @@ export function initTouchpad(root = document) {
         drawer.dataset.mode = mode;
         for (const tab of drawer.querySelectorAll("[data-mode-switch] [data-mode]")) {
             tab.setAttribute("aria-selected", String(tab.dataset.mode === mode));
+            tab.tabIndex = tab.dataset.mode === mode ? 0 : -1;
         }
         writeMode(mode);
     }
@@ -116,6 +118,8 @@ export function initTouchpad(root = document) {
         const tab = event.target.closest("[data-mode]");
         if (tab) setMode(tab.dataset.mode);
     });
+    bindChoiceKeys(drawer.querySelector("[data-mode-switch]"), "[data-mode]",
+        (tab) => setMode(tab.dataset.mode));
 
     document.addEventListener("homecontrol:state", (event) => {
         if (event.detail.deviceId === deviceId) setAvailable(event.detail.state.status === "CONNECTED");

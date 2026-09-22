@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#14161a">
+    <meta name="theme-color" content="#101917">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,28 +16,80 @@
     <script th:src="@{/vendor/htmx.min.js}" defer></script>
 </head>
 <body>
-<header>
-    <a th:href="@{/}">← Home</a>
+<a class="skip-link" href="#main-content">Skip to setup</a>
+<header class="app-header">
+    <a class="brand" th:href="@{/}" aria-label="Home Control home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg></span><span>Home<span class="brand-light">Control</span></span></a>
+    <nav class="header-nav" aria-label="Main navigation">
+        <a th:href="@{/}">Home</a>
+        <a th:href="@{/setup}" aria-current="page">Setup</a>
+    </nav>
 </header>
 
-<main class="setup">
-    <p class="error" th:if="${error}" th:text="${error}">Something went wrong</p>
+<main class="setup" id="main-content">
+    <div class="page-heading">
+        <div>
+            <p class="eyebrow">MAKE YOURSELF AT HOME</p>
+            <h1>Your home, your way.</h1>
+            <p>Connect your devices, bring in your favorites, and make this space yours.</p>
+        </div>
+        <a class="button" th:href="@{/}" th:if="${!#lists.isEmpty(paired)}">Back to home <span aria-hidden="true">↗</span></a>
+    </div>
+    <p class="error" role="alert" th:if="${error}" th:text="${error}">Something went wrong</p>
+
+    <div class="setup-layout">
+    <nav class="setup-nav" aria-label="Setup sections">
+        <p class="eyebrow">SETUP</p>
+        <a href="#devices"><span aria-hidden="true">01</span> Devices</a>
+        <a href="#connections" th:if="${jellyfin != null or youtube != null or tmdb != null or sports != null or pinned != null}"><span aria-hidden="true">02</span> Content sources</a>
+        <a href="#sources" th:if="${sourcesSetup != null}"><span aria-hidden="true">03</span> Dashboard</a>
+        <a href="#account" th:if="${loginRequired}"><span aria-hidden="true">04</span> Account</a>
+        <a href="#install"><span aria-hidden="true">↗</span> Install app</a>
+        <p class="hint">A little setup.<br>A home that feels connected.</p>
+    </nav>
+    <div class="setup-content">
+    <div id="devices" class="setup-category">
+        <p class="eyebrow">YOUR DEVICES</p>
+        <h2>Bring your home together</h2>
+        <p>Connect a TV or speaker on your home network to get started.</p>
+    </div>
+
+    <section class="setup-welcome" th:if="${#lists.isEmpty(paired) and !awaitingCode}">
+        <span class="badge">Welcome home</span>
+        <h2>One place for your next play.</h2>
+        <p>Start with a device below. Then add your media libraries, playlists, and favorite links.</p>
+        <ol class="setup-steps">
+            <li><strong>Connect a device</strong><span>Keep your TV or speaker on and on the same network.</span></li>
+            <li><strong>Add your favorites</strong><span>Connect the content sources you use at home.</span></li>
+            <li><strong>Make it yours</strong><span>Choose what appears on your dashboard.</span></li>
+        </ol>
+    </section>
 
     <section th:if="${awaitingCode}">
+        <p class="eyebrow">FINISH CONNECTING</p>
         <h2>Enter the code shown on your TV</h2>
+        <p class="hint">Your TV is waiting. Enter its six-character code to finish pairing.</p>
         <form method="post" th:action="@{/setup/code}">
-            <input name="code" maxlength="6" minlength="6" autocomplete="off"
-                   autofocus placeholder="A1B2C3" required>
-            <button type="submit">Pair</button>
+            <label>Pairing code
+                <input name="code" class="pairing-code" maxlength="6" minlength="6" autocomplete="off"
+                       autocapitalize="characters" spellcheck="false" autofocus placeholder="A1B2C3" required>
+            </label>
+            <button type="submit" class="primary">Pair device</button>
         </form>
     </section>
 
     <section th:unless="${awaitingCode}">
-        <h2>Devices on this network</h2>
-        <p th:if="${#lists.isEmpty(discovered)}">
-            Nothing found. If this app runs in Docker, mDNS needs
-            <code>network_mode: host</code> — otherwise enter the address below.
-        </p>
+        <h2>Find a device</h2>
+        <p class="hint">Nearby devices on your network appear here. Keep your TV or speaker switched on.</p>
+        <div class="empty-state compact" th:if="${#lists.isEmpty(discovered) and #lists.isEmpty(addable)}">
+            <strong>No devices found yet</strong>
+            <p>Check that your device is on the same network, or connect using its address below.</p>
+            <a class="button" th:href="@{/setup}">Scan again</a>
+        </div>
+        <details th:if="${#lists.isEmpty(discovered)}">
+            <summary>Having trouble finding a device?</summary>
+            <p class="hint">Check the network address in your TV's settings. If Home Control runs in Docker,
+                automatic discovery needs <code>network_mode: host</code>.</p>
+        </details>
         <ul>
             <li th:each="device : ${discovered}">
                 <form method="post"
@@ -69,36 +121,52 @@
             <p class="hint">A receiver at the same address as a paired TV is added to that TV instead of appearing twice.</p>
         </section>
 
-        <h2>Or enter an address</h2>
+        <details class="manual-device">
+        <summary>Add an Android TV by address</summary>
+        <p class="hint">Find the IP address in your TV's network settings.</p>
         <form method="post" th:action="@{/setup/pair}">
-            <input name="host" placeholder="192.168.1.50" required>
-            <input name="name" placeholder="Living Room Shield">
-            <button type="submit">Pair</button>
+            <label>IP address
+                <input name="host" placeholder="192.168.1.50" autocomplete="off" spellcheck="false" required>
+            </label>
+            <label>Device name (optional)
+                <input name="name" placeholder="Living Room Shield" autocomplete="off">
+            </label>
+            <button type="submit" class="primary">Pair device</button>
         </form>
+        </details>
 
         <th:block th:if="${!#lists.isEmpty(promptPairings)}">
-            <h2>Add a smart TV by address</h2>
+            <details class="manual-device">
+            <summary>Add another smart TV by address</summary>
             <form method="post" th:action="@{/setup/prompt-pair}">
-                <select name="adapter" aria-label="TV type">
-                    <option th:each="pairing : ${promptPairings}" th:value="${pairing.adapterId()}"
-                            th:text="${pairing.displayName()}">LG webOS TV</option>
-                </select>
-                <input name="host" placeholder="192.168.1.60" required>
-                <input name="name" placeholder="Living Room TV">
-                <button type="submit">Pair</button>
+                <label>TV type
+                    <select name="adapter" aria-label="TV type">
+                        <option th:each="pairing : ${promptPairings}" th:value="${pairing.adapterId()}"
+                                th:text="${pairing.displayName()}">LG webOS TV</option>
+                    </select>
+                </label>
+                <label>IP address
+                    <input name="host" placeholder="192.168.1.60" autocomplete="off" spellcheck="false" required>
+                </label>
+                <label>Device name (optional)
+                    <input name="name" placeholder="Living Room TV" autocomplete="off">
+                </label>
+                <button type="submit" class="primary">Pair device</button>
             </form>
-            <p class="hint">The TV shows a request on screen. This page waits until you answer it.</p>
+            <p class="hint">Accept the request on your TV. This page will wait while you finish.</p>
+            </details>
         </th:block>
     </section>
 
-    <section th:if="${!#lists.isEmpty(paired)}">
-        <h2>Paired devices</h2>
+    <section id="paired-devices" th:if="${!#lists.isEmpty(paired)}">
+        <h2>Your devices</h2>
+        <p class="hint">Manage the TVs and speakers connected to your home.</p>
         <ul>
             <li th:each="device : ${paired}">
                 <form method="post" th:action="@{/setup/forget}">
                     <input type="hidden" name="id" th:value="${device.id()}">
                     <span th:text="${device.name()} + ' at ' + ${device.host()}">Shield</span>
-                    <button type="submit">Forget</button>
+                    <button type="submit" class="danger">Forget</button>
                 </form>
                 <th:block th:if="${deepLinkTestable.contains(device.id())}">
                     <button type="button" hx-swap="innerHTML" hx-target="next .deep-link-output"
@@ -156,6 +224,19 @@
         <section th:replace="~{fragments/bluetooth-setup :: section}"></section>
     </th:block>
 
+    <div id="connections" class="setup-category" th:if="${jellyfin != null or youtube != null or tmdb != null or sports != null or pinned != null}">
+        <p class="eyebrow">CONTENT SOURCES</p>
+        <h2>All your favorites, together</h2>
+        <p>Choose the libraries and services you want to see at home.</p>
+        <nav class="source-links" aria-label="Content source settings">
+            <a href="#jellyfin" th:if="${jellyfin != null}">Jellyfin</a>
+            <a href="#youtube" th:if="${youtube != null}">YouTube</a>
+            <a href="#tmdb" th:if="${tmdb != null}">Movies &amp; series</a>
+            <a href="#pinned" th:if="${pinned != null}">Pinned links</a>
+            <a href="#sports" th:if="${sports != null}">Sports</a>
+        </nav>
+    </div>
+
     <th:block th:if="${jellyfin != null}">
         <section th:replace="~{fragments/jellyfin-setup :: section}"></section>
     </th:block>
@@ -178,14 +259,22 @@
 
     <section th:if="${sourcesSetup != null}" th:replace="~{fragments/sources-setup :: sources(${sourcesSetup})}"></section>
 
-    <section th:if="${loginRequired}">
-        <h2>Login password</h2>
+    <section id="account" th:if="${loginRequired}">
+        <p class="eyebrow">ACCOUNT</p>
+        <h2>Keep your home personal</h2>
+        <p class="hint">Update the password used to access Home Control. Choose at least 10 characters.</p>
         <p class="error" th:if="${loginError}" th:text="${loginError}">Wrong password</p>
         <p class="hint" th:if="${loginMessage}" th:text="${loginMessage}">Password changed</p>
         <form method="post" th:action="@{/setup/password}">
-            <input type="password" name="current" autocomplete="current-password" placeholder="Current password" required>
-            <input type="password" name="password" autocomplete="new-password" minlength="10" placeholder="New password" required>
-            <input type="password" name="confirmation" autocomplete="new-password" minlength="10" placeholder="Repeat new password" required>
+            <label>Current password
+                <input type="password" name="current" autocomplete="current-password" required>
+            </label>
+            <label>New password
+                <input type="password" name="password" autocomplete="new-password" minlength="10" required>
+            </label>
+            <label>Confirm new password
+                <input type="password" name="confirmation" autocomplete="new-password" minlength="10" required>
+            </label>
             <button type="submit">Change password</button>
         </form>
         <form method="post" th:action="@{/logout}">
@@ -193,14 +282,18 @@
         </form>
     </section>
 
-    <section id="install" class="setup">
-        <h2>Install on this phone or tablet</h2>
+    <section id="install">
+        <p class="eyebrow">ALWAYS CLOSE BY</p>
+        <h2>A home on your home screen</h2>
+        <p>Install Home Control on this phone or tablet for quick access to your devices and favorites.</p>
         <p id="install-done" class="hint" hidden>Home Control is already running as an installed app.</p>
-        <button type="button" id="install-button" hidden>Install Home Control</button>
+        <button type="button" id="install-button" class="primary" hidden>Install Home Control</button>
         <p id="install-ios" class="hint" hidden>In Safari, tap the Share button, then <strong>Add to Home Screen</strong>.</p>
         <p id="install-other" class="hint" hidden>Open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>
         <p id="install-http-note" class="hint" hidden>Over plain HTTP the home-screen icon opens the dashboard like a bookmark; offline support needs HTTPS through your reverse proxy.</p>
     </section>
+    </div>
+    </div>
     <script type="module">import { initPwa } from "/js/pwa.js"; initPwa();</script>
 </main>
 </body>

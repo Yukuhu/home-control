@@ -90,7 +90,8 @@ class DashboardPageTest {
                 .andExpect(content().string(not(containsString("/devices/bedroom/key/"))))
                 .andExpect(content().string(containsString("com.netflix.ninja")))
                 .andExpect(content().string(containsString("/devices/living/play")))
-                .andExpect(content().string(containsString("<body data-device=\"living\"")))
+                .andExpect(result -> org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
+                        .containsPattern("<body[^>]* data-device=\"living\""))
                 .andExpect(content().string(not(containsString("/devices/living/volume"))));
     }
 
@@ -143,7 +144,8 @@ class DashboardPageTest {
 
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("<body data-device=\"bedroom\"")))
+                .andExpect(result -> org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
+                        .containsPattern("<body[^>]* data-device=\"bedroom\""))
                 .andExpect(content().string(containsString("/devices/bedroom/key/HOME")))
                 .andExpect(content().string(not(containsString("/devices/living/key/"))));
     }

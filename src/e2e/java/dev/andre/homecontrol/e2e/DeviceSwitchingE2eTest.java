@@ -67,12 +67,12 @@ class DeviceSwitchingE2eTest extends E2eApplicationTest {
             assertThat(page.locator("#status-living")).hasText("DISCONNECTED");
 
             page.locator("button.tile[data-item='clip-1']").click();
-            assertThat(page.locator("[data-status-for='living']")).hasText("DISCONNECTED");
+            assertThat(page.locator("#play-sheet [data-status-for='living']")).hasText("DISCONNECTED");
 
             fakeDevices.push("living", new DeviceState(DeviceStatus.CONNECTED, true, "com.example.launcher",
                     0, 0, false, Instant.now()));
             assertThat(page.locator("#status-living")).hasText("CONNECTED");
-            assertThat(page.locator("[data-status-for='living']")).hasText("CONNECTED");
+            assertThat(page.locator("#play-sheet [data-status-for='living']")).hasText("CONNECTED");
         }
     }
 }

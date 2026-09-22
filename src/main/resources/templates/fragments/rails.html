@@ -3,9 +3,14 @@
 <body>
 
 <section id="rails" th:fragment="rails" aria-label="Content">
-    <p class="hint rails-empty" th:if="${!hasSources or #lists.isEmpty(rails)}">
-        No content yet. Connect a source in <a th:href="@{/setup(_fragment='sources')}" href="/setup#sources">Setup</a>.
-    </p>
+    <div class="rails-empty" th:if="${!hasSources or #lists.isEmpty(rails)}">
+        <div class="empty-art" aria-hidden="true"><span>♫</span><span>▷</span><span>▤</span></div>
+        <p class="eyebrow">A HOME FOR YOUR FAVORITES</p>
+        <h2>Your next movie night starts here.</h2>
+        <p>Connect Jellyfin, add YouTube, or pin a favorite link.<br>Your movies, music, and shows will appear right here.</p>
+        <a class="button primary" href="/setup#connections">Connect a source <span aria-hidden="true">↗</span></a>
+        <p class="hint">Just here for the remote? Choose a device above.</p>
+    </div>
     <th:block th:each="rail : ${rails}">
         <section th:replace="~{fragments/rails :: rail}"></section>
     </th:block>
@@ -65,7 +70,9 @@
               th:text="${#strings.isEmpty(item.title())} ? '?' : ${#strings.substring(item.title(), 0, 1)}">A</span>
         <span th:if="${item.progress() != null}" class="progress" aria-hidden="true"><span
               th:style="'width:' + ${#numbers.formatDecimal(item.progress() * 100, 1, 0)} + '%'"></span></span>
+        <span class="tile-play" aria-hidden="true">▶</span>
     </span>
+    <span class="visually-hidden" th:if="${item.progress() != null}" th:text="|${#numbers.formatDecimal(item.progress() * 100, 1, 0)}% watched. |"></span>
     <span class="title" th:text="${item.title()}">Title</span>
     <span class="subtitle" th:if="${item.subtitle() != null}" th:text="${item.subtitle()}">S1:E1</span>
 </button>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#14161a">
+    <meta name="theme-color" content="#101917">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,14 +16,31 @@
     <script th:src="@{/vendor/htmx.min.js}" defer></script>
     <script type="module" th:src="@{/js/app.js}"></script>
 </head>
-<body th:attr="data-device=${selected.id()}">
+<body class="dashboard" th:attr="data-device=${selected.id()}">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="app-header">
+    <a class="brand" href="/" aria-label="Home Control home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg></span><span>Home<span class="brand-light">Control</span></span></a>
+    <nav class="header-nav" aria-label="Main navigation">
+        <a href="/" aria-current="page">Home</a><a href="/setup">Setup</a>
+    </nav>
+    <span id="connection-status" class="connection-status" role="status">Connecting…</span>
+</header>
+<main id="content">
+    <div class="page-heading dashboard-heading">
+        <div><p class="eyebrow">YOUR EVERYDAY, CONNECTED</p><h1>Make yourself at home.</h1>
+        <p>Your favorite entertainment. The right screen. All in one place.</p></div>
+        <a class="button secondary" href="/setup#connections">Manage sources <span aria-hidden="true">↗</span></a>
+    </div>
+    <section class="device-section" aria-labelledby="devices-heading">
+        <div class="section-heading"><h2 id="devices-heading">Your devices <span class="count" th:text="${devices.size()}">1</span></h2><a href="/setup#devices">Manage devices <span aria-hidden="true">↗</span></a></div>
 <header class="strip">
     <nav class="devices" aria-label="Devices">
         <div class="chip-group" th:each="device : ${devices}">
             <a class="chip"
                th:classappend="${device.id() == selected.id()} ? 'selected'"
-               th:href="@{/(device=${device.id()})}" th:attr="data-device=${device.id()}"
+               th:href="@{/(device=${device.id()})}" th:attr="data-device=${device.id()},aria-current=${device.id() == selected.id()} ? 'true' : null"
                th:with="state=${states[device.id()]}">
+                <span class="device-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></span>
                 <span class="name" th:text="${device.name()}">Shield</span>
                 <span class="badge" th:id="'status-' + ${device.id()}"
                       th:classappend="${state.connected()} ? 'ok' : 'off'"
@@ -32,19 +49,21 @@
                       th:text="${state.nowPlaying() != null ? state.nowPlaying().title() : (state.currentApp() ?: 'Nothing playing')}">Nothing playing</span>
             </a>
             <button type="button" class="drawer-toggle" th:if="${device.id() == selected.id()}"
-                    aria-controls="remote-drawer" th:attr="aria-expanded=${remoteOpen}" aria-label="Open the remote">⌄</button>
+                    aria-controls="remote-drawer" th:attr="aria-expanded=${remoteOpen}" aria-label="Open the remote"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="2" width="12" height="20" rx="4"/><circle cx="12" cy="9" r="3"/><path d="M10 16h4"/></svg> Remote</button>
         </div>
     </nav>
-    <a th:href="@{/setup}">Setup</a>
 </header>
-
-<main id="content">
+    </section>
+    <section class="library-heading" aria-label="Your library"><div><p class="eyebrow">SOMETHING FOR EVERY MOOD</p><h2>Your library</h2></div>
     <form role="search" class="search" onsubmit="return false">
         <label for="search-q" class="visually-hidden">Search every source</label>
-        <input id="search-q" name="q" type="search" placeholder="Search" autocomplete="off" enterkeyhint="search"
+        <input id="search-q" name="q" type="search" placeholder="Search movies, shows, music…" autocomplete="off" enterkeyhint="search"
                hx-get="/search/results" hx-trigger="input changed delay:350ms, search"
-               hx-target="#search-results" hx-swap="innerHTML" hx-sync="this:replace">
+               hx-target="#search-results" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator=".search-pending">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <span class="search-pending htmx-indicator" role="status">Searching…</span>
     </form>
+    </section>
     <div id="search-results" aria-live="polite"></div>
     <section id="rails" th:replace="~{fragments/rails :: rails}"></section>
 </main>
@@ -52,9 +71,10 @@
 <aside id="remote-drawer" class="drawer" hx-swap="none" th:with="id=${selected.id()}"
        th:attr="hidden=${!remoteOpen} ? 'hidden'" data-mode="buttons" aria-label="Remote">
     <header class="drawer-header">
-        <h2 th:text="${selected.name()}">Shield</h2>
+        <div><p class="eyebrow">REMOTE CONTROL</p><h2 th:text="${selected.name()}">Shield</h2></div>
         <button type="button" class="drawer-close" aria-controls="remote-drawer" aria-label="Close the remote">✕</button>
     </header>
+    <p class="remote-connection hint" th:attr="data-status-for=${selected.id()}" th:text="${selectedState.status()}">CONNECTED</p>
     <p class="meta">
         <span th:id="'vol-' + ${id}" th:text="${selectedState.muted()} ? 'muted' : ('vol ' + ${selectedState.volumeLevel()})">vol</span>
     </p>
@@ -87,11 +107,11 @@
                 </section>
 
                 <section class="row">
-                    <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_PREVIOUS(id=${id})}" aria-label="Previous">⏮</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/REWIND(id=${id})}" aria-label="Rewind">⏪</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/PLAY_PAUSE(id=${id})}" aria-label="Play or pause">⏯</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/FAST_FORWARD(id=${id})}" aria-label="Fast forward">⏩</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_NEXT(id=${id})}" aria-label="Next">⏭</button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_PREVIOUS(id=${id})}" aria-label="Previous"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 5v14m14-14L8 12l11 7Z"/></svg></button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/REWIND(id=${id})}" aria-label="Rewind"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m12 5-9 7 9 7Zm9 0-9 7 9 7Z"/></svg></button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/PLAY_PAUSE(id=${id})}" aria-label="Play or pause"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m4 5 10 7-10 7Zm13 0v14m4-14v14"/></svg></button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/FAST_FORWARD(id=${id})}" aria-label="Fast forward"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m3 5 9 7-9 7Zm9 0 9 7-9 7Z"/></svg></button>
+                    <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_NEXT(id=${id})}" aria-label="Next"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M19 5v14M5 5l11 7-11 7Z"/></svg></button>
                 </section>
 
                 <section class="row essential">
@@ -156,15 +176,17 @@
     <section class="open-link" th:if="${canOpenLinks}">
         <h2>Open a link on this device</h2>
         <form th:attr="hx-post=@{/devices/{id}/play(id=${id})}" hx-target="#open-result" hx-swap="textContent">
-            <input name="uri" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" required>
+            <label for="open-uri" class="visually-hidden">Link to play on this device</label>
+            <input id="open-uri" name="uri" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" required>
             <button type="submit">Play</button>
         </form>
         <p id="open-result" class="hint" aria-live="polite"></p>
-        <p class="hint">The device opens whichever app claims the link. If nothing happens, that app may not be installed.</p>
-        <p class="hint">Direct media links (.mp4, .m4v, .mkv, .webm, .m3u8, .mp3, .flac …) play on Cast devices through the Default Media Receiver; the receiver must be able to reach the URL.</p>
-        <p class="hint" th:if="${rendererControls and !localAudio}">Direct audio links (.mp3, .flac, .m4a, .ogg …) play on speakers as a direct stream; the speaker must be able to reach the URL.</p>
-        <p class="hint" th:if="${localAudio}">This speaker plays through the server: direct audio links (.mp3, .flac, .m4a, .ogg …) and Jellyfin music work; the server must be able to reach the URL.</p>
+        <details class="link-help"><summary>Which links can I play?</summary>
+        <p class="hint">Paste a video or app link to open it on your TV. The matching app needs to be installed.</p>
+        <p class="hint" th:if="${castControls or (rendererControls and !localAudio)}">Direct media links also work on compatible TVs and speakers. For direct audio, the speaker must be able to reach the URL.</p>
+        <p class="hint" th:if="${localAudio}">This speaker plays through the server: direct audio links and Jellyfin music work. The server must be able to reach the URL.</p></details>
     </section>
+    <details class="keyboard-help" th:if="${remoteKeys}"><summary>Keyboard shortcuts</summary><p>With no button or field focused: <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> to navigate, <kbd>Enter</kbd> to select, <kbd>Space</kbd> to play or pause, <kbd>H</kbd> for Home, <kbd>M</kbd> to mute.</p></details>
 </aside>
 
 <dialog id="play-sheet" class="sheet" aria-labelledby="sheet-title">
@@ -178,6 +200,7 @@
             <p id="sheet-subtitle" class="hint"></p>
         </div>
     </div>
+    <p class="eyebrow sheet-label">PLAY ON</p>
     <div class="sheet-devices" role="radiogroup" aria-label="Play on">
         <button type="button" role="radio" class="sheet-device" th:each="device : ${devices}"
                 th:attr="data-sheet-device=${device.id()},aria-checked=${device.id() == selected.id()}">

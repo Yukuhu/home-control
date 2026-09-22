@@ -1,10 +1,10 @@
 <section id="pinned" th:fragment="section">
+    <p class="eyebrow">KEEP THE GOOD STUFF CLOSE</p>
     <h2>Pinned links</h2>
-    <p class="error" th:if="${pinnedError}" th:text="${pinnedError}">Could not pin that link</p>
+    <p class="error" role="alert" th:if="${pinnedError}" th:text="${pinnedError}">Could not pin that link</p>
     <p class="hint" th:if="${pinnedMessage}" th:text="${pinnedMessage}">Pinned</p>
 
-    <p>Pin a Netflix, Prime Video, DAZN or other streaming link (or any web link) to show it in the Pinned rail.
-        Home Control opens the link in the app on the TV; it never loads the page itself.</p>
+    <p>Save a favorite film, show, or web link to your dashboard. Select it at home to open it on your TV.</p>
 
     <form method="post" th:action="@{/setup/sources/pinned}">
         <label>Link
@@ -14,7 +14,7 @@
         <label>Title (optional)
             <input name="title" maxlength="120">
         </label>
-        <button type="submit">Pin</button>
+        <button type="submit" class="primary">Pin link</button>
     </form>
 
     <p th:if="${#lists.isEmpty(pinned.pins())}">No pinned links yet.</p>
@@ -25,7 +25,9 @@
             <code th:text="${pin.url()}">https://www.netflix.com/title/80057281</code>
 
             <form method="post" th:action="@{/setup/sources/pinned/{id}/title(id=${pin.id()})}">
-                <input name="title" maxlength="120" th:value="${pin.title()}">
+                <label>Link title
+                    <input name="title" maxlength="120" th:value="${pin.title()}">
+                </label>
                 <button type="submit">Rename</button>
             </form>
 
@@ -41,7 +43,7 @@
             </form>
 
             <form method="post" th:action="@{/setup/sources/pinned/{id}/remove(id=${pin.id()})}">
-                <button type="submit">Remove</button>
+                <button type="submit" class="danger">Remove</button>
             </form>
         </li>
     </ol>

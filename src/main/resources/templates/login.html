@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#14161a">
+    <meta name="theme-color" content="#101917">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,19 +14,25 @@
     <title>Home Control · Log in</title>
     <link rel="stylesheet" th:href="@{/app.css}">
 </head>
-<body>
-<main class="setup">
-    <h1>Log in</h1>
-    <p class="error" th:if="${error}" th:text="${error}">Wrong password</p>
+<body class="auth-page">
+<main class="auth-card">
+    <a class="brand" th:href="@{/}" aria-label="Home Control home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg></span><span>Home<span class="brand-light">Control</span></span></a>
+    <p class="eyebrow">YOUR HOME IS WAITING</p>
+    <h1>Welcome back.</h1>
+    <p>Your devices, your favorites, all in one place. Enter your password to come on in.</p>
+    <p class="error" role="alert" th:if="${error}" th:text="${error}">Wrong password</p>
     <form method="post" th:action="@{/login}">
         <input type="hidden" name="next" th:value="${next}">
-        <input type="password" name="password" autocomplete="current-password" autofocus required>
-        <button type="submit">Log in</button>
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" name="password" autocomplete="current-password" autofocus required>
+        <button type="submit" class="primary">Log in <span aria-hidden="true">→</span></button>
     </form>
-    <p class="hint">
-        Forgot the password? Stop Home Control and delete secrets.json in its data folder, then reconnect your
-        content sources.
-    </p>
+    <details class="auth-help">
+        <summary>Forgot your password?</summary>
+        <p class="hint">Stop Home Control and delete <code>secrets.json</code> in its data folder to reset access.
+            This also removes saved content-source credentials, so you will need to reconnect your sources.</p>
+    </details>
+    <p class="auth-footer">Made for the place you call home.</p>
 </main>
 </body>
 </html>

@@ -16,9 +16,9 @@ import java.io.UncheckedIOException;
 /** Draws the app icon with Java2D so no binary artwork lives in the repository. */
 public final class IconRenderer {
 
-    static final Color BACKGROUND = new Color(0x14161a);
-    static final Color FOREGROUND = new Color(0xe8e8ea);
-    static final Color ACCENT = new Color(0x3d7dff);
+    static final Color BACKGROUND = new Color(0x101917);
+    static final Color FOREGROUND = new Color(0xeef3ec);
+    static final Color ACCENT = new Color(0xb7e6a0);
 
     public enum Shape { ROUNDED, FULL_BLEED, MASKABLE }
 

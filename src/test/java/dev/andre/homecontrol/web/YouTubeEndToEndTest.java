@@ -181,7 +181,7 @@ class YouTubeEndToEndTest {
                 HttpResponse<String> setupBeforeConnect = send(stranger, page("/setup"));
                 assertThat(setupBeforeConnect.statusCode()).isEqualTo(200);
                 assertThat(setupBeforeConnect.body()).contains("YouTube").contains("TVs and Limited Input")
-                        .contains("YouTube Cast (best effort)").contains("Kitchen");
+                        .contains("YouTube on Cast devices (experimental)").contains("Kitchen");
 
                 // 2. Connecting stores the OAuth client, sets the login password and starts the
                 // device-code flow.

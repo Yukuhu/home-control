@@ -1,11 +1,15 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <body>
-<section th:fragment="section" id="bluetooth" class="setup bluetooth">
+<section th:fragment="section" id="bluetooth" class="bluetooth">
+    <p class="eyebrow">SOUND AROUND YOUR HOME</p>
     <h2>Bluetooth speakers</h2>
-    <p class="error" th:if="${bluetoothError}" th:text="${bluetoothError}">Error</p>
+    <p class="hint">Pair a speaker with the Home Control server to add another place to listen.</p>
+    <p class="error" role="alert" th:if="${bluetoothError}" th:text="${bluetoothError}">Error</p>
     <p class="hint" th:if="${bluetoothMessage}" th:text="${bluetoothMessage}">Message</p>
 
+    <details th:open="${!bluetooth.hostReady()}">
+    <summary>Bluetooth system checks</summary>
     <ul class="host-checks">
         <li th:each="check : ${bluetooth.checks()}" th:classappend="${check.ok()} ? 'ok' : 'problem'"
             th:attr="data-check=${check.id()}">
@@ -19,12 +23,13 @@
     <form method="post" th:action="@{/setup/bluetooth/check}">
         <button type="submit">Check again</button>
     </form>
+    </details>
 
     <h3>Add a speaker</h3>
     <p class="hint" th:text="|Put the speaker into pairing mode first. Scanning takes about ${bluetooth.scanSeconds()} seconds.|">
         Put the speaker into pairing mode first.</p>
     <form method="post" th:action="@{/setup/bluetooth/scan}">
-        <button type="submit">Scan for speakers</button>
+        <button type="submit" class="primary">Scan for speakers</button>
     </form>
     <ul class="bluetooth-scan" th:if="${bluetooth.scan().ran()}">
         <li th:each="found : ${bluetooth.scan().speakers()}">
@@ -56,7 +61,7 @@
             </form>
             <form method="post" th:action="@{/setup/bluetooth/disconnect}">
                 <input type="hidden" name="id" th:value="${speaker.id()}">
-                <button type="submit">Disconnect</button>
+                <button type="submit" class="danger">Disconnect</button>
             </form>
             <form method="post" th:action="@{/setup/bluetooth/audio-device}">
                 <input type="hidden" name="id" th:value="${speaker.id()}">

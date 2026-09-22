@@ -1,6 +1,8 @@
-<section th:fragment="section">
+<section th:fragment="section" id="jellyfin">
+    <p class="eyebrow">YOUR MEDIA LIBRARY</p>
     <h2>Jellyfin</h2>
-    <p class="error" th:if="${jellyfinError}" th:text="${jellyfinError}">Jellyfin rejected the request</p>
+    <p class="hint">Bring your movies, series, and music home. Pick up where you left off on any connected screen.</p>
+    <p class="error" role="alert" th:if="${jellyfinError}" th:text="${jellyfinError}">Jellyfin rejected the request</p>
     <p class="hint" th:if="${jellyfinMessage}" th:text="${jellyfinMessage}">Connected to nas</p>
 
     <th:block th:if="${jellyfin.configured()}">
@@ -9,7 +11,7 @@
         </p>
         <p th:text="'Server ' + ${jellyfin.serverUrl()}">Server http://192.168.1.20:8096</p>
         <p th:text="'TVs and speakers use ' + ${jellyfin.deviceServerUrl()}">TVs and speakers use http://192.168.1.20:8096</p>
-        <p class="error" th:if="${jellyfin.deviceAddressLooksLocal()}"
+        <p class="error" role="alert" th:if="${jellyfin.deviceAddressLooksLocal()}"
            th:text="'TVs and speakers cannot reach ' + ${jellyfin.deviceServerUrl()} + '. Reconnect with the address they should use.'">
             TVs and speakers cannot reach this address
         </p>
@@ -20,21 +22,23 @@
             <button type="submit">Test connection</button>
         </form>
         <form method="post" th:action="@{/setup/sources/jellyfin/disconnect}">
-            <button type="submit">Disconnect</button>
+            <button type="submit" class="danger">Disconnect</button>
         </form>
 
         <h3>Jellyfin apps</h3>
         <p class="hint">Home Control finds the Jellyfin app on a device by its network address. Link it
             here when Jellyfin sees a different address (for example behind Docker networking).</p>
-        <p class="error" th:if="${jellyfin.sessionsError()}" th:text="${jellyfin.sessionsError()}">Could not reach Jellyfin</p>
+        <p class="error" role="alert" th:if="${jellyfin.sessionsError()}" th:text="${jellyfin.sessionsError()}">Could not reach Jellyfin</p>
         <form method="post" th:action="@{/setup/sources/jellyfin/links}" th:each="jellyfinSession : ${jellyfin.sessions()}">
             <input type="hidden" name="session" th:value="${jellyfinSession.jellyfinDeviceId()}">
-            <label th:text="${jellyfinSession.label()}">SHIELD Android TV · Android TV · 192.168.1.50</label>
+            <label>
+                <span th:text="${jellyfinSession.label()}">SHIELD Android TV · Android TV · 192.168.1.50</span>
             <select name="device">
                 <option value="" th:selected="${jellyfinSession.linkedDeviceId() == ''}">Not linked</option>
                 <option th:each="device : ${jellyfin.devices()}" th:value="${device.id()}" th:text="${device.name()}"
                         th:selected="${device.id() == jellyfinSession.linkedDeviceId()}">Living Room</option>
             </select>
+            </label>
             <button type="submit">Link</button>
         </form>
     </th:block>
@@ -51,19 +55,29 @@
         </label>
         <label>Sign in with
             <select name="mode">
-                <option value="password" th:selected="${(jellyfinForm != null ? jellyfinForm.mode : jellyfin.mode()) == 'password'}">User name and password (recommended)</option>
+                <option value="password" th:selected="${(jellyfinForm != null ? jellyfinForm.mode : jellyfin.mode()) == 'password'}">User login (recommended)</option>
                 <option value="api-key" th:selected="${(jellyfinForm != null ? jellyfinForm.mode : jellyfin.mode()) == 'api-key'}">API key</option>
             </select>
         </label>
-        <input name="userName" required placeholder="User name"
-               th:value="${jellyfinForm != null ? jellyfinForm.userName : jellyfin.userName()}">
-        <input type="password" name="password" autocomplete="off" placeholder="Password">
-        <input type="password" name="apiKey" autocomplete="off" placeholder="API key">
+        <label>Jellyfin user name
+            <input name="userName" required autocomplete="username" placeholder="User name"
+                   th:value="${jellyfinForm != null ? jellyfinForm.userName : jellyfin.userName()}">
+        </label>
+        <label>Jellyfin password
+            <input type="password" name="password" autocomplete="off" placeholder="Enter when using a user login">
+        </label>
+        <label>API key
+            <input type="password" name="apiKey" autocomplete="off" placeholder="Enter when using an API key">
+        </label>
         <th:block th:if="${jellyfin.needsLoginPassword()}">
-            <p>Connecting a content source stores a secret, so Home Control will require this login password from now on.</p>
-            <input type="password" name="loginPassword" minlength="10" autocomplete="new-password" placeholder="New login password">
-            <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password" placeholder="Repeat login password">
+            <p>Create a Home Control password to keep your connected accounts private. You will use it to log in from now on.</p>
+            <label>Home Control password (at least 10 characters)
+                <input type="password" name="loginPassword" minlength="10" autocomplete="new-password" placeholder="New login password">
+            </label>
+            <label>Confirm Home Control password
+                <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password" placeholder="Repeat login password">
+            </label>
         </th:block>
-        <button type="submit" th:text="${jellyfin.configured()} ? 'Reconnect' : 'Connect'">Connect</button>
+        <button type="submit" class="primary" th:text="${jellyfin.configured()} ? 'Reconnect' : 'Connect'">Connect</button>
     </form>
 </section>

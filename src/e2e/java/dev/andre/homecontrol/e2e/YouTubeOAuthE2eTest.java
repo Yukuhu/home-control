@@ -11,6 +11,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.web.util.HtmlUtils;
 
 import java.net.URI;
 import java.net.URLDecoder;
@@ -65,9 +66,9 @@ class YouTubeOAuthE2eTest extends E2eApplicationTest {
     void setupButtonOpensConsentAndTheCallbackKeepsTheHouseholdLoggedIn(String browser) {
         try (BrowserSession session = open(browser)) {
             Page page = session.page();
-            // Playwright does not route later hops of a redirect chain. Inspect the real app's 302,
-            // preserving its session cookie, then point that hop at our consent server (127.0.0.1,
-            // a different site from the app's localhost) so no request reaches real Google.
+            // Inspect the real app's 302 and preserve its session cookie. WebKit cannot fulfill
+            // an intercepted redirect, so a temporary HTML hop takes the browser to our consent
+            // server (127.0.0.1, a different site from localhost) without reaching real Google.
             page.route("**/setup/sources/youtube/browser/connect", route -> {
                 var response = route.fetch(new Route.FetchOptions().setMaxRedirects(0));
                 org.assertj.core.api.Assertions.assertThat(response.status()).isEqualTo(302);
@@ -79,8 +80,13 @@ class YouTubeOAuthE2eTest extends E2eApplicationTest {
                 org.assertj.core.api.Assertions.assertThat(query).containsEntry("response_type", "code")
                         .containsEntry("redirect_uri", baseUrl() + "/setup/sources/youtube/callback");
                 var headers = new HashMap<>(response.headers());
-                headers.put("location", GOOGLE.base() + "/consent?" + request.getRawQuery());
-                route.fulfill(new Route.FulfillOptions().setResponse(response).setHeaders(headers));
+                headers.remove("location");
+                headers.remove("content-length");
+                String consentUrl = GOOGLE.base() + "/consent?" + request.getRawQuery();
+                route.fulfill(new Route.FulfillOptions().setResponse(response).setStatus(200)
+                        .setHeaders(headers).setContentType("text/html")
+                        .setBody("<meta http-equiv=\"refresh\" content=\"0;url="
+                                + HtmlUtils.htmlEscape(consentUrl) + "\">"));
             });
             page.navigate("/setup");
             var section = page.locator("#youtube");
