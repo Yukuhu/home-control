@@ -190,7 +190,8 @@
 </fieldset>
 <fieldset id="workflow-mappings">
 <legend>4. Map fields</legend>
-<p class="hint">Give each value a name, such as <code>A</code> or <code>Token</code>. One-tile workflows read the whole response. Generated tiles can also read the current entry. Mark credentials and private values as sensitive to mask previews.</p>
+<p class="hint">Give each value a name, such as <code>A</code> or <code>Token</code>. One-tile workflows read the whole response. Generated tiles can also read the current entry. New mappings start sensitive to mask previews.</p>
+<p class="hint">Switching to one tile changes all mappings to Whole response. Review their pointers. If you switch back to generated tiles, choose Current entry again where needed.</p>
 <div data-rows="variables">
 <div class="workflow-row" data-row="variables" th:each="row, stat : ${workflowForm.variables}">
 <div class="workflow-field">
@@ -201,7 +202,7 @@
 <label for="workflow-variables-0-scope" th:for="'workflow-variables-' + ${stat.index} + '-scope'">Read from</label>
 <select id="workflow-variables-0-scope" name="variables[0].scope" th:id="'workflow-variables-' + ${stat.index} + '-scope'" th:name="'variables[' + ${stat.index} + '].scope'" data-field="scope">
 <option value="ROOT" th:selected="${row.scope != null and row.scope.name() == 'ROOT'}">Whole response</option>
-<option value="ENTRY" th:selected="${row.scope != null and row.scope.name() == 'ENTRY'}">Current entry</option>
+<option value="ENTRY" th:if="${workflowForm.mode != null and workflowForm.mode.name() == 'GENERATED'}" th:selected="${row.scope != null and row.scope.name() == 'ENTRY'}">Current entry</option>
 </select>
 </div>
 <div class="workflow-field">
@@ -236,7 +237,7 @@
 </div>
 <div class="workflow-field">
 <label for="workflow-variables-0-sensitive">Sensitive value</label>
-<input id="workflow-variables-0-sensitive" name="variables[0].sensitive" data-field="sensitive" type="checkbox" value="true">
+<input id="workflow-variables-0-sensitive" name="variables[0].sensitive" data-field="sensitive" type="checkbox" value="true" checked>
 <input type="hidden" data-marker="sensitive" name="_variables[0].sensitive" value="on">
 </div>
 <button type="button" data-remove-row="variables" aria-label="Remove mapping">Remove</button>

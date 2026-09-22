@@ -302,6 +302,9 @@ response at `/auth/token` (Sensitive), and `D` from the current entry at `/quali
 template such as `https://media.example/play?id={A}&token={C}&quality={D}` then uses the
 selected channel's stable ID and a fresh token when you press Play. JSON Pointers can also be
 empty to select the root; escape `/` as `~1` and `~` as `~0` within a pointer segment.
+New mappings start Sensitive; uncheck it only for values you want visible in Test results.
+Switching to one tile resets every mapping to Whole response, so review its pointer. Switching
+back to generated tiles requires choosing Current entry again for those mappings.
 
 **Save** validates and encrypts the definition and never starts playback. Saving an enabled
 generated workflow can trigger its Dashboard catalog refresh, which requests the source; a
@@ -325,7 +328,11 @@ retaining encrypted definitions and the login requirement.
 Default limits are 50 workflows, 32 mappings, 16 static request headers, 200 entries per
 generated catalog, a 2 MiB JSON response, 64 JSON nesting levels, and 16,384 characters per
 stored definition. Source and expanded media URLs are limited to 8,192 characters and pointers
-to 512. Connections time out after 5 seconds and the whole JSON fetch after 15 seconds; at
+to 512. JSON numeric tokens are limited to 1,000 characters, and whole-number entry IDs to
+1,000 decimal digits after exponent expansion; extreme exponent IDs are rejected before
+expansion. Numeric values retain exact decimal precision, and numeric `1` and `1.0` identify
+the same entry while string `"1"` is distinct. Numeric mappings may use scientific notation.
+Connections time out after 5 seconds and the whole JSON fetch after 15 seconds; at
 most three same-origin redirects and four simultaneous workflow fetches are allowed.
 
 ### Connecting Jellyfin

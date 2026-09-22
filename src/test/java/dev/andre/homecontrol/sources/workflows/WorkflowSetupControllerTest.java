@@ -48,6 +48,32 @@ class WorkflowSetupControllerTest {
         when(devices.addable()).thenReturn(List.of());
     }
 
+    @Test void newMappingDefaultsSensitiveAndSavedFalseSurvives() {
+        assertThat(new WorkflowForm.VariableRow().sensitive).isTrue();
+        assertThat(WorkflowForm.from(saved).variables.getFirst().sensitive).isFalse();
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void setupIncludesModeEditAndSavedRevisionTestWithoutFetching(boolean generated) throws Exception {
+        if (generated) when(store.all()).thenReturn(List.of(new WorkflowDefinition(1, id, 3, WorkflowFixtures.generated())));
+        String html = mvc.perform(get("/setup")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(html).contains(generated ? "Generated tiles" : "Single tile", ">Edit</a>", "/setup/workflows/" + id + "/test", "Fetches fresh data", "without playback");
+        assertThat(html).containsPattern("(?s)action=\"/setup/workflows/" + id + "/test\".*?name=\"expectedRevision\" value=\"3\"");
+        verifyNoInteractions(testService);
+    }
+
+    @Test void explicitlyUncheckedSensitivityOverridesNewRowDefault() throws Exception {
+        when(store.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
+        mvc.perform(validPost().param("urlMode", "KEEP").param("headersMode", "KEEP").param("templateMode", "REPLACE")
+                        .param("template", "https://media.example/?token={Token}")
+                        .param("variables[0].name", "Token").param("variables[0].scope", "ROOT")
+                        .param("variables[0].pointer", "/token").param("_variables[0].sensitive", "on"))
+                .andExpect(status().is3xxRedirection());
+        var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
+        verify(store).update(eq(id), eq(3L), captor.capture(), any());
+        assertThat(captor.getValue().variables().getFirst().sensitive()).isFalse();
+    }
+
     @Test void savedEditorContainsKeepControlsAndNoStoredSecretsOrFetch() throws Exception {
         var result = mvc.perform(get("/setup/workflows/" + id)).andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))

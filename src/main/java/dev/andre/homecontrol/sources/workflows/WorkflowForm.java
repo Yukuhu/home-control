@@ -25,7 +25,7 @@ public final class WorkflowForm {
     public static final class VariableRow {
         public String name = "", pointer = "";
         public Scope scope = Scope.ROOT;
-        public boolean sensitive;
+        public boolean sensitive = true;
     }
     public static final class HeaderRow { public String name = "", value = ""; }
 

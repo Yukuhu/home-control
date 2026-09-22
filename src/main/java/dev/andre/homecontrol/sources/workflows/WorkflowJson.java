@@ -4,9 +4,10 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.StreamReadConstraints;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.cfg.JsonNodeFeature;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.math.BigInteger;
+import java.math.BigDecimal;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;
@@ -25,8 +26,11 @@ import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
 
 /** Pure JSON selection for a single workflow response. */
 public final class WorkflowJson {
+    private static final int MAX_NUMBER_DIGITS = 1000;
     private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()
-            .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64).build()).build()).build();
+            .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64)
+                    .maxNumberLength(MAX_NUMBER_DIGITS).build()).build())
+            .enable(JsonNodeFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
     // IANA IPv6 Global Unicast Address Space, RIR-designated ALLOCATED rows (2025-10-10):
     // https://www.iana.org/assignments/ipv6-unicast-address-assignments
     private static final List<Ipv6Prefix> ALLOCATED_RIR_IPV6 = List.of(
@@ -69,7 +73,7 @@ public final class WorkflowJson {
             JsonNode root = JSON.readTree(parser);
             if (root == null || parser.nextToken() != null) fail(WorkflowException.Stage.PARSE, "invalid JSON response");
             return root;
-        } catch (JacksonException e) {
+        } catch (JacksonException | NumberFormatException e) {
             throw new WorkflowException(WorkflowException.Stage.PARSE, "invalid JSON response");
         }
     }
@@ -127,8 +131,13 @@ public final class WorkflowJson {
             typed = "s:" + id.asText();
         } else if (id != null && id.isNumber()) {
             try {
-                BigInteger integral = id.decimalValue().toBigIntegerExact();
-                typed = "n:" + integral;
+                BigDecimal number = id.decimalValue().stripTrailingZeros();
+                // Check before integer conversion: tiny exponent tokens must never expand
+                // into enormous powers of ten. Long arithmetic also avoids scale overflow.
+                if (number.scale() > 0 || (long) number.precision() - number.scale() > MAX_NUMBER_DIGITS) {
+                    throw new ArithmeticException();
+                }
+                typed = "n:" + number.toBigIntegerExact();
             } catch (ArithmeticException e) {
                 throw new WorkflowException(WorkflowException.Stage.SELECT, "invalid entry ID");
             }

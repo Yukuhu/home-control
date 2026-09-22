@@ -95,6 +95,23 @@ class WorkflowCastRouteExecutorTest {
         }
     }
 
+    @Test void disappearedPreciseNumericIdCannotCastItsRoundedNeighbor() {
+        var generated = new WorkflowIntegrationFixture(true);
+        var client = mock(WorkflowHttpClient.class);
+        when(client.fetch(any())).thenReturn(
+                "{\"token\":\"old\",\"items\":[{\"id\":9007199254740992.0,\"title\":\"Selected\"}]}".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                "{\"token\":\"fresh\",\"items\":[{\"id\":9007199254740993.0,\"title\":\"Other\"}]}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var realRunner = new WorkflowRunner(client);
+        var source = new WorkflowContentSource(generated.store, realRunner, new WorkflowCatalogs(generated.store), preferences);
+        var item = source.rail(ID).items().getFirst();
+        var cast = new WorkflowCastRouteExecutor(generated.store, realRunner, devices, preferences);
+        when(devices.device("tv")).thenReturn(Optional.of(tv));
+        var playback = new PlaybackService(devices, new PlaybackPlanner(List.of(new WorkflowCastStrategy())), List.of(), List.of(cast));
+        assertThat(playback.attempt(item, "tv", Set.of())).isInstanceOf(PlayAttempt.Failed.class);
+        verify(devices, never()).execute(any(), any());
+        verify(client, never()).checkMedia(any());
+    }
+
     @Test void wrongDeviceAndDisabledSourceNeverFetchOrSend() {
         when(devices.capabilities("tv")).thenReturn(Set.of(Capability.APP_LINK));
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(UnsupportedActionException.class);

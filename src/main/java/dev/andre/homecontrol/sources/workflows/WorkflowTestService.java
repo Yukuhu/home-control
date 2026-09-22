@@ -68,7 +68,11 @@ public final class WorkflowTestService {
             warnings.add("Your receiver must reach the media address directly. Custom media-download headers are not supported.");
         } catch (RuntimeException failure) {
             Stage failed = failure instanceof WorkflowException e ? e.stage() : active;
-            stages.add(new StageView(label(failed), false, "Could not complete this step. Check the saved settings and response format."));
+            // WorkflowException's contract allows only locally authored safe context.
+            // Never expose messages or causes from parser, network or other exceptions.
+            String message = failure instanceof WorkflowException ? failure.getMessage()
+                    : "Could not complete this step. Check the saved settings and response format.";
+            stages.add(new StageView(label(failed), false, message));
             samples.clear();
         }
         authenticate(request);

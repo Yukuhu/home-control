@@ -29,6 +29,16 @@ if (editor) {
         editor.querySelector(`[data-add-row="${family}"]`).disabled = rows.children.length >= limits[family];
     }
     function visibility() {
+        const single = form.elements.mode.value === 'SINGLE';
+        editor.querySelectorAll('[data-rows="variables"] select[data-field="scope"]').forEach(select => {
+            const entry = select.querySelector('option[value="ENTRY"]');
+            if (single) {
+                select.value = 'ROOT';
+                entry?.remove();
+            } else if (!entry) {
+                select.add(new Option('Current entry', 'ENTRY'));
+            }
+        });
         editor.querySelectorAll('[data-mode]').forEach(section => {
             section.hidden = section.dataset.mode !== form.elements.mode.value;
         });
@@ -51,6 +61,7 @@ if (editor) {
             fragment.querySelector('[data-row]').dataset.newRow = 'true';
             rows.append(fragment);
             reindex(family);
+            visibility();
             rows.lastElementChild.querySelector('input').focus();
         } else if (remove) {
             const family = remove.dataset.removeRow;

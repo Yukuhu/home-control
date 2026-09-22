@@ -73,8 +73,8 @@ class WorkflowTestServiceTest {
             assertThat(stage.success()).isFalse();
         });
         assertThat(result.toString()).doesNotContain("private-json-token");
-        when(http.fetch(any())).thenThrow(new RuntimeException("upstream-secret"));
-        assertThat(service.test(id, 7, request).toString()).doesNotContain("upstream-secret");
+        when(http.fetch(any())).thenThrow(new RuntimeException("upstream-secret", new IllegalArgumentException("cause-secret")));
+        assertThat(service.test(id, 7, request).toString()).doesNotContain("upstream-secret", "cause-secret");
     }
 
     @Test void invalidSelectedArtworkProducesSafeWarningAndMappingFailuresStaySafe() {
@@ -106,13 +106,29 @@ class WorkflowTestServiceTest {
         assertThat(result.toString()).doesNotContain("private-marker");
         saved = new WorkflowDefinition(1, id, 7, WorkflowFixtures.generated());
         body("{\"token\":\"token-secret\",\"items\":[{\"id\":\"a\",\"title\":\"News\"}]}");
-        doThrow(new WorkflowException(WorkflowException.Stage.BUILD, "private-marker")).when(http).checkMedia(any());
+        doThrow(new RuntimeException("private-marker")).when(http).checkMedia(any());
         var failed = service.test(id, 7, request);
         assertThat(failed.samples()).isEmpty();
         assertThat(failed.toString()).doesNotContain("private-marker", "token-secret");
         assertThat(failed.stages()).anySatisfy(stage -> {
             assertThat(stage.name()).isEqualTo("Build media URL"); assertThat(stage.success()).isFalse();
         });
+    }
+
+    @Test void safeFailuresExplainHttpStatusBusyAdmissionMappingAndDuplicateEntry() {
+        for (String detail : List.of("server returned HTTP 403", "busy; try again later", "request timed out")) {
+            doThrow(new WorkflowException(WorkflowException.Stage.FETCH, detail)).when(http).fetch(any());
+            var result = service.test(id, 7, request);
+            assertThat(result.stages().getLast().message()).contains(detail);
+            assertThat(result.samples()).isEmpty();
+        }
+        reset(http);
+        body("{\"items\":[{\"id\":\"a\",\"title\":\"News\"}]}");
+        assertThat(service.test(id, 7, request).stages().getLast().message()).contains("mapping C has no scalar value");
+        body("{\"token\":\"private-token\",\"items\":[{\"id\":1,\"title\":\"A\"},{\"id\":1.0,\"title\":\"B\"}]}");
+        var result = service.test(id, 7, request);
+        assertThat(result.stages().getLast().message()).contains("entry 1 has duplicate ID");
+        assertThat(result.toString()).doesNotContain("private-token");
     }
 
     void body(String body) { when(http.fetch(any())).thenReturn(body.getBytes(StandardCharsets.UTF_8)); }

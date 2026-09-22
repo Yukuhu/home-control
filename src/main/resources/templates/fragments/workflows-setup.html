@@ -4,8 +4,15 @@
     <a class="button" th:href="@{/setup/workflows/new}">Create workflow</a>
     <p class="hint" th:if="${workflows.needsLoginPassword()}">Your first save creates a login password to protect saved addresses and credentials.</p>
     <ul><li th:each="workflow : ${workflows.definitions()}">
-        <a th:href="@{/setup/workflows/{id}(id=${workflow.id()})}" th:text="${workflow.name()}">Workflow</a>
+        <span th:text="${workflow.name()}">Workflow</span>
+        <span class="badge" th:text="${workflow.mode().name() == 'SINGLE'} ? 'Single tile' : 'Generated tiles'">Single tile</span>
         <span class="badge" th:text="${workflow.enabled()} ? 'Enabled' : 'Disabled'">Enabled</span>
+        <a th:href="@{/setup/workflows/{id}(id=${workflow.id()})}">Edit</a>
+        <form method="post" th:action="@{/setup/workflows/{id}/test(id=${workflow.id()})}">
+            <input type="hidden" name="expectedRevision" th:value="${workflow.revision()}">
+            <button type="submit" th:attr="aria-describedby='workflow-test-hint-' + ${workflow.id()}">Test workflow</button>
+            <p class="hint" th:id="'workflow-test-hint-' + ${workflow.id()}">Fetches fresh data using the saved settings, without playback. This may request a new upstream token.</p>
+        </form>
         <form method="post" th:action="@{/setup/workflows/{id}/enabled(id=${workflow.id()})}">
             <input type="hidden" name="expectedRevision" th:value="${workflow.revision()}">
             <input type="hidden" name="enabled" th:value="${!workflow.enabled()}">

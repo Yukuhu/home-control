@@ -128,6 +128,42 @@ class WorkflowJsonTest {
         assertThatThrownBy(() -> parse("{} {}")) .isInstanceOf(WorkflowException.class);
     }
 
+    @Test void numericIdentitiesKeepExactPrecisionAndRejectFractionalIds() {
+        var entries = WorkflowJson.entries(channels(), parse("""
+                {"channels":[{"id":9007199254740992.0,"title":"A"},
+                             {"id":9007199254740993.0,"title":"B"}]}
+                """));
+        assertThat(entries).extracting(WorkflowJson.Entry::key).doesNotHaveDuplicates();
+        assertThat(entries.get(1).key()).isEqualTo(WorkflowJson.stableKey(parse("9007199254740993")));
+        assertThatThrownBy(() -> WorkflowJson.stableKey(parse("1.0000000000000001")))
+                .isInstanceOf(WorkflowException.class).hasMessageContaining("invalid entry ID");
+        assertThat(WorkflowJson.stableKey(parse("10e-1"))).isEqualTo(WorkflowJson.stableKey(parse("1")));
+        assertThat(WorkflowJson.stableKey(parse("-0.0"))).isEqualTo(WorkflowJson.stableKey(parse("0")));
+    }
+
+    @Test void numericMappingsKeepExactValuesWithoutExpandingExponents() {
+        for (String number : new String[]{"9007199254740993.0", "1.0000000000000001", "1e100000000", "1e-100000000"}) {
+            var values = WorkflowJson.values(java.util.List.of(new Variable("A", Scope.ROOT, "", false)), parse(number), null);
+            String text = values.get("A").text();
+            assertThat(text.length()).isLessThanOrEqualTo(32);
+            assertThat(new java.math.BigDecimal(text)).isEqualByComparingTo(new java.math.BigDecimal(number));
+            var url = new WorkflowTemplate("https://media.example/?value={A}", java.util.Set.of("A")).expand(values);
+            assertThat(java.net.URLDecoder.decode(url.getRawQuery(), StandardCharsets.UTF_8)).isEqualTo("value=" + text);
+        }
+    }
+
+    @Test void numericIdsAndTokensHaveExplicitBoundsBeforeIntegerExpansion() {
+        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
+            String boundary = "1" + "0".repeat(999);
+            assertThat(WorkflowJson.stableKey(parse("1e999"))).isEqualTo(WorkflowJson.stableKey(parse(boundary)));
+            for (String number : new String[]{"1e1000", "1e100000000", "1e-100000000", "1e2147483647", "10e2147483647"}) {
+                assertThatThrownBy(() -> WorkflowJson.stableKey(parse(number))).isInstanceOf(WorkflowException.class);
+            }
+            assertThatThrownBy(() -> parse("1".repeat(1001))).isInstanceOf(WorkflowException.class);
+            assertThatThrownBy(() -> parse("1e2147483648")).isInstanceOf(WorkflowException.class);
+        });
+    }
+
     private static tools.jackson.databind.JsonNode parse(String json) {
         return WorkflowJson.parse(json.getBytes(StandardCharsets.UTF_8));
     }
