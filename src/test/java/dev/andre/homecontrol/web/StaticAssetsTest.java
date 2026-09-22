@@ -52,6 +52,8 @@ class StaticAssetsTest {
                 .andExpect(content().string(containsString("route-preview")));
         mockMvc.perform(get("/js/toast.js")).andExpect(status().isOk())
                 .andExpect(content().string(containsString("export function toast")));
+        mockMvc.perform(get("/js/workflows.js")).andExpect(status().isOk())
+                .andExpect(content().string(allOf(containsString("template.content.cloneNode(true)"), containsString("reindex"))));
         mockMvc.perform(get("/app.js")).andExpect(status().isNotFound());
     }
 
