@@ -102,6 +102,18 @@ class WorkflowJsonTest {
                 .isEqualTo(java.net.URI.create("https://[2606:4700::1111]/cover.png"));
     }
 
+    @Test void generatedArtworkAcceptsAllocatedIpv6AndRejectsReservedBoundaries() {
+        for (String host : new String[]{"[2001:200::1]", "[2001:4860::1]", "[2400::1]",
+                "[2606:4700::1111]", "[2800::1]", "[2a00::1]", "[2c00::1]"}) {
+            assertThat(WorkflowJson.artwork("https://" + host + "/cover.png"))
+                    .isEqualTo(java.net.URI.create("https://" + host + "/cover.png"));
+        }
+        for (String host : new String[]{"[2001:100::1]", "[2002::1]", "[2003:4000::1]",
+                "[23ff::1]", "[2d00::1]", "[3ffe::1]", "[3fff::1]"}) {
+            assertThat(WorkflowJson.artwork("https://" + host + "/cover.png")).isNull();
+        }
+    }
+
     @Test void singleModeUsesSavedDisplayAndKey() {
         var draft = WorkflowFixtures.single(java.net.URI.create("https://api.example/catalog"));
         var entries = WorkflowJson.entries(draft, parse("{}"));

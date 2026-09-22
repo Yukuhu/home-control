@@ -113,7 +113,7 @@ class WorkflowDefinitionTest {
 
     @Test void savedSingleArtworkRejectsRootDotLocalNamesAndDocumentationIpv6() {
         var draft = WorkflowFixtures.single(URI.create("https://api.example/catalog"));
-        for (String host : List.of("feed.local.", "localhost.", "[2001:db8::1]")) {
+        for (String host : List.of("feed.local.", "localhost.", "[2001:db8::1]", "[3ffe::1]")) {
             invalid(withTile(draft, new Tile("News", null, "https://" + host + "/cover.png")));
         }
         WorkflowValidator.validate(withTile(draft,
