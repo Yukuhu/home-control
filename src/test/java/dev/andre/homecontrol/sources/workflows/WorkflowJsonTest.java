@@ -87,6 +87,21 @@ class WorkflowJsonTest {
                 .getFirst().artwork()).isEqualTo(java.net.URI.create("https://8.8.8.8/a"));
     }
 
+    @Test void generatedArtworkOmitsRootDotLocalNamesAndDocumentationIpv6() {
+        var draft = channels();
+        var withArt = new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(), draft.fetch(),
+                new Listing("/channels", "/id", "/title", null, "/art"), null, draft.variables(), draft.cast());
+        for (String host : new String[]{"feed.local.", "localhost.", "[2001:db8::1]"}) {
+            var response = parse("{\"channels\":[{\"id\":\"a\",\"title\":\"A\",\"art\":\"https://"
+                    + host + "/cover.png\"}]}");
+            assertThat(WorkflowJson.entries(withArt, response).getFirst().artwork()).isNull();
+        }
+        var publicResponse = parse("{\"channels\":[{\"id\":\"a\",\"title\":\"A\","
+                + "\"art\":\"https://[2606:4700::1111]/cover.png\"}]}");
+        assertThat(WorkflowJson.entries(withArt, publicResponse).getFirst().artwork())
+                .isEqualTo(java.net.URI.create("https://[2606:4700::1111]/cover.png"));
+    }
+
     @Test void singleModeUsesSavedDisplayAndKey() {
         var draft = WorkflowFixtures.single(java.net.URI.create("https://api.example/catalog"));
         var entries = WorkflowJson.entries(draft, parse("{}"));

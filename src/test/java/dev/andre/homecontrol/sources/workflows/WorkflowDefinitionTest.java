@@ -111,6 +111,15 @@ class WorkflowDefinitionTest {
         WorkflowValidator.validate(withCast(draft, new Cast("https://media.example/file-{A}.mp4?token={C}", "video/mp4")));
     }
 
+    @Test void savedSingleArtworkRejectsRootDotLocalNamesAndDocumentationIpv6() {
+        var draft = WorkflowFixtures.single(URI.create("https://api.example/catalog"));
+        for (String host : List.of("feed.local.", "localhost.", "[2001:db8::1]")) {
+            invalid(withTile(draft, new Tile("News", null, "https://" + host + "/cover.png")));
+        }
+        WorkflowValidator.validate(withTile(draft,
+                new Tile("News", null, "https://[2606:4700::1111]/cover.png")));
+    }
+
     @Test void acceptsQueryValuePlaceholderButRejectsKeyBeforeAnotherParameter() {
         var draft = WorkflowFixtures.single(URI.create("https://api.example/catalog"));
         invalid(withCast(draft, new Cast("https://media.example/play?{A}&id=1", "video/mp4")));
