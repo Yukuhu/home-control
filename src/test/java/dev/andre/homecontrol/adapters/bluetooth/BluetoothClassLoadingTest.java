@@ -38,7 +38,8 @@ class BluetoothClassLoadingTest {
         String classpath = System.getProperty("home-control.test.runtime-classpath");
         assertThat(classpath).as("home-control.test.runtime-classpath is set by build.gradle.kts").isNotBlank();
         Path output = temp.resolve("child-" + enabled + ".log");
-        Process child = new ProcessBuilder(java, "-Xlog:class+load=info", "-cp", classpath, ContextSmoke.class.getName(),
+        Process child = new ProcessBuilder(java, "-Xlog:os+container=off", "-Xlog:class+load=info",
+                "-cp", classpath, ContextSmoke.class.getName(),
                 "--server.port=0",
                 "--shield.data-dir=" + temp.resolve("data-" + enabled),
                 "--shield.discovery-enabled=false",

@@ -30,6 +30,9 @@ import java.util.stream.Collectors;
 @Controller
 public class SetupController {
 
+    private static final String SETUP_VIEW = "setup";
+    private static final String ERROR_ATTRIBUTE = "error";
+
     private final PairingService pairing;
     private final DeviceManager devices;
     private final List<PromptPairing> promptPairings;
@@ -51,7 +54,7 @@ public class SetupController {
     @GetMapping("/setup")
     public String setup(Model model) {
         populateSetupModel(model, pairing.inProgress());
-        return "setup";
+        return SETUP_VIEW;
     }
 
     @PostMapping("/setup/pair")
@@ -61,13 +64,13 @@ public class SetupController {
             pairing.begin(host, name);
             populateSetupModel(model, true);
         } catch (StorageException e) {
-            model.addAttribute("error", e.getMessage());
+            model.addAttribute(ERROR_ATTRIBUTE, e.getMessage());
             populateSetupModel(model, false);
         } catch (IOException e) {
-            model.addAttribute("error", "Could not reach " + host + ": " + e.getMessage());
+            model.addAttribute(ERROR_ATTRIBUTE, "Could not reach " + host + ": " + e.getMessage());
             populateSetupModel(model, false);
         }
-        return "setup";
+        return SETUP_VIEW;
     }
 
     @PostMapping("/setup/code")
@@ -76,22 +79,22 @@ public class SetupController {
         try {
             result = pairing.submit(code);
         } catch (StorageException e) {
-            model.addAttribute("error", e.getMessage());
+            model.addAttribute(ERROR_ATTRIBUTE, e.getMessage());
             populateSetupModel(model, false);
-            return "setup";
+            return SETUP_VIEW;
         }
 
         switch (result) {
-            case PairingOutcome.Paired ignored -> {
+            case PairingOutcome.Paired() -> {
                 return "redirect:/";
             }
-            case PairingOutcome.WrongCode ignored -> model.addAttribute("error",
+            case PairingOutcome.WrongCode() -> model.addAttribute(ERROR_ATTRIBUTE,
                     "That code was not accepted. The device will show a new one — start again.");
-            case PairingOutcome.Failed failed -> model.addAttribute("error", failed.reason());
+            case PairingOutcome.Failed(var reason) -> model.addAttribute(ERROR_ATTRIBUTE, reason);
         }
 
         populateSetupModel(model, false);
-        return "setup";
+        return SETUP_VIEW;
     }
 
     /**
@@ -104,20 +107,20 @@ public class SetupController {
         Optional<PromptPairing> chosen = promptPairings.stream()
                 .filter(candidate -> candidate.adapterId().equals(adapter)).findFirst();
         if (chosen.isEmpty()) {
-            model.addAttribute("error", "Unknown device type " + adapter);
+            model.addAttribute(ERROR_ATTRIBUTE, "Unknown device type " + adapter);
             populateSetupModel(model, false);
-            return "setup";
+            return SETUP_VIEW;
         }
         switch (chosen.get().pair(host.trim(), name)) {
-            case PromptPairingResult.Paired paired -> {
-                return "redirect:" + UriComponentsBuilder.fromPath("/").queryParam("device", paired.device().id())
+            case PromptPairingResult.Paired(var device) -> {
+                return "redirect:" + UriComponentsBuilder.fromPath("/").queryParam("device", device.id())
                         .encode().build().toUriString();
             }
-            case PromptPairingResult.Declined declined -> model.addAttribute("error", declined.reason());
-            case PromptPairingResult.Failed failed -> model.addAttribute("error", failed.reason());
+            case PromptPairingResult.Declined(var reason) -> model.addAttribute(ERROR_ATTRIBUTE, reason);
+            case PromptPairingResult.Failed(var reason) -> model.addAttribute(ERROR_ATTRIBUTE, reason);
         }
         populateSetupModel(model, false);
-        return "setup";
+        return SETUP_VIEW;
     }
 
     /** A hand-entered Wake-on-LAN MAC address; blank clears it so the TV's own report is learned again. */
@@ -178,9 +181,9 @@ public class SetupController {
             change.run();
             return "redirect:/setup";
         } catch (IllegalArgumentException e) {
-            model.addAttribute("error", e.getMessage());
+            model.addAttribute(ERROR_ATTRIBUTE, e.getMessage());
             populateSetupModel(model, false);
-            return "setup";
+            return SETUP_VIEW;
         }
     }
 }

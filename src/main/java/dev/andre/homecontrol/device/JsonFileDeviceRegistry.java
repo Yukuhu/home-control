@@ -122,38 +122,41 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
 
     private static void validateDevices(List<Device> devices) {
         for (int index = 0; index < devices.size(); index++) {
-            Device device = devices.get(index);
-            if (device == null) {
-                throw invalidDevice(index, "record is null");
+            validateDevice(devices.get(index), index);
+        }
+    }
+
+    private static void validateDevice(Device device, int index) {
+        if (device == null) {
+            throw invalidDevice(index, "record is null");
+        }
+        if (device.id() == null || device.id().isBlank()) {
+            throw invalidDevice(index, "id is required");
+        }
+        if (device.name() == null || device.name().isBlank()) {
+            throw invalidDevice(index, "name is required");
+        }
+        if (device.host() == null || device.host().isBlank()) {
+            throw invalidDevice(index, "host is required");
+        }
+        if (device.kind() == null) {
+            throw invalidDevice(index, "kind is required");
+        }
+        if (device.lastSeen() == null) {
+            throw invalidDevice(index, "lastSeen is required");
+        }
+        if (device.hasAdapter(AndroidTvSettings.ADAPTER_ID)) {
+            try {
+                AndroidTvSettings.of(device);
+            } catch (IllegalArgumentException _) {
+                throw invalidDevice(index, "androidtv port must be an integer between 1 and 65535");
             }
-            if (device.id() == null || device.id().isBlank()) {
-                throw invalidDevice(index, "id is required");
-            }
-            if (device.name() == null || device.name().isBlank()) {
-                throw invalidDevice(index, "name is required");
-            }
-            if (device.host() == null || device.host().isBlank()) {
-                throw invalidDevice(index, "host is required");
-            }
-            if (device.kind() == null) {
-                throw invalidDevice(index, "kind is required");
-            }
-            if (device.lastSeen() == null) {
-                throw invalidDevice(index, "lastSeen is required");
-            }
-            if (device.hasAdapter(AndroidTvSettings.ADAPTER_ID)) {
-                try {
-                    AndroidTvSettings.of(device);
-                } catch (IllegalArgumentException e) {
-                    throw invalidDevice(index, "androidtv port must be an integer between 1 and 65535");
-                }
-            }
-            if (device.hasAdapter(CastSettings.ADAPTER_ID)) {
-                try {
-                    CastSettings.of(device);
-                } catch (IllegalArgumentException e) {
-                    throw invalidDevice(index, "cast port must be an integer between 1 and 65535");
-                }
+        }
+        if (device.hasAdapter(CastSettings.ADAPTER_ID)) {
+            try {
+                CastSettings.of(device);
+            } catch (IllegalArgumentException _) {
+                throw invalidDevice(index, "cast port must be an integer between 1 and 65535");
             }
         }
     }
@@ -205,7 +208,7 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
             if (temp != null) {
                 try {
                     Files.deleteIfExists(temp);
-                } catch (IOException ignored) {
+                } catch (IOException _) {
                     // Cleanup error; let the original exception propagate
                 }
             }

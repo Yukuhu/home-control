@@ -77,7 +77,7 @@ public class DeviceStateBroadcaster {
         BooleanSupplier check = allowed.get(emitter);
         try {
             return check != null && check.getAsBoolean();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             return false;
         }
     }
@@ -122,7 +122,7 @@ public class DeviceStateBroadcaster {
     private void enqueue(Send send) {
         try {
             fanOut.execute(() -> broadcast(send));
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             // The application is shutting down; there is nobody left to tell.
         }
     }
@@ -161,7 +161,7 @@ public class DeviceStateBroadcaster {
     private void completeQuietly(SseEmitter emitter) {
         try {
             emitter.complete();
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             // Already gone; the emitter is off the list either way.
         }
     }
@@ -170,7 +170,7 @@ public class DeviceStateBroadcaster {
     private void completeQuietly(SseEmitter emitter, Throwable cause) {
         try {
             emitter.completeWithError(cause);
-        } catch (Throwable ignored) {
+        } catch (Throwable _) {
             // Already gone; the emitter is off the list either way.
         }
     }

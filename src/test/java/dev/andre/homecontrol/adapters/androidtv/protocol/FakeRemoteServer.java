@@ -54,30 +54,44 @@ public class FakeRemoteServer implements AutoCloseable {
      * different failures — which is the only way to tell a rule about CONSECUTIVE verdicts
      * from one about a running total.
      */
-    private final Queue<Reaction> script = new ConcurrentLinkedQueue<>();
+    private final Queue<ConnectionGate> script = new ConcurrentLinkedQueue<>();
 
-    private enum Reaction {
-        /** Close the connection immediately, before any app-level exchange. */
-        CLOSE,
-        /** Accept it and then say nothing at all, so the client's TLS handshake times out. */
-        STALL,
-        /** Hold off the TLS handshake for a moment, then serve the connection normally. */
-        DELAY
+    /** Holds an accepted connection until the test observes the event it needs. */
+    public static final class ConnectionGate {
+        private final boolean serveAfterRelease;
+        private final CountDownLatch entered = new CountDownLatch(1);
+        private final CountDownLatch released = new CountDownLatch(1);
+
+        private ConnectionGate(boolean serveAfterRelease) {
+            this.serveAfterRelease = serveAfterRelease;
+        }
+
+        public void awaitEntered() throws InterruptedException {
+            if (!entered.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("the scripted connection was never accepted");
+            }
+        }
+
+        public void release() {
+            released.countDown();
+        }
+
+        private void awaitRelease() throws InterruptedException {
+            entered.countDown();
+            if (!released.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("the test never released the scripted connection");
+            }
+        }
     }
-
-    /** Comfortably longer than the stale timeout any test using {@link #stallNextConnection()} sets. */
-    private static final long STALL_MILLIS = 1_500;
-
-    /** Long enough for a test to act while the client is blocked in the handshake, well under any stale timeout. */
-    private static final long DELAY_MILLIS = 1_000;
 
     private volatile SSLSocket socket;
     private volatile MessageStream stream;
+    private volatile ConnectionGate activeGate;
 
     public FakeRemoteServer() throws Exception {
         SSLContext context = SSLContext.getInstance("TLS");
         context.init(TlsSockets.keyManagers(identity),
-                new TrustManager[]{TlsSockets.ACCEPT_ANY}, new SecureRandom());
+                new TrustManager[]{TlsSockets.PAIRING_TRUST}, new SecureRandom());
         serverSocket = (SSLServerSocket) context.getServerSocketFactory().createServerSocket(0);
         serverSocket.setWantClientAuth(true);
         Thread.ofVirtual().name("fake-remote-server").start(this::serve);
@@ -128,25 +142,32 @@ public class FakeRemoteServer implements AutoCloseable {
      */
     public void closeNextConnections(int n) {
         for (int i = 0; i < n; i++) {
-            script.add(Reaction.CLOSE);
+            ConnectionGate gate = new ConnectionGate(false);
+            gate.release();
+            script.add(gate);
         }
     }
 
     /**
      * Accepts the next connection and then never speaks, so the client's TLS handshake fails
      * with a {@link java.net.SocketTimeoutException} — a NETWORK-class failure (spec §8 class 1),
-     * not the handshake rejection {@link #closeNextConnections(int)} produces.
+     * not the handshake rejection {@link #closeNextConnections(int)} produces. Release the
+     * returned gate after observing that timeout so the server can accept the next connection.
      */
-    public void stallNextConnection() {
-        script.add(Reaction.STALL);
+    public ConnectionGate stallNextConnection() {
+        ConnectionGate gate = new ConnectionGate(false);
+        script.add(gate);
+        return gate;
     }
 
     /**
-     * Delays the handshake of the next connection by {@value #DELAY_MILLIS}ms and then serves it
-     * normally, so a test can act while the client is still blocked inside connect().
+     * Holds the next handshake until the returned gate is released, then serves it normally,
+     * so a test can act while the client is still blocked inside connect().
      */
-    public void delayNextConnection() {
-        script.add(Reaction.DELAY);
+    public ConnectionGate delayNextConnection() {
+        ConnectionGate gate = new ConnectionGate(true);
+        script.add(gate);
+        return gate;
     }
 
     /** How many normally served connections have since ended, from either side. */
@@ -187,29 +208,36 @@ public class FakeRemoteServer implements AutoCloseable {
     /** Accepts connections in a loop so reconnect behaviour can be tested. */
     private void serve() {
         while (!serverSocket.isClosed()) {
-            try {
-                socket = (SSLSocket) serverSocket.accept();
+            try (SSLSocket accepted = (SSLSocket) serverSocket.accept()) {
+                socket = accepted;
+                if (serverSocket.isClosed()) {
+                    continue;
+                }
                 connections.incrementAndGet();
-                Reaction reaction = script.poll();
-                if (reaction == Reaction.STALL) {
-                    Thread.sleep(STALL_MILLIS);
-                    socket.close();
-                    continue;
-                }
-                if (reaction == Reaction.CLOSE) {
-                    socket.close();
-                    continue;
-                }
-                if (reaction == Reaction.DELAY) {
-                    Thread.sleep(DELAY_MILLIS);
+                ConnectionGate gate = script.poll();
+                activeGate = gate;
+                if (gate != null) {
+                    if (serverSocket.isClosed()) {
+                        gate.release();
+                    }
+                    gate.awaitRelease();
+                    activeGate = null;
+                    if (!gate.serveAfterRelease) {
+                        continue;
+                    }
                 }
                 try {
-                    handle(socket);
+                    handle(accepted);
                 } finally {
                     connectionsEnded.incrementAndGet();
                 }
-            } catch (Exception e) {
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception _) {
                 // This connection ended; wait for the next one.
+            } finally {
+                activeGate = null;
             }
         }
     }
@@ -245,6 +273,10 @@ public class FakeRemoteServer implements AutoCloseable {
     @Override
     public void close() throws Exception {
         serverSocket.close();
+        ConnectionGate gate = activeGate;
+        if (gate != null) {
+            gate.release();
+        }
         if (socket != null) {
             socket.close();
         }

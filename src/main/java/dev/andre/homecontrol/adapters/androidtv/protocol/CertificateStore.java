@@ -1,10 +1,12 @@
 package dev.andre.homecontrol.adapters.androidtv.protocol;
 
 import dev.andre.homecontrol.storage.StorageException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.PrivateKey;
@@ -92,14 +94,14 @@ public class CertificateStore {
         }
     }
 
-    private void write(KeyStore keyStore) throws Exception {
+    private void write(KeyStore keyStore) throws GeneralSecurityException, IOException {
         Files.createDirectories(file.toAbsolutePath().getParent());
         try (OutputStream out = Files.newOutputStream(file)) {
             keyStore.store(out, password);
         }
     }
 
-    private KeyStore openOrEmpty() throws Exception {
+    private KeyStore openOrEmpty() throws GeneralSecurityException, IOException {
         KeyStore keyStore = KeyStore.getInstance("PKCS12");
         if (Files.exists(file)) {
             try (InputStream in = Files.newInputStream(file)) {

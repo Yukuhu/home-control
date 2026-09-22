@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
+import dev.andre.homecontrol.adapters.androidtv.protocol.TlsSockets;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteListener;
 import dev.andre.homecontrol.core.UnsupportedActionException;
@@ -58,7 +59,8 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     private volatile RemoteConnection connection;
     private volatile DeviceState state = DeviceState.initial();
     private volatile Duration backoff;
-    private volatile int consecutiveUnpaired;
+    /** Accessed only on the single-threaded scheduler. */
+    private int consecutiveUnpaired;
     private volatile boolean closed;
 
     public AndroidTvSession(Device device, ClientCertificate credential,
@@ -92,7 +94,7 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         RemoteConnection current = requireConnected();
         try {
             current.sendKey(key, press);
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw new DeviceOfflineException("The device dropped the connection while sending " + key);
         }
     }
@@ -101,7 +103,7 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         RemoteConnection current = requireConnected();
         try {
             current.sendAppLink(uri.toString());
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw new DeviceOfflineException("The device dropped the connection while opening " + uri);
         }
     }
@@ -149,14 +151,8 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         update(state.withStatus(DeviceStatus.CONNECTING));
         try {
             RemoteConnection opened = RemoteConnection.connect(device.host(), settings.port(),
-                    credential, properties.staleTimeoutSeconds() * 1000, this);
-
-            if (!presentsThePinnedCertificate(opened)) {
-                log.warn("Device {} presented an unexpected certificate; refusing it", device.id());
-                opened.close();
-                update(state.withStatus(DeviceStatus.UNPAIRED));
-                return;
-            }
+                    credential, properties.staleTimeoutSeconds() * 1000, this,
+                    settings.certificateFingerprint());
 
             connection = opened;
             if (closed) {
@@ -171,7 +167,10 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
             backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
             forgetAmbiguousVerdicts();
             update(state.withStatus(DeviceStatus.CONNECTED));
-        } catch (RemoteConnection.UnpairedException e) {
+        } catch (TlsSockets.CertificateMismatchException _) {
+            log.warn("Device {} presented an unexpected certificate; refusing it", device.id());
+            update(state.withStatus(DeviceStatus.UNPAIRED));
+        } catch (RemoteConnection.UnpairedException _) {
             handleAmbiguousUnpaired();
         } catch (IOException e) {
             log.debug("Could not reach {}: {}", device.host(), e.getMessage());
@@ -181,20 +180,13 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         }
     }
 
-    /** A device recorded without a fingerprint (paired before pinning) is accepted once. */
-    private boolean presentsThePinnedCertificate(RemoteConnection opened) {
-        String pinned = settings.certificateFingerprint();
-        return pinned == null
-                || pinned.equals(ClientCertificate.fingerprintOf(opened.serverCertificate()));
-    }
-
     /**
      * Handles an ambiguous UNPAIRED verdict — from either {@link RemoteConnection.UnpairedException}
      * or {@link DisconnectCause#UNPAIRED} — by retrying like an ordinary drop until it has
      * happened {@value #UNPAIRED_CONFIRMATION_THRESHOLD} times in a row, spanning a plausible
      * device reboot, then latching.
      * A certificate fingerprint MISMATCH is not ambiguous and does not go through here —
-     * it latches immediately, on the first occurrence (see {@code presentsThePinnedCertificate}).
+     * it latches immediately, on the first occurrence (see {@link TlsSockets.CertificateMismatchException}).
      */
     private void handleAmbiguousUnpaired() {
         consecutiveUnpaired++;
@@ -296,7 +288,7 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
                     task.run();
                 }
             });
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             // close() shut the scheduler down between the check above and this handoff;
             // the session is going away, so there is nothing left to update.
         }
@@ -313,12 +305,11 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         state = updated;
         try {
             onChange.accept(updated);
-        } catch (Throwable t) {
+        } catch (RuntimeException e) {
             // The listener publishes a Spring event, delivered synchronously on this thread
-            // to subscribers this class knows nothing about. Whatever they do, the transition
-            // has already happened and the caller must get to its scheduleReconnect() — a
-            // listener that throws must never be able to wedge the session.
-            log.warn("A device state listener failed for {}", device.id(), t);
+            // to subscribers this class knows nothing about. Recoverable listener failures
+            // must not prevent scheduleReconnect(); Errors abort the current task.
+            log.warn("A device state listener failed for {}", device.id(), e);
         }
     }
 

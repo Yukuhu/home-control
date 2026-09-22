@@ -90,20 +90,20 @@ public class PairingService {
         try {
             PairingResult result = current.session().submitCode(code);
             return switch (result) {
-                case PairingResult.Paired paired -> {
+                case PairingResult.Paired(var serverCertificate) -> {
                     certificates.save(current.deviceId(), current.credential());
                     sessions.adopt(AndroidTvSettings.device(
                             current.deviceId(),
                             current.name(),
                             current.host(),
                             AndroidTvSettings.DEFAULT_PORT,
-                            ClientCertificate.fingerprintOf(paired.serverCertificate()),
+                            ClientCertificate.fingerprintOf(serverCertificate),
                             Instant.now()));
                     log.info("Paired with {} at {}", current.name(), current.host());
                     yield new PairingOutcome.Paired();
                 }
-                case PairingResult.WrongCode ignored -> new PairingOutcome.WrongCode();
-                case PairingResult.Failed failed -> new PairingOutcome.Failed(failed.reason());
+                case PairingResult.WrongCode _ -> new PairingOutcome.WrongCode();
+                case PairingResult.Failed(var reason) -> new PairingOutcome.Failed(reason);
             };
         } finally {
             // The device shows a brand new code next time whatever happened here, so the
@@ -129,7 +129,7 @@ public class PairingService {
      * its existing registry entry instead of creating a duplicate (spec §6).
      */
     private static String deviceId(String host) {
-        return host.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+        return host.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-)|(-$)", "");
     }
 
     private record Attempt(PairingSession session, ClientCertificate credential,

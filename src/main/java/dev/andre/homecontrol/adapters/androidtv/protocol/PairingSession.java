@@ -72,7 +72,7 @@ public class PairingSession implements AutoCloseable {
                     (RSAPublicKey) credential.certificate().getPublicKey(),
                     (RSAPublicKey) serverCertificate.getPublicKey(),
                     code);
-        } catch (PairingDigest.WrongCodeException | IllegalArgumentException e) {
+        } catch (PairingDigest.WrongCodeException | IllegalArgumentException _) {
             return new PairingResult.WrongCode();
         }
 
@@ -88,7 +88,7 @@ public class PairingSession implements AutoCloseable {
                 return new PairingResult.Failed("the device rejected the pairing: " + reply.getStatus());
             }
             return new PairingResult.Paired(serverCertificate);
-        } catch (IOException e) {
+        } catch (IOException _) {
             return new PairingResult.Failed(
                     "the device closed the connection; it will show a new code on the next attempt");
         }
@@ -135,7 +135,7 @@ public class PairingSession implements AutoCloseable {
         if (socket != null) {
             try {
                 socket.close();
-            } catch (IOException ignored) {
+            } catch (IOException _) {
                 // Closing a already-dead pairing socket is not interesting.
             }
         }

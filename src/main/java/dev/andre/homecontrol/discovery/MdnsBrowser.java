@@ -162,7 +162,7 @@ public class MdnsBrowser implements AutoCloseable {
         if (jmdns != null) {
             try {
                 jmdns.close();
-            } catch (IOException ignored) {
+            } catch (IOException _) {
                 // Shutting down anyway.
             }
             jmdns = null;
