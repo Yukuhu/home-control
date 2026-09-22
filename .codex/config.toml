@@ -1,0 +1,19 @@
+# SonarCloud for https://github.com/Yukuhu/home-control
+# Credentials are read from a private local file outside this repository.
+[mcp_servers.sonarcloud]
+command = "/bin/bash"
+args = ["-c", '''set -eu
+IFS= read -r SONARQUBE_TOKEN < /home/andre/.config/sonarqube/home-control.token
+export SONARQUBE_TOKEN
+exec /home/andre/.sdkman/candidates/java/current/bin/java -Xlog:os+container=off -jar /home/andre/.local/share/sonarqube-mcp/sonarqube-mcp-server-1.27.0.4335.jar
+''']
+startup_timeout_sec = 60
+tool_timeout_sec = 60
+
+[mcp_servers.sonarcloud.env]
+SONARQUBE_URL = "https://sonarcloud.io"
+SONARQUBE_ORG = "yukuhu"
+SONARQUBE_PROJECT_KEY = "Yukuhu_home-control"
+SONARQUBE_READ_ONLY = "true"
+SONARQUBE_TOOLSETS = "issues,measures,quality-gates,rules,security-hotspots,duplications,coverage"
+STORAGE_PATH = "/home/andre/.local/share/sonarqube-mcp/home-control"
