@@ -27,6 +27,31 @@ import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
 public final class WorkflowJson {
     private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()
             .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64).build()).build()).build();
+    // IANA IPv6 Global Unicast Address Space, RIR-designated ALLOCATED rows (2025-10-10):
+    // https://www.iana.org/assignments/ipv6-unicast-address-assignments
+    private static final List<Ipv6Prefix> ALLOCATED_RIR_IPV6 = List.of(
+            "2001:200::/23", "2001:400::/23", "2001:600::/23", "2001:800::/22",
+            "2001:c00::/23", "2001:e00::/23", "2001:1200::/23", "2001:1400::/22",
+            "2001:1800::/23", "2001:1a00::/23", "2001:1c00::/22", "2001:2000::/19",
+            "2001:4000::/23", "2001:4200::/23", "2001:4400::/23", "2001:4600::/23",
+            "2001:4800::/23", "2001:4a00::/23", "2001:4c00::/23", "2001:5000::/20",
+            "2001:8000::/19", "2001:a000::/20", "2001:b000::/20", "2003::/18",
+            "2400::/12", "2410::/12", "2600::/12", "2610::/23", "2620::/23",
+            "2630::/12", "2800::/12", "2a00::/12", "2a10::/12", "2c00::/12"
+    ).stream().map(Ipv6Prefix::parse).toList();
+
+    private record Ipv6Prefix(int firstWord, int bits) {
+        static Ipv6Prefix parse(String cidr) {
+            String[] parts = cidr.split("/");
+            return new Ipv6Prefix(ipv6FirstWord(InetAddress.ofLiteral(parts[0]).getAddress()),
+                    Integer.parseInt(parts[1]));
+        }
+
+        boolean contains(int address) {
+            int mask = -1 << (32 - bits);
+            return (address & mask) == (firstWord & mask);
+        }
+    }
 
     private WorkflowJson() {}
 
@@ -163,23 +188,25 @@ public final class WorkflowJson {
     }
 
     private static boolean publicIpv6(String host) {
-        // Parse literal bytes without DNS, then exclude special-purpose ranges
-        // within global unicast space that are not reliably public destinations.
+        // Literal parsing never resolves a hostname. Only published RIR allocations
+        // are accepted; the embedded documentation block remains excluded.
         String literal = host.substring(1, host.length() - 1);
         try {
             InetAddress address = InetAddress.ofLiteral(literal);
             if (!(address instanceof Inet6Address) || literal.contains("%")) return false;
             byte[] bytes = address.getAddress();
-            int a = bytes[0] & 255, b = bytes[1] & 255, c = bytes[2] & 255, d = bytes[3] & 255;
-            boolean globalUnicast = (a & 0xe0) == 0x20;
-            boolean protocolAssignments = a == 0x20 && b == 0x01 && (c & 0xfe) == 0;
-            boolean documentation = a == 0x20 && b == 0x01 && c == 0x0d && d == 0xb8
-                    || a == 0x3f && b == 0xff && (c & 0xf0) == 0;
-            boolean sixToFour = a == 0x20 && b == 0x02;
-            return globalUnicast && !protocolAssignments && !documentation && !sixToFour;
+            boolean documentation = (bytes[0] & 255) == 0x20 && (bytes[1] & 255) == 0x01
+                    && (bytes[2] & 255) == 0x0d && (bytes[3] & 255) == 0xb8;
+            int word = ipv6FirstWord(bytes);
+            return !documentation && ALLOCATED_RIR_IPV6.stream().anyMatch(prefix -> prefix.contains(word));
         } catch (IllegalArgumentException e) {
             return false;
         }
+    }
+
+    private static int ipv6FirstWord(byte[] bytes) {
+        return (bytes[0] & 255) << 24 | (bytes[1] & 255) << 16
+                | (bytes[2] & 255) << 8 | (bytes[3] & 255);
     }
 
     private static JsonNode select(JsonNode root, String pointer) {
