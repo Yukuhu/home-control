@@ -111,6 +111,12 @@ class WorkflowDefinitionTest {
         WorkflowValidator.validate(withCast(draft, new Cast("https://media.example/file-{A}.mp4?token={C}", "video/mp4")));
     }
 
+    @Test void acceptsQueryValuePlaceholderButRejectsKeyBeforeAnotherParameter() {
+        var draft = WorkflowFixtures.single(URI.create("https://api.example/catalog"));
+        invalid(withCast(draft, new Cast("https://media.example/play?{A}&id=1", "video/mp4")));
+        WorkflowValidator.validate(withCast(draft, new Cast("https://media.example/play?id={A}", "video/mp4")));
+    }
+
     @Test void rawUnvalidatedDtoNamesNeverPrintCredentials() {
         assertThat(new Header("secret-header-name", "saved-secret").toString())
                 .doesNotContain("secret-header-name", "saved-secret");
