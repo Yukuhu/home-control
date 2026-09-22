@@ -20,6 +20,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.apache.httpcomponents.client5:httpclient5")
     implementation("com.google.protobuf:protobuf-java:4.36.1")
     implementation("org.jmdns:jmdns:3.6.3")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
