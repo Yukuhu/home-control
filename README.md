@@ -687,6 +687,14 @@ updating. The upgrade is one-way: an older image cannot read the new file. The o
 is kept once as `devices.v1.json` in the same directory — to roll back, stop the app,
 restore that file as `devices.json`, and start the older image.
 
+## CI quality gate
+
+The `Build and test` job runs the Gradle build, scans with SonarCloud, and waits for the
+quality gate. A failed scan, failed gate, or missing `SONAR_TOKEN` makes the job red and
+prevents the release job from running. Keep `SONAR_TOKEN` in both the GitHub Actions and
+Dependabot secret stores. GitHub does not provide that secret to fork pull requests, so
+their build stays red until a separate scan path is configured.
+
 ## Browser tests
 
 `./gradlew build` (or `scripts/gradle.sh build` without a local JDK) never resolves Playwright or

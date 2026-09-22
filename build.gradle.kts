@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "4.1.1"
     id("com.google.protobuf") version "0.10.0"
+    id("org.sonarqube") version "7.4.0.8496"
 }
 
 group = "dev.andre"
@@ -14,6 +15,14 @@ java {
 }
 
 repositories { mavenCentral() }
+
+sonar {
+    properties {
+        property("sonar.projectKey", "Yukuhu_home-control")
+        property("sonar.organization", "yukuhu")
+        property("sonar.gradle.scanAll", "true")
+    }
+}
 
 dependencies {
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
