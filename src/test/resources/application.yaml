@@ -45,6 +45,9 @@ home-control:
     login-attempts-per-address: 5
     login-attempts-total: 50
     login-window: 15m
+  workflows:
+    enabled: ${HOME_CONTROL_WORKFLOWS_ENABLED:true}
+    allow-loopback: ${HOME_CONTROL_WORKFLOWS_ALLOW_LOOPBACK:false}
   jellyfin:
     enabled: true
     connect-timeout-seconds: 5
