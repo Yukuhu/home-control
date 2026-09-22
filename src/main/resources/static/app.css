@@ -336,3 +336,19 @@ main.setup { max-width: 1300px; padding: 3rem clamp(1.25rem, 4vw, 4rem) 5rem; ma
 select { overflow: hidden; text-overflow: ellipsis; }
 .setup label:has(> select) { overflow: clip; }
 .setup select:focus-visible { outline-offset: -2px; }
+
+/* Workflow editor: bounded, ordered field rows share Setup's controls and colors. */
+.workflow-editor .workflow-field { min-width: 0; margin: .7rem 0; }
+.workflow-editor .workflow-field > input:not([type=checkbox]), .workflow-editor .workflow-field > select { display: block; width: 100%; margin-top: .4rem; }
+.workflow-editor .workflow-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem 1rem; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.workflow-editor .workflow-row > button { justify-self: start; align-self: end; }
+.workflow-editor .workflow-checkbox { display: flex; gap: .6rem; align-items: center; min-height: 44px; }
+.workflow-editor .workflow-sample { margin-top: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: .7rem; }
+.workflow-editor .workflow-sample code { white-space: pre-wrap; }
+.workflow-editor [hidden] { display: none !important; }
+.workflow-editor fieldset { width: 100%; scroll-margin-top: 1rem; }
+.workflow-editor .error a { color: inherit; }
+@media (max-width: 48rem) {
+    .workflow-editor .workflow-row { grid-template-columns: minmax(0, 1fr); }
+    .workflow-editor .setup-content > section { padding: 1rem; }
+}

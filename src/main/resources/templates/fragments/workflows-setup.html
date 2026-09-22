@@ -1,0 +1,21 @@
+<section id="workflows" th:fragment="section" xmlns:th="http://www.thymeleaf.org">
+    <p class="eyebrow">BRING YOUR OWN MEDIA</p><h2>Workflows</h2>
+    <p class="hint">Fetch JSON, map its fields, and play a direct media address on your receiver.</p>
+    <a class="button" th:href="@{/setup/workflows/new}">Create workflow</a>
+    <p class="hint" th:if="${workflows.needsLoginPassword()}">Your first save creates a login password to protect saved addresses and credentials.</p>
+    <ul><li th:each="workflow : ${workflows.definitions()}">
+        <a th:href="@{/setup/workflows/{id}(id=${workflow.id()})}" th:text="${workflow.name()}">Workflow</a>
+        <span class="badge" th:text="${workflow.enabled()} ? 'Enabled' : 'Disabled'">Enabled</span>
+        <form method="post" th:action="@{/setup/workflows/{id}/enabled(id=${workflow.id()})}">
+            <input type="hidden" name="expectedRevision" th:value="${workflow.revision()}">
+            <input type="hidden" name="enabled" th:value="${!workflow.enabled()}">
+            <button type="submit" th:text="${workflow.enabled()} ? 'Disable' : 'Enable'">Disable</button>
+        </form>
+        <form method="post" th:action="@{/setup/workflows/{id}/remove(id=${workflow.id()})}">
+            <input type="hidden" name="expectedRevision" th:value="${workflow.revision()}"><button type="submit" class="danger">Remove workflow</button>
+        </form>
+    </li><li th:each="problem : ${workflows.problems()}">
+        <p class="error" th:text="${problem.message()}">Stored definition cannot be loaded</p>
+        <form method="post" th:action="@{/setup/workflows/{id}/remove-invalid(id=${problem.token()})}"><button type="submit" class="danger">Remove unreadable workflow</button></form>
+    </li></ul>
+</section>

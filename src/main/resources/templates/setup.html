@@ -40,7 +40,7 @@
     <nav class="setup-nav" aria-label="Setup sections">
         <p class="eyebrow">SETUP</p>
         <a href="#devices"><span aria-hidden="true">01</span> Devices</a>
-        <a href="#connections" th:if="${jellyfin != null or youtube != null or tmdb != null or sports != null or pinned != null}"><span aria-hidden="true">02</span> Content sources</a>
+        <a href="#connections" th:if="${jellyfin != null or youtube != null or tmdb != null or sports != null or pinned != null or workflows != null}"><span aria-hidden="true">02</span> Content sources</a>
         <a href="#sources" th:if="${sourcesSetup != null}"><span aria-hidden="true">03</span> Dashboard</a>
         <a href="#account" th:if="${loginRequired}"><span aria-hidden="true">04</span> Account</a>
         <a href="#install"><span aria-hidden="true">↗</span> Install app</a>
@@ -224,7 +224,7 @@
         <section th:replace="~{fragments/bluetooth-setup :: section}"></section>
     </th:block>
 
-    <div id="connections" class="setup-category" th:if="${jellyfin != null or youtube != null or tmdb != null or sports != null or pinned != null}">
+    <div id="connections" class="setup-category" th:if="${jellyfin != null or youtube != null or tmdb != null or sports != null or pinned != null or workflows != null}">
         <p class="eyebrow">CONTENT SOURCES</p>
         <h2>All your favorites, together</h2>
         <p>Choose the libraries and services you want to see at home.</p>
@@ -252,6 +252,8 @@
     <th:block th:if="${pinned != null}">
         <section th:replace="~{fragments/pinned-setup :: section}"></section>
     </th:block>
+
+    <th:block th:if="${workflows != null}"><section th:replace="~{fragments/workflows-setup :: section}"></section></th:block>
 
     <th:block th:if="${sports != null}">
         <section th:replace="~{fragments/sports-setup :: section}"></section>

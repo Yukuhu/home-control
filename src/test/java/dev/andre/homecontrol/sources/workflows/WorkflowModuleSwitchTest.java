@@ -34,13 +34,14 @@ class WorkflowModuleSwitchTest {
             .withBean(LoginService.class, () -> mock(LoginService.class))
             .withBean(DeviceManager.class, () -> mock(DeviceManager.class))
             .withBean(RailPreferences.class, () -> preferences)
-            .withUserConfiguration(WorkflowConfiguration.class);
+            .withUserConfiguration(WorkflowConfiguration.class, WorkflowSetupController.class, WorkflowSetupAdvice.class, WorkflowTestService.class);
 
     @Test void disabledModuleDoesNotReadDefinitionsOrCreateExecutionBeans() {
         context.withPropertyValues("home-control.workflows.enabled=false").run(app -> {
             assertThat(app).doesNotHaveBean(WorkflowStore.class).doesNotHaveBean(WorkflowContentSource.class)
                     .doesNotHaveBean(WorkflowRunner.class).doesNotHaveBean(WorkflowHttpClient.class)
-                    .doesNotHaveBean(WorkflowCastRouteExecutor.class);
+                    .doesNotHaveBean(WorkflowCastRouteExecutor.class).doesNotHaveBean(WorkflowSetupController.class)
+                    .doesNotHaveBean(WorkflowSetupAdvice.class).doesNotHaveBean(WorkflowTestService.class);
             verifyNoInteractions(secrets);
         });
     }
@@ -112,5 +113,53 @@ class WorkflowModuleSwitchTest {
             assertInvalidated.run();
             called = true;
         }
+    }
+}
+
+@org.springframework.boot.test.context.SpringBootTest(properties = "home-control.workflows.enabled=false")
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+class WorkflowDisabledSetupTest {
+    @org.springframework.beans.factory.annotation.Autowired org.springframework.test.web.servlet.MockMvc mvc;
+    @org.springframework.beans.factory.annotation.Autowired org.springframework.context.ApplicationContext context;
+    static java.nio.file.Path directory;
+    @org.springframework.test.context.DynamicPropertySource
+    static void data(org.springframework.test.context.DynamicPropertyRegistry registry) throws java.io.IOException {
+        directory = java.nio.file.Files.createTempDirectory("workflow-editor-disabled");
+        registry.add("shield.data-dir", directory::toString);
+    }
+    @Test void noEditorAdviceServiceOrRoutesExistWhenModuleIsDisabled() throws Exception {
+        assertThat(context.getBeanNamesForType(WorkflowSetupController.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(WorkflowSetupAdvice.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(WorkflowTestService.class)).isEmpty();
+        var html = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/setup"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(html).doesNotContain("id=\"workflows\"", "/setup/workflows/new");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/setup/workflows/new"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        for (String suffix : List.of("", "/test", "/remove", "/enabled", "/remove-invalid")) {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/setup/workflows/w-0123456789ab" + suffix))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+        }
+        assertThat(java.nio.file.Files.exists(directory.resolve("secrets.json"))).isFalse();
+    }
+}
+
+@org.springframework.boot.test.context.SpringBootTest(properties = {"home-control.jellyfin.enabled=false",
+        "home-control.youtube.enabled=false", "home-control.tmdb.enabled=false", "home-control.sports.enabled=false", "home-control.pinned.enabled=false"})
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+class WorkflowOnlySetupTest {
+    @org.springframework.beans.factory.annotation.Autowired org.springframework.test.web.servlet.MockMvc mvc;
+    @org.springframework.test.context.DynamicPropertySource
+    static void data(org.springframework.test.context.DynamicPropertyRegistry registry) throws java.io.IOException {
+        String directory = java.nio.file.Files.createTempDirectory("workflow-editor-only").toString();
+        registry.add("shield.data-dir", () -> directory);
+    }
+    @Test void workflowSummaryRemainsVisibleAsTheOnlySourceModule() throws Exception {
+        String html = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/setup"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(html).contains("href=\"#connections\"", "id=\"connections\"", "id=\"workflows\"", "/setup/workflows/new")
+                .doesNotContain("id=\"pinned\"", "id=\"jellyfin\"", "id=\"tmdb\"", "id=\"youtube\"", "id=\"sports\"");
     }
 }
