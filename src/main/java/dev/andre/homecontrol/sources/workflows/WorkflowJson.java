@@ -7,6 +7,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigInteger;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -122,13 +124,15 @@ public final class WorkflowJson {
             URI uri = new URI(raw);
             String host = uri.getHost();
             if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null || uri.getRawUserInfo() != null
-                    || uri.getRawQuery() != null || uri.getRawFragment() != null
-                    || host.equalsIgnoreCase("localhost") || host.toLowerCase(java.util.Locale.ROOT).endsWith(".localhost")
-                    || host.toLowerCase(java.util.Locale.ROOT).endsWith(".local")) return null;
+                    || uri.getRawQuery() != null || uri.getRawFragment() != null) return null;
+            String classifiedHost = host.endsWith(".") ? host.substring(0, host.length() - 1) : host;
+            classifiedHost = classifiedHost.toLowerCase(java.util.Locale.ROOT);
+            if (classifiedHost.equals("localhost") || classifiedHost.endsWith(".localhost")
+                    || classifiedHost.endsWith(".local")) return null;
             for (String segment : uri.getPath().split("/", -1)) if (segment.equals(".") || segment.equals("..")) return null;
-            if (host.startsWith("[")) return publicIpv6(host) ? uri : null;
-            if (host.matches("[0-9.]+")) return publicIpv4(host) ? uri : null;
-            if (!host.contains(".")) return null;
+            if (classifiedHost.startsWith("[")) return publicIpv6(classifiedHost) ? uri : null;
+            if (classifiedHost.matches("[0-9.]+")) return publicIpv4(classifiedHost) ? uri : null;
+            if (!classifiedHost.contains(".")) return null;
             return uri;
         } catch (URISyntaxException e) {
             return null;
@@ -159,32 +163,23 @@ public final class WorkflowJson {
     }
 
     private static boolean publicIpv6(String host) {
-        // Only global unicast literals are accepted. This excludes local, mapped,
-        // multicast, link-local, unspecified, and scoped addresses without DNS.
+        // Parse literal bytes without DNS, then exclude special-purpose ranges
+        // within global unicast space that are not reliably public destinations.
         String literal = host.substring(1, host.length() - 1);
-        if (literal.contains("%") || literal.contains(".")) return false;
-        String[] halves = literal.split("::", -1);
-        if (halves.length > 2) return false;
-        List<String> groups = new ArrayList<>();
-        for (int half = 0; half < halves.length; half++) {
-            if (!halves[half].isEmpty()) groups.addAll(List.of(halves[half].split(":", -1)));
-            if (half == 0 && halves.length == 2) {
-                int count = groups.size() + (halves[1].isEmpty() ? 0 : halves[1].split(":", -1).length);
-                if (count >= 8) return false;
-                for (int i = count; i < 8; i++) groups.add("0");
-            }
-        }
-        if (groups.size() != 8) return false;
-        int first;
         try {
-            for (String group : groups) {
-                if (group.isEmpty() || group.length() > 4 || !group.matches("[0-9a-fA-F]+")) return false;
-            }
-            first = Integer.parseInt(groups.getFirst(), 16);
-        } catch (NumberFormatException e) {
+            InetAddress address = InetAddress.ofLiteral(literal);
+            if (!(address instanceof Inet6Address) || literal.contains("%")) return false;
+            byte[] bytes = address.getAddress();
+            int a = bytes[0] & 255, b = bytes[1] & 255, c = bytes[2] & 255, d = bytes[3] & 255;
+            boolean globalUnicast = (a & 0xe0) == 0x20;
+            boolean protocolAssignments = a == 0x20 && b == 0x01 && (c & 0xfe) == 0;
+            boolean documentation = a == 0x20 && b == 0x01 && c == 0x0d && d == 0xb8
+                    || a == 0x3f && b == 0xff && (c & 0xf0) == 0;
+            boolean sixToFour = a == 0x20 && b == 0x02;
+            return globalUnicast && !protocolAssignments && !documentation && !sixToFour;
+        } catch (IllegalArgumentException e) {
             return false;
         }
-        return first >= 0x2000 && first <= 0x3fff;
     }
 
     private static JsonNode select(JsonNode root, String pointer) {
