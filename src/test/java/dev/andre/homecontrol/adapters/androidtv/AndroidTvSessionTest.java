@@ -14,6 +14,8 @@ import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -93,15 +95,16 @@ class AndroidTvSessionTest {
     }
 
     @Test
-    void closingWhileAConnectIsInFlightClosesTheConnectionItThenOpens() {
+    void closingWhileAConnectIsInFlightClosesTheConnectionItThenOpens() throws Exception {
         // close() can run while connect() is still blocked in the TLS handshake on the
         // session's own thread. The connection that handshake produces afterwards belongs to
         // nobody, so the session must close it rather than leave its socket and reader open.
-        fakeDevice.delayNextConnection();
+        FakeRemoteServer.ConnectionGate gate = fakeDevice.delayNextConnection();
         session.start();
-        await().until(() -> fakeDevice.connections() == 1);
+        gate.awaitEntered();
 
         session.close();
+        gate.release();
 
         // Well inside the 10s stale timeout, which would otherwise end the connection too.
         await().atMost(Duration.ofSeconds(5)).until(() -> fakeDevice.connectionsEnded() == 1);
@@ -206,6 +209,35 @@ class AndroidTvSessionTest {
         }
     }
 
+    @Test
+    void doesNotContinueConnectingAfterAStateListenerThrowsAnError() throws Exception {
+        Device device = AndroidTvSettings.device("shield-listener-error", "Test Shield", "127.0.0.1",
+                fakeDevice.port(), null, Instant.now());
+        CountDownLatch connecting = new CountDownLatch(1);
+        CountDownLatch nextCallback = new CountDownLatch(1);
+
+        try (AndroidTvSession failing = new AndroidTvSession(device,
+                ClientCertificate.generate("shield-remote"), PROPERTIES, state -> {
+                    if (state.powerOn()) {
+                        nextCallback.countDown();
+                    } else if (state.status() == DeviceStatus.CONNECTING) {
+                        connecting.countDown();
+                        throw new LinkageError("a subscriber cannot load its dependency");
+                    }
+                })) {
+            failing.start();
+            assertThat(connecting.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // This callback runs after the connect task, so the assertion does not race
+            // the task continuing into a network connection after the listener failed.
+            failing.onPower(true);
+            assertThat(nextCallback.await(5, TimeUnit.SECONDS)).isTrue();
+
+            assertThat(fakeDevice.connections()).isZero();
+            assertThat(failing.state().status()).isEqualTo(DeviceStatus.CONNECTING);
+        }
+    }
+
     /** A port that was bound and released, so connecting to it is refused immediately. */
     private static int closedPort() throws Exception {
         try (ServerSocket probe = new ServerSocket(0)) {
@@ -229,7 +261,7 @@ class AndroidTvSessionTest {
     }
 
     @Test
-    void doesNotLatchWhenANetworkFailureSeparatesTheAmbiguousVerdicts() {
+    void doesNotLatchWhenANetworkFailureSeparatesTheAmbiguousVerdicts() throws Exception {
         // Two ambiguous verdicts, a network-class failure (the device accepts the connection
         // but never speaks, so the TLS handshake times out), then three more ambiguous
         // verdicts: five in total, but never five in a row. The network failure is positive
@@ -237,11 +269,17 @@ class AndroidTvSessionTest {
         // at all — so the count starts over and a merely flaky device is never told to
         // re-pair. The seventh connection is served normally.
         fakeDevice.closeNextConnections(2);
-        fakeDevice.stallNextConnection();
+        FakeRemoteServer.ConnectionGate gate = fakeDevice.stallNextConnection();
         fakeDevice.closeNextConnections(3);
 
         try (AndroidTvSession retrying = sessionWith(SHORT_TIMEOUT)) {
             retrying.start();
+
+            gate.awaitEntered();
+            await().atMost(Duration.ofSeconds(5))
+                    .until(() -> fakeDevice.connections() == 3
+                            && retrying.state().status() == DeviceStatus.DISCONNECTED);
+            gate.release();
 
             await().atMost(Duration.ofSeconds(40))
                     .until(() -> retrying.state().status() == DeviceStatus.CONNECTED);

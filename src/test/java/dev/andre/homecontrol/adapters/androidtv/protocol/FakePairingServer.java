@@ -41,7 +41,7 @@ public class FakePairingServer implements AutoCloseable {
     public FakePairingServer() throws Exception {
         SSLContext context = SSLContext.getInstance("TLS");
         context.init(TlsSockets.keyManagers(identity),
-                new TrustManager[]{TlsSockets.ACCEPT_ANY}, new SecureRandom());
+                new TrustManager[]{TlsSockets.PAIRING_TRUST}, new SecureRandom());
         serverSocket = (SSLServerSocket) context.getServerSocketFactory().createServerSocket(0);
         serverSocket.setWantClientAuth(true);
         Thread.ofVirtual().name("fake-pairing-server").start(this::serve);
@@ -105,7 +105,7 @@ public class FakePairingServer implements AutoCloseable {
                     return;
                 }
             }
-        } catch (Exception e) {
+        } catch (Exception _) {
             // The connection ended; tests assert on observed state, not on this thread.
         }
     }

@@ -26,7 +26,7 @@ public class RefusingPairingServer implements AutoCloseable {
     public RefusingPairingServer() throws Exception {
         SSLContext context = SSLContext.getInstance("TLS");
         context.init(TlsSockets.keyManagers(ClientCertificate.generate("refusing-fake-shield")),
-                new TrustManager[]{TlsSockets.ACCEPT_ANY}, new SecureRandom());
+                new TrustManager[]{TlsSockets.PAIRING_TRUST}, new SecureRandom());
         serverSocket = (SSLServerSocket) context.getServerSocketFactory().createServerSocket(0);
         serverSocket.setWantClientAuth(true);
         Thread.ofVirtual().name("refusing-fake-shield").start(this::serve);
@@ -55,7 +55,7 @@ public class RefusingPairingServer implements AutoCloseable {
             if (stream.read(PairingMessage.parser()) == null) {
                 hungUp.countDown();
             }
-        } catch (Exception e) {
+        } catch (Exception _) {
             // A reset instead of a clean close is the client hanging up too.
             hungUp.countDown();
         }

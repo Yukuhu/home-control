@@ -51,9 +51,16 @@ public class RemoteConnection implements AutoCloseable {
     public static RemoteConnection connect(String host, int port, ClientCertificate credential,
                                            int staleTimeoutMillis, RemoteListener listener)
             throws IOException {
+        return connect(host, port, credential, staleTimeoutMillis, listener, null);
+    }
+
+    public static RemoteConnection connect(String host, int port, ClientCertificate credential,
+                                           int staleTimeoutMillis, RemoteListener listener,
+                                           String expectedFingerprint)
+            throws IOException {
         SSLSocket socket;
         try {
-            socket = TlsSockets.connect(host, port, credential, staleTimeoutMillis);
+            socket = TlsSockets.connect(host, port, credential, staleTimeoutMillis, expectedFingerprint);
         } catch (TlsSockets.HandshakeRejectedException e) {
             // Only the HANDSHAKE phase means "the device refused our certificate"; retrying
             // with the same certificate is pointless, so it maps to UnpairedException.
@@ -78,7 +85,7 @@ public class RemoteConnection implements AutoCloseable {
     private static void closeQuietly(SSLSocket socket) {
         try {
             socket.close();
-        } catch (IOException ignored) {
+        } catch (IOException _) {
             // Already gone.
         }
     }
@@ -91,7 +98,7 @@ public class RemoteConnection implements AutoCloseable {
         Thread.ofVirtual().name("shield-remote-reader").start(this::readLoop);
     }
 
-    /** The certificate the device presented, for the caller to compare against its pin. */
+    /** The certificate the device presented; any supplied pin was verified during TLS. */
     public X509Certificate serverCertificate() {
         return serverCertificate;
     }
@@ -219,7 +226,7 @@ public class RemoteConnection implements AutoCloseable {
     private void closeSocket() {
         try {
             socket.close();
-        } catch (IOException ignored) {
+        } catch (IOException _) {
             // Already gone.
         }
     }

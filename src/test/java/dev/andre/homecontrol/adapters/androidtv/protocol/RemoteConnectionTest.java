@@ -67,6 +67,7 @@ class RemoteConnectionTest {
 
         @Override
         public void checkServerTrusted(X509Certificate[] chain, String authType) {
+            // This server-side trust manager only rejects client certificates.
         }
 
         @Override
@@ -175,7 +176,7 @@ class RemoteConnectionTest {
                     // Driving the handshake from the server side is what makes the
                     // TrustManager actually run and reject the client's certificate.
                     accepted.startHandshake();
-                } catch (Exception e) {
+                } catch (Exception _) {
                     // The handshake is expected to fail on this side too.
                 }
             });
@@ -203,7 +204,7 @@ class RemoteConnectionTest {
                         10_000, rejectingListener);
                 await().untilAtomic(rejectedDisconnect, org.hamcrest.Matchers.is(DisconnectCause.UNPAIRED));
                 rejected.close();
-            } catch (RemoteConnection.UnpairedException expected) {
+            } catch (RemoteConnection.UnpairedException _) {
                 // Also an acceptable outcome - see comment above.
             }
         }
@@ -226,7 +227,7 @@ class RemoteConnectionTest {
             // handshake round trip; if this is ever tightened enough to violate that, the test
             // fails loudly with a SocketTimeoutException escaping connect() itself, rather than
             // silently mis-asserting.
-            try (RemoteConnection staleConnection = RemoteConnection.connect("127.0.0.1", silentDevice.port(),
+            try (RemoteConnection _ = RemoteConnection.connect("127.0.0.1", silentDevice.port(),
                     ClientCertificate.generate("shield-remote"), 300, staleListener)) {
                 silentDevice.awaitHandshake();
 

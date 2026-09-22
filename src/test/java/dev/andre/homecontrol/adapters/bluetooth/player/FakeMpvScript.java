@@ -21,7 +21,8 @@ public final class FakeMpvScript {
         String classpath = System.getProperty("home-control.test.runtime-classpath", System.getProperty("java.class.path"));
         StringBuilder script = new StringBuilder("#!/bin/sh\n");
         environment.forEach((name, value) -> script.append("export ").append(name).append('=').append(quote(value)).append('\n'));
-        script.append("exec ").append(quote(java)).append(" -XX:TieredStopAtLevel=1 -cp ").append(quote(classpath))
+        // Container diagnostics must not become fake mpv protocol/version output.
+        script.append("exec ").append(quote(java)).append(" -Xlog:os+container=off -XX:TieredStopAtLevel=1 -cp ").append(quote(classpath))
                 .append(' ').append(FakeMpv.class.getName()).append(" \"$@\"\n");
         Files.createDirectories(directory);
         Path file = directory.resolve("mpv");

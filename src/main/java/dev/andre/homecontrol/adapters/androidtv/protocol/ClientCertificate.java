@@ -20,7 +20,7 @@ import java.util.HexFormat;
 /** A self-signed RSA identity. Once paired, this certificate IS the credential. */
 public record ClientCertificate(KeyPair keyPair, X509Certificate certificate) {
 
-    private static final Duration VALIDITY = Duration.ofDays(365 * 20);
+    private static final Duration VALIDITY = Duration.ofDays(365L * 20);
 
     public static ClientCertificate generate(String commonName) {
         try {

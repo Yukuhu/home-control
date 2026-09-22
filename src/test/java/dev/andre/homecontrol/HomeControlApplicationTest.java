@@ -18,6 +18,7 @@ class HomeControlApplicationTest {
 
     @Test
     void contextLoads() {
+        assertThat(context.getBean(HomeControlApplication.class)).isNotNull();
     }
 
     @Test
