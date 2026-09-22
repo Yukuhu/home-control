@@ -13,6 +13,7 @@ import org.springframework.validation.DirectFieldBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ExtendedServletRequestDataBinder;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +53,9 @@ public final class WorkflowSetupController {
 
     @InitBinder("workflowForm")
     void bindWorkflow(WebDataBinder binder, HttpServletRequest request) {
+        if (binder instanceof ExtendedServletRequestDataBinder servletBinder) {
+            servletBinder.addHeaderPredicate(ignored -> false);
+        }
         binder.initDirectFieldAccess();
         binder.setAutoGrowCollectionLimit(32);
         binder.setFieldDefaultPrefix(null); // Never accept Spring's !field client-selected defaults.
@@ -113,7 +117,7 @@ public final class WorkflowSetupController {
         privateResponse(response);
         // Spring also adds the route's id to property values; it is not a client-editable form field.
         boolean suppressed = java.util.Arrays.stream(binding.getSuppressedFields())
-                .anyMatch(field -> request.getParameterMap().containsKey(field));
+                .anyMatch(field -> !field.equals("id") || request.getParameterMap().containsKey("id"));
         if (suppressed || Boolean.TRUE.equals(request.getAttribute("workflowInvalidFields"))) {
             binding.reject("invalid", "Some submitted fields are invalid. Check the form and try again.");
         }

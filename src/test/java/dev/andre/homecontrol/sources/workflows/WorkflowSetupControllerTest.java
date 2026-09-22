@@ -192,6 +192,21 @@ class WorkflowSetupControllerTest {
         assertThat(captor.getValue().variables().getFirst().sensitive()).isFalse();
     }
 
+    @Test void requestHeadersCannotSupplyAnOmittedAllowedCheckbox() throws Exception {
+        when(store.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
+
+        mvc.perform(validPost().with(request -> {
+                    request.removeParameter("enabled");
+                    return request;
+                }).header("Enabled", "true")
+                .param("templateMode", "REPLACE").param("template", "https://media.example/item.mp4"))
+                .andExpect(status().is3xxRedirection());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
+        verify(store).update(eq(id), eq(3L), captor.capture(), any());
+        assertThat(captor.getValue().enabled()).isFalse();
+    }
+
     @Test void firstSaveRejectsKeepWithoutReachingStore() throws Exception {
         when(login.loginRequired()).thenReturn(false);
         var result = mvc.perform(post("/setup/workflows").param("urlMode", "KEEP"))
