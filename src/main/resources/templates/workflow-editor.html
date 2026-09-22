@@ -36,6 +36,7 @@
 <a href="#workflow-selection">Entries</a>
 <a href="#workflow-mappings">Fields</a>
 <a href="#workflow-media">Media</a>
+<a href="#workflow-action">Action</a>
 <a href="#workflow-test" th:if="${workflowId != null}">Test</a>
 </nav>
 <div class="setup-content">
@@ -260,9 +261,19 @@
 <p class="hint">Insert mapped fields as <code>{A}</code> in a path or query value, for example <code>https://media.example/play?id={A}</code>. Values are URL encoded for you.</p>
 <div class="workflow-field">
 <label for="workflow-mimeType">Direct media MIME type</label>
-<input id="workflow-mimeType" name="mimeType" type="text" maxlength="100" autocomplete="off" th:value="${workflowForm.mimeType}">
+<input id="workflow-mimeType" name="mimeType" type="text" list="workflow-mime-presets" maxlength="100" autocomplete="off" th:value="${workflowForm.mimeType}">
+<datalist id="workflow-mime-presets">
+<option value="application/vnd.apple.mpegurl" label="HLS"></option>
+<option value="application/dash+xml" label="DASH"></option>
+<option value="video/mp4" label="MP4"></option>
+<option value="audio/mpeg" label="MP3"></option>
+</datalist>
 </div>
 <p class="hint">Use a direct media address and matching type, such as <code>video/mp4</code>, <code>audio/mpeg</code>, or <code>application/vnd.apple.mpegurl</code>. Your receiver must reach it directly. Custom media-download headers are not supported.</p>
+</fieldset>
+<fieldset id="workflow-action">
+<legend>6. Action</legend>
+<p>Play sends a Cast LOAD to the Chromecast or Cast-enabled device selected on the Dashboard. The receiver fetches the direct media address itself.</p>
 </fieldset>
 <fieldset th:if="${needsLoginPassword}">
 <legend>Protect your workflows</legend>
@@ -276,7 +287,7 @@
 <input id="workflow-loginPasswordConfirmation" name="loginPasswordConfirmation" type="password" maxlength="1024" autocomplete="off">
 </div>
 </fieldset>
-<p class="hint">Saving does not fetch data or start playback. Saved credentials stay hidden; choose Keep to retain them.</p>
+<p class="hint">Saving never starts playback. A generated workflow may fetch JSON when its Dashboard row refreshes after Save; a single tile waits until Play. Saved credentials stay hidden; choose Keep to retain them.</p>
 <button type="submit" class="primary">Save workflow</button>
 </form>
 </section>
@@ -286,7 +297,7 @@
 <p class="hint">Save your changes first. Only the saved revision is tested.</p>
 <form method="post" th:action="@{/setup/workflows/{id}/test(id=${workflowId})}">
 <input type="hidden" name="expectedRevision" th:value="${workflowForm.expectedRevision}">
-<button type="submit">Test saved workflow</button>
+<button type="submit">Test workflow</button>
 </form>
 <div th:if="${testResult != null}" aria-live="polite">
 <ol class="workflow-stages">

@@ -272,9 +272,61 @@ mDNS is multicast and does not cross a Docker bridge network. Either run with
 Device-only deployments (no content source connected) are unchanged: `/`, `/setup` and the
 remote work with no login, exactly as before this feature.
 
-Connecting a content source — Jellyfin or YouTube — stores a secret, so from that point on a
+Connecting a content source such as Jellyfin, YouTube, or a workflow stores a secret, so from that point on a
 login password guards every page, the live-update stream and artwork, for every client. Set
 the login password on the setup page at the same time you connect the source.
+
+### Dynamic workflows
+
+In **Setup → Workflows**, create a workflow when one JSON address can supply values for a
+direct media address. **One tile** shows a title you choose; ordinary Dashboard loading reads
+local metadata and fetches JSON only when you press Play. **Tiles from an entry array** reads an array during Dashboard refresh and makes a
+tile for each entry. Each enabled workflow has its own Dashboard row. Dashboard source settings
+can hide the source or a row and change the default 15-minute refresh interval.
+
+For example, suppose the source URL returns:
+
+```json
+{
+  "auth": {"token": "example-token"},
+  "channels": [
+    {"id": "news", "title": "News", "quality": "hd"},
+    {"id": "music", "title": "Music", "quality": "sd"}
+  ]
+}
+```
+
+Choose **Tiles from an entry array**, set the array pointer to `/channels`, entry ID to `/id`,
+and title to `/title`. Add mappings `A` from the current entry at `/id`, `C` from the whole
+response at `/auth/token` (Sensitive), and `D` from the current entry at `/quality`. A media
+template such as `https://media.example/play?id={A}&token={C}&quality={D}` then uses the
+selected channel's stable ID and a fresh token when you press Play. JSON Pointers can also be
+empty to select the root; escape `/` as `~1` and `~` as `~0` within a pointer segment.
+
+**Save** validates and encrypts the definition and never starts playback. Saving an enabled
+generated workflow can trigger its Dashboard catalog refresh, which requests the source; a
+single-tile Dashboard refresh stays local. The first Save creates the household login password, even for a public feed; later
+edits and Tests require login. Saved source URLs, header values, and media templates are hidden
+on the edit page. Choose **Keep** to retain them or **Replace** to enter new values. **Test**
+fetches once and shows up to five sample tiles with sensitive values and literal URL parts
+masked; it sends nothing to a device. Opening a Dashboard tile previews its route without a
+workflow fetch. **Play** fetches fresh JSON once, builds the media address, and sends a Cast
+LOAD to the device selected in the play sheet. A failed Play does not retry automatically.
+
+The selected device needs a Cast receiver. Its Default Media Receiver must reach the direct
+media URL itself; Home Control does not proxy the media, add download headers, or guarantee
+that the receiver supports a particular codec. Workflows make one HTTP(S) JSON GET and one
+Cast action, with no scripts, pagination, or chained requests. Private LAN sources are allowed,
+but loopback, link-local, multicast, and unspecified addresses are blocked by default. Set
+`HOME_CONTROL_WORKFLOWS_ALLOW_LOOPBACK=true` only when a feed on this same host is needed.
+`HOME_CONTROL_WORKFLOWS_ENABLED=false` removes the editor, source, Test and execution while
+retaining encrypted definitions and the login requirement.
+
+Default limits are 50 workflows, 32 mappings, 16 static request headers, 200 entries per
+generated catalog, a 2 MiB JSON response, 64 JSON nesting levels, and 16,384 characters per
+stored definition. Source and expanded media URLs are limited to 8,192 characters and pointers
+to 512. Connections time out after 5 seconds and the whole JSON fetch after 15 seconds; at
+most three same-origin redirects and four simultaneous workflow fetches are allowed.
 
 ### Connecting Jellyfin
 
@@ -577,6 +629,8 @@ API key) live in `/data/sports.json`.
 | `HOME_CONTROL_SECURE_COOKIE` | `false` | Mark the login cookie `Secure` when the app is only reached over HTTPS |
 | `HOME_CONTROL_JELLYFIN_ENABLED` | `true` | Turn the Jellyfin module off entirely |
 | `HOME_CONTROL_YOUTUBE_ENABLED` | `true` | Turn the YouTube module off entirely |
+| `HOME_CONTROL_WORKFLOWS_ENABLED` | `true` | Turn the workflow UI, source, Test and Cast execution off while retaining encrypted definitions |
+| `HOME_CONTROL_WORKFLOWS_ALLOW_LOOPBACK` | `false` | Allow workflow source and media URLs to use this host's loopback address |
 | `home-control.youtube.daily-quota-units` | `10000` | Your Cloud project's daily YouTube Data API budget |
 | `home-control.youtube.searches-per-day` | `20` | On-demand searches allowed per day (100 quota units each) |
 | `home-control.youtube.channels-per-refresh` | `30` | Subscribed channels read per subscriptions refresh |

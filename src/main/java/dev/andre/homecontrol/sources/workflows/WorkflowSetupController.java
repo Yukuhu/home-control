@@ -113,7 +113,7 @@ public final class WorkflowSetupController {
         privateResponse(response);
         // Spring also adds the route's id to property values; it is not a client-editable form field.
         boolean suppressed = java.util.Arrays.stream(binding.getSuppressedFields())
-                .anyMatch(field -> !field.equals("id") || request.getParameterMap().containsKey("id"));
+                .anyMatch(field -> request.getParameterMap().containsKey(field));
         if (suppressed || Boolean.TRUE.equals(request.getAttribute("workflowInvalidFields"))) {
             binding.reject("invalid", "Some submitted fields are invalid. Check the form and try again.");
         }
