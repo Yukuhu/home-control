@@ -50,6 +50,14 @@ public sealed interface PlayableRef {
         }
     }
 
+    /** A paired Android TV can open Jellyfin before a controllable session exists. */
+    record JellyfinApp(String itemId, long startPositionTicks) implements PlayableRef {
+        @Override
+        public String kindLabel() {
+            return "Jellyfin app";
+        }
+    }
+
     record StreamUrl(URI url, String mimeType) implements PlayableRef {
         @Override
         public String kindLabel() {

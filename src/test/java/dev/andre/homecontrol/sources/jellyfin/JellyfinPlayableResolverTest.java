@@ -1,18 +1,28 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlayableResolver;
+import dev.andre.homecontrol.core.playback.PlaybackPlanner;
+import dev.andre.homecontrol.core.playback.JellyfinSessionStrategy;
+import dev.andre.homecontrol.core.playback.CastMessageStrategy;
+import dev.andre.homecontrol.core.playback.Route;
+import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.playback.PlaybackService;
+import dev.andre.homecontrol.playback.PlayAttempt;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,7 +30,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.*;
 
 class JellyfinPlayableResolverTest {
 
@@ -64,6 +74,47 @@ class JellyfinPlayableResolverTest {
 
     private static ContentItem item(PlayableRef ref) {
         return new ContentItem(ITEM_ID, "jellyfin", ContentKind.EPISODE, "Northern Lights", null, null, List.of(ref));
+    }
+
+    @Test
+    void aPairedShieldCanPlayEvenWhenJellyfinIsClosed() throws IOException {
+        connected();
+        fake.respondJson("GET", "/Sessions", 200, "[]");
+        Device shield = device("Shield", "10.0.0.5").withAdapter("androidtv", Map.of());
+
+        PlayableResolver.Resolution resolution = resolver.resolve(WANTED, item(WANTED), shield,
+                Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS));
+
+        assertThat(resolution.playables()).hasSize(1);
+        assertThat(resolution.playables().getFirst().kindLabel()).isEqualTo("Jellyfin app");
+        assertThat(resolution.liveCapabilities()).contains(Capability.JELLYFIN_CLIENT);
+        assertThat(fake.requests("GET", "/Items/" + ITEM_ID)).isEmpty();
+    }
+
+    @Test
+    void aMergedShieldOffersCastOnlyAfterTheUserChoosesToRetry() throws IOException {
+        connected();
+        fake.respondJson("GET", "/Sessions", 200, "[]");
+        Device shield = device("Shield", "10.0.0.5").withAdapter("androidtv", Map.of()).withAdapter("cast", Map.of());
+        DeviceManager devices = mock(DeviceManager.class);
+        given(devices.device(shield.id())).willReturn(Optional.of(shield));
+        given(devices.state(shield.id())).willReturn(DeviceState.unpaired());
+        given(devices.capabilities(shield.id())).willReturn(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS, Capability.CAST_RECEIVER));
+        PlaybackService playback = new PlaybackService(devices,
+                new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), new CastMessageStrategy())),
+                List.of(resolver), List.of(new JellyfinRouteExecutor(sessions, devices, Duration.ofSeconds(1))));
+
+        assertThat(playback.attempt(item(WANTED), shield.id(), Set.of()))
+                .isInstanceOfSatisfying(PlayAttempt.Failed.class, failed -> {
+                    assertThat(failed.route()).isInstanceOf(Route.JellyfinApp.class);
+                    assertThat(failed.remaining()).hasSize(1).allMatch(route -> route instanceof Route.CastMessage);
+                });
+        verify(devices, never()).execute(anyString(), any());
+
+        assertThat(playback.attempt(item(WANTED), shield.id(), Set.of("jellyfin-app")))
+                .isInstanceOfSatisfying(PlayAttempt.Played.class,
+                        played -> assertThat(played.route()).isInstanceOf(Route.CastMessage.class));
+        verify(devices).execute(eq(shield.id()), isA(Action.CastMessage.class));
     }
 
     @Test

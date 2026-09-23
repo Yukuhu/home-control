@@ -135,6 +135,7 @@ function watchAppLink(deviceId, deviceName) {
 async function attempt(deviceId, skip) {
     const play = document.getElementById("sheet-play");
     play.disabled = true;
+    play.textContent = "Starting playback…";
     const request = { ...current };
     let response;
     let data;

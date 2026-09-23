@@ -101,7 +101,15 @@ public sealed interface Route {
         }
     }
 
-    /** Tell the Jellyfin app already open on the device to play the item. Executed by a RouteExecutor, not an adapter. */
+    /** Wake an Android TV and open Jellyfin as needed, then play through its fresh session. */
+    record JellyfinApp(String itemId, long startPositionTicks) implements Route {
+        @Override
+        public String describe() {
+            return "Play in Jellyfin (wake device and open app if needed)";
+        }
+    }
+
+    /** Tell a Jellyfin session to play. Android TV also checks power and foreground app at execution time. */
     record JellyfinSession(String sessionId, String itemId, long startPositionTicks, String client) implements Route {
         @Override
         public String describe() {

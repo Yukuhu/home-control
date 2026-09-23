@@ -28,7 +28,7 @@ class WebOsKeysTest {
 
     @Test
     void everyRemoteKeyIsDecided() {
-        Set<RemoteKey> withoutButton = Set.of(RemoteKey.MEDIA_NEXT, RemoteKey.MEDIA_PREVIOUS);
+        Set<RemoteKey> withoutButton = Set.of(RemoteKey.MEDIA_NEXT, RemoteKey.MEDIA_PREVIOUS, RemoteKey.WAKEUP);
         for (RemoteKey key : RemoteKey.values()) {
             assertThat(WebOsKeys.button(key).isPresent()
                     || WebOsKeys.HANDLED_BY_SESSION.contains(key)

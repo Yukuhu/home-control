@@ -134,6 +134,7 @@ home-control:
     enabled: ${HOME_CONTROL_JELLYFIN_ENABLED:true}
     connect-timeout-seconds: 5
     request-timeout-seconds: 15
+    startup-timeout-seconds: 30
     rail-size: 20
   tmdb:
     enabled: true

@@ -12,6 +12,7 @@ public enum RemoteKey {
     HOME(3),
     MENU(82),
     POWER(26),
+    WAKEUP(224),
     VOLUME_UP(24),
     VOLUME_DOWN(25),
     VOLUME_MUTE(164),

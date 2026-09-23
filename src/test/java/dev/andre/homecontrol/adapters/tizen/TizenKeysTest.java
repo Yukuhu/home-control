@@ -22,7 +22,7 @@ class TizenKeysTest {
 
     @Test
     void everyRemoteKeyIsDecided() {
-        Set<RemoteKey> withoutCode = Set.of(RemoteKey.MEDIA_NEXT, RemoteKey.MEDIA_PREVIOUS);
+        Set<RemoteKey> withoutCode = Set.of(RemoteKey.MEDIA_NEXT, RemoteKey.MEDIA_PREVIOUS, RemoteKey.WAKEUP);
         for (RemoteKey key : RemoteKey.values()) {
             assertThat(TizenKeys.code(key).isPresent() || TizenKeys.HANDLED_BY_SESSION.contains(key)
                     || withoutCode.contains(key))
