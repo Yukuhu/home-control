@@ -59,7 +59,7 @@ public final class WorkflowCastRouteExecutor implements RouteExecutor {
     }
 
     private void requireSource() {
-        if (!preferences.sourceEnabled(WorkflowContentSource.ID)) {
+        if (!preferences.sourceEnabled(WorkflowContentSource.SOURCE_ID)) {
             throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "source is disabled");
         }
     }

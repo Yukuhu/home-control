@@ -14,6 +14,7 @@ import org.apache.hc.core5.util.Timeout;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -33,6 +34,7 @@ import static dev.andre.homecontrol.sources.workflows.WorkflowException.Stage;
 
 /** One total deadline and one worker-owned permit cover DNS, all redirects, and the entire response body. */
 public final class WorkflowHttpClient implements AutoCloseable {
+    private static final String CLIENT_CLOSED = "client is closed";
     private static final Set<String> DENIED_HEADERS = Set.of("host", "cookie", "connection", "content-length",
             "transfer-encoding", "te", "trailer", "upgrade", "keep-alive", "expect", "accept-encoding", "proxy");
     private final WorkflowProperties properties;
@@ -88,60 +90,92 @@ public final class WorkflowHttpClient implements AutoCloseable {
     }
 
     private byte[] fetchBody(WorkflowDraft.Fetch fetch) throws Exception {
-        if (fetch == null || fetch.headers() == null || fetch.headers().size() > 16) throw failure(Stage.FETCH, "invalid request settings");
+        if (fetch == null || fetch.headers() == null || fetch.headers().size() > 16) {
+            throw failure(Stage.FETCH, "invalid request settings");
+        }
         URI uri = policy.parse(fetch.url());
         Operation<?> operation = current.get();
         for (int redirects = 0; ; redirects++) {
             operation.check();
-            // HttpClient can bypass DnsResolver for literals, so check those here as well.
-            if (WorkflowUrlPolicy.literal(uri.getHost()) != null) policy.addresses(uri.getHost());
+            validateLiteralAddress(uri, operation);
+            FetchResponse response = fetchOnce(uri, fetch.headers(), operation);
+            if (response.redirectLocation() == null) return response.body();
+            if (redirects >= properties.maxRedirects()) throw failure(Stage.FETCH, "too many redirects");
+            uri = redirect(uri, response.redirectLocation());
+        }
+    }
+
+    private void validateLiteralAddress(URI uri, Operation<?> operation) throws UnknownHostException {
+        // HttpClient can bypass DnsResolver for literals, so check those here as well.
+        if (WorkflowUrlPolicy.literal(uri.getHost()) != null) policy.addresses(uri.getHost());
+        operation.check();
+    }
+
+    private URI redirect(URI uri, String location) {
+        URI next = policy.parse(uri.resolve(location).toString());
+        if (!policy.sameOrigin(uri, next)) {
+            throw failure(Stage.FETCH, "redirect changes origin; configure the final source URL");
+        }
+        return next;
+    }
+
+    private FetchResponse fetchOnce(URI uri, List<WorkflowDraft.Header> headers, Operation<?> operation)
+            throws Exception {
+        var request = new HttpGet(uri);
+        request.setConfig(RequestConfig.custom()
+                .setAuthenticationEnabled(false).setHardCancellationEnabled(true)
+                .setConnectionRequestTimeout(timeout(operation.remaining()))
+                .setResponseTimeout(timeout(operation.remaining())).build());
+        request.setHeader("Accept", "application/json");
+        for (var header : headers) {
+            validateHeader(header);
+            request.setHeader(header.name(), header.value());
+        }
+        operation.active.set(request);
+        try {
             operation.check();
-            var request = new HttpGet(uri);
-            request.setConfig(RequestConfig.custom()
-                    .setAuthenticationEnabled(false).setHardCancellationEnabled(true)
-                    .setConnectionRequestTimeout(timeout(operation.remaining()))
-                    .setResponseTimeout(timeout(operation.remaining())).build());
-            request.setHeader("Accept", "application/json");
-            for (var header : fetch.headers()) {
-                validateHeader(header);
-                request.setHeader(header.name(), header.value());
-            }
-            operation.active.set(request);
+            var response = CloseableHttpResponse.adapt(http.executeOpen(null, request, null));
             try {
+                int status = response.getCode();
+                if (isRedirect(status)) return new FetchResponse(null, redirectLocation(response));
+                if (status != 200) throw failure(Stage.FETCH, "server returned HTTP " + status);
+                validateContentEncoding(response);
+                var entity = response.getEntity();
+                if (entity == null) return new FetchResponse(new byte[0], null);
+                byte[] body = entity.getContent().readNBytes(properties.maxBytes() + 1);
                 operation.check();
-                var response = CloseableHttpResponse.adapt(http.executeOpen(null, request, null));
-                try {
-                    int status = response.getCode();
-                    if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
-                        if (redirects >= properties.maxRedirects()) throw failure(Stage.FETCH, "too many redirects");
-                        var location = response.getFirstHeader("Location");
-                        if (location == null) throw failure(Stage.FETCH, "redirect has no destination");
-                        URI next = policy.parse(uri.resolve(location.getValue()).toString());
-                        if (!policy.sameOrigin(uri, next)) throw failure(Stage.FETCH, "redirect changes origin; configure the final source URL");
-                        uri = next;
-                        continue;
-                    }
-                    if (status != 200) throw failure(Stage.FETCH, "server returned HTTP " + status);
-                    for (var encoding : response.getHeaders("Content-Encoding")) {
-                        if (!encoding.getValue().equalsIgnoreCase("identity")) throw failure(Stage.FETCH, "response compression is not supported");
-                    }
-                    var entity = response.getEntity();
-                    if (entity == null) return new byte[0];
-                    byte[] body = entity.getContent().readNBytes(properties.maxBytes() + 1);
-                    operation.check();
-                    if (body.length > properties.maxBytes()) throw failure(Stage.FETCH, "response is too large");
-                    return body;
-                } finally {
-                    // Keep cancellation active through cleanup; never gracefully drain a redirect/error body.
-                    request.cancel();
-                    response.close(CloseMode.IMMEDIATE);
-                }
+                if (body.length > properties.maxBytes()) throw failure(Stage.FETCH, "response is too large");
+                return new FetchResponse(body, null);
             } finally {
+                // Keep cancellation active through cleanup; never gracefully drain a redirect/error body.
                 request.cancel();
-                operation.active.compareAndSet(request, null);
+                response.close(CloseMode.IMMEDIATE);
+            }
+        } finally {
+            request.cancel();
+            operation.active.compareAndSet(request, null);
+        }
+    }
+
+    private static boolean isRedirect(int status) {
+        return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
+    }
+
+    private static String redirectLocation(CloseableHttpResponse response) {
+        var location = response.getFirstHeader("Location");
+        if (location == null) throw failure(Stage.FETCH, "redirect has no destination");
+        return location.getValue();
+    }
+
+    private static void validateContentEncoding(CloseableHttpResponse response) {
+        for (var encoding : response.getHeaders("Content-Encoding")) {
+            if (!encoding.getValue().equalsIgnoreCase("identity")) {
+                throw failure(Stage.FETCH, "response compression is not supported");
             }
         }
     }
+
+    private record FetchResponse(byte[] body, String redirectLocation) {}
 
     private static void validateHeader(WorkflowDraft.Header header) {
         if (header == null || header.name() == null || !header.name().matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+")) {
@@ -155,7 +189,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
     }
 
     private <T> T bounded(Stage stage, Callable<T> work) {
-        if (closed.get()) throw failure(stage, "client is closed");
+        if (closed.get()) throw failure(stage, CLIENT_CLOSED);
         if (!permits.tryAcquire()) throw failure(stage, "busy; try again later");
         var operation = new Operation<T>(stage);
         operations.add(operation);
@@ -183,7 +217,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
         } catch (RejectedExecutionException e) {
             operations.remove(operation);
             permits.release();
-            throw failure(stage, "client is closed");
+            throw failure(stage, CLIENT_CLOSED);
         }
         try {
             return operation.result.get(operation.remaining(), TimeUnit.NANOSECONDS);
@@ -231,7 +265,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
         if (!closed.compareAndSet(false, true)) return;
         operations.forEach(operation -> {
             operation.cancel();
-            operation.result.completeExceptionally(failure(operation.stage, "client is closed"));
+            operation.result.completeExceptionally(failure(operation.stage, CLIENT_CLOSED));
         });
         executor.shutdownNow();
         // Do not wait for platform DNS that can ignore interruption; those bounded workers retain their permits.

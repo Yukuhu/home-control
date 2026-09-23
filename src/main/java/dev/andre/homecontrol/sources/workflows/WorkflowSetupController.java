@@ -25,11 +25,13 @@ import java.util.regex.Pattern;
 public final class WorkflowSetupController {
     private static final String VIEW = "workflow-editor";
     private static final String BASE = "/setup/workflows";
-    private static final Set<String> SCALARS = Set.of("name", "enabled", "mode", "kind", "title", "subtitle", "artwork",
+    private static final String ENABLED = "enabled";
+    private static final String VARIABLE_PREFIX = "variables[";
+    private static final Set<String> SCALARS = Set.of("name", ENABLED, "mode", "kind", "title", "subtitle", "artwork",
             "arrayPointer", "idPointer", "titlePointer", "subtitlePointer", "artworkPointer",
             "includeSubtitlePointer", "includeArtworkPointer", "urlMode", "url", "templateMode", "template", "mimeType",
             "headersMode", "expectedRevision", "loginPassword", "loginPasswordConfirmation");
-    private static final Set<String> CHECKBOXES = Set.of("enabled", "includeSubtitlePointer", "includeArtworkPointer");
+    private static final Set<String> CHECKBOXES = Set.of(ENABLED, "includeSubtitlePointer", "includeArtworkPointer");
     private static final Pattern VARIABLE = Pattern.compile("variables\\[(0|[1-9][0-9]?)\\]\\.(name|scope|pointer|sensitive)");
     private static final Pattern HEADER = Pattern.compile("headers\\[(0|[1-9][0-9]?)\\]\\.(name|value)");
     public record ErrorView(String target, String message) {}
@@ -59,32 +61,52 @@ public final class WorkflowSetupController {
         binder.initDirectFieldAccess();
         binder.setAutoGrowCollectionLimit(32);
         binder.setFieldDefaultPrefix(null); // Never accept Spring's !field client-selected defaults.
+        BindingFields fields = allowedFields(request);
+        binder.setAllowedFields(fields.allowed().toArray(String[]::new));
+        if (fields.invalid()) request.setAttribute("workflowInvalidFields", Boolean.TRUE);
+    }
+
+    private static BindingFields allowedFields(HttpServletRequest request) {
         Set<String> allowed = new HashSet<>(SCALARS);
         Set<Integer> variables = new HashSet<>(), headers = new HashSet<>();
         boolean invalid = false;
         for (var parameter : request.getParameterMap().entrySet()) {
-            String raw = parameter.getKey();
-            String field = raw.startsWith("_") ? raw.substring(1) : raw;
-            boolean marker = raw.startsWith("_");
-            var variable = VARIABLE.matcher(field);
-            var header = HEADER.matcher(field);
-            boolean recognized = false;
-            if (SCALARS.contains(field) && (!marker || CHECKBOXES.contains(field))) {
-                recognized = true;
-            } else if (variable.matches() && (!marker || variable.group(2).equals("sensitive"))) {
-                int index = Integer.parseInt(variable.group(1));
-                if (index < 32) { variables.add(index); allowed.add(field); recognized = true; }
-            } else if (!marker && header.matches()) {
-                int index = Integer.parseInt(header.group(1));
-                if (index < 16) { headers.add(index); allowed.add(field); recognized = true; }
-            }
-            if (!recognized || parameter.getValue().length != 1) invalid = true;
+            if (!allowParameter(parameter.getKey(), parameter.getValue(), allowed, variables, headers)) invalid = true;
         }
-        if (!contiguous(variables)) { allowed.removeIf(field -> field.startsWith("variables[")); invalid = true; }
+        if (!contiguous(variables)) { allowed.removeIf(field -> field.startsWith(VARIABLE_PREFIX)); invalid = true; }
         if (!contiguous(headers)) { allowed.removeIf(field -> field.startsWith("headers[")); invalid = true; }
-        binder.setAllowedFields(allowed.toArray(String[]::new));
-        if (invalid) request.setAttribute("workflowInvalidFields", Boolean.TRUE);
+        return new BindingFields(allowed, invalid);
     }
+
+    private static boolean allowParameter(String raw, String[] values, Set<String> allowed,
+                                          Set<Integer> variables, Set<Integer> headers) {
+        String field = raw.startsWith("_") ? raw.substring(1) : raw;
+        boolean marker = raw.startsWith("_");
+        if (SCALARS.contains(field) && (!marker || CHECKBOXES.contains(field))) return singleValue(values);
+        var variable = VARIABLE.matcher(field);
+        if (variable.matches() && (!marker || variable.group(2).equals("sensitive"))) {
+            int index = Integer.parseInt(variable.group(1));
+            if (index >= 32 || !singleValue(values)) return false;
+            variables.add(index);
+            allowed.add(field);
+            return true;
+        }
+        var header = HEADER.matcher(field);
+        if (!marker && header.matches()) {
+            int index = Integer.parseInt(header.group(1));
+            if (index >= 16 || !singleValue(values)) return false;
+            headers.add(index);
+            allowed.add(field);
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean singleValue(String[] values) {
+        return values.length == 1;
+    }
+
+    private record BindingFields(Set<String> allowed, boolean invalid) {}
 
     @GetMapping(BASE + "/new")
     public String createEditor(Model model, HttpServletResponse response) {
@@ -181,7 +203,7 @@ public final class WorkflowSetupController {
     @PostMapping(BASE + "/{id}/enabled")
     public String enabled(@PathVariable String id, HttpServletRequest request, HttpServletResponse response, Model model) {
         return mutate(id, request, response, model, () -> {
-            String value = request.getParameter("enabled");
+            String value = request.getParameter(ENABLED);
             if (!"true".equals(value) && !"false".equals(value)) throw new IllegalArgumentException();
             store.setEnabled(id, revision(request), Boolean.parseBoolean(value), request);
         });
@@ -260,10 +282,10 @@ public final class WorkflowSetupController {
         if (detail.contains("entry artwork pointer")) return "artworkPointer";
         for (int i = 0; i < form.variables.size(); i++) {
             var row = form.variables.get(i);
-            if (row.name == null || !row.name.matches("[A-Za-z][A-Za-z0-9_]{0,31}")) return "variables[" + i + "].name";
-            if (detail.contains("mapping " + row.name + " pointer")) return "variables[" + i + "].pointer";
-            if (detail.equals("Workflow: invalid mapping scope: " + row.name)) return "variables[" + i + "].scope";
-            if (detail.equals("Workflow: duplicate mapping name: " + row.name)) return "variables[" + i + "].name";
+            if (row.name == null || !row.name.matches("[A-Za-z][A-Za-z0-9_]{0,31}")) return VARIABLE_PREFIX + i + "].name";
+            if (detail.contains("mapping " + row.name + " pointer")) return VARIABLE_PREFIX + i + "].pointer";
+            if (detail.equals("Workflow: invalid mapping scope: " + row.name)) return VARIABLE_PREFIX + i + "].scope";
+            if (detail.equals("Workflow: duplicate mapping name: " + row.name)) return VARIABLE_PREFIX + i + "].name";
         }
         if (detail.contains("header")) return "headersMode";
         return null;

@@ -18,18 +18,18 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # SonarCloud needs the base history to identify changed lines in PRs.
           fetch-depth: 0
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '25'
 
       # Also validates the Gradle wrapper checksums, which is on by default.
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
 
       - name: Build and run the full suite
         run: ./gradlew build
@@ -48,7 +48,7 @@ jobs:
       # Java bytecode is architecture-independent, so this one jar serves both
       # platforms the publish job builds for.
       - name: Upload the jar
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: jar
           path: build/libs/*.jar
@@ -56,7 +56,7 @@ jobs:
 
       - name: Upload the test report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-report
           path: build/reports/tests/test
@@ -65,15 +65,15 @@ jobs:
     name: Build the self-contained image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       # Proves `docker compose up --build` works from a clean checkout, and keeps
       # this Dockerfile's runtime stage from drifting away from Dockerfile.dist.
       # amd64 only: this job is a correctness check, not a release artifact.
       - name: Build Dockerfile
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           platforms: linux/amd64
@@ -83,7 +83,7 @@ jobs:
 
       # The -bluetooth variant installs mpv; prove that build too (amd64 only, not pushed).
       - name: Build Dockerfile with mpv
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           platforms: linux/amd64
@@ -96,19 +96,19 @@ jobs:
     name: Browser tests (Chromium, WebKit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '25'
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
 
       # Browser binaries are version-pinned by build.gradle.kts; OS packages are re-installed every
       # run by --with-deps (fast when already present) because the runner image is fresh.
       - name: Cache Playwright browsers
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('build.gradle.kts') }}
@@ -121,7 +121,7 @@ jobs:
 
       - name: Upload the browser test report and traces
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: e2e-report
           path: |
@@ -141,14 +141,14 @@ jobs:
       contents: write
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Version computation reads the whole history and every existing tag.
           fetch-depth: 0
 
       - name: Work out the next version
         id: version
-        uses: TriPSs/conventional-changelog-action@v6
+        uses: TriPSs/conventional-changelog-action@ee43def3241429afddab215ba89090cbf64fb45c # v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           preset: conventionalcommits
@@ -175,13 +175,13 @@ jobs:
           echo "majorminor=$(echo "$next" | cut -d. -f1,2)" >> "$GITHUB_OUTPUT"
         id: guard
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         if: steps.version.outputs.skipped == 'false'
         with:
           distribution: temurin
           java-version: '25'
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         if: steps.version.outputs.skipped == 'false'
 
       # Rebuilt here rather than reused from the test job, because the version is
@@ -194,12 +194,12 @@ jobs:
         if: steps.version.outputs.skipped == 'false'
         run: mkdir -p dist && cp Dockerfile.dist dist/Dockerfile && cp build/libs/*.jar dist/
 
-      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         if: steps.version.outputs.skipped == 'false'
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
         if: steps.version.outputs.skipped == 'false'
 
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         if: steps.version.outputs.skipped == 'false'
         with:
           registry: ghcr.io
@@ -208,7 +208,7 @@ jobs:
 
       - id: meta
         if: steps.version.outputs.skipped == 'false'
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           # metadata-action lowercases the image name, which GHCR requires.
           images: ghcr.io/${{ github.repository }}
@@ -220,7 +220,7 @@ jobs:
 
       - name: Build and push
         if: steps.version.outputs.skipped == 'false'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: dist
           platforms: linux/amd64,linux/arm64
@@ -249,7 +249,7 @@ jobs:
 
       - id: meta-bluetooth
         if: steps.version.outputs.skipped == 'false'
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ghcr.io/${{ github.repository }}
           flavor: |
@@ -267,7 +267,7 @@ jobs:
       - name: Build and push the Bluetooth variant
         if: steps.version.outputs.skipped == 'false'
         continue-on-error: true
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: dist
           platforms: linux/amd64,linux/arm64
