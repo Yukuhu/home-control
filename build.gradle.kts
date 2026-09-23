@@ -1,5 +1,6 @@
 plugins {
     java
+    jacoco
     id("org.springframework.boot") version "4.1.1"
     id("com.google.protobuf") version "0.10.0"
     id("org.sonarqube") version "7.4.0.8496"
@@ -15,6 +16,25 @@ java {
 }
 
 repositories { mavenCentral() }
+
+jacoco {
+    toolVersion = "0.8.15"
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required = true
+    }
+}
+
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.named("sonar") {
+    dependsOn(tasks.jacocoTestReport)
+}
 
 sonar {
     properties {

@@ -24,7 +24,6 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -153,8 +152,8 @@ class RemoteConnectionTest {
 
         // Android TV postpones its pings while it receives commands. Keep sending
         // for more than two idle windows without any incoming state or ping traffic.
-        long until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2_200);
-        do {
+        await().pollDelay(Duration.ZERO).pollInterval(Duration.ofMillis(100))
+                .during(Duration.ofMillis(2_200)).atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
             assertThat(disconnect.get()).as("active command traffic must not become stale").isNull();
             if (appLinks) {
                 connection.sendAppLink("https://www.youtube.com/");
@@ -163,8 +162,7 @@ class RemoteConnectionTest {
                 connection.sendKey(RemoteKey.DPAD_DOWN);
                 assertThat(device.nextKeyPress()).isEqualTo(20);
             }
-            TimeUnit.MILLISECONDS.sleep(100);
-        } while (System.nanoTime() < until);
+        });
 
         assertThat(disconnect.get()).isNull();
         device.pushRaw(new byte[]{frame[frame.length - 1]});
@@ -179,15 +177,14 @@ class RemoteConnectionTest {
     void incomingStateKeepsTheConnectionAliveWithoutOutgoingCommands() throws Exception {
         reconnectWithTimeout(1_000);
 
-        long until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2_200);
-        int level = 0;
-        do {
-            int expected = ++level;
+        AtomicInteger level = new AtomicInteger();
+        await().pollDelay(Duration.ZERO).pollInterval(Duration.ofMillis(100))
+                .during(Duration.ofMillis(2_200)).atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            int expected = level.incrementAndGet();
             device.pushVolume(expected, 100, false);
             await().untilAtomic(volume, org.hamcrest.Matchers.is(expected));
             assertThat(disconnect.get()).isNull();
-            TimeUnit.MILLISECONDS.sleep(100);
-        } while (System.nanoTime() < until);
+        });
 
         assertThat(disconnect.get()).isNull();
         await().untilAtomic(disconnect, org.hamcrest.Matchers.is(DisconnectCause.STALE));
