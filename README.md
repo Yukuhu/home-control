@@ -616,7 +616,7 @@ API key) live in `/data/sports.json`.
 | `shield.data-dir` | `/data` in Docker | Where the keystore and device registry live |
 | `SHIELD_KEYSTORE_PASSWORD` | `shield` | Keystore password |
 | `shield.discovery-enabled` | `true` | Turn mDNS off entirely |
-| `shield.stale-timeout-seconds` | `10` | No inbound message for this long means the connection is dead |
+| `shield.stale-timeout-seconds` | `10` | No incoming message or successfully sent command for this long triggers a reconnect; commands can postpone device pings |
 | `shield.reconnect-max-delay-seconds` | `60` | Upper bound on reconnect backoff |
 | `HOME_CONTROL_CAST_ENABLED` | `true` | Turn the Cast module off entirely; Android TV devices keep working |
 | `home-control.cast.*` | see `CastProperties` | Cast receiver heartbeat interval, stale timeout, reconnect backoff, and command/load timeouts |

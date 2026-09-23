@@ -15,6 +15,7 @@ import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 
+import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.AbstractMap;
 import java.util.List;
@@ -127,6 +128,14 @@ public class FakeRemoteServer implements AutoCloseable {
     public void pushPing(int value) throws Exception {
         stream.write(RemoteMessage.newBuilder()
                 .setRemotePingRequest(RemotePingRequest.newBuilder().setVal1(value)).build());
+    }
+
+    /** Sends part of a frame so tests can hold the client's reader inside a message. */
+    public void pushRaw(byte[] bytes) throws IOException {
+        synchronized (stream) {
+            socket.getOutputStream().write(bytes);
+            socket.getOutputStream().flush();
+        }
     }
 
     public void hangUp() throws Exception {

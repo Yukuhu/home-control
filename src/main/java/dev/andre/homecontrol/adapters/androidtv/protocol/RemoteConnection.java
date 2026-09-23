@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.security.cert.X509Certificate;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The long-lived command channel on port 6466.
@@ -44,6 +45,11 @@ public class RemoteConnection implements AutoCloseable {
     private final MessageStream stream;
     private final RemoteListener listener;
     private final X509Certificate serverCertificate;
+    private final long staleTimeoutNanos;
+    private final Thread idleWatchdog;
+
+    /** Guarded by this connection's monitor, together with the idle-expiry decision. */
+    private long lastActivityNanos = System.nanoTime();
 
     private volatile boolean configured;
     private volatile boolean closed;
@@ -74,9 +80,8 @@ public class RemoteConnection implements AutoCloseable {
         try {
             return new RemoteConnection(socket, listener);
         } catch (IOException | RuntimeException e) {
-            // The constructor reads the streams and the peer's certificate, either of which
-            // can still fail with the socket open and nobody yet holding it. The reader thread
-            // starts last, so nothing else is running to clean up after us.
+            // Reading the streams/certificate or configuring the timeout can fail before
+            // the background threads start and before an owner holds the open socket.
             closeQuietly(socket);
             throw e;
         }
@@ -95,6 +100,16 @@ public class RemoteConnection implements AutoCloseable {
         this.listener = listener;
         this.stream = new MessageStream(socket.getInputStream(), socket.getOutputStream());
         this.serverCertificate = (X509Certificate) socket.getSession().getPeerCertificates()[0];
+        this.staleTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(socket.getSoTimeout());
+        // The device postpones pings while receiving commands. A read-only timeout
+        // would disconnect an active remote. Watch traffic in both directions instead.
+        // Keep the parser's read uninterrupted: retrying after a timeout could lose a
+        // partially read protobuf frame. TLS establishment still uses the socket timeout.
+        socket.setSoTimeout(0);
+        this.idleWatchdog = Thread.ofVirtual().name("shield-remote-idle").unstarted(this::watchIdle);
+        if (staleTimeoutNanos > 0) {
+            idleWatchdog.start();
+        }
         Thread.ofVirtual().name("shield-remote-reader").start(this::readLoop);
     }
 
@@ -108,7 +123,7 @@ public class RemoteConnection implements AutoCloseable {
     }
 
     public void sendKey(RemoteKey key, KeyPress press) throws IOException {
-        stream.write(RemoteMessage.newBuilder()
+        write(RemoteMessage.newBuilder()
                 .setRemoteKeyInject(RemoteKeyInject.newBuilder()
                         .setKeyCode(RemoteKeyCode.forNumber(key.code()))
                         .setDirection(direction(press)))
@@ -128,15 +143,50 @@ public class RemoteConnection implements AutoCloseable {
      * success shows up, if at all, as a later current-app event (spec §5.3).
      */
     public void sendAppLink(String uri) throws IOException {
-        stream.write(RemoteMessage.newBuilder()
+        write(RemoteMessage.newBuilder()
                 .setRemoteAppLinkLaunchRequest(RemoteAppLinkLaunchRequest.newBuilder().setAppLink(uri))
                 .build());
+    }
+
+    private void write(RemoteMessage message) throws IOException {
+        stream.write(message);
+        recordActivity();
+    }
+
+    private synchronized void recordActivity() {
+        lastActivityNanos = System.nanoTime();
+    }
+
+    private void watchIdle() {
+        try {
+            while (!closed) {
+                long remaining = checkIdle();
+                if (remaining <= 0) {
+                    return;
+                }
+                TimeUnit.NANOSECONDS.sleep(remaining);
+            }
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private synchronized long checkIdle() {
+        if (closed) {
+            return 0;
+        }
+        long remaining = staleTimeoutNanos - (System.nanoTime() - lastActivityNanos);
+        if (remaining <= 0) {
+            finish(DisconnectCause.STALE);
+        }
+        return remaining;
     }
 
     private void readLoop() {
         try {
             RemoteMessage message;
             while (!closed && (message = stream.read(RemoteMessage.parser())) != null) {
+                recordActivity();
                 dispatch(message);
             }
             finish(DisconnectCause.CLOSED);
@@ -182,7 +232,7 @@ public class RemoteConnection implements AutoCloseable {
 
     private void dispatch(RemoteMessage message) throws IOException {
         if (message.hasRemoteConfigure()) {
-            stream.write(RemoteMessage.newBuilder()
+            write(RemoteMessage.newBuilder()
                     .setRemoteConfigure(RemoteConfigure.newBuilder()
                             .setCode1(CLIENT_FEATURES)
                             .setDeviceInfo(RemoteDeviceInfo.newBuilder()
@@ -195,11 +245,11 @@ public class RemoteConnection implements AutoCloseable {
                     .build());
             configured = true;
         } else if (message.hasRemoteSetActive()) {
-            stream.write(RemoteMessage.newBuilder()
+            write(RemoteMessage.newBuilder()
                     .setRemoteSetActive(RemoteSetActive.newBuilder().setActive(CLIENT_FEATURES))
                     .build());
         } else if (message.hasRemotePingRequest()) {
-            stream.write(RemoteMessage.newBuilder()
+            write(RemoteMessage.newBuilder()
                     .setRemotePingResponse(RemotePingResponse.newBuilder()
                             .setVal1(message.getRemotePingRequest().getVal1()))
                     .build());
@@ -224,6 +274,9 @@ public class RemoteConnection implements AutoCloseable {
     }
 
     private void closeSocket() {
+        if (Thread.currentThread() != idleWatchdog) {
+            idleWatchdog.interrupt();
+        }
         try {
             socket.close();
         } catch (IOException _) {
