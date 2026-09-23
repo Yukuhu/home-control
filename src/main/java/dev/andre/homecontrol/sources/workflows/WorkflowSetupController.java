@@ -282,7 +282,7 @@ public final class WorkflowSetupController {
         if (detail.contains("entry artwork pointer")) return "artworkPointer";
         for (int i = 0; i < form.variables.size(); i++) {
             var row = form.variables.get(i);
-            if (row.name == null || !row.name.matches("[A-Za-z][A-Za-z0-9_]{0,31}")) return VARIABLE_PREFIX + i + "].name";
+            if (row.name == null || !row.name.matches("[A-Za-z][\\w]{0,31}")) return VARIABLE_PREFIX + i + "].name";
             if (detail.contains("mapping " + row.name + " pointer")) return VARIABLE_PREFIX + i + "].pointer";
             if (detail.equals("Workflow: invalid mapping scope: " + row.name)) return VARIABLE_PREFIX + i + "].scope";
             if (detail.equals("Workflow: duplicate mapping name: " + row.name)) return VARIABLE_PREFIX + i + "].name";

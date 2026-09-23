@@ -100,7 +100,7 @@ public final class WorkflowJson {
         String key;
         try {
             key = stableKey(select(node, listing.idPointer()));
-        } catch (WorkflowException failure) {
+        } catch (WorkflowException _) {
             throw new WorkflowException(WorkflowException.Stage.SELECT, "entry " + index + " has invalid ID");
         }
         if (!keys.add(key)) fail(WorkflowException.Stage.SELECT, "entry " + index + " has duplicate ID");
@@ -192,7 +192,7 @@ public final class WorkflowJson {
 
     private static boolean publicIpv4(String host) {
         int[] octets = parseIpv4(host);
-        if (octets == null) return false;
+        if (octets.length == 0) return false;
         int a = octets[0], b = octets[1], c = octets[2];
         return a > 0 && a < 224 && a != 10 && a != 127
                 && !(a == 100 && b >= 64 && b <= 127)
@@ -205,16 +205,16 @@ public final class WorkflowJson {
 
     private static int[] parseIpv4(String host) {
         String[] parts = host.split("\\.", -1);
-        if (parts.length != 4) return null;
+        if (parts.length != 4) return new int[0];
         int[] octets = new int[4];
         for (int i = 0; i < octets.length; i++) {
-            if (parts[i].isEmpty() || parts[i].length() > 3) return null;
+            if (parts[i].isEmpty() || parts[i].length() > 3) return new int[0];
             try {
                 octets[i] = Integer.parseInt(parts[i]);
             } catch (NumberFormatException e) {
-                return null;
+                return new int[0];
             }
-            if (octets[i] > 255 || (parts[i].length() > 1 && parts[i].charAt(0) == '0')) return null;
+            if (octets[i] > 255 || (parts[i].length() > 1 && parts[i].charAt(0) == '0')) return new int[0];
         }
         return octets;
     }

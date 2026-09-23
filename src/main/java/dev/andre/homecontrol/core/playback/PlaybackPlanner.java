@@ -60,15 +60,15 @@ public class PlaybackPlanner {
         Set<String> reasons = new LinkedHashSet<>();
         for (PlayableRef ref : item.playables()) {
             switch (ref) {
-                case PlayableRef.AppLink ignored -> {
+                case PlayableRef.AppLink _ -> {
                     if (!capabilities.contains(Capability.APP_LINK)) {
                         reasons.add("this device cannot open app links");
                     }
                 }
-                case PlayableRef.WorkflowCast ignored -> reasons.add(NOT_CAST_RECEIVER);
-                case PlayableRef.CastLoad ignored -> reasons.add(NOT_CAST_RECEIVER);
-                case PlayableRef.CastMessage ignored -> reasons.add(NOT_CAST_RECEIVER);
-                case PlayableRef.YouTubeLounge ignored -> reasons.add(NOT_CAST_RECEIVER);
+                case PlayableRef.WorkflowCast _ -> reasons.add(NOT_CAST_RECEIVER);
+                case PlayableRef.CastLoad _ -> reasons.add(NOT_CAST_RECEIVER);
+                case PlayableRef.CastMessage _ -> reasons.add(NOT_CAST_RECEIVER);
+                case PlayableRef.YouTubeLounge _ -> reasons.add(NOT_CAST_RECEIVER);
                 case PlayableRef.StreamUrl stream -> reasons.add(
                         capabilities.contains(Capability.LOCAL_AUDIO_SINK) && !LocalAudioSinkStrategy.playable(stream)
                                 && !capabilities.contains(Capability.CAST_RECEIVER) && !capabilities.contains(Capability.MEDIA_RENDERER)
@@ -76,9 +76,9 @@ public class PlaybackPlanner {
                                 : capabilities.contains(Capability.CAST_RECEIVER) || capabilities.contains(Capability.MEDIA_RENDERER)
                                         || capabilities.contains(Capability.LOCAL_AUDIO_SINK)
                                         ? "the stream was not accepted" : "this device cannot play a direct stream");
-                case PlayableRef.JellyfinItem ignored -> reasons.add("Jellyfin is switched off on this server");
-                case PlayableRef.JellyfinSession ignored -> reasons.add("the open Jellyfin app cannot be controlled");
-                case PlayableRef.JellyfinApp ignored -> reasons.add("the Jellyfin app cannot be started on this device");
+                case PlayableRef.JellyfinItem _ -> reasons.add("Jellyfin is switched off on this server");
+                case PlayableRef.JellyfinSession _ -> reasons.add("the open Jellyfin app cannot be controlled");
+                case PlayableRef.JellyfinApp _ -> reasons.add("the Jellyfin app cannot be started on this device");
             }
         }
         if (reasons.isEmpty()) {

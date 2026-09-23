@@ -11,6 +11,7 @@ import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuil
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -120,7 +121,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
     }
 
     private FetchResponse fetchOnce(URI uri, List<WorkflowDraft.Header> headers, Operation<?> operation)
-            throws Exception {
+            throws IOException {
         var request = new HttpGet(uri);
         request.setConfig(RequestConfig.custom()
                 .setAuthenticationEnabled(false).setHardCancellationEnabled(true)
@@ -175,7 +176,18 @@ public final class WorkflowHttpClient implements AutoCloseable {
         }
     }
 
-    private record FetchResponse(byte[] body, String redirectLocation) {}
+    private static final class FetchResponse {
+        private final byte[] body;
+        private final String redirectLocation;
+
+        private FetchResponse(byte[] body, String redirectLocation) {
+            this.body = body;
+            this.redirectLocation = redirectLocation;
+        }
+
+        byte[] body() { return body; }
+        String redirectLocation() { return redirectLocation; }
+    }
 
     private static void validateHeader(WorkflowDraft.Header header) {
         if (header == null || header.name() == null || !header.name().matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+")) {
