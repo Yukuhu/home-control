@@ -53,6 +53,12 @@ public class JellyfinConfiguration {
     }
 
     @Bean
+    public JellyfinVlcExecutor jellyfinVlcExecutor(JellyfinSetupService setup, JellyfinClient client, DeviceManager devices,
+            @Value("${home-control.jellyfin.startup-timeout-seconds:30}") int startupTimeoutSeconds) {
+        return new JellyfinVlcExecutor(setup, client, devices, Duration.ofSeconds(startupTimeoutSeconds));
+    }
+
+    @Bean
     public JellyfinRouteExecutor jellyfinRouteExecutor(JellyfinSessions sessions, DeviceManager devices,
             @Value("${home-control.jellyfin.startup-timeout-seconds:30}") int startupTimeoutSeconds) {
         return new JellyfinRouteExecutor(sessions, devices, Duration.ofSeconds(startupTimeoutSeconds));

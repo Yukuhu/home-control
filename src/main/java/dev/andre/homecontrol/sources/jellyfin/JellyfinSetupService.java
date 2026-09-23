@@ -93,7 +93,8 @@ public class JellyfinSetupService {
                 info.path("ServerName").asString(""), info.path("Version").asString(""),
                 user.path("Id").asString(""), user.path("Name").asString(request.userName().strip()), mode, deviceId,
                 receiver.isBlank() ? JellyfinSettings.DEFAULT_CAST_RECEIVER_ID : receiver,
-                previous.map(JellyfinSettings::sessionLinks).orElse(Map.of()));
+                previous.map(JellyfinSettings::sessionLinks).orElse(Map.of()),
+                previous.map(JellyfinSettings::players).orElse(Map.of()));
         try {
             login.storeSecrets(Map.of(JellyfinSettings.TOKEN_SECRET, token), request.loginPassword(),
                     request.loginPasswordConfirmation(), http);

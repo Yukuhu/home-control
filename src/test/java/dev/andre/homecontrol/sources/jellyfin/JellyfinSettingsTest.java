@@ -16,6 +16,24 @@ class JellyfinSettingsTest {
             "device-1", "F007D354", Map.of());
 
     @Test
+    void playerChoiceIsPerDeviceAndCanBeResetWithoutLosingLinks() {
+        var vlc = settings.withPlayer("shield", JellyfinSettings.Player.VLC).withSessionLink("shield", "jf-shield");
+        assertThat(vlc.player("bedroom")).isEqualTo(JellyfinSettings.Player.JELLYFIN);
+        assertThat(vlc.player("shield")).isEqualTo(JellyfinSettings.Player.VLC);
+        var reset = vlc.withPlayer("shield", JellyfinSettings.Player.JELLYFIN);
+        assertThat(JellyfinSettings.from(reset.toMap()).orElseThrow().player("shield")).isEqualTo(JellyfinSettings.Player.JELLYFIN);
+        assertThat(reset.sessionLinks()).containsEntry("shield", "jf-shield");
+    }
+
+    @Test
+    void retainsPerDevicePlayerPreferencesAlongsideSessionLinks() {
+        var stored = new java.util.LinkedHashMap<>(settings.withSessionLink("shield", "jf-shield").toMap());
+        stored.put("player.shield", "vlc");
+        assertThat(JellyfinSettings.from(stored).orElseThrow().toMap())
+                .containsEntry("player.shield", "vlc").containsEntry("link.shield", "jf-shield");
+    }
+
+    @Test
     void roundTripsThroughAStringMap() {
         JellyfinSettings withLinks = settings.withSessionLink("living-room", "jf-living")
                 .withSessionLink("bedroom", "jf-bedroom");

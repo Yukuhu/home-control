@@ -141,6 +141,55 @@ class JellyfinRouteExecutorTest {
     }
 
     @Test
+    void retriesAnUnconfirmedLaunchAfterReconnectBeforePlaying() {
+        AtomicReference<DeviceState> state = new AtomicReference<>(ready().withCurrentApp("launcher"));
+        given(devices.state("shield")).willAnswer(_ -> {
+            DeviceState observed = state.get();
+            if (!observed.connected()) {
+                state.set(observed.withStatus(DeviceStatus.CONNECTED));
+            }
+            return observed;
+        });
+        doAnswer(_ -> {
+            state.set(state.get().withStatus(DeviceStatus.DISCONNECTED));
+            return null;
+        }).doAnswer(_ -> { state.set(ready()); return null; }).when(devices).execute("shield", LAUNCH);
+        given(sessions.sessionFor(shield)).willReturn(Optional.of(session("fresh")));
+
+        executor.execute(new Route.JellyfinApp("item-1", 600L), shield);
+
+        verify(devices, times(2)).execute("shield", LAUNCH);
+        verify(sessions).playNow("fresh", "item-1", 600L);
+    }
+
+    @Test
+    void retriesLaunchWhenTheConnectionDropsDuringTheWrite() {
+        AtomicReference<DeviceState> state = new AtomicReference<>(ready().withCurrentApp("launcher"));
+        given(devices.state("shield")).willAnswer(_ -> state.get());
+        doThrow(new DeviceOfflineException("connection dropped"))
+                .doAnswer(_ -> { state.set(ready()); return null; }).when(devices).execute("shield", LAUNCH);
+        given(sessions.sessionFor(shield)).willReturn(Optional.of(session("fresh")));
+
+        executor.execute(new Route.JellyfinApp("item-1", 0), shield);
+
+        verify(sessions).playNow("fresh", "item-1", 0);
+    }
+
+    @Test
+    void retriesAnUnconfirmedLaunchEvenWhenNoDisconnectWasObserved() {
+        AtomicReference<DeviceState> state = new AtomicReference<>(ready().withCurrentApp("launcher"));
+        given(devices.state("shield")).willAnswer(_ -> state.get());
+        doNothing().doAnswer(_ -> { state.set(ready()); return null; }).when(devices).execute("shield", LAUNCH);
+        given(sessions.sessionFor(shield)).willReturn(Optional.of(session("fresh")));
+        var startup = new JellyfinRouteExecutor(sessions, devices, Duration.ofSeconds(4));
+
+        startup.execute(new Route.JellyfinApp("item-1", 0), shield);
+
+        verify(devices, times(2)).execute("shield", LAUNCH);
+        verify(sessions).playNow("fresh", "item-1", 0);
+    }
+
+    @Test
     void aLaunchThatNeverReachesJellyfinCannotUseAnOldSession() {
         given(devices.state("shield")).willReturn(ready().withCurrentApp("launcher"));
 

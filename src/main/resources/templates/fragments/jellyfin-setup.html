@@ -16,13 +16,30 @@
             TVs and speakers cannot reach this address
         </p>
         <p class="hint" th:if="${jellyfin.mode() == 'api-key'}">
-            API-key mode hands an administrator key to Cast devices. Prefer a user login.
+            API-key mode hands an administrator key to Cast devices and VLC. Prefer a user login.
         </p>
         <form method="post" th:action="@{/setup/sources/jellyfin/test}">
             <button type="submit">Test connection</button>
         </form>
         <form method="post" th:action="@{/setup/sources/jellyfin/disconnect}">
             <button type="submit" class="danger">Disconnect</button>
+        </form>
+
+        <h3>Device playback</h3>
+        <p class="hint">Choose a player for each Shield or Android TV. Install and open VLC once on the TV
+            before using it here. VLC opens the stream directly without starting Jellyfin.</p>
+        <p class="hint">VLC does not update Jellyfin watched status or resume progress. Streams start from the
+            beginning; Jellyfin subtitle and audio preferences are not transferred. Choose tracks in VLC.</p>
+        <form method="post" th:action="@{/setup/sources/jellyfin/players}" th:each="device : ${jellyfin.devices()}"
+              th:if="${device.androidTv()}">
+            <input type="hidden" name="device" th:value="${device.id()}">
+            <label><span th:text="${device.name()}">Shield</span>
+                <select name="player">
+                    <option value="jellyfin" th:selected="${device.player() == 'jellyfin'}">Jellyfin app</option>
+                    <option value="vlc" th:selected="${device.player() == 'vlc'}">VLC</option>
+                </select>
+            </label>
+            <button type="submit">Save player</button>
         </form>
 
         <h3>Jellyfin apps</h3>

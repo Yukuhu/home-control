@@ -17,6 +17,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ActionTest {
 
     @Test
+    void authenticatedAppLinksKeepCredentialsOutOfCommandErrors() {
+        var action = new Action.OpenAppLink(URI.create("vlc://https://nas.lan/video?api_key=secret-token"));
+        assertThat(action.uri().getRawQuery()).contains("secret-token");
+        assertThat("Device cannot perform " + action).doesNotContain("secret-token");
+    }
+
+    @Test
     void aKeyPressRequiresRemoteKeys() {
         assertThat(new Action.PressKey(RemoteKey.HOME).requires()).isEqualTo(Capability.REMOTE_KEYS);
     }

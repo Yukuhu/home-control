@@ -53,7 +53,11 @@ public class JellyfinPlayableResolver implements PlayableResolver {
         List<String> notes = new ArrayList<>();
         if (nativeApp) {
             // Preview remains read-only; native startup wins but Cast remains an explicit retry.
-            playables.add(new PlayableRef.JellyfinApp(wanted.itemId(), wanted.resumeTicks()));
+            if (settings.get().player(device.id()) == JellyfinSettings.Player.VLC) {
+                playables.add(new PlayableRef.JellyfinVlc(wanted.itemId()));
+            } else {
+                playables.add(new PlayableRef.JellyfinApp(wanted.itemId(), wanted.resumeTicks()));
+            }
         } else {
             try {
                 Optional<JellyfinSession> open = sessions.sessionFor(device);

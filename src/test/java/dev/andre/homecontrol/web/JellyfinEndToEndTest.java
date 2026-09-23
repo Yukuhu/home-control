@@ -190,6 +190,35 @@ class JellyfinEndToEndTest {
                         "playCommand", "PlayNow", "itemIds", EPISODE, "startPositionTicks", "6120000000"));
                 assertThat(jellyfin.requests("POST", "/Sessions/" + SHIELD_SESSION + "/Playing")).hasSize(1);
 
+                assertThat(send(stranger, post("/setup/sources/jellyfin/players",
+                        Map.of("device", "shield-e2e", "player", "vlc"))).statusCode()).isIn(302, 401);
+                // VLC preference persists independently of a running Jellyfin session.
+                assertThat(send(browser, post("/setup/sources/jellyfin/players",
+                        Map.of("device", "shield-e2e", "player", "vlc"))).statusCode()).isEqualTo(302);
+                assertThat(send(browser, page("/setup")).body()).contains("Device playback", "VLC");
+                jellyfin.respondJson("GET", "/Sessions", 200, "[]");
+                jellyfin.respond("POST", "/Items/" + EPISODE + "/PlaybackInfo", 200, "playback-info-direct.json");
+                shieldRemote.pushPower(false);
+                shieldRemote.pushCurrentApp("com.google.android.tvlauncher");
+                await().until(() -> !devices.state("shield-e2e").powerOn());
+                HttpResponse<String> vlcPreview = send(browser, get("/devices/shield-e2e/route-preview?source=jellyfin&item=" + EPISODE));
+                assertThat(vlcPreview.body()).contains("jellyfin-vlc", "VLC").doesNotContain(ACCESS_TOKEN);
+                assertThat(jellyfin.requests("POST", "/Items/" + EPISODE + "/PlaybackInfo")).isEmpty();
+                CompletableFuture<HttpResponse<String>> vlcStarting = CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return send(browser, post("/devices/shield-e2e/play-attempt", Map.of("source", "jellyfin", "item", EPISODE)));
+                    } catch (Exception e) {
+                        throw new CompletionException(e);
+                    }
+                });
+                assertThat(shieldRemote.nextKeyPress()).isEqualTo(224);
+                shieldRemote.pushPower(true);
+                String vlcLink = shieldRemote.nextAppLink();
+                assertThat(vlcLink).startsWith("vlc://" + jellyfin.url() + "/Videos/" + EPISODE + "/stream?")
+                        .contains("static=true", "mediaSourceId=" + EPISODE, "api_key=" + ACCESS_TOKEN);
+                assertThat(vlcStarting.get(5, TimeUnit.SECONDS).body()).contains("jellyfin-vlc", "\"optimistic\":true");
+                assertThat(jellyfin.requests("POST", "/Sessions/" + SHIELD_SESSION + "/Playing")).hasSize(1);
+
                 // Rung 3 (spec §5.3): the Kitchen Cast device has no Jellyfin app, so the Jellyfin receiver gets the request.
                 await().until(() -> devices.state("kitchen-e2e").connected());
                 HttpResponse<String> preview = send(browser, get("/devices/kitchen-e2e/route?source=jellyfin&item=" + EPISODE));

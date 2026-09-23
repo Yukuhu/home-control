@@ -12,6 +12,7 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
 import dev.andre.homecontrol.adapters.androidtv.protocol.TlsSockets;
 import dev.andre.homecontrol.core.RemoteKey;
+import dev.andre.homecontrol.core.RedactedUris;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteListener;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import org.slf4j.Logger;
@@ -104,7 +105,7 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         try {
             current.sendAppLink(uri.toString());
         } catch (IOException _) {
-            throw new DeviceOfflineException("The device dropped the connection while opening " + uri);
+            throw new DeviceOfflineException("The device dropped the connection while opening " + RedactedUris.withoutQuery(uri));
         }
     }
 

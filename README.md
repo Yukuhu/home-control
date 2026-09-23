@@ -357,9 +357,28 @@ requirement stays; disconnect Jellyfin first, or delete `secrets.json`, to drop 
 
 ### Play routes
 
+Under **Setup → Jellyfin → Device playback**, choose **Jellyfin app** (the default) or **VLC**
+for each paired Shield / Android TV. Preferences survive reconnecting Jellyfin and are independent
+of the session links below them.
+
+With **VLC** selected, Home Control obtains an authenticated original stream from Jellyfin,
+wakes the device, and sends a `vlc://https://…` (or HTTP) link through Remote v2. Install VLC
+and complete its first-run setup on the TV once. Jellyfin's TV app does not need to be open;
+its own external-player setting is not used. The stream uses the configured **Address for TVs
+and speakers**, so that address must be reachable from the Shield.
+
+VLC playback starts from the beginning and does not update Jellyfin watched status or resume
+progress. Jellyfin audio and subtitle preferences, including separate subtitle files, are not
+passed to VLC; choose available embedded tracks in VLC. This route sends the original media
+(including MKV) without transcoding; items requiring a live-stream opening step are rejected.
+A successful response means the link was sent, not that VLC confirmed playback. Physical Shield
+launch compatibility still needs validation. Stream credentials are resolved only when Play is
+pressed and are not included in route previews.
+
 Playing a Jellyfin item on a device tries, in order:
 
-1. **The device's own Jellyfin app** — on a paired Shield / Android TV, Play checks the remote
+1. **The selected device player** — VLC follows the flow above. With **Jellyfin app** selected,
+   **the device's own Jellyfin app** — on a paired Shield / Android TV, Play checks the remote
    connection, wakes the device if asleep, opens Jellyfin if needed, and waits for its app and
    controllable session before playing at the saved position. Opening the play sheet only
    previews this route; it never wakes the TV. On other devices, an already-open Jellyfin
@@ -376,7 +395,10 @@ Install Jellyfin for Android TV and sign in on the Shield once. If the app asks 
 user each time, configure its automatic login on the TV. Startup waits up to
 `home-control.jellyfin.startup-timeout-seconds` (30 by default); a failure explains whether the
 Shield could not connect, did not wake, or Jellyfin did not become ready. Playback is sent once
-and is not queued for later. If session matching fails, link the app under **Setup → Jellyfin
+and is not queued for later. Unconfirmed wake and launch commands are retried during the startup
+budget, including after a remote reconnect; playback itself is never retried. Startup logs show
+connection, power and foreground app changes, launch attempts and the stage that timed out.
+If session matching fails, link the app under **Setup → Jellyfin
 apps** while it is open, then try Play again.
 
 App startup uses the Remote v2 package-launch link, `market://launch?id=org.jellyfin.androidtv`,
@@ -384,7 +406,15 @@ as used by [androidtvremote2](https://github.com/tronikos/androidtvremote2/blob/
 Package launching depends on the Shield's firmware and Google Play Store;
 [known limitations](https://www.home-assistant.io/integrations/androidtv_remote/#launching-apps)
 can prevent it from opening the app. Home Control waits for Jellyfin to report ready and shows
-an error if launch fails. Wake and launch still need validation on physical hardware.
+an error if launch fails. If the Shield stays on its dashboard, open Jellyfin manually and retry
+Play, or choose the Jellyfin Cast receiver when available. Retrying cannot fix a Play Store
+version that rejects package launching. Wake and launch still need validation on physical hardware.
+
+If Jellyfin closes back to the Shield dashboard when remote playback starts, disable
+**Settings → Playback → Use external player** in the Jellyfin TV app and retry with its built-in
+player. [Jellyfin Android TV issue #5731](https://github.com/jellyfin/jellyfin-androidtv/issues/5731)
+reports this `PlayNow` crash on Shield with version 0.19.9. This is separate from app launch
+failure; remote reconnect messages alone do not identify a Jellyfin crash.
 
 A fourth option, a direct stream URL Jellyfin builds for the device to fetch itself, exists in
 the code (`JellyfinStreams`) but is groundwork for Wi-Fi/media-renderer speakers (sub-project I)
