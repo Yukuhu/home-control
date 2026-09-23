@@ -136,7 +136,7 @@ class JellyfinSetupServiceTest {
     void reconnectingKeepsTheDeviceIdAndLinksAndNeedsTheLogin() {
         MockHttpServletRequest first = new MockHttpServletRequest();
         JellyfinSettings connected = setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), first);
-        setup.save(connected.withSessionLink("shield", "jf-dev"));
+        setup.save(connected.withSessionLink("shield", "jf-dev").withPlayer("shield", JellyfinSettings.Player.VLC));
 
         MockHttpServletRequest unauthenticated = new MockHttpServletRequest();
         assertThatThrownBy(() -> setup.connect(passwordRequest(null, null), unauthenticated))
@@ -146,6 +146,7 @@ class JellyfinSetupServiceTest {
 
         assertThat(again.deviceId()).isEqualTo(connected.deviceId());
         assertThat(again.sessionLinks()).containsEntry("shield", "jf-dev");
+        assertThat(again.player("shield")).isEqualTo(JellyfinSettings.Player.VLC);
         assertThat(fake.requests("POST", "/Sessions/Logout")).isEmpty();
     }
 

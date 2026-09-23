@@ -151,6 +151,7 @@ public class PlaybackService {
             case Route.Render render -> devices.execute(device.id(), render.action());
             case Route.PlayLocally local -> devices.execute(device.id(), local.action());
             case Route.JellyfinSession ignored -> executeJellyfin(route, device);
+            case Route.JellyfinVlc ignored -> executeJellyfin(route, device);
             case Route.JellyfinApp ignored -> executeJellyfin(route, device);
             case Route.WorkflowCast workflow -> executors.stream()
                     .filter(executor -> executor.executes(workflow))

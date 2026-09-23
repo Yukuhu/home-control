@@ -29,6 +29,28 @@ class JellyfinSetupControllerTest {
     @MockitoBean
     JellyfinSetupService setup;
 
+    @MockitoBean
+    dev.andre.homecontrol.device.DeviceManager devices;
+
+    @Test
+    void savesPlayerOnlyForAKnownAndroidTvAndRejectsUnknownPlayers() throws Exception {
+        var shield = new dev.andre.homecontrol.core.Device("shield", "Shield", dev.andre.homecontrol.core.DeviceKind.ANDROID_TV,
+                "10.0.0.5", Map.of("androidtv", Map.of()), java.time.Instant.EPOCH);
+        given(devices.device("shield")).willReturn(java.util.Optional.of(shield));
+        var settings = new JellyfinSettings(URI.create("http://nas:8096"), URI.create("http://nas:8096"),
+                "server", "nas", "10.11.2", "user", "andre", JellyfinSettings.AuthMode.PASSWORD, "hc", "F007D354", Map.of());
+        given(setup.settings()).willReturn(java.util.Optional.of(settings));
+        mockMvc.perform(post("/setup/sources/jellyfin/players").param("device", "shield").param("player", "vlc"))
+                .andExpect(redirectedUrl("/setup")).andExpect(flash().attribute("jellyfinMessage", "Player preference saved"));
+        verify(setup).save(settings.withPlayer("shield", JellyfinSettings.Player.VLC));
+        org.mockito.Mockito.clearInvocations(setup);
+        mockMvc.perform(post("/setup/sources/jellyfin/players").param("device", "shield").param("player", "unknown"))
+                .andExpect(flash().attributeExists("jellyfinError"));
+        mockMvc.perform(post("/setup/sources/jellyfin/players").param("device", "missing").param("player", "vlc"))
+                .andExpect(flash().attributeExists("jellyfinError"));
+        verify(setup, org.mockito.Mockito.never()).save(any());
+    }
+
     @Test
     void aSuccessfulConnectRedirectsWithAMessage() throws Exception {
         JellyfinSettings connected = new JellyfinSettings(URI.create("http://nas:8096"), URI.create("http://nas:8096"),

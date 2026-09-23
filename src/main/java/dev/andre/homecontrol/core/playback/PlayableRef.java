@@ -50,6 +50,11 @@ public sealed interface PlayableRef {
         }
     }
 
+    /** Deferred VLC launch; credentials are resolved only when Play is pressed. */
+    record JellyfinVlc(String itemId) implements PlayableRef {
+        @Override public String kindLabel() { return "Open in VLC (from beginning; no Jellyfin progress tracking)"; }
+    }
+
     /** A paired Android TV can open Jellyfin before a controllable session exists. */
     record JellyfinApp(String itemId, long startPositionTicks) implements PlayableRef {
         @Override

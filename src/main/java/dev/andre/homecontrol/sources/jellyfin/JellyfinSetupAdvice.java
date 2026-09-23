@@ -21,7 +21,7 @@ public class JellyfinSetupAdvice {
     public record SessionOption(String jellyfinDeviceId, String label, String linkedDeviceId) {
     }
 
-    public record DeviceOption(String id, String name) {
+    public record DeviceOption(String id, String name, boolean androidTv, String player) {
     }
 
     /** What the setup page shows about Jellyfin. Never holds a token. */
@@ -82,7 +82,8 @@ public class JellyfinSetupAdvice {
         }
         DeviceManager deviceManager = devices.getIfAvailable();
         List<DeviceOption> deviceOptions = deviceManager == null ? List.of()
-                : deviceManager.devices().stream().map(d -> new DeviceOption(d.id(), d.name())).toList();
+                : deviceManager.devices().stream().map(d -> new DeviceOption(d.id(), d.name(), d.hasAdapter("androidtv"),
+                        s.player(d.id()).name().toLowerCase(java.util.Locale.ROOT))).toList();
         return new View(true, s.serverName(), s.serverVersion(), s.serverUrl().toString(),
                 s.deviceServerUrl().toString(), s.userName(),
                 s.authMode() == JellyfinSettings.AuthMode.API_KEY ? "api-key" : "password",

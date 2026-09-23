@@ -18,10 +18,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Predicate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JellyfinRouteExecutor implements RouteExecutor {
 
+    private static final Logger log = LoggerFactory.getLogger(JellyfinRouteExecutor.class);
+    private static final long RETRY_NANOS = Duration.ofSeconds(2).toNanos();
     private static final String PACKAGE = "org.jellyfin.androidtv";
     // Remote v2 package launch, also used by androidtvremote2's send_launch_app_command.
     private static final URI APP_LINK = URI.create("market://launch?id=" + PACKAGE);
@@ -61,33 +64,87 @@ public class JellyfinRouteExecutor implements RouteExecutor {
 
     private String prepare(Device device) {
         long deadline = System.nanoTime() + startupTimeout.toNanos();
-        DeviceState state = awaitState(device, deadline, DeviceState::connected,
-                device.name() + " did not connect; check that the Shield is reachable and paired", true);
-        if (!state.powerOn()) {
-            // WAKEUP is idempotent, unlike POWER, even when the reported state is stale.
-            devices.execute(device.id(), new Action.PressKey(RemoteKey.WAKEUP));
-            state = awaitState(device, deadline, s -> s.connected() && s.powerOn(),
-                    device.name() + " did not wake up in time", false);
-        }
-        if (!PACKAGE.equals(state.currentApp())) {
-            devices.execute(device.id(), new Action.OpenAppLink(APP_LINK));
-        }
-        String notReady = "Jellyfin did not become ready on " + device.name()
-                + "; check that the app is installed, sign in on the TV, and link it under Setup → Jellyfin apps if needed";
+        long nextCommand = 0;
+        boolean connectedOnce = false;
+        String stage = "remote connection";
+        DeviceState previous = null;
+        log.info("Preparing Jellyfin on {} (startup timeout {}s)", device.id(), startupTimeout.toSeconds());
         while (true) {
-            awaitState(device, deadline, s -> s.connected() && s.powerOn() && PACKAGE.equals(s.currentApp()),
-                    notReady, false);
-            Optional<JellyfinSession> session = findSession(device, deadline, notReady);
             checkInterrupted();
-            // Refresh the session after startup; the id from a preview can already be obsolete.
-            if (System.nanoTime() >= deadline) {
-                throw new ActionFailedException(notReady);
+            DeviceState state = devices.state(device.id());
+            if (previous == null || previous.status() != state.status()
+                    || previous.powerOn() != state.powerOn()
+                    || !java.util.Objects.equals(previous.currentApp(), state.currentApp())) {
+                log.info("Jellyfin startup on {}: status={}, power={}, app={}",
+                        device.id(), state.status(), state.powerOn(), state.currentApp());
+                previous = state;
             }
-            if (session.isPresent()) {
-                return session.get().id();
+            if (state.status() == DeviceStatus.UNPAIRED) {
+                throw new DeviceOfflineException(device.name() + " must be paired again before Jellyfin can start");
+            }
+            if (System.nanoTime() >= deadline) {
+                log.warn("Jellyfin startup timed out on {} while waiting for {} (status={}, power={}, app={})",
+                        device.id(), stage, state.status(), state.powerOn(), state.currentApp());
+                if (!connectedOnce) {
+                    throw new DeviceOfflineException(device.name()
+                            + " did not connect; check that the Shield is reachable and paired");
+                }
+                if (!state.powerOn()) {
+                    throw new ActionFailedException(device.name() + " did not wake up in time");
+                }
+                throw new ActionFailedException(notReady(device) + " (waiting for " + stage + ")");
+            }
+            if (!state.connected()) {
+                stage = "remote connection";
+                // A successful socket write is not a launch acknowledgement. Retry after reconnect.
+                nextCommand = 0;
+            } else {
+                connectedOnce = true;
+                try {
+                    if (!state.powerOn()) {
+                        stage = "wake confirmation";
+                        if (System.nanoTime() >= nextCommand) {
+                            log.info("Sending WAKEUP for Jellyfin on {}", device.id());
+                            devices.execute(device.id(), new Action.PressKey(RemoteKey.WAKEUP));
+                            nextCommand = System.nanoTime() + RETRY_NANOS;
+                        }
+                    } else if (!PACKAGE.equals(state.currentApp())) {
+                        // A wake confirmation permits the first launch immediately.
+                        if (stage.equals("wake confirmation")) {
+                            nextCommand = 0;
+                        }
+                        stage = "Jellyfin foreground app";
+                        if (System.nanoTime() >= nextCommand) {
+                            log.info("Sending Jellyfin app launch on {} via {}", device.id(), APP_LINK);
+                            devices.execute(device.id(), new Action.OpenAppLink(APP_LINK));
+                            nextCommand = System.nanoTime() + RETRY_NANOS;
+                        }
+                    } else {
+                        stage = "controllable Jellyfin session";
+                        Optional<JellyfinSession> session = findSession(device, deadline, notReady(device));
+                        checkInterrupted();
+                        if (System.nanoTime() >= deadline) {
+                            throw new ActionFailedException(notReady(device));
+                        }
+                        if (session.isPresent()) {
+                            log.info("Jellyfin is ready on {}; sending playback to the refreshed session", device.id());
+                            return session.get().id();
+                        }
+                    }
+                } catch (DeviceOfflineException e) {
+                    // Only wake/launch are retried. PlayNow remains outside this loop and is sent once.
+                    log.info("Remote connection unavailable during Jellyfin startup on {}; retrying", device.id());
+                    nextCommand = 0;
+                    stage = "remote connection";
+                }
             }
             pause(deadline);
         }
+    }
+
+    private static String notReady(Device device) {
+        return "Jellyfin did not become ready on " + device.name()
+                + "; check that the app is installed, sign in on the TV, and link it under Setup → Jellyfin apps if needed";
     }
 
     /** A stalled HTTP body or DNS lookup must not hold the Play request past its startup budget. */
@@ -113,27 +170,6 @@ public class JellyfinRouteExecutor implements RouteExecutor {
         } finally {
             // The worker only queries readiness; even a late result can never send PlayNow.
             probe.cancel(true);
-        }
-    }
-
-    private DeviceState awaitState(Device device, long deadline, Predicate<DeviceState> ready,
-                                   String timeoutMessage, boolean connecting) {
-        while (true) {
-            checkInterrupted();
-            DeviceState state = devices.state(device.id());
-            if (state.status() == DeviceStatus.UNPAIRED) {
-                throw new DeviceOfflineException(device.name() + " must be paired again before Jellyfin can start");
-            }
-            if (System.nanoTime() >= deadline) {
-                if (connecting) {
-                    throw new DeviceOfflineException(timeoutMessage);
-                }
-                throw new ActionFailedException(timeoutMessage);
-            }
-            if (ready.test(state)) {
-                return state;
-            }
-            pause(deadline);
         }
     }
 

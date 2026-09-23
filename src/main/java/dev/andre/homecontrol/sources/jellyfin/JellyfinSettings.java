@@ -3,6 +3,8 @@ package dev.andre.homecontrol.sources.jellyfin;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
@@ -10,7 +12,7 @@ import java.util.regex.Pattern;
 /** Non-secret Jellyfin settings kept in sources.json. The token lives in the secret store. */
 public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String serverId, String serverName,
                                String serverVersion, String userId, String userName, AuthMode authMode,
-                               String deviceId, String castReceiverId, Map<String, String> sessionLinks) {
+                               String deviceId, String castReceiverId, Map<String, String> sessionLinks, Map<String, Player> players) {
 
     public static final String SOURCE_ID = "jellyfin";
     public static final String TOKEN_SECRET = "jellyfin.token";
@@ -18,9 +20,31 @@ public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String server
     private static final String LINK_PREFIX = "link.";
     private static final Pattern IP_V4 = Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3}");
 
+    public enum Player { JELLYFIN, VLC }
+
+    public JellyfinSettings(URI serverUrl, URI deviceServerUrl, String serverId, String serverName,
+                            String serverVersion, String userId, String userName, AuthMode authMode,
+                            String deviceId, String castReceiverId, Map<String, String> sessionLinks) {
+        this(serverUrl, deviceServerUrl, serverId, serverName, serverVersion, userId, userName,
+                authMode, deviceId, castReceiverId, sessionLinks, Map.of());
+    }
+
+    public Player player(String deviceId) {
+        return players.getOrDefault(deviceId, Player.JELLYFIN);
+    }
+
+    public JellyfinSettings withPlayer(String deviceId, Player player) {
+        Map<String, Player> updated = new LinkedHashMap<>(players);
+        if (player == Player.JELLYFIN) updated.remove(deviceId);
+        else updated.put(deviceId, Objects.requireNonNull(player));
+        return new JellyfinSettings(serverUrl, deviceServerUrl, serverId, serverName, serverVersion,
+                userId, userName, authMode, this.deviceId, castReceiverId, sessionLinks, updated);
+    }
+
     public enum AuthMode { PASSWORD, API_KEY }
 
     public JellyfinSettings {
+        players = players == null ? Map.of() : Map.copyOf(players);
         sessionLinks = sessionLinks == null ? Map.of() : Map.copyOf(sessionLinks);
     }
 
@@ -37,6 +61,7 @@ public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String server
         map.put("deviceId", deviceId);
         map.put("castReceiverId", castReceiverId);
         new TreeMap<>(sessionLinks).forEach((device, jellyfinDevice) -> map.put(LINK_PREFIX + device, jellyfinDevice));
+        new TreeMap<>(players).forEach((device, player) -> map.put("player." + device, player.name().toLowerCase(Locale.ROOT)));
         return map;
     }
 
@@ -45,7 +70,9 @@ public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String server
             return Optional.empty();
         }
         Map<String, String> links = new LinkedHashMap<>();
+        Map<String, Player> players = new LinkedHashMap<>();
         map.forEach((key, value) -> {
+            if (key.startsWith("player.") && "vlc".equals(value)) players.put(key.substring(7), Player.VLC);
             if (key.startsWith(LINK_PREFIX)) {
                 links.put(key.substring(LINK_PREFIX.length()), value);
             }
@@ -54,7 +81,7 @@ public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String server
                 URI.create(map.getOrDefault("deviceServerUrl", map.get("serverUrl"))),
                 map.get("serverId"), map.get("serverName"), map.get("serverVersion"), map.get("userId"),
                 map.get("userName"), AuthMode.valueOf(map.getOrDefault("authMode", AuthMode.PASSWORD.name())),
-                map.get("deviceId"), map.getOrDefault("castReceiverId", DEFAULT_CAST_RECEIVER_ID), links));
+                map.get("deviceId"), map.getOrDefault("castReceiverId", DEFAULT_CAST_RECEIVER_ID), links, players));
     }
 
     /** A blank {@code jellyfinDeviceId} removes the link. */
@@ -66,7 +93,7 @@ public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String server
             links.put(deviceId, jellyfinDeviceId);
         }
         return new JellyfinSettings(serverUrl, deviceServerUrl, serverId, serverName, serverVersion, userId, userName,
-                authMode, this.deviceId, castReceiverId, links);
+                authMode, this.deviceId, castReceiverId, links, players);
     }
 
     /** True when a TV or speaker is unlikely to resolve or reach this address (loopback or a Docker service name). */

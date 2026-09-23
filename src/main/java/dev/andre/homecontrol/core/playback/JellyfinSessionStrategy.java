@@ -16,6 +16,12 @@ public class JellyfinSessionStrategy implements RouteStrategy {
         if (!capabilities.contains(Capability.JELLYFIN_CLIENT)) {
             return Optional.empty();
         }
+        Optional<Route> vlc = item.playables().stream().filter(PlayableRef.JellyfinVlc.class::isInstance)
+                .map(PlayableRef.JellyfinVlc.class::cast).findFirst()
+                .map(ref -> new Route.JellyfinVlc(ref.itemId()));
+        if (vlc.isPresent() && capabilities.containsAll(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS))) {
+            return vlc;
+        }
         Optional<Route> open = item.playables().stream()
                 .filter(PlayableRef.JellyfinSession.class::isInstance)
                 .map(PlayableRef.JellyfinSession.class::cast)

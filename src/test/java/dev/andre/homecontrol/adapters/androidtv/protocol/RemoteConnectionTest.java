@@ -8,6 +8,11 @@ import dev.andre.homecontrol.core.RemoteKey;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteError;
+import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteAppLinkLaunchRequest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -107,6 +112,23 @@ class RemoteConnectionTest {
     void advertisesKeyImePowerVolumeAndAppLink() {
         assertThat(device.clientConfigureFeatures()).isEqualTo(614);
         assertThat(device.clientActiveFeatures()).isEqualTo(614);
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void reportsRejectedLaunchWithoutLoggingItsUrl(CapturedOutput output) throws Exception {
+        var rejected = RemoteMessage.newBuilder().setRemoteAppLinkLaunchRequest(
+                RemoteAppLinkLaunchRequest.newBuilder().setAppLink("https://example.test/?token=secret-token"));
+        var error = RemoteMessage.newBuilder().setRemoteError(
+                RemoteError.newBuilder().setValue(true).setMessage(rejected)).build();
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        error.writeDelimitedTo(bytes);
+
+        device.pushRaw(bytes.toByteArray());
+
+        await().untilAsserted(() -> assertThat(output.getOut())
+                .contains("Android TV rejected remote message", "remote_app_link_launch_request"));
+        assertThat(output.getAll()).doesNotContain("secret-token");
     }
 
     @Test

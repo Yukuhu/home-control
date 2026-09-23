@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,8 +19,10 @@ import java.util.Map;
 public class JellyfinSetupController {
 
     private final JellyfinSetupService setup;
+    private final DeviceManager devices;
 
-    public JellyfinSetupController(JellyfinSetupService setup) {
+    public JellyfinSetupController(JellyfinSetupService setup, DeviceManager devices) {
+        this.devices = devices;
         this.setup = setup;
     }
 
@@ -66,6 +69,27 @@ public class JellyfinSetupController {
     public String disconnect(RedirectAttributes redirect) {
         setup.disconnect();
         redirect.addFlashAttribute("jellyfinMessage", "Jellyfin disconnected");
+        return "redirect:/setup";
+    }
+
+    @PostMapping("/setup/sources/jellyfin/players")
+    public String player(@RequestParam String device, @RequestParam String player, RedirectAttributes redirect) {
+        try {
+            if (devices.device(device).filter(d -> d.hasAdapter("androidtv")).isEmpty()) {
+                throw new IllegalArgumentException("Choose a paired Shield or Android TV device");
+            }
+            JellyfinSettings.Player selected = switch (player) {
+                case "jellyfin" -> JellyfinSettings.Player.JELLYFIN;
+                case "vlc" -> JellyfinSettings.Player.VLC;
+                default -> throw new IllegalArgumentException("Choose Jellyfin app or VLC");
+            };
+            JellyfinSettings settings = setup.settings().orElseThrow(() ->
+                    new IllegalArgumentException("Connect Jellyfin before choosing a player"));
+            setup.save(settings.withPlayer(device, selected));
+            redirect.addFlashAttribute("jellyfinMessage", "Player preference saved");
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("jellyfinError", e.getMessage());
+        }
         return "redirect:/setup";
     }
 

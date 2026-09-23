@@ -14,6 +14,9 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemotePingRespon
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteSetActive;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteSetVolumeLevel;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSocket;
 import java.io.IOException;
@@ -29,6 +32,8 @@ import java.util.concurrent.TimeUnit;
  * answers its pings and forwards everything else to the {@link RemoteListener}.
  */
 public class RemoteConnection implements AutoCloseable {
+
+    private static final Logger log = LoggerFactory.getLogger(RemoteConnection.class);
 
     private static final int FEATURE_KEY = 1 << 1;      // 2
     private static final int FEATURE_IME_RECEIVE = 1 << 2; // 4, supplies current-app events
@@ -253,6 +258,13 @@ public class RemoteConnection implements AutoCloseable {
                     .setRemotePingResponse(RemotePingResponse.newBuilder()
                             .setVal1(message.getRemotePingRequest().getVal1()))
                     .build());
+        } else if (message.hasRemoteError()) {
+            // Error replies may echo app URLs containing credentials. Log only the message types.
+            log.warn("Android TV rejected remote message from {}: types={}, error={}",
+                    socket.getRemoteSocketAddress(),
+                    message.getRemoteError().getMessage().getAllFields().keySet().stream()
+                            .map(field -> field.getName()).toList(),
+                    message.getRemoteError().getValue());
         } else if (message.hasRemoteStart()) {
             listener.onPower(message.getRemoteStart().getStarted());
         } else if (message.hasRemoteImeKeyInject()) {
@@ -261,7 +273,7 @@ public class RemoteConnection implements AutoCloseable {
             RemoteSetVolumeLevel volume = message.getRemoteSetVolumeLevel();
             listener.onVolume(volume.getVolumeLevel(), volume.getVolumeMax(), volume.getVolumeMuted());
         }
-        // IME editing, voice, preferred-audio-device and RemoteError traffic is ignored.
+        // IME editing, voice, preferred-audio-device traffic is ignored.
     }
 
     private synchronized void finish(DisconnectCause cause) {
