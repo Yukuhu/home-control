@@ -76,6 +76,7 @@ public class PlaybackPlanner {
                                         ? "the stream was not accepted" : "this device cannot play a direct stream");
                 case PlayableRef.JellyfinItem ignored -> reasons.add("Jellyfin is switched off on this server");
                 case PlayableRef.JellyfinSession ignored -> reasons.add("the open Jellyfin app cannot be controlled");
+                case PlayableRef.JellyfinApp ignored -> reasons.add("the Jellyfin app cannot be started on this device");
             }
         }
         if (reasons.isEmpty()) {

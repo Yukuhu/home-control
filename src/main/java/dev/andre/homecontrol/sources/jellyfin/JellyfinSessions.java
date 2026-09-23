@@ -44,7 +44,9 @@ public class JellyfinSessions {
                     node.path("DeviceName").asString(""), node.path("Client").asString(""),
                     normalizeAddress(node.path("RemoteEndPoint").asString("")), instant(node.path("LastActivityDate").asString("")),
                     node.path("SupportsMediaControl").asBoolean(false));
-            if (session.supportsMediaControl() && !session.id().isBlank() && !session.deviceId().equals(connection.deviceId())) {
+            if (session.supportsMediaControl() && node.path("IsActive").asBoolean(true)
+                    && node.path("SupportsRemoteControl").asBoolean(true)
+                    && !session.id().isBlank() && !session.deviceId().equals(connection.deviceId())) {
                 result.add(session);
             }
         }

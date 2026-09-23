@@ -6,8 +6,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Rung 1 of spec §5.3: the Jellyfin app is open on the device. It resumes with the user's own
- * profile, audio and subtitle choices, so it beats relaunching anything.
+ * Prefer the native Jellyfin app, either an existing session or an Android TV app that can
+ * be started on demand. It preserves the user's profile, audio and subtitle choices.
  */
 public class JellyfinSessionStrategy implements RouteStrategy {
 
@@ -16,10 +16,15 @@ public class JellyfinSessionStrategy implements RouteStrategy {
         if (!capabilities.contains(Capability.JELLYFIN_CLIENT)) {
             return Optional.empty();
         }
-        return item.playables().stream()
+        Optional<Route> open = item.playables().stream()
                 .filter(PlayableRef.JellyfinSession.class::isInstance)
                 .map(PlayableRef.JellyfinSession.class::cast)
                 .findFirst()
                 .map(s -> new Route.JellyfinSession(s.sessionId(), s.itemId(), s.startPositionTicks(), s.client()));
+        return open.or(() -> item.playables().stream()
+                .filter(PlayableRef.JellyfinApp.class::isInstance)
+                .map(PlayableRef.JellyfinApp.class::cast)
+                .findFirst()
+                .map(app -> new Route.JellyfinApp(app.itemId(), app.startPositionTicks())));
     }
 }

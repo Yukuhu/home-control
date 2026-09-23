@@ -31,6 +31,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static dev.andre.homecontrol.sources.jellyfin.FakeJellyfinServer.ACCESS_TOKEN;
@@ -151,11 +154,41 @@ class JellyfinEndToEndTest {
                 // Rung 1: the Shield's Jellyfin app is linked on the setup page, then commanded.
                 assertThat(send(browser, post("/setup/sources/jellyfin/links",
                         Map.of("session", SHIELD_JELLYFIN_DEVICE, "device", "shield-e2e"))).statusCode()).isEqualTo(302);
-                HttpResponse<String> onShield = send(browser, post("/devices/shield-e2e/play", Map.of("source", "jellyfin", "item", EPISODE)));
+                // The app is now closed and the Shield asleep. Preview must still offer Play,
+                // without waking the device or sending anything to Jellyfin.
+                await().atMost(Duration.ofSeconds(5)).until(() -> devices.state("shield-e2e").connected());
+                shieldRemote.pushPower(false);
+                shieldRemote.pushCurrentApp("com.google.android.tvlauncher");
+                jellyfin.respondJson("GET", "/Sessions", 200, "[]");
+                await().until(() -> !devices.state("shield-e2e").powerOn()
+                        && "com.google.android.tvlauncher".equals(devices.state("shield-e2e").currentApp()));
+                HttpResponse<String> shieldPreview = send(browser, get("/devices/shield-e2e/route-preview?source=jellyfin&item=" + EPISODE));
+                assertThat(shieldPreview.statusCode()).isEqualTo(200);
+                assertThat(shieldPreview.body()).contains("\"playable\":true", "jellyfin-app");
+                assertThat(shieldRemote.receivedKeyPresses()).isEmpty();
+                assertThat(jellyfin.requests("POST", "/Sessions/" + SHIELD_SESSION + "/Playing")).isEmpty();
+
+                CompletableFuture<HttpResponse<String>> starting = CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return send(browser, post("/devices/shield-e2e/play-attempt", Map.of("source", "jellyfin", "item", EPISODE)));
+                    } catch (Exception e) {
+                        throw new CompletionException(e);
+                    }
+                });
+                assertThat(shieldRemote.nextKeyPress()).isEqualTo(224);
+                assertThat(starting).isNotDone();
+                shieldRemote.pushPower(true);
+                assertThat(shieldRemote.nextAppLink()).isEqualTo("market://launch?id=org.jellyfin.androidtv");
+                assertThat(starting).isNotDone();
+                assertThat(jellyfin.requests("POST", "/Sessions/" + SHIELD_SESSION + "/Playing")).isEmpty();
+                shieldRemote.pushCurrentApp("org.jellyfin.androidtv");
+                jellyfin.respond("GET", "/Sessions", 200, "sessions.json");
+                HttpResponse<String> onShield = starting.get(5, TimeUnit.SECONDS);
                 assertThat(onShield.statusCode()).isEqualTo(200);
-                assertThat(onShield.body()).isEqualTo("Play in the open Jellyfin app (Android TV)");
+                assertThat(onShield.body()).contains("\"played\":true", "jellyfin-app");
                 assertThat(jellyfin.last("POST", "/Sessions/" + SHIELD_SESSION + "/Playing").query()).containsExactlyInAnyOrderEntriesOf(Map.of(
                         "playCommand", "PlayNow", "itemIds", EPISODE, "startPositionTicks", "6120000000"));
+                assertThat(jellyfin.requests("POST", "/Sessions/" + SHIELD_SESSION + "/Playing")).hasSize(1);
 
                 // Rung 3 (spec §5.3): the Kitchen Cast device has no Jellyfin app, so the Jellyfin receiver gets the request.
                 await().until(() -> devices.state("kitchen-e2e").connected());

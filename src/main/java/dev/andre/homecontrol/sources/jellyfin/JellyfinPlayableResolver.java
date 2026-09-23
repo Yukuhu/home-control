@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** Jellyfin item → open app session, else Jellyfin receiver message and direct stream (spec §4.2, §5.3). */
+/** Jellyfin item → native Android TV app, open session, or receiver message/direct stream. */
 public class JellyfinPlayableResolver implements PlayableResolver {
 
     private final JellyfinSetupService setup;
@@ -46,22 +46,31 @@ public class JellyfinPlayableResolver implements PlayableResolver {
                 && !wanted.serverId().equalsIgnoreCase(settings.get().serverId())) {
             return Resolution.note("this item is from a different Jellyfin server");
         }
+        boolean nativeApp = device.hasAdapter("androidtv") && capabilities.contains(Capability.APP_LINK)
+                && capabilities.contains(Capability.REMOTE_KEYS);
+        List<PlayableRef> playables = new ArrayList<>();
+        Set<Capability> liveCapabilities = nativeApp ? Set.of(Capability.JELLYFIN_CLIENT) : Set.of();
         List<String> notes = new ArrayList<>();
-        try {
-            Optional<JellyfinSession> open = sessions.sessionFor(device);
-            if (open.isPresent()) {
-                return new Resolution(List.of(new PlayableRef.JellyfinSession(open.get().id(), wanted.itemId(),
-                        wanted.resumeTicks(), open.get().client())), Set.of(Capability.JELLYFIN_CLIENT), List.of());
+        if (nativeApp) {
+            // Preview remains read-only; native startup wins but Cast remains an explicit retry.
+            playables.add(new PlayableRef.JellyfinApp(wanted.itemId(), wanted.resumeTicks()));
+        } else {
+            try {
+                Optional<JellyfinSession> open = sessions.sessionFor(device);
+                if (open.isPresent()) {
+                    return new Resolution(List.of(new PlayableRef.JellyfinSession(open.get().id(), wanted.itemId(),
+                            wanted.resumeTicks(), open.get().client())), Set.of(Capability.JELLYFIN_CLIENT), List.of());
+                }
+                notes.add("no Jellyfin app is open on " + device.name());
+            } catch (JellyfinException e) {
+                notes.add("could not ask Jellyfin which apps are open (" + e.getMessage() + ")");
             }
-            notes.add("no Jellyfin app is open on " + device.name());
-        } catch (JellyfinException e) {
-            notes.add("could not ask Jellyfin which apps are open (" + e.getMessage() + ")");
         }
         boolean cast = capabilities.contains(Capability.CAST_RECEIVER);
         boolean renderer = capabilities.contains(Capability.MEDIA_RENDERER);
         boolean local = capabilities.contains(Capability.LOCAL_AUDIO_SINK);
         if (!cast && !renderer && !local) {
-            return new Resolution(List.of(), Set.of(), notes);
+            return new Resolution(playables, liveCapabilities, notes);
         }
         JsonNode fetched;
         try {
@@ -69,9 +78,8 @@ public class JellyfinPlayableResolver implements PlayableResolver {
                     Map.of("userId", connection.get().userId()));
         } catch (JellyfinException | IllegalArgumentException e) {
             notes.add("could not load the item from Jellyfin (" + e.getMessage() + ")");
-            return new Resolution(List.of(), Set.of(), notes);
+            return new Resolution(playables, liveCapabilities, notes);
         }
-        List<PlayableRef> playables = new ArrayList<>();
         if (cast) {
             playables.add(JellyfinCastMessages.playable(settings.get(), connection.get().token(), fetched,
                     wanted.resumeTicks(), device.name()));
@@ -89,6 +97,6 @@ public class JellyfinPlayableResolver implements PlayableResolver {
                 notes.add("could not ask Jellyfin how to stream the item (" + e.getMessage() + ")");
             }
         }
-        return new Resolution(playables, Set.of(), notes);
+        return new Resolution(playables, liveCapabilities, notes);
     }
 }

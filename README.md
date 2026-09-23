@@ -359,13 +359,32 @@ requirement stays; disconnect Jellyfin first, or delete `secrets.json`, to drop 
 
 Playing a Jellyfin item on a device tries, in order:
 
-1. **The device's own open Jellyfin app** — if Jellyfin reports a session for that device, Home
-   Control tells the app to play, resuming at the saved position.
+1. **The device's own Jellyfin app** — on a paired Shield / Android TV, Play checks the remote
+   connection, wakes the device if asleep, opens Jellyfin if needed, and waits for its app and
+   controllable session before playing at the saved position. Opening the play sheet only
+   previews this route; it never wakes the TV. On other devices, an already-open Jellyfin
+   session is used when available.
 2. **The Jellyfin receiver on a Cast device** (a Chromecast, or a device with a merged Cast side)
-   — if the device has no matching Jellyfin app session but does accept Cast messages, a
-   `Cast with the Jellyfin receiver` message starts playback there instead.
+   — on devices without the Android TV app route or a matching Jellyfin session, a
+   `Cast with the Jellyfin receiver` message starts playback there instead. A Shield with a
+   merged Cast receiver also offers this as a retry option if native app startup fails;
+   casting starts only when you choose that option.
 3. Otherwise there is no route: `/devices/<id>/route` and `/devices/<id>/play` answer 422 with
    the reason.
+
+Install Jellyfin for Android TV and sign in on the Shield once. If the app asks you to choose a
+user each time, configure its automatic login on the TV. Startup waits up to
+`home-control.jellyfin.startup-timeout-seconds` (30 by default); a failure explains whether the
+Shield could not connect, did not wake, or Jellyfin did not become ready. Playback is sent once
+and is not queued for later. If session matching fails, link the app under **Setup → Jellyfin
+apps** while it is open, then try Play again.
+
+App startup uses the Remote v2 package-launch link, `market://launch?id=org.jellyfin.androidtv`,
+as used by [androidtvremote2](https://github.com/tronikos/androidtvremote2/blob/main/src/androidtvremote2/androidtv_remote.py).
+Package launching depends on the Shield's firmware and Google Play Store;
+[known limitations](https://www.home-assistant.io/integrations/androidtv_remote/#launching-apps)
+can prevent it from opening the app. Home Control waits for Jellyfin to report ready and shows
+an error if launch fails. Wake and launch still need validation on physical hardware.
 
 A fourth option, a direct stream URL Jellyfin builds for the device to fetch itself, exists in
 the code (`JellyfinStreams`) but is groundwork for Wi-Fi/media-renderer speakers (sub-project I)

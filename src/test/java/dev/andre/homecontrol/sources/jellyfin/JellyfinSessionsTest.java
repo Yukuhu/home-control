@@ -57,6 +57,21 @@ class JellyfinSessionsTest {
     }
 
     @Test
+    void aDormantOrDisconnectedAppIsNotReadyForPlayback() throws IOException {
+        connected(Map.of());
+        fake.respondJson("GET", "/Sessions", 200, """
+                [
+                  {"Id":"old", "DeviceId":"shield", "SupportsMediaControl":true,
+                   "IsActive":false, "SupportsRemoteControl":true},
+                  {"Id":"disconnected", "DeviceId":"shield", "SupportsMediaControl":true,
+                   "IsActive":true, "SupportsRemoteControl":false}
+                ]
+                """);
+
+        assertThat(sessions.controllable()).isEmpty();
+    }
+
+    @Test
     void listsControllableSessionsExceptOurOwn() throws IOException {
         connected(Map.of());
 

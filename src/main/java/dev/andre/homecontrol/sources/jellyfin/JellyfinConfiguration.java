@@ -1,6 +1,8 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.device.DeviceManager;
+import org.springframework.beans.factory.annotation.Value;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -9,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Clock;
+import java.time.Duration;
 
 /** The Jellyfin module. {@code home-control.jellyfin.enabled=false} removes all of it. */
 @Configuration(proxyBeanMethods = false)
@@ -50,7 +53,8 @@ public class JellyfinConfiguration {
     }
 
     @Bean
-    public JellyfinRouteExecutor jellyfinRouteExecutor(JellyfinSessions sessions) {
-        return new JellyfinRouteExecutor(sessions);
+    public JellyfinRouteExecutor jellyfinRouteExecutor(JellyfinSessions sessions, DeviceManager devices,
+            @Value("${home-control.jellyfin.startup-timeout-seconds:30}") int startupTimeoutSeconds) {
+        return new JellyfinRouteExecutor(sessions, devices, Duration.ofSeconds(startupTimeoutSeconds));
     }
 }
