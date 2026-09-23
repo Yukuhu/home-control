@@ -28,8 +28,9 @@
         <h3>Device playback</h3>
         <p class="hint">Choose a player for each Shield or Android TV. Install and open VLC once on the TV
             before using it here. VLC opens the stream directly without starting Jellyfin.</p>
-        <p class="hint">VLC does not update Jellyfin watched status or resume progress. Streams start from the
-            beginning; Jellyfin subtitle and audio preferences are not transferred. Choose tracks in VLC.</p>
+        <p class="hint">Movies and episodes resume from Jellyfin's saved position. Resumed streams have limited
+            seeking and use Jellyfin's selected audio and subtitle tracks. VLC does not update Jellyfin
+            watched status or save new resume progress.</p>
         <form method="post" th:action="@{/setup/sources/jellyfin/players}" th:each="device : ${jellyfin.devices()}"
               th:if="${device.androidTv()}">
             <input type="hidden" name="device" th:value="${device.id()}">
