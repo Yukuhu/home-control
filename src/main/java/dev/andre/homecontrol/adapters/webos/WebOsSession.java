@@ -161,14 +161,14 @@ public class WebOsSession implements DeviceHandle, InputListing {
                     SsapMessages.empty().put("volume", Math.clamp(volume.level(), 0, 100)), "set the volume");
             case Action.Mute mute -> call(SsapUris.SET_MUTE, SsapMessages.empty().put("mute", mute.muted()),
                     mute.muted() ? "mute" : "unmute");
-            case Action.Stop ignored -> call(SsapUris.MEDIA_STOP, SsapMessages.empty(), "stop playback");
-            case Action.CastLoad ignored -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
-            case Action.CastMessage ignored -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
-            case Action.PlayMedia ignored -> throw new UnsupportedActionException(device.name() + " cannot play a direct stream");
-            case Action.Pause ignored -> throw new UnsupportedActionException(device.name() + " cannot pause a direct stream");
-            case Action.Resume ignored -> throw new UnsupportedActionException(device.name() + " cannot resume a direct stream");
-            case Action.JoinGroup ignored -> throw new UnsupportedActionException(device.name() + " cannot be grouped");
-            case Action.LeaveGroup ignored -> throw new UnsupportedActionException(device.name() + " cannot be grouped");
+            case Action.Stop _ -> call(SsapUris.MEDIA_STOP, SsapMessages.empty(), "stop playback");
+            case Action.CastLoad _ -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
+            case Action.CastMessage _ -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
+            case Action.PlayMedia _ -> throw new UnsupportedActionException(device.name() + " cannot play a direct stream");
+            case Action.Pause _ -> throw new UnsupportedActionException(device.name() + " cannot pause a direct stream");
+            case Action.Resume _ -> throw new UnsupportedActionException(device.name() + " cannot resume a direct stream");
+            case Action.JoinGroup _ -> throw new UnsupportedActionException(device.name() + " cannot be grouped");
+            case Action.LeaveGroup _ -> throw new UnsupportedActionException(device.name() + " cannot be grouped");
         }
     }
 

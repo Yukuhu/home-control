@@ -89,9 +89,9 @@ public class BluetoothSpeakerSession implements DeviceHandle {
         synchronized (commands) {
             switch (action) {
                 case Action.PlayMedia play -> play(play);
-                case Action.Pause ignored -> pause(true);
-                case Action.Resume ignored -> pause(false);
-                case Action.Stop ignored -> {
+                case Action.Pause _ -> pause(true);
+                case Action.Resume _ -> pause(false);
+                case Action.Stop _ -> {
                     player.stop();
                     title = null;
                 }

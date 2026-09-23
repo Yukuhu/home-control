@@ -106,18 +106,18 @@ public class UpnpSession implements DeviceHandle {
                     commands.playUri(current.avTransport(), current.sink(), play, DidlLite.DLNA_STREAMING);
                     lastPlayed = new PlayedItem(play.url().toString(), play.title());
                 }
-                case Action.Pause ignored -> commands.transport(current.avTransport(), UpnpActions.pause(av), "pause");
-                case Action.Resume ignored -> commands.transport(current.avTransport(), UpnpActions.play(av), "resume playback");
-                case Action.Stop ignored -> commands.transport(current.avTransport(), UpnpActions.stop(av), "stop playback");
+                case Action.Pause _ -> commands.transport(current.avTransport(), UpnpActions.pause(av), "pause");
+                case Action.Resume _ -> commands.transport(current.avTransport(), UpnpActions.play(av), "resume playback");
+                case Action.Stop _ -> commands.transport(current.avTransport(), UpnpActions.stop(av), "stop playback");
                 case Action.SetVolume volume -> commands.setVolume(volumeControl(current), volume.level(), current.volumeMax());
                 case Action.Mute mute -> commands.setMute(volumeControl(current), mute.muted());
-                case Action.PressKey ignored -> throw unsupported("has no remote keys");
-                case Action.OpenAppLink ignored -> throw unsupported("cannot open app links");
-                case Action.SelectInput ignored -> throw unsupported("has no inputs");
-                case Action.CastLoad ignored -> throw unsupported("is not a Cast receiver");
-                case Action.CastMessage ignored -> throw unsupported("is not a Cast receiver");
-                case Action.JoinGroup ignored -> throw unsupported("cannot be grouped");
-                case Action.LeaveGroup ignored -> throw unsupported("cannot be grouped");
+                case Action.PressKey _ -> throw unsupported("has no remote keys");
+                case Action.OpenAppLink _ -> throw unsupported("cannot open app links");
+                case Action.SelectInput _ -> throw unsupported("has no inputs");
+                case Action.CastLoad _ -> throw unsupported("is not a Cast receiver");
+                case Action.CastMessage _ -> throw unsupported("is not a Cast receiver");
+                case Action.JoinGroup _ -> throw unsupported("cannot be grouped");
+                case Action.LeaveGroup _ -> throw unsupported("cannot be grouped");
             }
         } finally {
             poller.pollNow();

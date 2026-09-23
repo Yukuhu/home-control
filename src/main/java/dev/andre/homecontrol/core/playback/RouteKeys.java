@@ -8,17 +8,17 @@ public final class RouteKeys {
 
     public static String key(Route route) {
         return switch (route) {
-            case Route.OpenAppLink ignored -> "app-link";
-            case Route.WorkflowCast ignored -> "workflow-cast";
+            case Route.OpenAppLink _ -> "app-link";
+            case Route.WorkflowCast _ -> "workflow-cast";
             case Route.Cast cast -> "cast:" + cast.receiverAppId();
             case Route.CastMessage message -> "cast-message:" + message.receiverAppId();
-            case Route.JellyfinSession ignored -> "jellyfin-session";
-            case Route.JellyfinVlc ignored -> "jellyfin-vlc";
-            case Route.JellyfinApp ignored -> "jellyfin-app";
-            case Route.YouTubeLounge ignored -> "youtube-lounge";
-            case Route.Render ignored -> "render";
-            case Route.PlayLocally ignored -> "local-audio";
-            case Route.Unroutable ignored -> "unroutable";
+            case Route.JellyfinSession _ -> "jellyfin-session";
+            case Route.JellyfinVlc _ -> "jellyfin-vlc";
+            case Route.JellyfinApp _ -> "jellyfin-app";
+            case Route.YouTubeLounge _ -> "youtube-lounge";
+            case Route.Render _ -> "render";
+            case Route.PlayLocally _ -> "local-audio";
+            case Route.Unroutable _ -> "unroutable";
         };
     }
 

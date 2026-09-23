@@ -143,21 +143,21 @@ public class SonosSession implements DeviceHandle, GroupListing {
                     onCoordinator(coordinator -> commands.playUri(coordinator, sink, forSonos, "*"));
                     lastPlayed = new PlayedItem(forSonos.url().toString(), play.title());
                 }
-                case Action.Pause ignored -> onCoordinator(coordinator ->
+                case Action.Pause _ -> onCoordinator(coordinator ->
                         commands.transport(coordinator, UpnpActions.pause(AV_TRANSPORT), "pause"));
-                case Action.Resume ignored -> onCoordinator(coordinator ->
+                case Action.Resume _ -> onCoordinator(coordinator ->
                         commands.transport(coordinator, UpnpActions.play(AV_TRANSPORT), "resume playback"));
-                case Action.Stop ignored -> onCoordinator(coordinator ->
+                case Action.Stop _ -> onCoordinator(coordinator ->
                         commands.transport(coordinator, UpnpActions.stop(AV_TRANSPORT), "stop playback"));
                 case Action.SetVolume volume -> commands.setVolume(renderingControl(), volume.level(), 100);
                 case Action.Mute mute -> commands.setMute(renderingControl(), mute.muted());
                 case Action.JoinGroup join -> join(join.memberId());
-                case Action.LeaveGroup ignored -> leave();
-                case Action.PressKey ignored -> throw unsupported("has no remote keys");
-                case Action.OpenAppLink ignored -> throw unsupported("cannot open app links");
-                case Action.SelectInput ignored -> throw unsupported("has no inputs");
-                case Action.CastLoad ignored -> throw unsupported("is not a Cast receiver");
-                case Action.CastMessage ignored -> throw unsupported("is not a Cast receiver");
+                case Action.LeaveGroup _ -> leave();
+                case Action.PressKey _ -> throw unsupported("has no remote keys");
+                case Action.OpenAppLink _ -> throw unsupported("cannot open app links");
+                case Action.SelectInput _ -> throw unsupported("has no inputs");
+                case Action.CastLoad _ -> throw unsupported("is not a Cast receiver");
+                case Action.CastMessage _ -> throw unsupported("is not a Cast receiver");
             }
         } finally {
             poller.pollNow();

@@ -3,7 +3,6 @@ package dev.andre.homecontrol.device;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
 import dev.andre.homecontrol.adapters.cast.CastSettings;
 import dev.andre.homecontrol.core.Device;
-import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.storage.StorageException;
 import tools.jackson.databind.JsonNode;

@@ -194,19 +194,19 @@ public class YouTubeAuthorizationService implements AutoCloseable {
                 return pending != null; // cancelled or restarted meanwhile
             }
             switch (result) {
-                case GoogleOAuthClient.TokenPoll.Pending ignored -> {
+                case GoogleOAuthClient.TokenPoll.Pending _ -> {
                     nextPollAt = clock.instant().plus(interval);
                     return true;
                 }
-                case GoogleOAuthClient.TokenPoll.SlowDown ignored -> {
+                case GoogleOAuthClient.TokenPoll.SlowDown _ -> {
                     interval = interval.plus(SLOW_DOWN_STEP);
                     nextPollAt = clock.instant().plus(interval);
                     return true;
                 }
-                case GoogleOAuthClient.TokenPoll.Denied ignored -> {
+                case GoogleOAuthClient.TokenPoll.Denied _ -> {
                     return finish(State.DENIED, "Access was denied on the Google page. Start again to retry.");
                 }
-                case GoogleOAuthClient.TokenPoll.Expired ignored -> {
+                case GoogleOAuthClient.TokenPoll.Expired _ -> {
                     return finish(State.EXPIRED, "The code expired before it was entered. Start again.");
                 }
                 case GoogleOAuthClient.TokenPoll.Failed failed -> {

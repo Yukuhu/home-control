@@ -74,8 +74,8 @@ public final class IcsOccurrences {
 
         ZoneId zoneOf(IcsTime time) {
             return switch (time) {
-                case IcsTime.Utc ignored -> ZoneOffset.UTC;
-                case IcsTime.Date ignored -> calendarZone;
+                case IcsTime.Utc _ -> ZoneOffset.UTC;
+                case IcsTime.Date _ -> calendarZone;
                 case IcsTime.Local local -> {
                     if (local.tzid() == null) {
                         yield calendarZone;

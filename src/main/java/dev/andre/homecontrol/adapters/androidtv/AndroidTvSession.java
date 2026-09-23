@@ -114,26 +114,26 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         switch (action) {
             case Action.PressKey press -> sendKey(press.key(), press.press());
             case Action.OpenAppLink open -> openAppLink(open.uri());
-            case Action.SetVolume ignored -> throw new UnsupportedActionException(
+            case Action.SetVolume _ -> throw new UnsupportedActionException(
                     "Android TV Remote v2 has no absolute volume; use the volume keys");
-            case Action.Mute ignored -> throw new UnsupportedActionException(
+            case Action.Mute _ -> throw new UnsupportedActionException(
                     "Android TV Remote v2 cannot set mute directly; use the mute key");
-            case Action.Stop ignored -> throw new UnsupportedActionException(
+            case Action.Stop _ -> throw new UnsupportedActionException(
                     "Android TV Remote v2 cannot stop a cast");
-            case Action.CastLoad ignored -> throw new UnsupportedActionException(
+            case Action.CastLoad _ -> throw new UnsupportedActionException(
                     "Android TV Remote v2 cannot load Cast media");
-            case Action.CastMessage ignored -> throw new UnsupportedActionException(
+            case Action.CastMessage _ -> throw new UnsupportedActionException(
                     "Android TV Remote v2 cannot run Cast receiver apps");
-            case Action.SelectInput ignored -> throw new UnsupportedActionException(
+            case Action.SelectInput _ -> throw new UnsupportedActionException(
                     "Android TV does not list its inputs; switch inputs from the Home screen");
-            case Action.PlayMedia ignored -> throw new UnsupportedActionException(
+            case Action.PlayMedia _ -> throw new UnsupportedActionException(
                     "Android TV Remote v2 cannot play a direct stream");
-            case Action.Pause ignored -> throw new UnsupportedActionException(
+            case Action.Pause _ -> throw new UnsupportedActionException(
                     "Android TV Remote v2 cannot pause a direct stream; use the play/pause key");
-            case Action.Resume ignored -> throw new UnsupportedActionException(
+            case Action.Resume _ -> throw new UnsupportedActionException(
                     "Android TV Remote v2 cannot resume a direct stream; use the play/pause key");
-            case Action.JoinGroup ignored -> throw new UnsupportedActionException("Android TV cannot be grouped");
-            case Action.LeaveGroup ignored -> throw new UnsupportedActionException("Android TV cannot be grouped");
+            case Action.JoinGroup _ -> throw new UnsupportedActionException("Android TV cannot be grouped");
+            case Action.LeaveGroup _ -> throw new UnsupportedActionException("Android TV cannot be grouped");
         }
     }
 

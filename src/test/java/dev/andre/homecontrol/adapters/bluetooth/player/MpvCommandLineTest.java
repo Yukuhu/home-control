@@ -3,8 +3,6 @@ package dev.andre.homecontrol.adapters.bluetooth.player;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

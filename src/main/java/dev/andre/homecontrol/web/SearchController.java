@@ -2,7 +2,6 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.content.SearchOutcome;
 import dev.andre.homecontrol.content.SearchService;
-import dev.andre.homecontrol.core.content.ContentSource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;

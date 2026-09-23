@@ -96,22 +96,22 @@ public class CastSession implements DeviceHandle {
     @Override
     public void execute(Action action) {
         switch (action) {
-            case Action.PressKey ignored -> throw new UnsupportedActionException(
+            case Action.PressKey _ -> throw new UnsupportedActionException(
                     device.name() + " is a Cast receiver and has no remote keys");
-            case Action.OpenAppLink ignored -> throw new UnsupportedActionException(
+            case Action.OpenAppLink _ -> throw new UnsupportedActionException(
                     device.name() + " is a Cast receiver and cannot open app links");
             case Action.SetVolume set -> receiverCommand(CastPayloads.setVolumeLevel(set.level() / 100.0), "set the volume");
             case Action.Mute mute -> receiverCommand(CastPayloads.setMuted(mute.muted()), mute.muted() ? "mute" : "unmute");
-            case Action.Stop ignored -> stopForegroundApp();
+            case Action.Stop _ -> stopForegroundApp();
             case Action.CastLoad load -> load(load.receiverAppId(), load.load());
             case Action.CastMessage message -> customMessage(message.receiverAppId(), message.namespace(), message.message());
-            case Action.SelectInput ignored -> throw new UnsupportedActionException(
+            case Action.SelectInput _ -> throw new UnsupportedActionException(
                     device.name() + " is a Cast receiver and has no inputs");
-            case Action.PlayMedia ignored -> throw new UnsupportedActionException(device.name() + " cannot play a direct stream");
-            case Action.Pause ignored -> throw new UnsupportedActionException(device.name() + " cannot pause a direct stream");
-            case Action.Resume ignored -> throw new UnsupportedActionException(device.name() + " cannot resume a direct stream");
-            case Action.JoinGroup ignored -> throw new UnsupportedActionException(device.name() + " cannot be grouped");
-            case Action.LeaveGroup ignored -> throw new UnsupportedActionException(device.name() + " cannot be grouped");
+            case Action.PlayMedia _ -> throw new UnsupportedActionException(device.name() + " cannot play a direct stream");
+            case Action.Pause _ -> throw new UnsupportedActionException(device.name() + " cannot pause a direct stream");
+            case Action.Resume _ -> throw new UnsupportedActionException(device.name() + " cannot resume a direct stream");
+            case Action.JoinGroup _ -> throw new UnsupportedActionException(device.name() + " cannot be grouped");
+            case Action.LeaveGroup _ -> throw new UnsupportedActionException(device.name() + " cannot be grouped");
         }
     }
 
