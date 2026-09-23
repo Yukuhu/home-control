@@ -15,6 +15,8 @@ import java.util.Set;
  */
 public class PlaybackPlanner {
 
+    private static final String NOT_CAST_RECEIVER = "this device is not a Cast receiver";
+
     private final List<RouteStrategy> strategies;
 
     public PlaybackPlanner(List<RouteStrategy> strategies) {
@@ -63,10 +65,10 @@ public class PlaybackPlanner {
                         reasons.add("this device cannot open app links");
                     }
                 }
-                case PlayableRef.WorkflowCast ignored -> reasons.add("this device is not a Cast receiver");
-                case PlayableRef.CastLoad ignored -> reasons.add("this device is not a Cast receiver");
-                case PlayableRef.CastMessage ignored -> reasons.add("this device is not a Cast receiver");
-                case PlayableRef.YouTubeLounge ignored -> reasons.add("this device is not a Cast receiver");
+                case PlayableRef.WorkflowCast ignored -> reasons.add(NOT_CAST_RECEIVER);
+                case PlayableRef.CastLoad ignored -> reasons.add(NOT_CAST_RECEIVER);
+                case PlayableRef.CastMessage ignored -> reasons.add(NOT_CAST_RECEIVER);
+                case PlayableRef.YouTubeLounge ignored -> reasons.add(NOT_CAST_RECEIVER);
                 case PlayableRef.StreamUrl stream -> reasons.add(
                         capabilities.contains(Capability.LOCAL_AUDIO_SINK) && !LocalAudioSinkStrategy.playable(stream)
                                 && !capabilities.contains(Capability.CAST_RECEIVER) && !capabilities.contains(Capability.MEDIA_RENDERER)

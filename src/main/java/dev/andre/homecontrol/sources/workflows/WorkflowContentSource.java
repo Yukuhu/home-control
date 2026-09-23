@@ -12,7 +12,7 @@ import java.util.Optional;
 
 /** Local single tiles and generated catalogs. Opening an item never performs workflow I/O. */
 public final class WorkflowContentSource implements ContentSource {
-    public static final String ID = "workflows";
+    public static final String SOURCE_ID = "workflows";
     private final WorkflowStore store;
     private final WorkflowRunner runner;
     private final WorkflowCatalogs catalogs;
@@ -26,11 +26,11 @@ public final class WorkflowContentSource implements ContentSource {
         this.preferences = preferences;
     }
 
-    @Override public String id() { return ID; }
+    @Override public String id() { return SOURCE_ID; }
     @Override public String displayName() { return "Workflows"; }
-    @Override public boolean available() { return preferences.sourceEnabled(ID) && store.all().stream().anyMatch(d -> d.draft().enabled()); }
+    @Override public boolean available() { return preferences.sourceEnabled(SOURCE_ID) && store.all().stream().anyMatch(d -> d.draft().enabled()); }
     @Override public List<RailDescriptor> rails() {
-        if (!preferences.sourceEnabled(ID)) return List.of();
+        if (!preferences.sourceEnabled(SOURCE_ID)) return List.of();
         return store.all().stream().filter(d -> d.draft().enabled()).map(WorkflowContentSource::descriptor).toList();
     }
 
@@ -56,7 +56,7 @@ public final class WorkflowContentSource implements ContentSource {
     }
 
     @Override public Optional<ContentItem> item(String itemId) {
-        if (!preferences.sourceEnabled(ID) || itemId == null) return Optional.empty();
+        if (!preferences.sourceEnabled(SOURCE_ID) || itemId == null) return Optional.empty();
         if (itemId.matches("w-[0-9a-f]{12}")) {
             return store.find(itemId).filter(d -> d.draft().enabled() && d.draft().mode() == WorkflowDraft.Mode.SINGLE)
                     .map(WorkflowContentSource::single);
@@ -65,7 +65,7 @@ public final class WorkflowContentSource implements ContentSource {
     }
 
     private void requireSource() {
-        if (!preferences.sourceEnabled(ID)) throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "source is disabled");
+        if (!preferences.sourceEnabled(SOURCE_ID)) throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "source is disabled");
     }
 
     private static ContentItem single(WorkflowDefinition definition) {
@@ -75,7 +75,7 @@ public final class WorkflowContentSource implements ContentSource {
     }
 
     private static RailDescriptor descriptor(WorkflowDefinition definition) {
-        return new RailDescriptor(ID, definition.id(), definition.draft().name());
+        return new RailDescriptor(SOURCE_ID, definition.id(), definition.draft().name());
     }
 
     private static WorkflowException changed() {

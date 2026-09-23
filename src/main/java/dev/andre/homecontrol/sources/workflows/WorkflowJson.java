@@ -83,34 +83,42 @@ public final class WorkflowJson {
             Tile tile = draft.tile();
             return List.of(new Entry("single", tile.title(), tile.subtitle(), artwork(tile.artwork()), root));
         }
-        Listing listing = draft.listing();
+        return generatedEntries(draft.listing(), root);
+    }
+
+    private static List<Entry> generatedEntries(Listing listing, JsonNode root) {
         JsonNode array = select(root, listing.arrayPointer());
         if (array == null || !array.isArray()) fail(WorkflowException.Stage.SELECT, "entry array is missing or invalid");
         if (array.size() > 200) fail(WorkflowException.Stage.SELECT, "too many entries");
         List<Entry> entries = new ArrayList<>(array.size());
         Set<String> keys = new HashSet<>();
-        for (int i = 0; i < array.size(); i++) {
-            JsonNode node = array.get(i);
-            String key;
-            try {
-                key = stableKey(select(node, listing.idPointer()));
-            } catch (WorkflowException e) {
-                throw new WorkflowException(WorkflowException.Stage.SELECT, "entry " + i + " has invalid ID");
-            }
-            if (!keys.add(key)) fail(WorkflowException.Stage.SELECT, "entry " + i + " has duplicate ID");
-            JsonNode titleNode = select(node, listing.titlePointer());
-            if (titleNode == null || !titleNode.isTextual() || titleNode.asText().isBlank()
-                    || titleNode.asText().length() > 120) {
-                fail(WorkflowException.Stage.SELECT, "entry " + i + " has invalid title");
-            }
-            JsonNode subtitleNode = listing.subtitlePointer() == null ? null : select(node, listing.subtitlePointer());
-            String subtitle = subtitleNode != null && subtitleNode.isTextual()
-                    && subtitleNode.asText().length() <= 240 ? subtitleNode.asText() : null;
-            JsonNode artNode = listing.artworkPointer() == null ? null : select(node, listing.artworkPointer());
-            URI art = artNode != null && artNode.isTextual() ? artwork(artNode.asText()) : null;
-            entries.add(new Entry(key, titleNode.asText(), subtitle, art, node));
-        }
+        for (int i = 0; i < array.size(); i++) entries.add(entry(listing, array.get(i), keys, i));
         return List.copyOf(entries);
+    }
+
+    private static Entry entry(Listing listing, JsonNode node, Set<String> keys, int index) {
+        String key;
+        try {
+            key = stableKey(select(node, listing.idPointer()));
+        } catch (WorkflowException failure) {
+            throw new WorkflowException(WorkflowException.Stage.SELECT, "entry " + index + " has invalid ID");
+        }
+        if (!keys.add(key)) fail(WorkflowException.Stage.SELECT, "entry " + index + " has duplicate ID");
+        JsonNode title = select(node, listing.titlePointer());
+        if (title == null || !title.isTextual() || title.asText().isBlank() || title.asText().length() > 120) {
+            fail(WorkflowException.Stage.SELECT, "entry " + index + " has invalid title");
+        }
+        return new Entry(key, title.asText(), subtitle(listing, node), artwork(listing, node), node);
+    }
+
+    private static String subtitle(Listing listing, JsonNode node) {
+        JsonNode value = listing.subtitlePointer() == null ? null : select(node, listing.subtitlePointer());
+        return value != null && value.isTextual() && value.asText().length() <= 240 ? value.asText() : null;
+    }
+
+    private static URI artwork(Listing listing, JsonNode node) {
+        JsonNode value = listing.artworkPointer() == null ? null : select(node, listing.artworkPointer());
+        return value != null && value.isTextual() ? artwork(value.asText()) : null;
     }
 
     public static Map<String, Value> values(List<Variable> variables, JsonNode root, JsonNode entry) {
@@ -156,36 +164,35 @@ public final class WorkflowJson {
         if (raw == null) return null;
         try {
             URI uri = new URI(raw);
-            String host = uri.getHost();
-            if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null || uri.getRawUserInfo() != null
-                    || uri.getRawQuery() != null || uri.getRawFragment() != null) return null;
-            String classifiedHost = host.endsWith(".") ? host.substring(0, host.length() - 1) : host;
-            classifiedHost = classifiedHost.toLowerCase(java.util.Locale.ROOT);
-            if (classifiedHost.equals("localhost") || classifiedHost.endsWith(".localhost")
-                    || classifiedHost.endsWith(".local")) return null;
-            for (String segment : uri.getPath().split("/", -1)) if (segment.equals(".") || segment.equals("..")) return null;
-            if (classifiedHost.startsWith("[")) return publicIpv6(classifiedHost) ? uri : null;
-            if (classifiedHost.matches("[0-9.]+")) return publicIpv4(classifiedHost) ? uri : null;
-            if (!classifiedHost.contains(".")) return null;
-            return uri;
+            return safeArtworkUri(uri) ? uri : null;
         } catch (URISyntaxException e) {
             return null;
         }
     }
 
-    private static boolean publicIpv4(String host) {
-        String[] parts = host.split("\\.", -1);
-        if (parts.length != 4) return false;
-        int[] octets = new int[4];
-        for (int i = 0; i < 4; i++) {
-            if (parts[i].isEmpty() || parts[i].length() > 3) return false;
-            try {
-                octets[i] = Integer.parseInt(parts[i]);
-            } catch (NumberFormatException e) {
-                return false;
-            }
-            if (octets[i] > 255 || (parts[i].length() > 1 && parts[i].charAt(0) == '0')) return false;
+    private static boolean safeArtworkUri(URI uri) {
+        String host = uri.getHost();
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null || uri.getRawUserInfo() != null
+                || uri.getRawQuery() != null || uri.getRawFragment() != null) return false;
+        String classifiedHost = host.endsWith(".") ? host.substring(0, host.length() - 1) : host;
+        classifiedHost = classifiedHost.toLowerCase(java.util.Locale.ROOT);
+        if (classifiedHost.equals("localhost") || classifiedHost.endsWith(".localhost")
+                || classifiedHost.endsWith(".local") || hasDotSegments(uri)) return false;
+        if (classifiedHost.startsWith("[")) return publicIpv6(classifiedHost);
+        if (classifiedHost.matches("[0-9.]+")) return publicIpv4(classifiedHost);
+        return classifiedHost.contains(".");
+    }
+
+    private static boolean hasDotSegments(URI uri) {
+        for (String segment : uri.getPath().split("/", -1)) {
+            if (segment.equals(".") || segment.equals("..")) return true;
         }
+        return false;
+    }
+
+    private static boolean publicIpv4(String host) {
+        int[] octets = parseIpv4(host);
+        if (octets == null) return false;
         int a = octets[0], b = octets[1], c = octets[2];
         return a > 0 && a < 224 && a != 10 && a != 127
                 && !(a == 100 && b >= 64 && b <= 127)
@@ -194,6 +201,22 @@ public final class WorkflowJson {
                 && !(a == 192 && (b == 168 || (b == 0 && c == 0) || (b == 0 && c == 2)))
                 && !(a == 198 && (b == 18 || b == 19 || (b == 51 && c == 100)))
                 && !(a == 203 && b == 0 && c == 113);
+    }
+
+    private static int[] parseIpv4(String host) {
+        String[] parts = host.split("\\.", -1);
+        if (parts.length != 4) return null;
+        int[] octets = new int[4];
+        for (int i = 0; i < octets.length; i++) {
+            if (parts[i].isEmpty() || parts[i].length() > 3) return null;
+            try {
+                octets[i] = Integer.parseInt(parts[i]);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+            if (octets[i] > 255 || (parts[i].length() > 1 && parts[i].charAt(0) == '0')) return null;
+        }
+        return octets;
     }
 
     private static boolean publicIpv6(String host) {

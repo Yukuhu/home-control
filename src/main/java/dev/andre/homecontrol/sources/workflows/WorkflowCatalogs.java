@@ -67,7 +67,7 @@ public final class WorkflowCatalogs {
     static List<ContentItem> items(WorkflowDefinition definition, List<WorkflowRunner.CatalogEntry> entries) {
         return entries.stream().map(entry -> new ContentItem(
                 definition.draft().mode() == WorkflowDraft.Mode.SINGLE ? definition.id() : definition.id() + "." + entry.key(),
-                WorkflowContentSource.ID, definition.draft().kind(), entry.title(), entry.subtitle(), entry.artwork(),
+                WorkflowContentSource.SOURCE_ID, definition.draft().kind(), entry.title(), entry.subtitle(), entry.artwork(),
                 List.of(new PlayableRef.WorkflowCast(definition.id(), definition.revision(), entry.key())))).toList();
     }
 }
