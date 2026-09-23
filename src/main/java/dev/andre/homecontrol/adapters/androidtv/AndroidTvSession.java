@@ -226,8 +226,8 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     }
 
     /*
-     * Every RemoteListener callback below arrives on the protocol reader thread.
-     * RemoteConnection's constructor starts that thread before its connect() factory
+     * RemoteListener callbacks arrive on the protocol reader or idle-watchdog thread.
+     * RemoteConnection's constructor starts those threads before its connect() factory
      * even returns, so any of these can fire while connect() — running on this
      * session's own scheduler thread — is still executing its success path for the
      * very same connection. Each of these does a read-modify-write on `state` (and

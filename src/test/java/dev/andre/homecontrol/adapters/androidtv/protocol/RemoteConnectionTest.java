@@ -1,11 +1,15 @@
 package dev.andre.homecontrol.adapters.androidtv.protocol;
 
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteDirection;
+import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteMessage;
+import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteStart;
 import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.RemoteKey;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
@@ -13,10 +17,14 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import java.io.ByteArrayOutputStream;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -130,6 +138,81 @@ class RemoteConnectionTest {
         assertThat(device.nextPong()).isEqualTo(7);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void outgoingCommandsKeepAnOtherwiseQuietConnectionAlive(boolean appLinks) throws Exception {
+        reconnectWithTimeout(1_000);
+
+        // Also leave a frame partly read: timeout handling must not discard the
+        // parser's position while commands are keeping the connection active.
+        ByteArrayOutputStream encoded = new ByteArrayOutputStream();
+        RemoteMessage.newBuilder().setRemoteStart(RemoteStart.newBuilder().setStarted(true))
+                .build().writeDelimitedTo(encoded);
+        byte[] frame = encoded.toByteArray();
+        device.pushRaw(Arrays.copyOf(frame, frame.length - 1));
+
+        // Android TV postpones its pings while it receives commands. Keep sending
+        // for more than two idle windows without any incoming state or ping traffic.
+        long until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2_200);
+        do {
+            assertThat(disconnect.get()).as("active command traffic must not become stale").isNull();
+            if (appLinks) {
+                connection.sendAppLink("https://www.youtube.com/");
+                assertThat(device.nextAppLink()).isEqualTo("https://www.youtube.com/");
+            } else {
+                connection.sendKey(RemoteKey.DPAD_DOWN);
+                assertThat(device.nextKeyPress()).isEqualTo(20);
+            }
+            TimeUnit.MILLISECONDS.sleep(100);
+        } while (System.nanoTime() < until);
+
+        assertThat(disconnect.get()).isNull();
+        device.pushRaw(new byte[]{frame[frame.length - 1]});
+        await().untilAtomic(power, org.hamcrest.Matchers.is(true));
+        device.pushPing(19);
+        assertThat(device.nextPong()).isEqualTo(19);
+        // A genuinely idle connection must still expire once commands stop.
+        await().untilAtomic(disconnect, org.hamcrest.Matchers.is(DisconnectCause.STALE));
+    }
+
+    @Test
+    void incomingStateKeepsTheConnectionAliveWithoutOutgoingCommands() throws Exception {
+        reconnectWithTimeout(1_000);
+
+        long until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2_200);
+        int level = 0;
+        do {
+            int expected = ++level;
+            device.pushVolume(expected, 100, false);
+            await().untilAtomic(volume, org.hamcrest.Matchers.is(expected));
+            assertThat(disconnect.get()).isNull();
+            TimeUnit.MILLISECONDS.sleep(100);
+        } while (System.nanoTime() < until);
+
+        assertThat(disconnect.get()).isNull();
+        await().untilAtomic(disconnect, org.hamcrest.Matchers.is(DisconnectCause.STALE));
+    }
+
+    @Test
+    void ownerCloseDoesNotLaterReportAnIdleDisconnect() throws Exception {
+        reconnectWithTimeout(300);
+
+        connection.close();
+
+        await().until(() -> device.connectionsEnded() == 1);
+        await().during(Duration.ofMillis(600)).atMost(Duration.ofSeconds(2))
+                .untilAtomic(disconnect, org.hamcrest.Matchers.nullValue());
+    }
+
+    private void reconnectWithTimeout(int timeoutMillis) throws Exception {
+        connection.close();
+        device.close();
+        device = new FakeRemoteServer();
+        connection = RemoteConnection.connect("127.0.0.1", device.port(),
+                ClientCertificate.generate("shield-remote"), timeoutMillis, listener);
+        device.awaitHandshake();
+    }
+
     @Test
     void sendsKeyPressesWithTheVerifiedKeyCode() throws Exception {
         connection.sendKey(RemoteKey.DPAD_UP);
@@ -221,9 +304,10 @@ class RemoteConnectionTest {
         };
 
         try (FakeRemoteServer silentDevice = new FakeRemoteServer()) {
-            // staleTimeoutMillis also bounds every individual read during the TLS handshake and
-            // the configure/active exchange, because TlsSockets.connect() calls setSoTimeout()
-            // before startHandshake(). 300ms must stay comfortably larger than a localhost
+            // staleTimeoutMillis also bounds every individual read during the TLS handshake,
+            // because TlsSockets.connect() calls setSoTimeout() before startHandshake().
+            // After TLS, the idle watchdog covers the configure/active exchange and commands.
+            // 300ms must stay comfortably larger than a localhost
             // handshake round trip; if this is ever tightened enough to violate that, the test
             // fails loudly with a SocketTimeoutException escaping connect() itself, rather than
             // silently mis-asserting.

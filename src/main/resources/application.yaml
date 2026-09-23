@@ -15,7 +15,7 @@ shield:
   data-dir: ./data
   keystore-password: ${SHIELD_KEYSTORE_PASSWORD:shield}
   discovery-enabled: true
-  # The device pings roughly every 5s; 10s without any inbound message means dead.
+  # The device pings when idle; commands postpone pings. Count traffic in both directions.
   stale-timeout-seconds: 10
   reconnect-initial-delay-seconds: 1
   reconnect-max-delay-seconds: 60
