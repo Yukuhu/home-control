@@ -12,7 +12,7 @@ public record AndroidTvSettings(int port, String certificateFingerprint) {
 
     public static final String ADAPTER_ID = "androidtv";
     public static final int DEFAULT_PORT = 6466;
-    static final String PORT = "port";
+    static final String PORT_KEY = "port";
     static final String FINGERPRINT = "certificateFingerprint";
 
     public static AndroidTvSettings of(Device device) {
@@ -20,7 +20,7 @@ public record AndroidTvSettings(int port, String certificateFingerprint) {
             throw new IllegalArgumentException("Device " + device.id() + " has no androidtv adapter");
         }
         Map<String, String> settings = device.adapterSettings(ADAPTER_ID);
-        int port = Integer.parseInt(settings.getOrDefault(PORT, String.valueOf(DEFAULT_PORT)));
+        int port = Integer.parseInt(settings.getOrDefault(PORT_KEY, String.valueOf(DEFAULT_PORT)));
         if (port < 1 || port > 65_535) {
             throw new IllegalArgumentException(
                     "Device " + device.id() + " has an androidtv port outside 1-65535: " + port);
@@ -30,7 +30,7 @@ public record AndroidTvSettings(int port, String certificateFingerprint) {
 
     public Map<String, String> toMap() {
         Map<String, String> map = new LinkedHashMap<>();
-        map.put(PORT, String.valueOf(port));
+        map.put(PORT_KEY, String.valueOf(port));
         if (certificateFingerprint != null) {
             map.put(FINGERPRINT, certificateFingerprint);
         }

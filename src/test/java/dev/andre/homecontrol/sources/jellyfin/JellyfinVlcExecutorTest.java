@@ -57,7 +57,8 @@ class JellyfinVlcExecutorTest {
                   {"Id":"live","SupportsDirectPlay":true,"RequiresOpening":true}
                 ]}
                 """));
-        assertThatThrownBy(() -> executor.execute(new Route.JellyfinVlc(ID), shield))
+        Route route = new Route.JellyfinVlc(ID);
+        assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("no direct stream");
         verifyNoInteractions(devices);
     }
@@ -65,7 +66,8 @@ class JellyfinVlcExecutorTest {
     @Test
     void aFailedWakeNeverSendsAPlaybackLink() {
         when(devices.state("shield")).thenReturn(DeviceState.initial().withStatus(DeviceStatus.CONNECTED));
-        assertThatThrownBy(() -> executor.execute(new Route.JellyfinVlc(ID), shield))
+        Route route = new Route.JellyfinVlc(ID);
+        assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("ready");
         verify(devices, never()).execute(anyString(), isA(Action.OpenAppLink.class));
     }
@@ -74,7 +76,8 @@ class JellyfinVlcExecutorTest {
     void aFailedLinkWriteDoesNotLeakCredentialsOrRetryPlayback() {
         doThrow(new DeviceOfflineException("failed opening vlc://https://nas/?api_key=secret-token"))
                 .when(devices).execute(anyString(), isA(Action.OpenAppLink.class));
-        assertThatThrownBy(() -> executor.execute(new Route.JellyfinVlc(ID), shield))
+        Route route = new Route.JellyfinVlc(ID);
+        assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(DeviceOfflineException.class).hasMessageNotContaining("secret-token")
                 .hasMessageNotContaining("api_key");
         verify(devices, times(1)).execute(anyString(), isA(Action.OpenAppLink.class));
@@ -83,15 +86,21 @@ class JellyfinVlcExecutorTest {
     @Test
     void stalledStreamLookupIsCancelledAndCannotPlayLater() throws Exception {
         CountDownLatch cancelled = new CountDownLatch(1);
+        CountDownLatch releaseLookup = new CountDownLatch(1);
         when(client.get(any(), anyString(), anyMap())).thenAnswer(_ -> {
-            try { Thread.sleep(5_000); }
-            catch (InterruptedException e) { cancelled.countDown(); Thread.currentThread().interrupt(); }
+            try { releaseLookup.await(); }
+            catch (InterruptedException _) { cancelled.countDown(); Thread.currentThread().interrupt(); }
             return json.readTree("{\"MediaType\":\"Video\"}");
         });
         var bounded = new JellyfinVlcExecutor(setup, client, devices, Duration.ofMillis(100));
-        assertThatThrownBy(() -> bounded.execute(new Route.JellyfinVlc(ID), shield))
-                .isInstanceOf(ActionFailedException.class).hasMessageContaining("in time");
-        assertThat(cancelled.await(1, TimeUnit.SECONDS)).isTrue();
-        verifyNoInteractions(devices);
+        Route route = new Route.JellyfinVlc(ID);
+        try {
+            assertThatThrownBy(() -> bounded.execute(route, shield))
+                    .isInstanceOf(ActionFailedException.class).hasMessageContaining("in time");
+            assertThat(cancelled.await(1, TimeUnit.SECONDS)).isTrue();
+            verifyNoInteractions(devices);
+        } finally {
+            releaseLookup.countDown();
+        }
     }
 }

@@ -27,7 +27,7 @@ public record SourcePreferences(List<String> railOrder, Set<String> hiddenRails,
 
     private static final Pattern RAIL_KEY = Pattern.compile("^[a-z0-9][a-z0-9._-]{0,63}/[a-z0-9][a-z0-9._-]{0,63}$");
     private static final Pattern SOURCE_ID = Pattern.compile("^[a-z0-9][a-z0-9._-]{0,63}$");
-    private static final Pattern REGION = Pattern.compile("^[A-Z]{2}$");
+    private static final Pattern REGION_PATTERN = Pattern.compile("^[A-Z]{2}$");
     private static final int MAX_RAIL_ORDER = 200;
 
     public SourcePreferences {
@@ -54,7 +54,7 @@ public record SourcePreferences(List<String> railOrder, Set<String> hiddenRails,
         if (locale != null) {
             requireLocale(locale);
         }
-        if (region != null && !REGION.matcher(region).matches()) {
+        if (region != null && !REGION_PATTERN.matcher(region).matches()) {
             throw new IllegalArgumentException("Use a two-letter country code such as DE");
         }
 

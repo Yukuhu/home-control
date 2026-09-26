@@ -33,7 +33,7 @@ public class WebOsPairing implements PromptPairing {
 
     @Override
     public String adapterId() {
-        return WebOsAdapter.ID;
+        return WebOsAdapter.ADAPTER_ID;
     }
 
     @Override
@@ -54,7 +54,7 @@ public class WebOsPairing implements PromptPairing {
             connection = SsapConnection.open(http, host, properties, reason -> { });
             String key = connection.register(null, Duration.ofSeconds(properties.pairingTimeoutSeconds()));
             Device device = devices.attach(host, deviceName(connection, host, name), DeviceKind.WEBOS,
-                    WebOsAdapter.ID, Map.of(WebOsSettings.CLIENT_KEY, key));
+                    WebOsAdapter.ADAPTER_ID, Map.of(WebOsSettings.CLIENT_KEY, key));
             return new PromptPairingResult.Paired(device);
         } catch (SsapPairingException e) {
             return switch (e.reason()) {

@@ -120,12 +120,12 @@
 <template id="workflow-headers-template">
 <div class="workflow-row" data-row="headers">
 <div class="workflow-field">
-<label for="workflow-headers-0-name">Header name</label>
-<input id="workflow-headers-0-name" name="headers[0].name" data-field="name" type="text" autocomplete="off" maxlength="120">
+<label for="workflow-headers-new-name">Header name</label>
+<input id="workflow-headers-new-name" name="headers[0].name" data-field="name" type="text" autocomplete="off" maxlength="120">
 </div>
 <div class="workflow-field">
-<label for="workflow-headers-0-value">New header value</label>
-<input id="workflow-headers-0-value" name="headers[0].value" data-field="value" type="password" autocomplete="off" maxlength="16384">
+<label for="workflow-headers-new-value">New header value</label>
+<input id="workflow-headers-new-value" name="headers[0].value" data-field="value" type="password" autocomplete="off" maxlength="16384">
 </div>
 <button type="button" data-remove-row="headers" aria-label="Remove header">Remove</button>
 </div>
@@ -221,23 +221,23 @@
 <template id="workflow-variables-template">
 <div class="workflow-row" data-row="variables">
 <div class="workflow-field">
-<label for="workflow-variables-0-name">Variable name</label>
-<input id="workflow-variables-0-name" name="variables[0].name" data-field="name" type="text" autocomplete="off" maxlength="32">
+<label for="workflow-variables-new-name">Variable name</label>
+<input id="workflow-variables-new-name" name="variables[0].name" data-field="name" type="text" autocomplete="off" maxlength="32">
 </div>
 <div class="workflow-field">
-<label for="workflow-variables-0-scope">Read from</label>
-<select id="workflow-variables-0-scope" name="variables[0].scope" data-field="scope">
+<label for="workflow-variables-new-scope">Read from</label>
+<select id="workflow-variables-new-scope" name="variables[0].scope" data-field="scope">
 <option value="ROOT">Whole response</option>
 <option value="ENTRY">Current entry</option>
 </select>
 </div>
 <div class="workflow-field">
-<label for="workflow-variables-0-pointer">JSON Pointer</label>
-<input id="workflow-variables-0-pointer" name="variables[0].pointer" data-field="pointer" type="text" autocomplete="off" maxlength="512">
+<label for="workflow-variables-new-pointer">JSON Pointer</label>
+<input id="workflow-variables-new-pointer" name="variables[0].pointer" data-field="pointer" type="text" autocomplete="off" maxlength="512">
 </div>
 <div class="workflow-field">
-<label for="workflow-variables-0-sensitive">Sensitive value</label>
-<input id="workflow-variables-0-sensitive" name="variables[0].sensitive" data-field="sensitive" type="checkbox" value="true" checked>
+<label for="workflow-variables-new-sensitive">Sensitive value</label>
+<input id="workflow-variables-new-sensitive" name="variables[0].sensitive" data-field="sensitive" type="checkbox" value="true" checked>
 <input type="hidden" data-marker="sensitive" name="_variables[0].sensitive" value="on">
 </div>
 <button type="button" data-remove-row="variables" aria-label="Remove mapping">Remove</button>

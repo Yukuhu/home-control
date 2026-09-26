@@ -67,9 +67,9 @@ class WebOsSessionTest {
     /** Stands in for the device manager: merges what the session learned into the registry. */
     private LearnedSettings learned() {
         return updates -> registry.findById("lg").ifPresent(stored -> {
-            Map<String, String> settings = new LinkedHashMap<>(stored.adapterSettings(WebOsAdapter.ID));
+            Map<String, String> settings = new LinkedHashMap<>(stored.adapterSettings(WebOsAdapter.ADAPTER_ID));
             settings.putAll(updates);
-            registry.save(stored.withAdapter(WebOsAdapter.ID, settings));
+            registry.save(stored.withAdapter(WebOsAdapter.ADAPTER_ID, settings));
         });
     }
 
@@ -97,7 +97,7 @@ class WebOsSessionTest {
     }
 
     private String storedSetting(String key) {
-        return registry.findById("lg").orElseThrow().adapterSettings(WebOsAdapter.ID).get(key);
+        return registry.findById("lg").orElseThrow().adapterSettings(WebOsAdapter.ADAPTER_ID).get(key);
     }
 
     @Test

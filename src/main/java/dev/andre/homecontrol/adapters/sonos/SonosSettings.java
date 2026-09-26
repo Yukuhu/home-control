@@ -11,8 +11,8 @@ import java.util.Map;
 public record SonosSettings(String uuid, int port) {
 
     public static final String ADAPTER_ID = "sonos";
-    static final String UUID = "uuid";
-    static final String PORT = "port";
+    static final String UUID_KEY = "uuid";
+    static final String PORT_KEY = "port";
 
     public static SonosSettings of(Device device) {
         if (!device.hasAdapter(ADAPTER_ID)) {
@@ -21,23 +21,23 @@ public record SonosSettings(String uuid, int port) {
         Map<String, String> settings = device.adapterSettings(ADAPTER_ID);
         int port;
         try {
-            port = Integer.parseInt(settings.getOrDefault(PORT, String.valueOf(SonosEndpoints.DEFAULT_PORT)));
+            port = Integer.parseInt(settings.getOrDefault(PORT_KEY, String.valueOf(SonosEndpoints.DEFAULT_PORT)));
         } catch (NumberFormatException e) {
             port = SonosEndpoints.DEFAULT_PORT;
         }
-        return new SonosSettings(settings.get(UUID), port);
+        return new SonosSettings(settings.get(UUID_KEY), port);
     }
 
     public static SonosSettings from(DiscoveredDevice found) {
-        return new SonosSettings(found.attributes().get(UUID), found.port());
+        return new SonosSettings(found.attributes().get(UUID_KEY), found.port());
     }
 
     public Map<String, String> toMap() {
         Map<String, String> map = new LinkedHashMap<>();
         if (uuid != null) {
-            map.put(UUID, uuid);
+            map.put(UUID_KEY, uuid);
         }
-        map.put(PORT, String.valueOf(port));
+        map.put(PORT_KEY, String.valueOf(port));
         return map;
     }
 }

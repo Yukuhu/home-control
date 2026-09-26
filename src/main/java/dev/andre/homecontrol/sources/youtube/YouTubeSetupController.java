@@ -21,6 +21,8 @@ import java.util.Map;
 public class YouTubeSetupController {
 
     private static final String REDIRECT = "redirect:/setup#youtube";
+    private static final String ERROR = "youtubeError";
+    private static final String MESSAGE = "youtubeMessage";
 
     private final YouTubeSetupService setup;
 
@@ -39,7 +41,7 @@ public class YouTubeSetupController {
             return "redirect:" + setup.connectBrowser(new YouTubeSetupService.ConnectRequest(
                     clientId, clientSecret, loginPassword, loginPasswordConfirmation), request);
         } catch (YouTubeException | PasswordRejectedException | LoginRequiredException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
             redirect.addFlashAttribute("youtubeForm", Map.of("clientId", clientId == null ? "" : clientId));
             return REDIRECT;
         }
@@ -51,7 +53,7 @@ public class YouTubeSetupController {
         try {
             return "redirect:" + setup.authorizeBrowser(request);
         } catch (YouTubeException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
             return REDIRECT;
         }
     }
@@ -61,16 +63,21 @@ public class YouTubeSetupController {
                            @RequestParam(required = false) String error, HttpServletRequest request,
                            HttpServletResponse response, RedirectAttributes redirect) {
         privateResponse(response);
+        completeCallback(state, code, error, request, redirect);
+        return REDIRECT;
+    }
+
+    private void completeCallback(String state, String code, String error, HttpServletRequest request,
+                                  RedirectAttributes redirect) {
         // Spring also maps HEAD to GET. Only a real callback navigation may consume a grant.
-        if (!"GET".equals(request.getMethod())) return REDIRECT;
+        if (!"GET".equals(request.getMethod())) return;
         try {
             var status = setup.completeBrowser(request, state, code, error);
             redirect.addFlashAttribute(status.state() == YouTubeAuthorizationService.State.CONNECTED
-                    ? "youtubeMessage" : "youtubeError", status.message());
+                    ? MESSAGE : ERROR, status.message());
         } catch (YouTubeException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
-        return REDIRECT;
     }
 
     private static void privateResponse(HttpServletResponse response) {
@@ -87,9 +94,9 @@ public class YouTubeSetupController {
                 new YouTubeSetupService.ConnectRequest(clientId, clientSecret, loginPassword, loginPasswordConfirmation);
         try {
             setup.connect(connectRequest, request);
-            redirect.addFlashAttribute("youtubeMessage", "Enter the code on your phone");
+            redirect.addFlashAttribute(MESSAGE, "Enter the code on your phone");
         } catch (YouTubeException | PasswordRejectedException | LoginRequiredException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
             redirect.addFlashAttribute("youtubeForm", Map.of("clientId", clientId == null ? "" : clientId));
         }
         return REDIRECT;
@@ -99,9 +106,9 @@ public class YouTubeSetupController {
     public String authorize(RedirectAttributes redirect) {
         try {
             setup.authorize();
-            redirect.addFlashAttribute("youtubeMessage", "Enter the code on your phone");
+            redirect.addFlashAttribute(MESSAGE, "Enter the code on your phone");
         } catch (YouTubeException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
         return REDIRECT;
     }
@@ -110,9 +117,9 @@ public class YouTubeSetupController {
     public String cancel(RedirectAttributes redirect) {
         try {
             setup.cancel();
-            redirect.addFlashAttribute("youtubeMessage", "Cancelled");
+            redirect.addFlashAttribute(MESSAGE, "Cancelled");
         } catch (YouTubeException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
         return REDIRECT;
     }
@@ -120,9 +127,9 @@ public class YouTubeSetupController {
     @PostMapping("/setup/sources/youtube/test")
     public String test(RedirectAttributes redirect) {
         try {
-            redirect.addFlashAttribute("youtubeMessage", setup.check());
+            redirect.addFlashAttribute(MESSAGE, setup.check());
         } catch (YouTubeException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
         return REDIRECT;
     }
@@ -131,9 +138,9 @@ public class YouTubeSetupController {
     public String disconnect(RedirectAttributes redirect) {
         try {
             setup.disconnect();
-            redirect.addFlashAttribute("youtubeMessage", "YouTube disconnected");
+            redirect.addFlashAttribute(MESSAGE, "YouTube disconnected");
         } catch (YouTubeException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
         return REDIRECT;
     }
@@ -142,9 +149,9 @@ public class YouTubeSetupController {
     public String loadPlaylists(RedirectAttributes redirect) {
         try {
             int found = setup.loadPlaylists().size();
-            redirect.addFlashAttribute("youtubeMessage", "Found " + found + " playlists");
+            redirect.addFlashAttribute(MESSAGE, "Found " + found + " playlists");
         } catch (YouTubeException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
         return REDIRECT;
     }
@@ -154,9 +161,9 @@ public class YouTubeSetupController {
                                   RedirectAttributes redirect) {
         try {
             setup.choosePlaylists(playlist == null ? List.of() : playlist);
-            redirect.addFlashAttribute("youtubeMessage", "Playlists saved");
+            redirect.addFlashAttribute(MESSAGE, "Playlists saved");
         } catch (YouTubeException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
         return REDIRECT;
     }
@@ -165,9 +172,9 @@ public class YouTubeSetupController {
     public String watchLater(@RequestParam boolean enabled, RedirectAttributes redirect) {
         try {
             setup.setWatchLater(enabled);
-            redirect.addFlashAttribute("youtubeMessage", enabled ? "Watch Later shown" : "Watch Later hidden");
+            redirect.addFlashAttribute(MESSAGE, enabled ? "Watch Later shown" : "Watch Later hidden");
         } catch (YouTubeException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
         return REDIRECT;
     }
@@ -178,9 +185,9 @@ public class YouTubeSetupController {
                          RedirectAttributes redirect) {
         try {
             String name = setup.setLounge(device, enabled);
-            redirect.addFlashAttribute("youtubeMessage", "YouTube Cast switched " + (enabled ? "on" : "off") + " for " + name);
+            redirect.addFlashAttribute(MESSAGE, "YouTube Cast switched " + (enabled ? "on" : "off") + " for " + name);
         } catch (YouTubeException e) {
-            redirect.addFlashAttribute("youtubeError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
         return REDIRECT;
     }

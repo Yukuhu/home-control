@@ -47,24 +47,24 @@ public class JellyfinVlcExecutor implements RouteExecutor {
 
     @Override
     public void execute(Route route, Device device) {
-        if (!(route instanceof Route.JellyfinVlc vlc) || !device.hasAdapter("androidtv")) {
+        if (!(route instanceof Route.JellyfinVlc(var itemId)) || !device.hasAdapter("androidtv")) {
             throw new IllegalArgumentException("VLC needs an Android TV device");
         }
         long deadline = System.nanoTime() + timeout.toNanos();
         try {
-            URI link = resolveWithinDeadline(vlc.itemId(), deadline);
+            URI link = resolveWithinDeadline(itemId, deadline);
             wake(device, deadline);
             checkDeadline(deadline);
             log.info("Sending VLC playback link to {}", device.id());
             // The link also starts playback. Never retry it after a successful socket write.
             devices.execute(device.id(), new Action.OpenAppLink(link));
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new ActionFailedException("VLC startup was interrupted");
-        } catch (DeviceOfflineException e) {
+        } catch (DeviceOfflineException _) {
             // Adapter errors can contain the authenticated URI; never pass their text to the browser.
             throw new DeviceOfflineException("The remote connection to " + device.name() + " was lost while starting VLC");
-        } catch (JellyfinException | IllegalArgumentException e) {
+        } catch (JellyfinException | IllegalArgumentException _) {
             throw new ActionFailedException("Could not prepare the Jellyfin stream for VLC; check the Jellyfin connection and media availability");
         }
     }
@@ -74,7 +74,7 @@ public class JellyfinVlcExecutor implements RouteExecutor {
         Thread.ofVirtual().name("jellyfin-vlc-stream").start(lookup);
         try {
             return lookup.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
-        } catch (TimeoutException e) {
+        } catch (TimeoutException _) {
             throw new ActionFailedException("Jellyfin did not provide a VLC stream in time");
         } catch (ExecutionException e) {
             if (e.getCause() instanceof RuntimeException cause) throw cause;
@@ -128,12 +128,12 @@ public class JellyfinVlcExecutor implements RouteExecutor {
             if (state.connected() && System.nanoTime() >= nextWake) {
                 try {
                     devices.execute(device.id(), new Action.PressKey(RemoteKey.WAKEUP));
-                } catch (DeviceOfflineException ignored) {
+                } catch (DeviceOfflineException _) {
                     // Only the idempotent wake command can be retried after reconnecting.
                 }
                 nextWake = System.nanoTime() + Duration.ofSeconds(2).toNanos();
             }
-            TimeUnit.NANOSECONDS.sleep(Math.min(Duration.ofMillis(250).toNanos(), Math.max(0, deadline - System.nanoTime())));
+            TimeUnit.NANOSECONDS.sleep(Math.clamp(deadline - System.nanoTime(), 0, Duration.ofMillis(250).toNanos()));
         }
     }
 

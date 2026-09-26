@@ -34,7 +34,7 @@ public class JellyfinClient {
 
     static final String CLIENT_NAME = "Home Control";
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9-]{1,64}");
-    private static final Pattern VERSION = Pattern.compile("^(\\d+)\\.(\\d+)");
+    private static final Pattern SERVER_VERSION_PATTERN = Pattern.compile("^(\\d+)\\.(\\d+)");
     /** A generous cap on any Jellyfin JSON answer; a well-behaved server never comes close. */
     static final int MAX_JSON_BYTES = 2 * 1024 * 1024;
     /** A generous cap on one artwork image; a well-behaved server never comes close. */
@@ -104,7 +104,7 @@ public class JellyfinClient {
             throw notJellyfin(serverUrl);
         }
         String serverVersion = info.path("Version").asString("");
-        Matcher matcher = VERSION.matcher(serverVersion);
+        Matcher matcher = SERVER_VERSION_PATTERN.matcher(serverVersion);
         if (!matcher.find() || Integer.parseInt(matcher.group(1)) < 10
                 || (Integer.parseInt(matcher.group(1)) == 10 && Integer.parseInt(matcher.group(2)) < 9)) {
             throw new JellyfinException(JellyfinException.Kind.UNSUPPORTED_VERSION,

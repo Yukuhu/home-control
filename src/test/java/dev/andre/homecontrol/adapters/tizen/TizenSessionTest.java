@@ -67,9 +67,9 @@ class TizenSessionTest {
     /** Stands in for the device manager: merges what the session learned into the registry. */
     private LearnedSettings learned() {
         return updates -> registry.findById("samsung").ifPresent(stored -> {
-            Map<String, String> settings = new LinkedHashMap<>(stored.adapterSettings(TizenAdapter.ID));
+            Map<String, String> settings = new LinkedHashMap<>(stored.adapterSettings(TizenAdapter.ADAPTER_ID));
             settings.putAll(updates);
-            registry.save(stored.withAdapter(TizenAdapter.ID, settings));
+            registry.save(stored.withAdapter(TizenAdapter.ADAPTER_ID, settings));
         });
     }
 
@@ -93,7 +93,7 @@ class TizenSessionTest {
     }
 
     private String stored(String key) {
-        return registry.findById("samsung").orElseThrow().adapterSettings(TizenAdapter.ID).get(key);
+        return registry.findById("samsung").orElseThrow().adapterSettings(TizenAdapter.ADAPTER_ID).get(key);
     }
 
     @Test

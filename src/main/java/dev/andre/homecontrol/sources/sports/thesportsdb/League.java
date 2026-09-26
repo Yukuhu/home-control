@@ -10,12 +10,12 @@ import java.util.regex.Pattern;
 /** A TheSportsDB league/competition, as returned by {@code lookupleague.php} and {@code search_all_leagues.php}. */
 public record League(String id, String name, String sport, String country, URI badge) {
 
-    private static final Pattern ID = Pattern.compile("^[0-9]{1,9}$");
+    private static final Pattern LEAGUE_ID_PATTERN = Pattern.compile("^[0-9]{1,9}$");
     private static final int MAX_NAME = 120;
 
     public static Optional<League> of(JsonNode node) {
         String id = node.path("idLeague").asString("");
-        if (!ID.matcher(id).matches()) {
+        if (!LEAGUE_ID_PATTERN.matcher(id).matches()) {
             return Optional.empty();
         }
         String name = node.path("strLeague").asString("").strip();

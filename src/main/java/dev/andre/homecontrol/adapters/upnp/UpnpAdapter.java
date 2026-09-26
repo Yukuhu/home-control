@@ -23,7 +23,7 @@ import java.util.function.Consumer;
 /** UPnP/DLNA media renderers (spec §4.1): TVs, AV receivers, Wi-Fi speakers. Pairing-free. */
 public class UpnpAdapter implements DeviceAdapter {
 
-    public static final String ID = UpnpSettings.ADAPTER_ID;
+    public static final String ADAPTER_ID = UpnpSettings.ADAPTER_ID;
 
     private final UpnpProperties properties;
     private final UpnpDiscovery discovery;
@@ -42,7 +42,7 @@ public class UpnpAdapter implements DeviceAdapter {
 
     @Override
     public String id() {
-        return ID;
+        return ADAPTER_ID;
     }
 
     @Override
@@ -74,6 +74,6 @@ public class UpnpAdapter implements DeviceAdapter {
 
     @Override
     public Optional<Map<String, String>> settingsFor(DiscoveredDevice found) {
-        return ID.equals(found.adapterId()) ? Optional.of(UpnpSettings.from(found).toMap()) : Optional.empty();
+        return ADAPTER_ID.equals(found.adapterId()) ? Optional.of(UpnpSettings.from(found).toMap()) : Optional.empty();
     }
 }
