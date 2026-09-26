@@ -96,6 +96,28 @@ reached `CONNECTED` on the command channel. Both checks used temporary data dire
 the deployed container's credentials were not replaced. Completing a new pairing
 still requires the TV's code, and recovery of the deployed container is not claimed.
 
+## Mobile remote follow-up
+
+Local Android Chromium emulation reproduced three additional layout failures:
+wide touch viewports opened the desktop dock, and pinch zoom before or after
+opening left the remote sized to the layout viewport instead of the visible area.
+For example, at 2× zoom a 390×844 layout viewport has a 195×422 visual viewport,
+but the old remote still occupied 366×820 CSS pixels.
+
+Docking now requires a wide viewport with a fine pointer and hover support.
+Touch devices use the modal overlay at every width. The overlay and its toast
+track the visual viewport's size and offset on resize and pan; controls wrap or
+shrink within that width. Desktop spacing applies only to a nonmodal open remote,
+and background scrolling is locked only while the modal is active.
+
+The three new regression tests failed before the change and passed afterward.
+Local probes show zero remote horizontal overflow at normal phone width, 1080px
+touch width, 2× zoom, and a forced 1280px layout with only 390px visible. These are
+browser-emulation checks; the user's deployed phone page has not been inspected.
+The complete Chromium suite passes all 51 tests, including ten remote layout
+checks covering focus, scrolling, rotation, desktop docking, zoom, and toast
+visibility. Browser coverage is now 90.19% of lines and 93.97% of branches.
+
 ## Findings requiring separate work
 
 - **TLS certificate validation (`java:S4830`, 12 findings):** `CastTls` and

@@ -48,10 +48,20 @@ public final class Browsers {
     }
 
     public static BrowserSession open(String browser, String baseUrl, String traceName, boolean mobile) {
+        return openWithPointer(browser, baseUrl, traceName, mobile, true);
+    }
+
+    /** A desktop browser with a fine pointer, distinct from the touch-enabled default contexts. */
+    public static BrowserSession openDesktop(String browser, String baseUrl, String traceName) {
+        return openWithPointer(browser, baseUrl, traceName, false, false);
+    }
+
+    private static BrowserSession openWithPointer(String browser, String baseUrl, String traceName,
+                                                  boolean mobile, boolean touch) {
         BrowserContext context = browser(browser).newContext(new Browser.NewContextOptions()
                 .setBaseURL(baseUrl).setIsMobile(mobile)
                 .setViewportSize(390, 844)
-                .setHasTouch(true)
+                .setHasTouch(touch)
                 .setLocale("en-US"));
         context.setDefaultTimeout(10_000);
         context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true));
