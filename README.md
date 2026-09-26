@@ -361,16 +361,26 @@ Under **Setup → Jellyfin → Device playback**, choose **Jellyfin app** (the d
 for each paired Shield / Android TV. Preferences survive reconnecting Jellyfin and are independent
 of the session links below them.
 
-With **VLC** selected, Home Control obtains an authenticated original stream from Jellyfin,
+With **VLC** selected, Home Control obtains an authenticated stream from Jellyfin,
 wakes the device, and sends a `vlc://https://…` (or HTTP) link through Remote v2. Install VLC
 and complete its first-run setup on the TV once. Jellyfin's TV app does not need to be open;
 its own external-player setting is not used. The stream uses the configured **Address for TVs
 and speakers**, so that address must be reachable from the Shield.
 
-VLC playback starts from the beginning and does not update Jellyfin watched status or resume
-progress. Jellyfin audio and subtitle preferences, including separate subtitle files, are not
-passed to VLC; choose available embedded tracks in VLC. This route sends the original media
-(including MKV) without transcoding; items requiring a live-stream opening step are rejected.
+Movies and episodes resume from the latest position saved in Jellyfin, fetched when Play is pressed.
+To resume with the existing Remote v2 pairing, Jellyfin seeks to that position and remuxes the remaining
+video into a Matroska stream, copying video and audio without re-encoding. Jellyfin must support direct
+streaming/remuxing for the item and have temporary space available. The start may fall on an earlier
+keyframe. VLC's timeline is relative to the resumed stream: seeking is limited, and it cannot rewind
+before that starting point. This stream contains Jellyfin's selected audio and subtitle tracks rather
+than all tracks in the original file; MP4 timed-text subtitles are converted to SRT for compatibility.
+If Jellyfin cannot offer a resumable stream, playback reports an error instead of silently starting
+from the beginning.
+
+Videos without a saved position, completed videos, and audio still use the original media (including
+MKV); choose embedded tracks in VLC for these streams. VLC does not update Jellyfin watched status or
+save new resume progress, so a later launch uses the position last saved by a Jellyfin client.
+Items requiring a live-stream opening step are rejected.
 A successful response means the link was sent, not that VLC confirmed playback. Physical Shield
 launch compatibility still needs validation. Stream credentials are resolved only when Play is
 pressed and are not included in route previews.

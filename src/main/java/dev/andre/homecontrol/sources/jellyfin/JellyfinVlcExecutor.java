@@ -11,6 +11,7 @@ import dev.andre.homecontrol.core.playback.RouteExecutor;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
@@ -94,10 +95,14 @@ public class JellyfinVlcExecutor implements RouteExecutor {
         if (!"Video".equals(type) && !"Audio".equals(type)) {
             throw new ActionFailedException("VLC can open Jellyfin video and audio items only");
         }
+        long startTicks = "Video".equals(type) ? resumeTicks(item) : 0;
         var request = JSON.createObjectNode();
         request.put("UserId", connection.userId());
+        request.put("StartTimeTicks", startTicks);
         request.put("EnableDirectPlay", true);
-        request.put("EnableDirectStream", false);
+        request.put("EnableDirectStream", startTicks > 0);
+        request.put("AllowVideoStreamCopy", true);
+        request.put("AllowAudioStreamCopy", true);
         request.put("EnableTranscoding", false);
         request.put("AutoOpenLiveStream", false);
         var info = client.post(connection, "/Items/" + id + "/PlaybackInfo", Map.of(), request);
@@ -107,13 +112,47 @@ public class JellyfinVlcExecutor implements RouteExecutor {
                     || source.path("RequiresOpening").asBoolean(false)
                     || source.path("RequiresClosing").asBoolean(false)
                     || source.path("IsInfiniteStream").asBoolean(false)) continue;
+            if (startTicks > 0 && !source.path("SupportsDirectStream").asBoolean(false)) continue;
             // VLC, unlike the Cast renderer, can fetch the original container (including MKV).
             String stream = settings.deviceServerUrl() + ("Audio".equals(type) ? "/Audio/" : "/Videos/")
-                    + id + "/stream?static=true&mediaSourceId=" + encode(sourceId) + "&api_key=" + encode(connection.token());
+                    + id + (startTicks > 0 ? resumedStream(source, startTicks) : "/stream?static=true")
+                    + "&mediaSourceId=" + encode(sourceId) + "&api_key=" + encode(connection.token());
             // VLC's MediaWrapper.manageVLCMrl removes precisely this prefix.
             return URI.create("vlc://" + stream);
         }
+        if (startTicks > 0) {
+            throw new ActionFailedException("Jellyfin has no direct stream that can resume in VLC; use the Jellyfin app for this item");
+        }
         throw new ActionFailedException("Jellyfin has no direct stream for VLC; use the Jellyfin app for this item");
+    }
+
+    private static long resumeTicks(JsonNode item) {
+        var userData = item.path("UserData");
+        long position = Math.max(0, userData.path("PlaybackPositionTicks").asLong(0));
+        long runtime = item.path("RunTimeTicks").asLong(0);
+        return userData.path("Played").asBoolean(false) || (runtime > 0 && position >= runtime) ? 0 : position;
+    }
+
+    private static String resumedStream(JsonNode source, long startTicks) {
+        // Remote v2 cannot send VLC's Android position extra, and Jellyfin's static stream ignores
+        // StartTimeTicks. Ask Jellyfin to seek and remux to Matroska, copying codecs without re-encoding.
+        int subtitle = Math.max(-1, source.path("DefaultSubtitleStreamIndex").asInt(-1));
+        String stream = "/stream.mkv?static=false&startTimeTicks=" + startTicks
+                + "&videoCodec=copy&audioCodec=copy&subtitleMethod=Embed&subtitleCodec=" + subtitleCodec(source, subtitle);
+        int audio = source.path("DefaultAudioStreamIndex").asInt(-1);
+        if (audio >= 0) stream += "&audioStreamIndex=" + audio;
+        return stream + "&subtitleStreamIndex=" + subtitle;
+    }
+
+    private static String subtitleCodec(JsonNode source, int selectedIndex) {
+        if (selectedIndex >= 0) {
+            for (var stream : source.path("MediaStreams")) {
+                // MP4 timed text cannot be copied into Matroska; video and audio still use copy.
+                if (stream.path("Index").asInt(-1) == selectedIndex
+                        && "mov_text".equalsIgnoreCase(stream.path("Codec").asString(""))) return "srt";
+            }
+        }
+        return "copy";
     }
 
     private void wake(Device device, long deadline) throws InterruptedException {

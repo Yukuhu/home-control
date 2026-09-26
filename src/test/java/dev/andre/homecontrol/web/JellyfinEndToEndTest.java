@@ -214,8 +214,9 @@ class JellyfinEndToEndTest {
                 assertThat(shieldRemote.nextKeyPress()).isEqualTo(224);
                 shieldRemote.pushPower(true);
                 String vlcLink = shieldRemote.nextAppLink();
-                assertThat(vlcLink).startsWith("vlc://" + jellyfin.url() + "/Videos/" + EPISODE + "/stream?")
-                        .contains("static=true", "mediaSourceId=" + EPISODE, "api_key=" + ACCESS_TOKEN);
+                assertThat(vlcLink).startsWith("vlc://" + jellyfin.url() + "/Videos/" + EPISODE + "/stream.mkv?")
+                        .contains("static=false", "startTimeTicks=6120000000", "videoCodec=copy", "audioCodec=copy",
+                                "mediaSourceId=" + EPISODE, "api_key=" + ACCESS_TOKEN);
                 assertThat(vlcStarting.get(5, TimeUnit.SECONDS).body()).contains("jellyfin-vlc", "\"optimistic\":true");
                 assertThat(jellyfin.requests("POST", "/Sessions/" + SHIELD_SESSION + "/Playing")).hasSize(1);
 

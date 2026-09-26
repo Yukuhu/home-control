@@ -5,6 +5,10 @@ import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
@@ -47,6 +51,125 @@ class JellyfinVlcExecutorTest {
         verify(devices).execute("shield", new Action.OpenAppLink(URI.create(
                 "vlc://https://nas.lan/jellyfin/Videos/" + ID + "/stream?static=true&mediaSourceId=source%2B1&api_key=secret%2B%26token")));
         verify(devices, times(1)).execute(anyString(), any());
+    }
+
+    @Test
+    void resumesVideoWithFreshJellyfinPositionAndCopiesSelectedTracks() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree("""
+                {"MediaType":"Video","RunTimeTicks":14400000000,
+                 "UserData":{"PlaybackPositionTicks":6123456789,"Played":false}}
+                """));
+        when(client.post(any(), anyString(), anyMap(), any())).thenReturn(json.readTree("""
+                {"MediaSources":[{"Id":"source+1","Container":"mkv","SupportsDirectPlay":true,
+                 "SupportsDirectStream":true,"DefaultAudioStreamIndex":2,"DefaultSubtitleStreamIndex":4,
+                 "MediaStreams":[
+                   {"Index":0,"Type":"Video","Codec":"hevc"},
+                   {"Index":2,"Type":"Audio","Codec":"ac3"},
+                   {"Index":4,"Type":"Subtitle","Codec":"ass","IsTextSubtitleStream":true},
+                   {"Index":7,"Type":"Subtitle","Codec":"mov_text","IsTextSubtitleStream":true}]}]}
+                """));
+
+        executor.execute(new Route.JellyfinVlc(ID), shield);
+
+        verify(devices).execute("shield", new Action.OpenAppLink(URI.create(
+                "vlc://https://nas.lan/jellyfin/Videos/" + ID + "/stream.mkv?static=false&startTimeTicks=6123456789"
+                        + "&videoCodec=copy&audioCodec=copy&subtitleMethod=Embed&subtitleCodec=copy"
+                        + "&audioStreamIndex=2&subtitleStreamIndex=4"
+                        + "&mediaSourceId=source%2B1&api_key=secret%2B%26token")));
+        verify(devices, times(1)).execute(anyString(), any());
+        var request = ArgumentCaptor.forClass(JsonNode.class);
+        verify(client).post(any(), eq("/Items/" + ID + "/PlaybackInfo"), anyMap(), request.capture());
+        assertThat(request.getValue().path("StartTimeTicks").asLong()).isEqualTo(6_123_456_789L);
+        assertThat(request.getValue().path("EnableDirectStream").asBoolean()).isTrue();
+        assertThat(request.getValue().path("EnableTranscoding").asBoolean()).isFalse();
+    }
+
+    @Test
+    void resumesWithoutRequestingSubtitlesWhenJellyfinHasNoneSelected() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree("""
+                {"MediaType":"Video","UserData":{"PlaybackPositionTicks":6120000000}}
+                """));
+        when(client.post(any(), anyString(), anyMap(), any())).thenReturn(json.readTree("""
+                {"MediaSources":[{"Id":"source+1","SupportsDirectPlay":true,"SupportsDirectStream":true}]}
+                """));
+
+        executor.execute(new Route.JellyfinVlc(ID), shield);
+
+        verify(devices).execute("shield", new Action.OpenAppLink(URI.create(
+                "vlc://https://nas.lan/jellyfin/Videos/" + ID + "/stream.mkv?static=false&startTimeTicks=6120000000"
+                        + "&videoCodec=copy&audioCodec=copy&subtitleMethod=Embed&subtitleCodec=copy&subtitleStreamIndex=-1"
+                        + "&mediaSourceId=source%2B1&api_key=secret%2B%26token")));
+    }
+
+    @Test
+    void convertsSelectedMp4TextSubtitlesToAMatroskaCompatibleFormat() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree("""
+                {"MediaType":"Video","UserData":{"PlaybackPositionTicks":6120000000}}
+                """));
+        when(client.post(any(), anyString(), anyMap(), any())).thenReturn(json.readTree("""
+                {"MediaSources":[{"Id":"source+1","Container":"mp4","SupportsDirectPlay":true,
+                 "SupportsDirectStream":true,"DefaultAudioStreamIndex":1,"DefaultSubtitleStreamIndex":2,
+                 "MediaStreams":[
+                   {"Index":0,"Type":"Video","Codec":"h264"},
+                   {"Index":1,"Type":"Audio","Codec":"aac"},
+                   {"Index":2,"Type":"Subtitle","Codec":"mov_text","IsTextSubtitleStream":true}]}]}
+                """));
+
+        executor.execute(new Route.JellyfinVlc(ID), shield);
+
+        verify(devices).execute("shield", new Action.OpenAppLink(URI.create(
+                "vlc://https://nas.lan/jellyfin/Videos/" + ID + "/stream.mkv?static=false&startTimeTicks=6120000000"
+                        + "&videoCodec=copy&audioCodec=copy&subtitleMethod=Embed&subtitleCodec=srt"
+                        + "&audioStreamIndex=1&subtitleStreamIndex=2"
+                        + "&mediaSourceId=source%2B1&api_key=secret%2B%26token")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {0, -1, 14_400_000_000L, Long.MAX_VALUE})
+    void usesOriginalStreamWhenVideoHasNoUsableResumePoint(long position) {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree("""
+                {"MediaType":"Video","RunTimeTicks":14400000000,"UserData":{"PlaybackPositionTicks":%d}}
+                """.formatted(position)));
+
+        executor.execute(new Route.JellyfinVlc(ID), shield);
+
+        verify(devices).execute("shield", new Action.OpenAppLink(URI.create(
+                "vlc://https://nas.lan/jellyfin/Videos/" + ID + "/stream?static=true&mediaSourceId=source%2B1&api_key=secret%2B%26token")));
+    }
+
+    @Test
+    void completedVideoStartsFromBeginningEvenIfJellyfinRetainsAPosition() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree("""
+                {"MediaType":"Video","UserData":{"PlaybackPositionTicks":6120000000,"Played":true}}
+                """));
+
+        executor.execute(new Route.JellyfinVlc(ID), shield);
+
+        verify(devices).execute("shield", new Action.OpenAppLink(URI.create(
+                "vlc://https://nas.lan/jellyfin/Videos/" + ID + "/stream?static=true&mediaSourceId=source%2B1&api_key=secret%2B%26token")));
+    }
+
+    @Test
+    void audioContinuesToUseOriginalStream() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree("""
+                {"MediaType":"Audio","UserData":{"PlaybackPositionTicks":6120000000}}
+                """));
+
+        executor.execute(new Route.JellyfinVlc(ID), shield);
+
+        verify(devices).execute("shield", new Action.OpenAppLink(URI.create(
+                "vlc://https://nas.lan/jellyfin/Audio/" + ID + "/stream?static=true&mediaSourceId=source%2B1&api_key=secret%2B%26token")));
+    }
+
+    @Test
+    void refusesResumeWhenJellyfinDoesNotOfferDirectStreaming() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree("""
+                {"MediaType":"Video","UserData":{"PlaybackPositionTicks":6120000000}}
+                """));
+
+        assertThatThrownBy(() -> executor.execute(new Route.JellyfinVlc(ID), shield))
+                .isInstanceOf(ActionFailedException.class).hasMessageContaining("resume");
+        verifyNoInteractions(devices);
     }
 
     @Test

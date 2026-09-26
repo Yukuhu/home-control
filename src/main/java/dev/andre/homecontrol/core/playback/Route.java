@@ -103,7 +103,7 @@ public sealed interface Route {
 
     /** Deferred VLC launch; credentials are resolved only when Play is pressed. */
     record JellyfinVlc(String itemId) implements Route {
-        @Override public String describe() { return "Open in VLC (from beginning; no Jellyfin progress tracking)"; }
+        @Override public String describe() { return "Open in VLC (no Jellyfin progress tracking)"; }
     }
 
     /** Wake an Android TV and open Jellyfin as needed, then play through its fresh session. */
