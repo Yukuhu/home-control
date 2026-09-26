@@ -20,6 +20,8 @@ import java.util.concurrent.TimeoutException;
 /** One query, every enabled searchable source, in parallel, with one deadline (spec §6.1 search). */
 public class SearchService {
 
+    private static final String TIMEOUT_MESSAGE = " did not answer in time";
+
     private static final Logger log = LoggerFactory.getLogger(SearchService.class);
 
     private final ContentSources sources;
@@ -73,15 +75,15 @@ public class SearchService {
             Future<List<ContentItem>> future = entry.getValue();
             if (interrupted) {
                 future.cancel(true);
-                failures.add(new SearchOutcome.Failure(source, source.displayName() + " did not answer in time"));
+                failures.add(new SearchOutcome.Failure(source, source.displayName() + TIMEOUT_MESSAGE));
                 continue;
             }
             try {
                 long remaining = Math.max(0, deadline - System.nanoTime());
                 hits.add(new SearchOutcome.Hits(source, future.get(remaining, TimeUnit.NANOSECONDS)));
-            } catch (TimeoutException e) {
+            } catch (TimeoutException _) {
                 future.cancel(true);
-                failures.add(new SearchOutcome.Failure(source, source.displayName() + " did not answer in time"));
+                failures.add(new SearchOutcome.Failure(source, source.displayName() + TIMEOUT_MESSAGE));
             } catch (ExecutionException e) {
                 if (e.getCause() instanceof ContentSourceException cause) {
                     failures.add(new SearchOutcome.Failure(source, cause.getMessage()));
@@ -89,11 +91,11 @@ public class SearchService {
                     log.warn("{} search failed", source.id(), e.getCause());
                     failures.add(new SearchOutcome.Failure(source, source.displayName() + " could not search"));
                 }
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 interrupted = true;
                 future.cancel(true);
-                failures.add(new SearchOutcome.Failure(source, source.displayName() + " did not answer in time"));
+                failures.add(new SearchOutcome.Failure(source, source.displayName() + TIMEOUT_MESSAGE));
             }
         }
         return new SearchOutcome(query, hits, failures);

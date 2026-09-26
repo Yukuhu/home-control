@@ -148,8 +148,8 @@ class SportsCalendarsTest {
 
     @Test
     void rejectsBadInput() {
-        assertThatThrownBy(() -> calendars.add(
-                new SportsCalendars.AddCalendar("ftp://x/y", "", "household password", "household password"), http))
+        var preparedArg151_0 = new SportsCalendars.AddCalendar("ftp://x/y", "", "household password", "household password");
+        assertThatThrownBy(() -> calendars.add(preparedArg151_0, http))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("Use an http, https or webcal link");
 
         assertThatThrownBy(() -> calendars.add(new SportsCalendars.AddCalendar(
@@ -162,13 +162,15 @@ class SportsCalendarsTest {
                 .hasMessage("That link did not return a calendar (.ics)");
 
         server.respond("/missing.ics", 404, "text/plain", "");
-        assertThatThrownBy(() -> calendars.add(new SportsCalendars.AddCalendar(
-                server.url("/missing.ics").toString(), "", "household password", "household password"), http))
+        var preparedArg165_0 = new SportsCalendars.AddCalendar(
+                server.url("/missing.ics").toString(), "", "household password", "household password");
+        assertThatThrownBy(() -> calendars.add(preparedArg165_0, http))
                 .isInstanceOf(CalendarFetchException.class).hasMessage("127.0.0.1 has no calendar at that link");
 
         doThrow(new PasswordRejectedException("no")).when(login).checkNewPassword(any(), any());
-        assertThatThrownBy(() -> calendars.add(new SportsCalendars.AddCalendar(
-                server.url("/private/token-abc123/bl.ics").toString(), "", "x", "y"), http))
+        var preparedArg170_0 = new SportsCalendars.AddCalendar(
+                server.url("/private/token-abc123/bl.ics").toString(), "", "x", "y");
+        assertThatThrownBy(() -> calendars.add(preparedArg170_0, http))
                 .isInstanceOf(PasswordRejectedException.class);
         assertThat(server.count("/private/token-abc123/bl.ics")).isZero();
     }

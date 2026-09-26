@@ -122,7 +122,7 @@ public final class TheSportsDbEventMapper {
             }
             try {
                 return Optional.of(LocalDateTime.of(date.get(), LocalTime.parse(hhmmss)));
-            } catch (DateTimeParseException e) {
+            } catch (DateTimeParseException _) {
                 return Optional.empty();
             }
         }
@@ -133,7 +133,7 @@ public final class TheSportsDbEventMapper {
             }
             try {
                 return Optional.of(LocalDateTime.of(date.get(), LocalTime.parse(hhmm)));
-            } catch (DateTimeParseException e) {
+            } catch (DateTimeParseException _) {
                 return Optional.empty();
             }
         }
@@ -151,7 +151,7 @@ public final class TheSportsDbEventMapper {
         }
         try {
             return Optional.of(LocalDate.parse(node.asString()));
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             return Optional.empty();
         }
     }
@@ -181,7 +181,7 @@ public final class TheSportsDbEventMapper {
         }
         try {
             return new URI(raw);
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             return null;
         }
     }
@@ -201,7 +201,7 @@ public final class TheSportsDbEventMapper {
                 return Optional.of(OffsetDateTime.parse(value).toInstant());
             }
             return Optional.of(LocalDateTime.parse(value).toInstant(ZoneOffset.UTC));
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             return Optional.empty();
         }
     }

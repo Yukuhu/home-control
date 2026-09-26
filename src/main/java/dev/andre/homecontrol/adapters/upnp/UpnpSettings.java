@@ -44,7 +44,7 @@ public record UpnpSettings(String udn, URI location, String model) {
     private static URI uri(String value) {
         try {
             return value == null || value.isBlank() ? null : URI.create(value);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return null;
         }
     }

@@ -15,6 +15,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @ConditionalOnProperty(name = "home-control.pinned.enabled", havingValue = "true", matchIfMissing = true)
 public class PinnedSetupController {
 
+    private static final String MESSAGE = "pinnedMessage";
+    private static final String ERROR = "pinnedError";
+    private static final String SAVE_ERROR_PREFIX = "Could not save pinned links: ";
+    private static final String REDIRECT = "redirect:/setup#pinned";
+
     private static final Logger log = LoggerFactory.getLogger(PinnedSetupController.class);
 
     private final PinnedShortcuts pins;
@@ -28,14 +33,14 @@ public class PinnedSetupController {
                       RedirectAttributes redirect) {
         try {
             Pin pin = pins.add(url, title);
-            redirect.addFlashAttribute("pinnedMessage", "Pinned " + pin.title());
+            redirect.addFlashAttribute(MESSAGE, "Pinned " + pin.title());
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("pinnedError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (StorageException e) {
             log.warn("Could not save pinned links", e);
-            redirect.addFlashAttribute("pinnedError", "Could not save pinned links: " + e.getMessage());
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR_PREFIX + e.getMessage());
         }
-        return "redirect:/setup#pinned";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/pinned/{id}/title")
@@ -43,32 +48,32 @@ public class PinnedSetupController {
                          RedirectAttributes redirect) {
         try {
             pins.rename(id, title);
-            redirect.addFlashAttribute("pinnedMessage", "Renamed to " + (title == null ? "" : title.strip()));
+            redirect.addFlashAttribute(MESSAGE, "Renamed to " + (title == null ? "" : title.strip()));
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("pinnedError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (StorageException e) {
             log.warn("Could not save pinned links", e);
-            redirect.addFlashAttribute("pinnedError", "Could not save pinned links: " + e.getMessage());
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR_PREFIX + e.getMessage());
         }
-        return "redirect:/setup#pinned";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/pinned/{id}/move")
     public String move(@PathVariable String id, @RequestParam String direction, RedirectAttributes redirect) {
         if (!"up".equals(direction) && !"down".equals(direction)) {
-            redirect.addFlashAttribute("pinnedError", "Choose up or down");
-            return "redirect:/setup#pinned";
+            redirect.addFlashAttribute(ERROR, "Choose up or down");
+            return REDIRECT;
         }
         try {
             pins.move(id, "up".equals(direction));
-            redirect.addFlashAttribute("pinnedMessage", "Order saved");
+            redirect.addFlashAttribute(MESSAGE, "Order saved");
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("pinnedError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (StorageException e) {
             log.warn("Could not save pinned links", e);
-            redirect.addFlashAttribute("pinnedError", "Could not save pinned links: " + e.getMessage());
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR_PREFIX + e.getMessage());
         }
-        return "redirect:/setup#pinned";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/pinned/{id}/remove")
@@ -77,13 +82,13 @@ public class PinnedSetupController {
             String title = pins.find(id).map(Pin::title)
                     .orElseThrow(() -> new IllegalArgumentException("No pinned link " + id));
             pins.remove(id);
-            redirect.addFlashAttribute("pinnedMessage", "Removed " + title);
+            redirect.addFlashAttribute(MESSAGE, "Removed " + title);
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("pinnedError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (StorageException e) {
             log.warn("Could not save pinned links", e);
-            redirect.addFlashAttribute("pinnedError", "Could not save pinned links: " + e.getMessage());
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR_PREFIX + e.getMessage());
         }
-        return "redirect:/setup#pinned";
+        return REDIRECT;
     }
 }

@@ -33,7 +33,7 @@ final class DialClient {
             throw new IOException("Interrupted while starting " + app, e);
         }
         switch (response.statusCode()) {
-            case 200, 201 -> {
+            case 200, 201 -> { // DIAL accepted the launch; there is no response body to read.
             }
             case 404 -> throw new DialException(app + " is not available over DIAL on this TV");
             case 503 -> throw new DialException("The TV could not start " + app + " right now");

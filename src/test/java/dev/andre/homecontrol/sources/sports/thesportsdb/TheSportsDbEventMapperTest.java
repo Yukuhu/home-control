@@ -187,7 +187,7 @@ class TheSportsDbEventMapperTest {
 
         JsonNode cdnThumb = MAPPER.readTree(
                 "{\"idEvent\":\"1\",\"idLeague\":\"4331\",\"strEvent\":\"A vs B\",\"strTimestamp\":\"2026-09-19T10:00:00Z\",\"strThumb\":\"https://cdn.example/x.jpg\"}");
-        assertThat(map(cdnThumb, "4331").orElseThrow().artwork().toString()).isEqualTo("https://cdn.example/x.jpg");
+        assertThat(map(cdnThumb, "4331").orElseThrow().artwork()).hasToString("https://cdn.example/x.jpg");
 
         JsonNode wwwThumb = MAPPER.readTree(
                 "{\"idEvent\":\"1\",\"idLeague\":\"4331\",\"strEvent\":\"A vs B\",\"strTimestamp\":\"2026-09-19T10:00:00Z\",\"strThumb\":\"https://www.thesportsdb.com/images/x.PNG\"}");
@@ -195,7 +195,7 @@ class TheSportsDbEventMapperTest {
 
         JsonNode gifThumb = MAPPER.readTree(
                 "{\"idEvent\":\"1\",\"idLeague\":\"4331\",\"strEvent\":\"A vs B\",\"strTimestamp\":\"2026-09-19T10:00:00Z\",\"strThumb\":\"https://r2.thesportsdb.com/images/x.gif\"}");
-        assertThat(map(gifThumb, "4331").orElseThrow().artwork().toString()).isEqualTo("https://r2.thesportsdb.com/images/x.gif");
+        assertThat(map(gifThumb, "4331").orElseThrow().artwork()).hasToString("https://r2.thesportsdb.com/images/x.gif");
     }
 
     @Test

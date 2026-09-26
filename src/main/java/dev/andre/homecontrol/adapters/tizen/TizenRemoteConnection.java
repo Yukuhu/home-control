@@ -24,6 +24,9 @@ import java.util.function.Consumer;
  */
 final class TizenRemoteConnection implements AutoCloseable {
 
+    private static final String CHANNEL_CONNECT_EVENT = "ms.channel.connect";
+    private static final String CHANNEL_UNAUTHORIZED_EVENT = "ms.channel.unauthorized";
+
     enum Authorization { CONNECTED, UNAUTHORIZED, NO_ANSWER }
 
     private static final Logger log = LoggerFactory.getLogger(TizenRemoteConnection.class);
@@ -70,8 +73,8 @@ final class TizenRemoteConnection implements AutoCloseable {
                 event = late == null ? event : late;
             }
             return switch (event) {
-                case "ms.channel.connect" -> Authorization.CONNECTED;
-                case "ms.channel.unauthorized" -> Authorization.UNAUTHORIZED;
+                case CHANNEL_CONNECT_EVENT -> Authorization.CONNECTED;
+                case CHANNEL_UNAUTHORIZED_EVENT -> Authorization.UNAUTHORIZED;
                 default -> throw new IOException("The TV closed the connection before answering");
             };
         } catch (InterruptedException e) {
@@ -111,21 +114,25 @@ final class TizenRemoteConnection implements AutoCloseable {
         JsonNode message;
         try {
             message = TizenMessages.JSON.readTree(text);
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             log.debug("Ignoring a message from the TV that is not JSON");
             return;
         }
         switch (message.path("event").asString("")) {
-            case "ms.channel.connect" -> {
+            case CHANNEL_CONNECT_EVENT -> {
                 String token = message.path("data").path("token").asString("");
                 if (!token.isEmpty()) {
                     issuedToken = token;
                 }
-                channelEvents.add("ms.channel.connect");
+                channelEvents.add(CHANNEL_CONNECT_EVENT);
             }
-            case "ms.channel.unauthorized" -> channelEvents.add("ms.channel.unauthorized");
+            case CHANNEL_UNAUTHORIZED_EVENT -> channelEvents.add(CHANNEL_UNAUTHORIZED_EVENT);
             case "ed.installedApp.get" -> installedApps = TizenMessages.installedApps(message);
-            case "ms.error" -> log.debug("The TV reported an error: {}", message.path("data").path("message").asString(""));
+            case "ms.error" -> {
+                if (log.isDebugEnabled()) {
+                    log.debug("The TV reported an error: {}", message.path("data").path("message").asString(""));
+                }
+            }
             default -> {
                 // ed.edenTV.update, ms.voiceApp.hide, ed.apps.launch results, client (dis)connects: not needed.
             }

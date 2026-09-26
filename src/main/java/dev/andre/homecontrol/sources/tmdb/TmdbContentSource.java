@@ -28,6 +28,9 @@ import java.util.stream.Collectors;
 /** TMDB: titles, artwork, where they stream, and what is trending on the household's own services. */
 public class TmdbContentSource implements ContentSource {
 
+    private static final String NOT_CONNECTED = "TMDB is not connected";
+    private static final String LANGUAGE = "language";
+
     public static final String SOURCE_ID = "tmdb";
     private static final RailDescriptor TRENDING = new RailDescriptor(SOURCE_ID, "trending", "Trending on your services");
 
@@ -90,7 +93,7 @@ public class TmdbContentSource implements ContentSource {
             throw new IllegalArgumentException("TMDB has no rail '" + railId + "'");
         }
         TmdbCredential credential = setup.credential()
-                .orElseThrow(() -> new ContentSourceException("TMDB is not connected"));
+                .orElseThrow(() -> new ContentSourceException(NOT_CONNECTED));
         SourcePreferences prefs = preferences.get();
         List<String> configuredProviders = prefs.providers();
         if (configuredProviders.isEmpty()) {
@@ -140,10 +143,10 @@ public class TmdbContentSource implements ContentSource {
     @Override
     public List<ContentItem> search(String query, int limit) {
         TmdbCredential credential = setup.credential()
-                .orElseThrow(() -> new ContentSourceException("TMDB is not connected"));
+                .orElseThrow(() -> new ContentSourceException(NOT_CONNECTED));
         LinkedHashMap<String, String> params = new LinkedHashMap<>();
         params.put("query", query);
-        params.put("language", preferences.get().locale());
+        params.put(LANGUAGE, preferences.get().locale());
         params.put("include_adult", "false");
         params.put("page", "1");
         JsonNode response = client.get(credential, "/search/multi", params);
@@ -165,11 +168,11 @@ public class TmdbContentSource implements ContentSource {
             return Optional.empty();
         }
         TmdbCredential credential = setup.credential()
-                .orElseThrow(() -> new ContentSourceException("TMDB is not connected"));
+                .orElseThrow(() -> new ContentSourceException(NOT_CONNECTED));
         TmdbMediaRef mediaRef = ref.orElseThrow();
         SourcePreferences prefs = preferences.get();
         LinkedHashMap<String, String> params = new LinkedHashMap<>();
-        params.put("language", prefs.locale());
+        params.put(LANGUAGE, prefs.locale());
         params.put("append_to_response", "watch/providers");
         JsonNode body;
         try {
@@ -229,7 +232,7 @@ public class TmdbContentSource implements ContentSource {
         int page = 1;
         while (candidates.size() < properties.trendingCandidates()) {
             LinkedHashMap<String, String> params = new LinkedHashMap<>();
-            params.put("language", language);
+            params.put(LANGUAGE, language);
             params.put("page", String.valueOf(page));
             JsonNode response = client.get(credential, "/trending/all/week", params);
             int rawCount = 0;

@@ -14,13 +14,24 @@ public class SoapFault extends Exception {
     private final String description;
 
     public SoapFault(int errorCode, String description) {
-        this(errorCode, describe(errorCode, description), true);
+        this(errorCode, new ResolvedDescription(describe(errorCode, description)));
     }
 
-    private SoapFault(int errorCode, String description, boolean resolved) {
-        super(errorCode > 0 ? "UPnP error " + errorCode + (description.isEmpty() ? "" : ": " + description) : description);
+    private SoapFault(int errorCode, ResolvedDescription resolved) {
+        super(message(errorCode, resolved.value()));
         this.errorCode = errorCode;
-        this.description = description;
+        this.description = resolved.value();
+    }
+
+    private record ResolvedDescription(String value) {
+    }
+
+    private static String message(int errorCode, String description) {
+        if (errorCode <= 0) {
+            return description;
+        }
+        String prefix = "UPnP error " + errorCode;
+        return description.isEmpty() ? prefix : prefix + ": " + description;
     }
 
     private static String describe(int errorCode, String description) {

@@ -106,7 +106,7 @@ class TheSportsDbScheduleTest {
 
         TheSportsDbSchedule.Result result = schedule.events();
 
-        assertThat(result.errors()).allMatch(e -> e.contains("Your TheSportsDB key is missing"));
+        assertThat(result.errors()).isNotEmpty().allMatch(e -> e.contains("Your TheSportsDB key is missing"));
         assertThat(server.count("eventsday.php")).isZero();
     }
 

@@ -9,15 +9,16 @@ import java.util.regex.Pattern;
 public record TmdbMediaRef(Type type, long id) {
 
     public enum Type { MOVIE, TV }
+    private static final String MOVIE_VALUE = "movie";
 
     private static final Pattern ITEM_ID = Pattern.compile("^(movie|tv)-([1-9][0-9]{0,9})$");
 
     public String itemId() {
-        return (type == Type.MOVIE ? "movie" : "tv") + "-" + id;
+        return (type == Type.MOVIE ? MOVIE_VALUE : "tv") + "-" + id;
     }
 
     public String path() {
-        return "/" + (type == Type.MOVIE ? "movie" : "tv") + "/" + id;
+        return "/" + (type == Type.MOVIE ? MOVIE_VALUE : "tv") + "/" + id;
     }
 
     public static Optional<TmdbMediaRef> parse(String itemId) {
@@ -28,10 +29,10 @@ public record TmdbMediaRef(Type type, long id) {
         if (!matcher.matches()) {
             return Optional.empty();
         }
-        Type type = "movie".equals(matcher.group(1)) ? Type.MOVIE : Type.TV;
+        Type type = MOVIE_VALUE.equals(matcher.group(1)) ? Type.MOVIE : Type.TV;
         try {
             return Optional.of(new TmdbMediaRef(type, Long.parseLong(matcher.group(2))));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return Optional.empty();
         }
     }
@@ -39,7 +40,7 @@ public record TmdbMediaRef(Type type, long id) {
     public static Optional<TmdbMediaRef> of(JsonNode result, String mediaTypeHint) {
         String mediaType = result.path("media_type").asString(mediaTypeHint == null ? "" : mediaTypeHint);
         Type type;
-        if ("movie".equals(mediaType)) {
+        if (MOVIE_VALUE.equals(mediaType)) {
             type = Type.MOVIE;
         } else if ("tv".equals(mediaType)) {
             type = Type.TV;

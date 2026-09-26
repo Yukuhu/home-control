@@ -27,9 +27,17 @@ import java.util.regex.Pattern;
 /** {@code sports.json}: calendars, the TheSportsDB key kind and competitions. Never the calendar URL. */
 public class JsonFileSportsStore {
 
+    private static final String TIME_ZONE = "timeZone";
+    private static final String PROVIDER = "provider";
+    private static final String ADDED_AT = "addedAt";
+    private static final String SPORT = "sport";
+    private static final String COUNTRY = "country";
+    private static final String BADGE = "badge";
+
     private static final Logger log = LoggerFactory.getLogger(JsonFileSportsStore.class);
 
     private static final int VERSION = 1;
+    private static final String VERSION_KEY = "version";
     private static final Pattern CALENDAR_ID = Pattern.compile("^c-[0-9a-f]{12}$");
     private static final Pattern LEAGUE_ID = Pattern.compile("^[0-9]{1,9}$");
     private static final int MAX_LABEL = 80;
@@ -57,7 +65,7 @@ public class JsonFileSportsStore {
         if (root == null || !root.isObject()) {
             throw new StorageException("Could not read sports settings in " + file + "; fix or delete it", null);
         }
-        int version = root.path("version").isIntegralNumber() ? root.path("version").asInt() : -1;
+        int version = root.path(VERSION_KEY).isIntegralNumber() ? root.path(VERSION_KEY).asInt() : -1;
         if (version > VERSION) {
             throw new StorageException(
                     "Sports settings in " + file + " were written by a newer Home Control; fix or delete it", null);
@@ -67,7 +75,7 @@ public class JsonFileSportsStore {
         }
 
         String timeZone = null;
-        JsonNode tzNode = root.path("timeZone");
+        JsonNode tzNode = root.path(TIME_ZONE);
         if (tzNode.isString() && SportsTimeZones.parse(tzNode.asString()).isPresent()) {
             timeZone = tzNode.asString();
         } else if (tzNode.isString() && !tzNode.asString().isBlank()) {
@@ -120,8 +128,8 @@ public class JsonFileSportsStore {
             log.warn("Skipping sports calendar at index {}: invalid fields", index);
             return null;
         }
-        String provider = provider(entry.path("provider"));
-        Instant addedAt = addedAt(entry.path("addedAt"));
+        String provider = provider(entry.path(PROVIDER));
+        Instant addedAt = addedAt(entry.path(ADDED_AT));
         return new SportsSettings.CalendarEntry(id, label, host, provider, addedAt);
     }
 
@@ -135,11 +143,11 @@ public class JsonFileSportsStore {
         if (name.isEmpty() || name.length() > MAX_NAME) {
             name = "Competition " + leagueId;
         }
-        String sport = shortField(entry.path("sport"));
-        String country = shortField(entry.path("country"));
-        URI badge = absoluteHttps(entry.path("badge"));
-        String provider = provider(entry.path("provider"));
-        Instant addedAt = addedAt(entry.path("addedAt"));
+        String sport = shortField(entry.path(SPORT));
+        String country = shortField(entry.path(COUNTRY));
+        URI badge = absoluteHttps(entry.path(BADGE));
+        String provider = provider(entry.path(PROVIDER));
+        Instant addedAt = addedAt(entry.path(ADDED_AT));
         return new SportsSettings.CompetitionEntry(leagueId, name, sport, country, badge, provider, addedAt);
     }
 
@@ -161,7 +169,7 @@ public class JsonFileSportsStore {
         }
         try {
             return new URI(raw);
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             return null;
         }
     }
@@ -180,18 +188,18 @@ public class JsonFileSportsStore {
         }
         try {
             return Instant.parse(node.asString());
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             return Instant.EPOCH;
         }
     }
 
     public synchronized void save(SportsSettings settings) {
         ObjectNode root = mapper.createObjectNode();
-        root.put("version", VERSION);
+        root.put(VERSION_KEY, VERSION);
         if (settings.timeZone() == null) {
-            root.putNull("timeZone");
+            root.putNull(TIME_ZONE);
         } else {
-            root.put("timeZone", settings.timeZone());
+            root.put(TIME_ZONE, settings.timeZone());
         }
         ArrayNode calendarsNode = root.putArray("calendars");
         for (SportsSettings.CalendarEntry entry : settings.calendars()) {
@@ -200,11 +208,11 @@ public class JsonFileSportsStore {
             node.put("label", entry.label());
             node.put("host", entry.host());
             if (entry.provider() == null) {
-                node.putNull("provider");
+                node.putNull(PROVIDER);
             } else {
-                node.put("provider", entry.provider());
+                node.put(PROVIDER, entry.provider());
             }
-            node.put("addedAt", entry.addedAt().toString());
+            node.put(ADDED_AT, entry.addedAt().toString());
         }
         ObjectNode tsdb = root.putObject("theSportsDb");
         tsdb.put("key", settings.keyKind() == SportsSettings.KeyKind.PERSONAL ? "personal" : "free");
@@ -214,26 +222,26 @@ public class JsonFileSportsStore {
             node.put("leagueId", entry.leagueId());
             node.put("name", entry.name());
             if (entry.sport() == null) {
-                node.putNull("sport");
+                node.putNull(SPORT);
             } else {
-                node.put("sport", entry.sport());
+                node.put(SPORT, entry.sport());
             }
             if (entry.country() == null) {
-                node.putNull("country");
+                node.putNull(COUNTRY);
             } else {
-                node.put("country", entry.country());
+                node.put(COUNTRY, entry.country());
             }
             if (entry.badge() == null) {
-                node.putNull("badge");
+                node.putNull(BADGE);
             } else {
-                node.put("badge", entry.badge().toString());
+                node.put(BADGE, entry.badge().toString());
             }
             if (entry.provider() == null) {
-                node.putNull("provider");
+                node.putNull(PROVIDER);
             } else {
-                node.put("provider", entry.provider());
+                node.put(PROVIDER, entry.provider());
             }
-            node.put("addedAt", entry.addedAt().toString());
+            node.put(ADDED_AT, entry.addedAt().toString());
         }
 
         Path parent = file.toAbsolutePath().getParent();
@@ -247,7 +255,7 @@ public class JsonFileSportsStore {
             if (temp != null) {
                 try {
                     Files.deleteIfExists(temp);
-                } catch (IOException ignored) {
+                } catch (IOException _) {
                     // Cleanup error; let the original exception propagate
                 }
             }

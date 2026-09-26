@@ -64,9 +64,9 @@ final class TizenRest {
                 }
                 return Optional.of(TizenMessages.JSON.readTree(bytes));
             }
-        } catch (IOException | JacksonException e) {
+        } catch (IOException | JacksonException _) {
             return Optional.empty();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return Optional.empty();
         }

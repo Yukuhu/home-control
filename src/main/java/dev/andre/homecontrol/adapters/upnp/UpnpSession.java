@@ -109,8 +109,8 @@ public class UpnpSession implements DeviceHandle {
                 case Action.Pause _ -> commands.transport(current.avTransport(), UpnpActions.pause(av), "pause");
                 case Action.Resume _ -> commands.transport(current.avTransport(), UpnpActions.play(av), "resume playback");
                 case Action.Stop _ -> commands.transport(current.avTransport(), UpnpActions.stop(av), "stop playback");
-                case Action.SetVolume volume -> commands.setVolume(volumeControl(current), volume.level(), current.volumeMax());
-                case Action.Mute mute -> commands.setMute(volumeControl(current), mute.muted());
+                case Action.SetVolume(var level) -> commands.setVolume(volumeControl(current), level, current.volumeMax());
+                case Action.Mute(var muted) -> commands.setMute(volumeControl(current), muted);
                 case Action.PressKey _ -> throw unsupported("has no remote keys");
                 case Action.OpenAppLink _ -> throw unsupported("cannot open app links");
                 case Action.SelectInput _ -> throw unsupported("has no inputs");
@@ -133,47 +133,6 @@ public class UpnpSession implements DeviceHandle {
 
     private UnsupportedActionException unsupported(String what) {
         return new UnsupportedActionException(device.name() + " is a media renderer and " + what);
-    }
-
-    /**
-     * Reads the description and SCPD only under F1's rules ({@link DeviceFetch}): the location
-     * announced for this UDN, else the stored one — either way on the registered device's own address;
-     * plain HTTP to an IP literal, 64 KiB at most, no redirects — and only a description that names
-     * this device's UDN. Locations are never logged.
-     */
-    private Endpoints resolve() throws IOException, InterruptedException {
-        Optional<URI> announced = Optional.ofNullable(settings.udn()).flatMap(locator);
-        URI location = announced.orElse(settings.location());
-        // Whatever the source, the description must live on the registered device's address: an
-        // announcement cannot move this session (and the stream URLs it sends) to another host.
-        if (location == null || !DeviceFetch.isSafeToFetch(location, device.host())) {
-            throw new IOException(device.id() + " has no description address on its own host");
-        }
-        Duration timeout = Duration.ofSeconds(properties.commandTimeoutSeconds());
-        DeviceDescription description;
-        try {
-            description = DeviceDescriptions.parse(
-                    DeviceFetch.get(http, location, timeout, DeviceFetch.MAX_DESCRIPTION_BYTES), location);
-        } catch (IllegalArgumentException e) {
-            throw new IOException("Unreadable description for " + device.id());
-        }
-        if (settings.udn() != null && (description.udn() == null || !settings.udn().equalsIgnoreCase(description.udn()))) {
-            throw new IOException("The description at " + device.id() + "'s address belongs to another device");
-        }
-        ServiceEndpoint avTransport = service(description, UpnpActions.AV_TRANSPORT, location)
-                .orElseThrow(() -> new IOException(device.id() + " offers no usable AVTransport service"));
-        ServiceEndpoint renderingControl = service(description, UpnpActions.RENDERING_CONTROL, location).orElse(null);
-        ServiceEndpoint connectionManager = service(description, UpnpActions.CONNECTION_MANAGER, location).orElse(null);
-        int volumeMax = renderingControl == null ? 0 : volumeMaximum(renderingControl, location, timeout);
-        ProtocolInfo sink = ProtocolInfo.UNKNOWN;
-        if (connectionManager != null) {
-            try {
-                sink = commands.sink(connectionManager);
-            } catch (SoapFault fault) {
-                log.debug("{} did not list its formats: {}", device.id(), fault.getMessage());
-            }
-        }
-        return new Endpoints(avTransport, renderingControl, volumeMax, sink);
     }
 
     /** Services on another host than the (already verified) description location are refused (epic constraint). */
@@ -203,38 +162,12 @@ public class UpnpSession implements DeviceHandle {
         }
         try {
             return VolumeRange.maximum(DeviceFetch.get(http, scpd, timeout, DeviceFetch.MAX_DESCRIPTION_BYTES));
-        } catch (IOException e) {
+        } catch (IOException _) {
             return VolumeRange.DEFAULT_MAXIMUM;
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return VolumeRange.DEFAULT_MAXIMUM;
         }
-    }
-
-    /** Reads the device and publishes; runs on the poll loop only. */
-    private void readState(Endpoints current) throws IOException, SoapFault {
-        TransportInfo info = commands.transportInfo(current.avTransport());
-        transport = info;
-        NowPlaying nowPlaying = null;
-        if (info.active()) {
-            PositionInfo position;
-            try {
-                position = commands.positionInfo(current.avTransport());
-            } catch (SoapFault fault) {
-                position = new PositionInfo("", "", null, null);
-            }
-            nowPlaying = NowPlayings.of(info, position, lastPlayed);
-        }
-        DeviceState next = state.withStatus(DeviceStatus.CONNECTED).withPower(true).withNowPlaying(nowPlaying);
-        if (current.renderingControl() != null) {
-            try {
-                VolumeReading volume = commands.volume(current.renderingControl(), current.volumeMax());
-                next = next.withVolume(volume.percent(), 100, volume.muted());
-            } catch (SoapFault fault) {
-                log.debug("{} did not report its volume: {}", device.id(), fault.getMessage());
-            }
-        }
-        publish(next);
     }
 
     private synchronized void publish(DeviceState next) {
@@ -257,6 +190,73 @@ public class UpnpSession implements DeviceHandle {
     }
 
     private final class Link implements ReconnectingPoller.Link {
+
+        /**
+         * Reads the description and SCPD only under F1's rules ({@link DeviceFetch}): the location
+         * announced for this UDN, else the stored one — either way on the registered device's own address;
+         * plain HTTP to an IP literal, 64 KiB at most, no redirects — and only a description that names
+         * this device's UDN. Locations are never logged.
+         */
+        private Endpoints resolve() throws IOException, InterruptedException {
+            Optional<URI> announced = Optional.ofNullable(settings.udn()).flatMap(locator);
+            URI location = announced.orElse(settings.location());
+            // Whatever the source, the description must live on the registered device's address: an
+            // announcement cannot move this session (and the stream URLs it sends) to another host.
+            if (location == null || !DeviceFetch.isSafeToFetch(location, device.host())) {
+                throw new IOException(device.id() + " has no description address on its own host");
+            }
+            Duration timeout = Duration.ofSeconds(properties.commandTimeoutSeconds());
+            DeviceDescription description;
+            try {
+                description = DeviceDescriptions.parse(
+                        DeviceFetch.get(http, location, timeout, DeviceFetch.MAX_DESCRIPTION_BYTES), location);
+            } catch (IllegalArgumentException _) {
+                throw new IOException("Unreadable description for " + device.id());
+            }
+            if (settings.udn() != null && (description.udn() == null || !settings.udn().equalsIgnoreCase(description.udn()))) {
+                throw new IOException("The description at " + device.id() + "'s address belongs to another device");
+            }
+            ServiceEndpoint avTransport = service(description, UpnpActions.AV_TRANSPORT, location)
+                    .orElseThrow(() -> new IOException(device.id() + " offers no usable AVTransport service"));
+            ServiceEndpoint renderingControl = service(description, UpnpActions.RENDERING_CONTROL, location).orElse(null);
+            ServiceEndpoint connectionManager = service(description, UpnpActions.CONNECTION_MANAGER, location).orElse(null);
+            int volumeMax = renderingControl == null ? 0 : volumeMaximum(renderingControl, location, timeout);
+            ProtocolInfo sink = ProtocolInfo.UNKNOWN;
+            if (connectionManager != null) {
+                try {
+                    sink = commands.sink(connectionManager);
+                } catch (SoapFault fault) {
+                    log.debug("{} did not list its formats: {}", device.id(), fault.getMessage());
+                }
+            }
+            return new Endpoints(avTransport, renderingControl, volumeMax, sink);
+        }
+
+        /** Reads the device and publishes; runs on the poll loop only. */
+        private void readState(Endpoints current) throws IOException, SoapFault {
+            TransportInfo info = commands.transportInfo(current.avTransport());
+            transport = info;
+            NowPlaying nowPlaying = null;
+            if (info.active()) {
+                PositionInfo position;
+                try {
+                    position = commands.positionInfo(current.avTransport());
+                } catch (SoapFault _) {
+                    position = new PositionInfo("", "", null, null);
+                }
+                nowPlaying = NowPlayings.of(info, position, lastPlayed);
+            }
+            DeviceState next = state.withStatus(DeviceStatus.CONNECTED).withPower(true).withNowPlaying(nowPlaying);
+            if (current.renderingControl() != null) {
+                try {
+                    VolumeReading volume = commands.volume(current.renderingControl(), current.volumeMax());
+                    next = next.withVolume(volume.percent(), 100, volume.muted());
+                } catch (SoapFault fault) {
+                    log.debug("{} did not report its volume: {}", device.id(), fault.getMessage());
+                }
+            }
+            publish(next);
+        }
 
         @Override
         public void connect() throws Exception {

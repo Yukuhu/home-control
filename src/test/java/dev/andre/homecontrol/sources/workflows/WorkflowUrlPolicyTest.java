@@ -39,7 +39,7 @@ class WorkflowUrlPolicyTest {
         assertThatThrownBy(() -> local.addresses("169.254.1.1")).isInstanceOf(UnknownHostException.class);
     }
 
-    @Test void validatesEveryAnswerAndResolvesOnlyOnce() throws Exception {
+    @Test void validatesEveryAnswerAndResolvesOnlyOnce() {
         var calls = new AtomicInteger();
         var mixed = new WorkflowUrlPolicy(false, host -> {
             calls.incrementAndGet();
@@ -63,11 +63,16 @@ class WorkflowUrlPolicyTest {
 
     @Test void propertiesRejectUnboundedOrNonPositiveLimits() {
         assertThatThrownBy(() -> properties(Duration.ZERO, 1, 1, 1)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> properties(Duration.ofSeconds(Long.MAX_VALUE), 1, 1, 1)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> properties(Duration.ofSeconds(1), 0, 1, 1)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> properties(Duration.ofSeconds(1), 1, 0, 1)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> properties(Duration.ofSeconds(1), 1, Integer.MAX_VALUE, 1)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> properties(Duration.ofSeconds(1), 1, 1, 0)).isInstanceOf(IllegalArgumentException.class);
+        var preparedArg66_0 = Duration.ofSeconds(Long.MAX_VALUE);
+        assertThatThrownBy(() -> properties(preparedArg66_0, 1, 1, 1)).isInstanceOf(IllegalArgumentException.class);
+        var preparedArg67_0 = Duration.ofSeconds(1);
+        assertThatThrownBy(() -> properties(preparedArg67_0, 0, 1, 1)).isInstanceOf(IllegalArgumentException.class);
+        var preparedArg68_0 = Duration.ofSeconds(1);
+        assertThatThrownBy(() -> properties(preparedArg68_0, 1, 0, 1)).isInstanceOf(IllegalArgumentException.class);
+        var preparedArg69_0 = Duration.ofSeconds(1);
+        assertThatThrownBy(() -> properties(preparedArg69_0, 1, Integer.MAX_VALUE, 1)).isInstanceOf(IllegalArgumentException.class);
+        var preparedArg70_0 = Duration.ofSeconds(1);
+        assertThatThrownBy(() -> properties(preparedArg70_0, 1, 1, 0)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test void bindsSafeDefaultsAndAllowsExplicitLocalOverrides() {

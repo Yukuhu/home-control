@@ -53,7 +53,7 @@ public final class IcsZones {
             }
             try {
                 return Optional.of(ZoneId.of(candidate));
-            } catch (DateTimeException e) {
+            } catch (DateTimeException _) {
                 // try a shorter suffix
             }
         }
@@ -63,7 +63,7 @@ public final class IcsZones {
     private static ZoneId zoneOf(String id) {
         try {
             return ZoneId.of(id);
-        } catch (DateTimeException e) {
+        } catch (DateTimeException _) {
             // fallback spelling for JDKs whose tzdb lacks the modern alias
             return ZoneId.of(id.equals("Europe/Kyiv") ? "Europe/Kiev" : id);
         }

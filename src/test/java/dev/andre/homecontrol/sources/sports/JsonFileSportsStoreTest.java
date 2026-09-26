@@ -74,8 +74,8 @@ class JsonFileSportsStoreTest {
 
         assertThat(store.load()).isEqualTo(loaded);
         String text = Files.readString(file(), StandardCharsets.UTF_8);
-        assertThat(text).contains("\"version\" : 1").contains("\"theSportsDb\" : {").contains("\"key\" : \"free\"");
-        assertThat(text).doesNotContain("http://").doesNotContain("https://calendar");
+        assertThat(text).contains("\"version\" : 1").contains("\"theSportsDb\" : {").contains("\"key\" : \"free\"")
+                .doesNotContain("http://").doesNotContain("https://calendar");
     }
 
     @Test
@@ -93,7 +93,8 @@ class JsonFileSportsStoreTest {
     void malformedFilesAreNamedErrors(String content) throws IOException {
         Files.writeString(file(), content);
 
-        assertThatThrownBy(() -> new JsonFileSportsStore(file()).load())
+        var preparedReceiver96 = new JsonFileSportsStore(file());
+        assertThatThrownBy(() -> preparedReceiver96.load())
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file().toString())
                 .hasMessageContaining("fix or delete it");

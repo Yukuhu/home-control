@@ -24,6 +24,19 @@ public final class WorkflowTemplate {
     public WorkflowTemplate(String template, Set<String> variableNames) {
         if (template == null || template.isBlank() || template.length() > MAX_URL) fail("invalid media URL template length");
         this.template = template;
+        this.tokens = tokenize(template, variableNames);
+        int authority = template.indexOf("://");
+        int slash = authority < 0 ? -1 : template.indexOf('/', authority + 3);
+        int query = template.indexOf('?');
+        this.queryStart = query;
+        this.pathStart = slash >= 0 && (query < 0 || slash < query) ? slash : -1;
+        validatePlaceholderPositions();
+        StringBuilder checked = new StringBuilder();
+        for (Token token : tokens) checked.append(token.variable() ? "x" : token.text());
+        validUri(checked.toString());
+    }
+
+    private static List<Token> tokenize(String template, Set<String> variableNames) {
         List<Token> parts = new ArrayList<>();
         Matcher matcher = VARIABLE.matcher(template);
         int previous = 0;
@@ -38,26 +51,21 @@ public final class WorkflowTemplate {
         String tail = template.substring(previous);
         if (tail.indexOf('{') >= 0 || tail.indexOf('}') >= 0) fail("invalid media URL placeholder");
         parts.add(new Token(tail, false, previous));
-        this.tokens = List.copyOf(parts);
-        int authority = template.indexOf("://");
-        int slash = authority < 0 ? -1 : template.indexOf('/', authority + 3);
-        int query = template.indexOf('?');
-        this.queryStart = query;
-        this.pathStart = slash >= 0 && (query < 0 || slash < query) ? slash : -1;
+        return List.copyOf(parts);
+    }
+
+    private void validatePlaceholderPositions() {
         for (Token token : tokens) {
             if (!token.variable()) continue;
             int start = token.start();
-            if (query < 0 || start < query) {
+            if (queryStart < 0 || start < queryStart) {
                 if (pathStart < 0 || start < pathStart) fail("media URL placeholder must be in a path or query value");
             } else {
-                int fieldStart = Math.max(template.lastIndexOf('&', start), query);
+                int fieldStart = Math.max(template.lastIndexOf('&', start), queryStart);
                 int equals = template.indexOf('=', fieldStart + 1);
                 if (equals < 0 || equals >= start) fail("media URL placeholder must be in a query value");
             }
         }
-        StringBuilder checked = new StringBuilder();
-        for (Token token : tokens) checked.append(token.variable() ? "x" : token.text());
-        validUri(checked.toString());
     }
 
     public URI expand(Map<String, WorkflowJson.Value> values) {
@@ -135,7 +143,7 @@ public final class WorkflowTemplate {
                 if (segment.equals(".") || segment.equals("..")) fail("dot path segment in media URL");
             }
             return uri;
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             throw new WorkflowException(WorkflowException.Stage.BUILD, "invalid media URL template");
         }
     }

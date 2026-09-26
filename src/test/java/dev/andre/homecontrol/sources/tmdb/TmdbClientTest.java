@@ -70,7 +70,7 @@ class TmdbClientTest {
         client.get(apiKey, "/search/multi", query);
 
         FakeTmdbServer.Recorded recorded = fake.last("GET", "/3/search/multi");
-        assertThat(recorded.query().get("query")).isEqualTo("Tom & Jerry/ü");
+        assertThat(recorded.query()).containsEntry("query", "Tom & Jerry/ü");
         assertThat(recorded.header("accept")).isEqualTo("application/json");
     }
 

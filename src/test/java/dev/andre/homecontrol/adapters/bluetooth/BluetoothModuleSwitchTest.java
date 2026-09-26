@@ -71,8 +71,8 @@ class BluetoothModuleSwitchTest {
 
     @Test
     void applicationYamlKeepsItOff() throws Exception {
-        assertThat(bluetoothEnabled("src/main/resources/application.yaml")).isEqualTo(false);
-        assertThat(bluetoothEnabled("src/test/resources/application.yaml")).isEqualTo(false);
+        assertThat(bluetoothEnabled("src/main/resources/application.yaml")).isFalse();
+        assertThat(bluetoothEnabled("src/test/resources/application.yaml")).isFalse();
     }
 
     @Test

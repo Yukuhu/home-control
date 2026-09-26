@@ -40,7 +40,7 @@ final class OwnerOnlyFiles {
         } finally {
             try {
                 Files.deleteIfExists(temp); // gone after a successful move; a leftover after a failure
-            } catch (IOException ignored) {
+            } catch (IOException _) {
                 // a stray temp file is harmless; the next write creates a new one
             }
         }
@@ -59,7 +59,7 @@ final class OwnerOnlyFiles {
     private static void syncDirectory(Path directory) {
         try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
             channel.force(true);
-        } catch (IOException | UnsupportedOperationException e) {
+        } catch (IOException | UnsupportedOperationException _) {
             // not supported here (e.g. Windows); the file itself is already on disk
         }
     }

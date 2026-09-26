@@ -25,6 +25,6 @@ public record YouTubeVideo(String id, String title, String channelTitle, Instant
 
     public ContentItem toItem() {
         return new ContentItem(id, SOURCE_ID, ContentKind.VIDEO, title, channelTitle == null || channelTitle.isBlank() ? null : channelTitle,
-                URI.create("/sources/youtube/thumbnails/" + id), List.of(new PlayableRef.AppLink(watchUrl(id), "youtube")), null);
+                URI.create("/sources/youtube/thumbnails/" + id), List.of(new PlayableRef.AppLink(watchUrl(id), SOURCE_ID)), null);
     }
 }

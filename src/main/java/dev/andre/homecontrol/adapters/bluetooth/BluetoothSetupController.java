@@ -20,6 +20,10 @@ import java.nio.charset.StandardCharsets;
 @ConditionalOnProperty(prefix = "home-control.bluetooth", name = "enabled", havingValue = "true")
 public class BluetoothSetupController {
 
+    private static final String REDIRECT = "redirect:/setup#bluetooth";
+    private static final String ERROR = "bluetoothError";
+    private static final String MESSAGE = "bluetoothMessage";
+
     private final BluetoothPairingService pairing;
     private final BluetoothHostChecks checks;
 
@@ -31,7 +35,7 @@ public class BluetoothSetupController {
     @PostMapping("/setup/bluetooth/check")
     public String check() {
         checks.invalidate();
-        return "redirect:/setup#bluetooth";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/bluetooth/scan")
@@ -39,15 +43,15 @@ public class BluetoothSetupController {
         BluetoothScan scan = pairing.scan();
         checks.invalidate();
         if (scan.error() != null) {
-            flash.addFlashAttribute("bluetoothError", scan.error());
+            flash.addFlashAttribute(ERROR, scan.error());
         } else if (scan.speakers().isEmpty()) {
-            flash.addFlashAttribute("bluetoothMessage",
+            flash.addFlashAttribute(MESSAGE,
                     "No speakers found. Put the speaker into pairing mode and scan again.");
         } else {
             int count = scan.speakers().size();
-            flash.addFlashAttribute("bluetoothMessage", "Found " + count + " device" + (count == 1 ? "" : "s"));
+            flash.addFlashAttribute(MESSAGE, "Found " + count + " device" + (count == 1 ? "" : "s"));
         }
-        return "redirect:/setup#bluetooth";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/bluetooth/pair")
@@ -55,13 +59,13 @@ public class BluetoothSetupController {
         try {
             BluetoothPairing result = pairing.pair(address);
             if (result.warning() != null) {
-                flash.addFlashAttribute("bluetoothError", result.warning());
-                return "redirect:/setup#bluetooth";
+                flash.addFlashAttribute(ERROR, result.warning());
+                return REDIRECT;
             }
             return "redirect:/?device=" + UriUtils.encodeQueryParam(result.device().id(), StandardCharsets.UTF_8);
         } catch (BluetoothSetupException e) {
-            flash.addFlashAttribute("bluetoothError", e.getMessage());
-            return "redirect:/setup#bluetooth";
+            flash.addFlashAttribute(ERROR, e.getMessage());
+            return REDIRECT;
         }
     }
 
@@ -69,22 +73,22 @@ public class BluetoothSetupController {
     public String connect(@RequestParam String id, RedirectAttributes flash) {
         try {
             Device device = pairing.connect(id);
-            flash.addFlashAttribute("bluetoothMessage", "Connected " + device.name());
+            flash.addFlashAttribute(MESSAGE, "Connected " + device.name());
         } catch (BluetoothSetupException e) {
-            flash.addFlashAttribute("bluetoothError", e.getMessage());
+            flash.addFlashAttribute(ERROR, e.getMessage());
         }
-        return "redirect:/setup#bluetooth";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/bluetooth/disconnect")
     public String disconnect(@RequestParam String id, RedirectAttributes flash) {
         try {
             Device device = pairing.disconnect(id);
-            flash.addFlashAttribute("bluetoothMessage", "Disconnected " + device.name());
+            flash.addFlashAttribute(MESSAGE, "Disconnected " + device.name());
         } catch (BluetoothSetupException e) {
-            flash.addFlashAttribute("bluetoothError", e.getMessage());
+            flash.addFlashAttribute(ERROR, e.getMessage());
         }
-        return "redirect:/setup#bluetooth";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/bluetooth/audio-device")
@@ -92,13 +96,13 @@ public class BluetoothSetupController {
                               RedirectAttributes flash) {
         try {
             Device device = pairing.setAudioDevice(id, audioDevice);
-            flash.addFlashAttribute("bluetoothMessage", audioDevice == null || audioDevice.isBlank()
+            flash.addFlashAttribute(MESSAGE, audioDevice == null || audioDevice.isBlank()
                     ? device.name() + " finds its audio output automatically"
                     : device.name() + " plays on " + audioDevice);
         } catch (BluetoothSetupException e) {
-            flash.addFlashAttribute("bluetoothError", e.getMessage());
+            flash.addFlashAttribute(ERROR, e.getMessage());
         }
-        return "redirect:/setup#bluetooth";
+        return REDIRECT;
     }
 
     @ExceptionHandler(DeviceNotFoundException.class)

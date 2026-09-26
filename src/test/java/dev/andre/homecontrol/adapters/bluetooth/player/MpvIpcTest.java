@@ -83,7 +83,7 @@ class MpvIpcTest {
                         if (volume ? !result.isNumber() : !result.isBoolean()) {
                             failures.incrementAndGet();
                         }
-                    } catch (Exception e) {
+                    } catch (Exception _) {
                         failures.incrementAndGet();
                     } finally {
                         done.countDown();
@@ -136,7 +136,7 @@ class MpvIpcTest {
         Thread.ofVirtual().start(() -> {
             try {
                 silent.accept();
-            } catch (IOException ignored) {
+            } catch (IOException _) {
             }
         });
         try {
@@ -195,7 +195,7 @@ class MpvIpcTest {
         Thread.ofVirtual().start(() -> {
             try {
                 accepted[0] = silent.accept();
-            } catch (IOException ignored) {
+            } catch (IOException _) {
             }
         });
         java.util.concurrent.atomic.AtomicBoolean closedCalled = new java.util.concurrent.atomic.AtomicBoolean();
@@ -238,7 +238,9 @@ class MpvIpcTest {
     void neverSendsGarbageForUnknownArgumentTypes() throws Exception {
         MpvIpc ipc = MpvIpc.connect(socket(), Duration.ofSeconds(1), () -> true, listener());
         try {
-            assertThatThrownBy(() -> ipc.command(Duration.ofSeconds(1), "set_property", "volume", new Object()))
+            var preparedArg237_0 = Duration.ofSeconds(1);
+            var preparedArg237_3 = new Object();
+            assertThatThrownBy(() -> ipc.command(preparedArg237_0, "set_property", "volume", preparedArg237_3))
                     .isInstanceOf(IllegalArgumentException.class);
         } finally {
             ipc.close();

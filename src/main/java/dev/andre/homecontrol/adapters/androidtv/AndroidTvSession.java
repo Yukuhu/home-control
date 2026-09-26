@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
@@ -52,25 +53,41 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
 
     private final Device device;
     private final AndroidTvSettings settings;
-    private final ClientCertificate credential;
     private final AndroidTvProperties properties;
     private final Consumer<DeviceState> onChange;
     private final ScheduledExecutorService scheduler;
+    private final ConnectionOpener opener;
 
     private volatile RemoteConnection connection;
     private volatile DeviceState state = DeviceState.initial();
     private volatile Duration backoff;
+    /** Tags reader callbacks so an old connection cannot update a newer attempt. */
+    private final AtomicLong generation = new AtomicLong();
     /** Accessed only on the single-threaded scheduler. */
     private int consecutiveUnpaired;
     private volatile boolean closed;
 
     public AndroidTvSession(Device device, ClientCertificate credential,
                          AndroidTvProperties properties, Consumer<DeviceState> onChange) {
+        this(device, credential, properties, onChange, null);
+    }
+
+    @FunctionalInterface
+    interface ConnectionOpener {
+        RemoteConnection open(RemoteListener listener) throws IOException;
+    }
+
+    AndroidTvSession(Device device, ClientCertificate credential,
+                     AndroidTvProperties properties, Consumer<DeviceState> onChange,
+                     ConnectionOpener opener) {
         this.device = device;
         this.settings = AndroidTvSettings.of(device);
-        this.credential = credential;
         this.properties = properties;
         this.onChange = onChange;
+        this.opener = opener == null
+                ? listener -> RemoteConnection.connect(device.host(), settings.port(), credential,
+                        properties.staleTimeoutSeconds() * 1000, listener, settings.certificateFingerprint())
+                : opener;
         this.backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
         this.scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "shield-session-" + device.id());
@@ -112,8 +129,8 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     @Override
     public void execute(Action action) {
         switch (action) {
-            case Action.PressKey press -> sendKey(press.key(), press.press());
-            case Action.OpenAppLink open -> openAppLink(open.uri());
+            case Action.PressKey(var key, var press) -> sendKey(key, press);
+            case Action.OpenAppLink(var uri) -> openAppLink(uri);
             case Action.SetVolume _ -> throw new UnsupportedActionException(
                     "Android TV Remote v2 has no absolute volume; use the volume keys");
             case Action.Mute _ -> throw new UnsupportedActionException(
@@ -149,11 +166,10 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         if (closed) {
             return;
         }
+        long attempt = generation.incrementAndGet();
         update(state.withStatus(DeviceStatus.CONNECTING));
         try {
-            RemoteConnection opened = RemoteConnection.connect(device.host(), settings.port(),
-                    credential, properties.staleTimeoutSeconds() * 1000, this,
-                    settings.certificateFingerprint());
+            RemoteConnection opened = opener.open(listenerFor(attempt));
 
             connection = opened;
             if (closed) {
@@ -165,9 +181,8 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
                 connection = null;
                 return;
             }
-            backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
-            forgetAmbiguousVerdicts();
-            update(state.withStatus(DeviceStatus.CONNECTED));
+            // TLS only proves transport setup. The reader reports Remote v2 readiness
+            // after the device's configure/active exchange, on this same scheduler.
         } catch (TlsSockets.CertificateMismatchException _) {
             log.warn("Device {} presented an unexpected certificate; refusing it", device.id());
             update(state.withStatus(DeviceStatus.UNPAIRED));
@@ -179,6 +194,44 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
             update(state.withStatus(DeviceStatus.DISCONNECTED));
             scheduleReconnect();
         }
+    }
+
+    private RemoteListener listenerFor(long attempt) {
+        return new RemoteListener() {
+            @Override
+            public void onReady() {
+                runOnScheduler(attempt, AndroidTvSession.this::handleReady);
+            }
+
+            @Override
+            public void onPower(boolean on) {
+                runOnScheduler(attempt, () -> update(state.withPower(on)));
+            }
+
+            @Override
+            public void onCurrentApp(String appPackage) {
+                runOnScheduler(attempt, () -> update(state.withCurrentApp(appPackage)));
+            }
+
+            @Override
+            public void onVolume(int level, int max, boolean muted) {
+                runOnScheduler(attempt, () -> update(state.withVolume(level, max, muted)));
+            }
+
+            @Override
+            public void onDisconnected(DisconnectCause cause) {
+                runOnScheduler(attempt, () -> handleDisconnect(cause));
+            }
+        };
+    }
+
+    private void handleReady() {
+        if (connection == null || state.status() != DeviceStatus.CONNECTING) {
+            return;
+        }
+        backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
+        forgetAmbiguousVerdicts();
+        update(state.withStatus(DeviceStatus.CONNECTED));
     }
 
     /**
@@ -197,7 +250,7 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
             update(state.withStatus(DeviceStatus.DISCONNECTED));
             scheduleReconnect();
         } else {
-            log.warn("Device {} rejected our certificate {} times in a row; it must be paired again",
+            log.warn("Could not establish the remote session for {} after {} authentication-like failures; try pairing again",
                     device.id(), consecutiveUnpaired);
             update(state.withStatus(DeviceStatus.UNPAIRED));
         }
@@ -242,22 +295,22 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
 
     @Override
     public void onPower(boolean on) {
-        runOnScheduler(() -> update(state.withPower(on)));
+        runOnScheduler(generation.get(), () -> update(state.withPower(on)));
     }
 
     @Override
     public void onCurrentApp(String appPackage) {
-        runOnScheduler(() -> update(state.withCurrentApp(appPackage)));
+        runOnScheduler(generation.get(), () -> update(state.withCurrentApp(appPackage)));
     }
 
     @Override
     public void onVolume(int level, int max, boolean isMuted) {
-        runOnScheduler(() -> update(state.withVolume(level, max, isMuted)));
+        runOnScheduler(generation.get(), () -> update(state.withVolume(level, max, isMuted)));
     }
 
     @Override
     public void onDisconnected(DisconnectCause cause) {
-        runOnScheduler(() -> handleDisconnect(cause));
+        runOnScheduler(generation.get(), () -> handleDisconnect(cause));
     }
 
     private void handleDisconnect(DisconnectCause cause) {
@@ -279,13 +332,13 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
      * between that check and the task actually running. A single guard, used by every
      * callback above, so the guard cannot drift out of sync between them.
      */
-    private void runOnScheduler(Runnable task) {
+    private void runOnScheduler(long attempt, Runnable task) {
         if (closed) {
             return;
         }
         try {
             scheduler.execute(() -> {
-                if (!closed) {
+                if (!closed && attempt == generation.get()) {
                     task.run();
                 }
             });

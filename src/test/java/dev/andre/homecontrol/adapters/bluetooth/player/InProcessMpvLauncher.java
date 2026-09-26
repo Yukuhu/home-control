@@ -40,7 +40,7 @@ public final class InProcessMpvLauncher implements MpvLauncher {
                 if (!delay.isZero()) {
                     Thread.sleep(delay.toMillis());
                 }
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 process.exit.complete(1);
                 return;
@@ -58,10 +58,10 @@ public final class InProcessMpvLauncher implements MpvLauncher {
                 // broadcast just before mpv's --idle=once quit) has been read and dispatched.
                 Thread.sleep(50);
                 process.exit.complete(0);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 process.exit.complete(1);
-            } catch (Exception e) {
+            } catch (Exception _) {
                 process.exit.complete(1);
             }
         });
@@ -146,7 +146,7 @@ public final class InProcessMpvLauncher implements MpvLauncher {
             }
             try {
                 exit.get(2, TimeUnit.SECONDS);
-            } catch (Exception ignored) {
+            } catch (Exception _) {
             }
         }
     }

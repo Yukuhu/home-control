@@ -26,7 +26,7 @@ public record WorkflowProperties(@DefaultValue("true") boolean enabled,
             if (value == null || value.isNegative() || value.isZero() || value.toNanos() <= 0) {
                 throw new IllegalArgumentException("Workflow timeouts must be positive and finite");
             }
-        } catch (ArithmeticException e) {
+        } catch (ArithmeticException _) {
             throw new IllegalArgumentException("Workflow timeouts must be positive and finite");
         }
     }

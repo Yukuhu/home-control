@@ -2,7 +2,7 @@
 // Live state, writes, JSON, fragments and other assets always require the server.
 const CACHE = "home-control-offline-v2";
 const OFFLINE = "/offline.html";
-const OFFLINE_ASSETS = ["/app.css", "/icons/icon.svg"];
+const OFFLINE_ASSETS = new Set(["/app.css", "/icons/icon.svg"]);
 
 self.addEventListener("install", (event) => {
     event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([OFFLINE, ...OFFLINE_ASSETS])));
@@ -23,6 +23,6 @@ self.addEventListener("fetch", (event) => {
         return;
     }
     const url = new URL(request.url);
-    if (url.origin !== self.location.origin || !OFFLINE_ASSETS.includes(url.pathname)) return;
+    if (url.origin !== self.location.origin || !OFFLINE_ASSETS.has(url.pathname)) return;
     event.respondWith(fetch(request).catch(() => caches.match(url.pathname)));
 });

@@ -18,6 +18,10 @@ import java.util.Map;
 @ConditionalOnProperty(name = "home-control.jellyfin.enabled", havingValue = "true", matchIfMissing = true)
 public class JellyfinSetupController {
 
+    private static final String MESSAGE = "jellyfinMessage";
+    private static final String ERROR = "jellyfinError";
+    private static final String REDIRECT = "redirect:/setup";
+
     private final JellyfinSetupService setup;
     private final DeviceManager devices;
 
@@ -42,9 +46,9 @@ public class JellyfinSetupController {
                 serverUrl, deviceServerUrl, authMode, userName, password, apiKey, loginPassword, loginPasswordConfirmation);
         try {
             JellyfinSettings connected = setup.connect(connectRequest, request);
-            redirect.addFlashAttribute("jellyfinMessage", "Connected to " + connected.serverName() + " as " + connected.userName());
+            redirect.addFlashAttribute(MESSAGE, "Connected to " + connected.serverName() + " as " + connected.userName());
         } catch (JellyfinException | PasswordRejectedException | LoginRequiredException | IllegalStateException e) {
-            redirect.addFlashAttribute("jellyfinError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
             Map<String, String> form = new LinkedHashMap<>();
             form.put("serverUrl", serverUrl == null ? "" : serverUrl);
             form.put("deviceServerUrl", deviceServerUrl == null ? "" : deviceServerUrl);
@@ -52,24 +56,24 @@ public class JellyfinSetupController {
             form.put("userName", userName == null ? "" : userName);
             redirect.addFlashAttribute("jellyfinForm", form);
         }
-        return "redirect:/setup";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/jellyfin/test")
     public String test(RedirectAttributes redirect) {
         try {
-            redirect.addFlashAttribute("jellyfinMessage", setup.check());
+            redirect.addFlashAttribute(MESSAGE, setup.check());
         } catch (JellyfinException e) {
-            redirect.addFlashAttribute("jellyfinError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
-        return "redirect:/setup";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/jellyfin/disconnect")
     public String disconnect(RedirectAttributes redirect) {
         setup.disconnect();
-        redirect.addFlashAttribute("jellyfinMessage", "Jellyfin disconnected");
-        return "redirect:/setup";
+        redirect.addFlashAttribute(MESSAGE, "Jellyfin disconnected");
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/jellyfin/players")
@@ -86,11 +90,11 @@ public class JellyfinSetupController {
             JellyfinSettings settings = setup.settings().orElseThrow(() ->
                     new IllegalArgumentException("Connect Jellyfin before choosing a player"));
             setup.save(settings.withPlayer(device, selected));
-            redirect.addFlashAttribute("jellyfinMessage", "Player preference saved");
+            redirect.addFlashAttribute(MESSAGE, "Player preference saved");
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("jellyfinError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
-        return "redirect:/setup";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/jellyfin/links")
@@ -98,10 +102,10 @@ public class JellyfinSetupController {
                        RedirectAttributes redirect) {
         try {
             setup.link(session, device);
-            redirect.addFlashAttribute("jellyfinMessage", "Link saved");
+            redirect.addFlashAttribute(MESSAGE, "Link saved");
         } catch (JellyfinException e) {
-            redirect.addFlashAttribute("jellyfinError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
-        return "redirect:/setup";
+        return REDIRECT;
     }
 }

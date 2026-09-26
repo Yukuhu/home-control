@@ -15,6 +15,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @ConditionalOnProperty(name = "home-control.tmdb.enabled", havingValue = "true", matchIfMissing = true)
 public class TmdbSetupController {
 
+    private static final String MESSAGE = "tmdbMessage";
+    private static final String ERROR = "tmdbError";
+    private static final String REDIRECT = "redirect:/setup#tmdb";
+
     private final TmdbSetupService setup;
 
     public TmdbSetupController(TmdbSetupService setup) {
@@ -28,31 +32,31 @@ public class TmdbSetupController {
                           HttpServletRequest request, RedirectAttributes redirect) {
         try {
             setup.connect(new TmdbSetupService.ConnectRequest(credential, loginPassword, loginPasswordConfirmation), request);
-            redirect.addFlashAttribute("tmdbMessage", "TMDB connected");
+            redirect.addFlashAttribute(MESSAGE, "TMDB connected");
         } catch (ContentSourceException e) {
-            redirect.addFlashAttribute("tmdbError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (PasswordRejectedException e) {
-            redirect.addFlashAttribute("tmdbError", e.getMessage());
-        } catch (LoginRequiredException e) {
-            redirect.addFlashAttribute("tmdbError", "Log in again to change TMDB");
+            redirect.addFlashAttribute(ERROR, e.getMessage());
+        } catch (LoginRequiredException _) {
+            redirect.addFlashAttribute(ERROR, "Log in again to change TMDB");
         }
-        return "redirect:/setup#tmdb";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/tmdb/test")
     public String test(RedirectAttributes redirect) {
         try {
-            redirect.addFlashAttribute("tmdbMessage", setup.check());
+            redirect.addFlashAttribute(MESSAGE, setup.check());
         } catch (ContentSourceException e) {
-            redirect.addFlashAttribute("tmdbError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
-        return "redirect:/setup#tmdb";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/tmdb/disconnect")
     public String disconnect(RedirectAttributes redirect) {
         setup.disconnect();
-        redirect.addFlashAttribute("tmdbMessage", "TMDB disconnected");
-        return "redirect:/setup#tmdb";
+        redirect.addFlashAttribute(MESSAGE, "TMDB disconnected");
+        return REDIRECT;
     }
 }

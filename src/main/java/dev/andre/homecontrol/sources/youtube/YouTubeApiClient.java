@@ -85,7 +85,7 @@ public class YouTubeApiClient {
     private static JsonNode errorBody(YouTubeHttp.Response response) {
         try {
             return response.json().path("error");
-        } catch (YouTubeException notJson) {
+        } catch (YouTubeException _) {
             return MissingNode.getInstance();
         }
     }

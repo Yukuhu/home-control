@@ -102,7 +102,7 @@ public final class DeviceDescriptions {
         }
         try {
             return base == null ? URI.create(value) : base.resolve(value);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return null;
         }
     }

@@ -68,7 +68,7 @@ public final class CastConnection implements AutoCloseable {
         } catch (IOException | RuntimeException e) {
             try {
                 socket.close();
-            } catch (IOException ignored) {
+            } catch (IOException _) {
                 // Already failing.
             }
             throw e;
@@ -142,11 +142,11 @@ public final class CastConnection implements AutoCloseable {
         public CastIncoming await(Duration timeout) throws IOException {
             try {
                 return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
-            } catch (TimeoutException e) {
+            } catch (TimeoutException _) {
                 throw new CastTimeoutException("The Cast receiver did not answer within " + timeout.toMillis() + " ms");
             } catch (ExecutionException e) {
                 throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause());
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 throw new InterruptedIOException("Interrupted while waiting for the Cast receiver");
             } finally {
@@ -174,9 +174,9 @@ public final class CastConnection implements AutoCloseable {
                 dispatch(message);
             }
             finish(CastDisconnectCause.CLOSED);
-        } catch (SocketTimeoutException e) {
+        } catch (SocketTimeoutException _) {
             finish(CastDisconnectCause.STALE);
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException _) {
             finish(CastDisconnectCause.ERROR);
         }
     }
@@ -189,7 +189,7 @@ public final class CastConnection implements AutoCloseable {
         try {
             incoming = new CastIncoming(message.getNamespace(), message.getSourceId(), message.getDestinationId(),
                     CastPayloads.parse(message.getPayloadUtf8()));
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             log.debug("Ignoring a Cast message with an unreadable payload on {}", message.getNamespace());
             return;
         }
@@ -238,7 +238,7 @@ public final class CastConnection implements AutoCloseable {
         }
         try {
             write(CastNamespaces.CONNECTION, CastNamespaces.PLATFORM_RECEIVER_ID, CastPayloads.close());
-        } catch (IOException | RuntimeException ignored) {
+        } catch (IOException | RuntimeException _) {
             // Leaving anyway.
         }
         shutdown();
@@ -248,7 +248,7 @@ public final class CastConnection implements AutoCloseable {
         heartbeat.shutdownNow();
         try {
             socket.close();
-        } catch (IOException ignored) {
+        } catch (IOException _) {
             // Already gone.
         }
         IOException lost = new IOException("The Cast connection was closed");

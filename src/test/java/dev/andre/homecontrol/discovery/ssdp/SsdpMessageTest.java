@@ -85,7 +85,7 @@ class SsdpMessageTest {
 
         byte[] random = new byte[64];
         new Random(42).nextBytes(random);
-        assertThat(SsdpMessage.parse(random, random.length)).isEqualTo(Optional.empty());
+        assertThat(SsdpMessage.parse(random, random.length)).isEmpty();
     }
 
     @Test

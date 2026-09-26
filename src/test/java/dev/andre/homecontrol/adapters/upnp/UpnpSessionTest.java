@@ -145,10 +145,13 @@ class UpnpSessionTest {
     void rejectsWhatARendererCannotDo() {
         startConnected();
 
-        assertThatThrownBy(() -> session.execute(new Action.PressKey(RemoteKey.HOME))).isInstanceOf(UnsupportedActionException.class);
-        assertThatThrownBy(() -> session.execute(new Action.OpenAppLink(URI.create("https://x"))))
+        var failingAction148 = new Action.PressKey(RemoteKey.HOME);
+        assertThatThrownBy(() -> session.execute(failingAction148)).isInstanceOf(UnsupportedActionException.class);
+        var failingAction149 = new Action.OpenAppLink(URI.create("https://x"));
+        assertThatThrownBy(() -> session.execute(failingAction149))
                 .isInstanceOf(UnsupportedActionException.class);
-        assertThatThrownBy(() -> session.execute(new Action.SelectInput("HDMI_1"))).isInstanceOf(UnsupportedActionException.class);
+        var failingAction151 = new Action.SelectInput("HDMI_1");
+        assertThatThrownBy(() -> session.execute(failingAction151)).isInstanceOf(UnsupportedActionException.class);
     }
 
     @Test
@@ -157,7 +160,8 @@ class UpnpSessionTest {
 
         fake.hangUp(true);
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
-        assertThatThrownBy(() -> session.execute(new Action.SetVolume(10))).isInstanceOf(DeviceOfflineException.class);
+        var failingAction160 = new Action.SetVolume(10);
+        assertThatThrownBy(() -> session.execute(failingAction160)).isInstanceOf(DeviceOfflineException.class);
 
         fake.hangUp(false);
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
@@ -249,7 +253,7 @@ class UpnpSessionTest {
     }
 
     @Test
-    void pollsFasterWhilePlaying() throws IOException {
+    void pollsFasterWhilePlaying() {
         session = track(new UpnpSession(fake.device("kitchen"), new UpnpProperties(true, 1, 30, 1, 1, 1, 2),
                 SoapClient.httpClient(Duration.ofSeconds(1)), udn -> Optional.empty(), states::add, () -> { }));
         session.start();
@@ -267,7 +271,8 @@ class UpnpSessionTest {
         startConnected();
 
         fake.delayAnswers(Duration.ofSeconds(2));
-        assertThatThrownBy(() -> session.execute(new Action.SetVolume(30)))
+        var failingAction270 = new Action.SetVolume(30);
+        assertThatThrownBy(() -> session.execute(failingAction270))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("did not answer in time");
 
@@ -284,7 +289,8 @@ class UpnpSessionTest {
                 .until(() -> session.state().status() == DeviceStatus.CONNECTED);
 
         fake.answerRaw("Pause", 200, "<x/>");
-        assertThatThrownBy(() -> session.execute(new Action.Pause()))
+        var failingAction287 = new Action.Pause();
+        assertThatThrownBy(() -> session.execute(failingAction287))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("Unreadable answer to Pause");
     }

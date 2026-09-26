@@ -83,7 +83,7 @@ public class CastDiscovery {
         }
         try {
             return (Integer.parseInt(txt.getOrDefault("ca", "0")) & CAPABILITY_MULTIZONE_GROUP) != 0;
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return false;
         }
     }

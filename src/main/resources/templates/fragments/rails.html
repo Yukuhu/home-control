@@ -25,7 +25,7 @@
         <h2 th:text="${rail.title()}">Continue watching</h2>
         <span class="source" th:text="${rail.sourceName()}">Jellyfin</span>
         <th:block th:if="${failed and hasItems}">
-            <span class="rail-stale" role="status">Couldn't refresh</span>
+            <output class="rail-stale">Couldn't refresh</output>
             <!-- hx-swap="none": the response here is a snapshot from before the refresh finished
                  (see the sibling button's comment below); the real update always comes through
                  the version-guarded SSE `rail` watcher (rails.js), which cannot go stale like this. -->
@@ -39,11 +39,11 @@
         <div class="tile skeleton"></div><div class="tile skeleton"></div><div class="tile skeleton"></div>
     </div>
 
-    <div class="tiles" role="list" th:if="${rail.status() != 'LOADING' and hasItems}">
-        <div role="listitem" th:each="item : ${rail.items()}">
+    <ul class="tiles" th:if="${rail.status() != 'LOADING' and hasItems}">
+        <li th:each="item : ${rail.items()}">
             <button th:replace="~{fragments/rails :: tile(${item})}"></button>
-        </div>
-    </div>
+        </li>
+    </ul>
 
     <p class="rail-empty" th:if="${rail.status() == 'READY' and !hasItems}">Nothing here right now</p>
 

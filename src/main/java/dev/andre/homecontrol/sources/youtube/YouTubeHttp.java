@@ -38,7 +38,7 @@ public class YouTubeHttp {
         public JsonNode json() {
             try {
                 return MAPPER.readTree(body);
-            } catch (JacksonException e) {
+            } catch (JacksonException _) {
                 throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "Google sent an answer that is not JSON");
             }
         }
@@ -74,9 +74,9 @@ public class YouTubeHttp {
         HttpResponse<InputStream> response;
         try {
             response = http.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Could not reach " + uri.getHost());
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Interrupted while calling " + uri.getHost());
         }
@@ -89,7 +89,7 @@ public class YouTubeHttp {
                 throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "Google sent an oversized response");
             }
             return new Response(response.statusCode(), response.headers().firstValue("Content-Type").orElse(""), bytes);
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Could not reach " + uri.getHost());
         }
     }

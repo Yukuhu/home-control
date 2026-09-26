@@ -130,8 +130,8 @@ public class PlaybackService {
             return new Route.Unroutable(String.join("; ", resolved.notes()));
         }
         Route route = planner.plan(resolved.item(), resolved.capabilities());
-        if (route instanceof Route.Unroutable unroutable && !resolved.notes().isEmpty()) {
-            return new Route.Unroutable(String.join("; ", resolved.notes()) + "; " + unroutable.reason());
+        if (route instanceof Route.Unroutable(var reason) && !resolved.notes().isEmpty()) {
+            return new Route.Unroutable(String.join("; ", resolved.notes()) + "; " + reason);
         }
         return route;
     }
@@ -139,7 +139,7 @@ public class PlaybackService {
     /** The planner's own reason nothing routes, prefixed with any resolver notes — shared wording with {@link #plan}. */
     private String explain(Resolved resolved) {
         Route route = planner.plan(resolved.item(), resolved.capabilities());
-        String reason = route instanceof Route.Unroutable u ? u.reason() : "no route";
+        String reason = route instanceof Route.Unroutable(var routeReason) ? routeReason : "no route";
         return resolved.notes().isEmpty() ? reason : String.join("; ", resolved.notes()) + "; " + reason;
     }
 
@@ -163,7 +163,7 @@ public class PlaybackService {
                     .findFirst()
                     .orElseThrow(() -> new UnroutableException(device.name() + ": YouTube is switched off on this server"))
                     .execute(lounge, device);
-            case Route.Unroutable unroutable -> throw new UnroutableException(device.name() + ": " + unroutable.reason());
+            case Route.Unroutable(var reason) -> throw new UnroutableException(device.name() + ": " + reason);
         }
     }
 

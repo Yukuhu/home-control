@@ -16,7 +16,7 @@ record TizenDeviceInfo(String name, String modelName, String powerState, String 
     Optional<String> macAddress() {
         try {
             return wifiMac.isEmpty() ? Optional.empty() : Optional.of(MacAddress.normalize(wifiMac));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

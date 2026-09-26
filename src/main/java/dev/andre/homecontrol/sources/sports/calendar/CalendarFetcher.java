@@ -77,7 +77,7 @@ public class CalendarFetcher {
                     }
                     try {
                         current = policy.parse(current.resolve(location).toString());
-                    } catch (IllegalArgumentException e) {
+                    } catch (IllegalArgumentException _) {
                         throw new CalendarFetchException(Kind.BAD_RESPONSE,
                                 host + " redirected to a link Home Control does not follow");
                     }
@@ -113,7 +113,7 @@ public class CalendarFetcher {
                     if (Charset.isSupported(m.group(1).strip())) {
                         return Charset.forName(m.group(1).strip());
                     }
-                } catch (IllegalCharsetNameException | UnsupportedCharsetException ignored) {
+                } catch (IllegalCharsetNameException | UnsupportedCharsetException _) {
                     // fall through to UTF-8
                 }
             }

@@ -15,6 +15,8 @@ public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String server
                                String deviceId, String castReceiverId, Map<String, String> sessionLinks, Map<String, Player> players) {
 
     public static final String SOURCE_ID = "jellyfin";
+    private static final String SERVER_URL_KEY = "serverUrl";
+    private static final String USER_ID_KEY = "userId";
     public static final String TOKEN_SECRET = "jellyfin.token";
     public static final String DEFAULT_CAST_RECEIVER_ID = "F007D354";
     private static final String LINK_PREFIX = "link.";
@@ -50,12 +52,12 @@ public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String server
 
     public Map<String, String> toMap() {
         Map<String, String> map = new LinkedHashMap<>();
-        map.put("serverUrl", serverUrl.toString());
+        map.put(SERVER_URL_KEY, serverUrl.toString());
         map.put("deviceServerUrl", deviceServerUrl.toString());
         map.put("serverId", serverId);
         map.put("serverName", serverName);
         map.put("serverVersion", serverVersion);
-        map.put("userId", userId);
+        map.put(USER_ID_KEY, userId);
         map.put("userName", userName);
         map.put("authMode", authMode.name());
         map.put("deviceId", deviceId);
@@ -66,7 +68,7 @@ public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String server
     }
 
     public static Optional<JellyfinSettings> from(Map<String, String> map) {
-        if (map == null || map.get("serverUrl") == null || map.get("userId") == null) {
+        if (map == null || map.get(SERVER_URL_KEY) == null || map.get(USER_ID_KEY) == null) {
             return Optional.empty();
         }
         Map<String, String> links = new LinkedHashMap<>();
@@ -77,9 +79,9 @@ public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String server
                 links.put(key.substring(LINK_PREFIX.length()), value);
             }
         });
-        return Optional.of(new JellyfinSettings(URI.create(map.get("serverUrl")),
-                URI.create(map.getOrDefault("deviceServerUrl", map.get("serverUrl"))),
-                map.get("serverId"), map.get("serverName"), map.get("serverVersion"), map.get("userId"),
+        return Optional.of(new JellyfinSettings(URI.create(map.get(SERVER_URL_KEY)),
+                URI.create(map.getOrDefault("deviceServerUrl", map.get(SERVER_URL_KEY))),
+                map.get("serverId"), map.get("serverName"), map.get("serverVersion"), map.get(USER_ID_KEY),
                 map.get("userName"), AuthMode.valueOf(map.getOrDefault("authMode", AuthMode.PASSWORD.name())),
                 map.get("deviceId"), map.getOrDefault("castReceiverId", DEFAULT_CAST_RECEIVER_ID), links, players));
     }

@@ -28,6 +28,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 /** One speaker's player: at most one mpv process, started per play, the URL sent over IPC. */
 public final class MpvPlayer implements AutoCloseable {
 
+    private static final String SET_PROPERTY = "set_property";
+    private static final String GET_PROPERTY = "get_property";
+
     private record Running(MpvProcess process, MpvIpc ipc, AtomicInteger consecutiveStatusFailures) {
         Running(MpvProcess process, MpvIpc ipc) {
             this(process, ipc, new AtomicInteger());
@@ -105,6 +108,7 @@ public final class MpvPlayer implements AutoCloseable {
                         case "end-file" -> loaded.completeExceptionally(MpvException.loadFailed(
                                 event.path("file_error").asString(event.path("reason").asString("stopped"))));
                         default -> {
+                            // Other mpv events do not affect the pending file load.
                         }
                     }
                 }
@@ -122,11 +126,11 @@ public final class MpvPlayer implements AutoCloseable {
         process.onExit().thenRun(() -> loaded.completeExceptionally(new IOException("mpv exited")));
         try {
             if (muted) {
-                ipc.command(commandTimeout, "set_property", "mute", true);
+                ipc.command(commandTimeout, SET_PROPERTY, "mute", true);
             }
             ipc.command(commandTimeout, "loadfile", url.toString(), "replace");
             loaded.get(loadTimeout.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
+        } catch (TimeoutException _) {
             stop();
             throw new IOException("the stream did not start within " + loadTimeout.toSeconds() + " s");
         } catch (ExecutionException e) {
@@ -138,7 +142,7 @@ public final class MpvPlayer implements AutoCloseable {
         } catch (IOException | MpvException e) {
             stop();
             throw e;
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             stop();
             throw new InterruptedIOException("interrupted while starting playback");
@@ -151,15 +155,15 @@ public final class MpvPlayer implements AutoCloseable {
     }
 
     public void pause(boolean paused) throws IOException, MpvException {
-        require().ipc().command(commandTimeout, "set_property", "pause", paused);
+        require().ipc().command(commandTimeout, SET_PROPERTY, "pause", paused);
     }
 
     public void volume(int percent) throws IOException, MpvException {
-        require().ipc().command(commandTimeout, "set_property", "volume", Math.clamp(percent, 0, 100));
+        require().ipc().command(commandTimeout, SET_PROPERTY, "volume", Math.clamp(percent, 0, 100));
     }
 
     public void mute(boolean muted) throws IOException, MpvException {
-        require().ipc().command(commandTimeout, "set_property", "mute", muted);
+        require().ipc().command(commandTimeout, SET_PROPERTY, "mute", muted);
     }
 
     /**
@@ -190,7 +194,7 @@ public final class MpvPlayer implements AutoCloseable {
                     flag(current, "mute"));
             current.consecutiveStatusFailures().set(0);
             return Optional.of(status);
-        } catch (IOException e) {
+        } catch (IOException _) {
             // A single failed poll can be a transient IPC hiccup under concurrent access; only tear the
             // player down once a second poll in a row also fails.
             if (current.consecutiveStatusFailures().incrementAndGet() < 2) {
@@ -216,14 +220,15 @@ public final class MpvPlayer implements AutoCloseable {
         }
         try {
             current.ipc().command(commandTimeout, "quit");
-        } catch (IOException | MpvException ignored) {
+        } catch (IOException | MpvException _) {
             // already gone, or it closed the socket while quitting
         }
         current.ipc().close();
         current.process().terminate(Duration.ofSeconds(2));
         try {
             Files.deleteIfExists(socket);
-        } catch (IOException ignored) {
+        } catch (IOException _) {
+            // The process and IPC channel are already closed; a stale socket is removed on next start.
         }
     }
 
@@ -242,24 +247,24 @@ public final class MpvPlayer implements AutoCloseable {
 
     private boolean flag(Running current, String property) throws IOException {
         try {
-            return current.ipc().command(commandTimeout, "get_property", property).asBoolean(false);
-        } catch (MpvException unavailable) {
+            return current.ipc().command(commandTimeout, GET_PROPERTY, property).asBoolean(false);
+        } catch (MpvException _) {
             return false;
         }
     }
 
     private Optional<Double> number(Running current, String property) throws IOException {
         try {
-            JsonNode value = current.ipc().command(commandTimeout, "get_property", property);
+            JsonNode value = current.ipc().command(commandTimeout, GET_PROPERTY, property);
             return value.isNumber() ? Optional.of(value.asDouble(0)) : Optional.empty();
-        } catch (MpvException unavailable) {
+        } catch (MpvException _) {
             return Optional.empty();
         }
     }
 
     private String metadataTitle(Running current) throws IOException {
         try {
-            JsonNode metadata = current.ipc().command(commandTimeout, "get_property", "metadata");
+            JsonNode metadata = current.ipc().command(commandTimeout, GET_PROPERTY, "metadata");
             String icy = null;
             for (Map.Entry<String, JsonNode> entry : metadata.properties()) {
                 String value = entry.getValue().asString("").strip();
@@ -274,7 +279,7 @@ public final class MpvPlayer implements AutoCloseable {
                 }
             }
             return icy;
-        } catch (MpvException unavailable) {
+        } catch (MpvException _) {
             return null;
         }
     }

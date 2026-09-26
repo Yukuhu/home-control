@@ -13,6 +13,8 @@ import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
 
 /** Save-time syntax and size checks. Address resolution belongs to the outbound fetch policy. */
 public final class WorkflowValidator {
+
+    private static final String INVALID_PREFIX = "invalid ";
     private static final int MAX_URL = 8_192;
     private static final Pattern NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,31}");
     private static final Pattern MIME = Pattern.compile("[A-Za-z0-9!#$&^_.+*-]+/[A-Za-z0-9!#$&^_.+*-]+");
@@ -28,6 +30,12 @@ public final class WorkflowValidator {
         if (draft.mode() == null) fail("mode is required");
         if (draft.kind() != ContentKind.VIDEO && draft.kind() != ContentKind.TRACK) fail("kind must be video or audio");
         fetch(draft.fetch());
+        presentation(draft);
+        Set<String> names = mappingNames(draft);
+        cast(draft.cast(), names);
+    }
+
+    private static void presentation(WorkflowDraft draft) {
         if (draft.mode() == Mode.SINGLE) {
             if (draft.listing() != null) fail("single mode cannot have entry selection");
             if (draft.tile() == null) fail("single mode requires a tile");
@@ -43,6 +51,9 @@ public final class WorkflowValidator {
             pointer(draft.listing().subtitlePointer(), "entry subtitle", false);
             pointer(draft.listing().artworkPointer(), "entry artwork", false);
         }
+    }
+
+    private static Set<String> mappingNames(WorkflowDraft draft) {
         if (draft.variables() == null) fail("mappings are required");
         if (draft.variables().size() > 32) fail("too many mappings");
         Set<String> names = new HashSet<>();
@@ -56,7 +67,7 @@ public final class WorkflowValidator {
             }
             pointer(variable.pointer(), "mapping " + variable.name(), true);
         }
-        cast(draft.cast(), names);
+        return names;
     }
 
     private static void fetch(Fetch fetch) {
@@ -66,15 +77,19 @@ public final class WorkflowValidator {
         if (fetch.headers().size() > 16) fail("too many headers");
         Set<String> names = new HashSet<>();
         for (Header header : fetch.headers()) {
-            if (header == null || header.name() == null || !HEADER_NAME.matcher(header.name()).matches()) {
-                fail("invalid header name");
-            }
-            String lower = header.name().toLowerCase(Locale.ROOT);
-            if (DENIED_HEADERS.contains(lower) || lower.startsWith("proxy-")) fail("header is not allowed: " + header.name());
-            if (!names.add(lower)) fail("duplicate header: " + header.name());
-            if (header.value() == null || header.value().chars().anyMatch(c -> c == '\r' || c == '\n' || c == 0)) {
-                fail("invalid header value: " + header.name());
-            }
+            validateHeader(header, names);
+        }
+    }
+
+    private static void validateHeader(Header header, Set<String> names) {
+        if (header == null || header.name() == null || !HEADER_NAME.matcher(header.name()).matches()) {
+            fail("invalid header name");
+        }
+        String lower = header.name().toLowerCase(Locale.ROOT);
+        if (DENIED_HEADERS.contains(lower) || lower.startsWith("proxy-")) fail("header is not allowed: " + header.name());
+        if (!names.add(lower)) fail("duplicate header: " + header.name());
+        if (header.value() == null || header.value().chars().anyMatch(c -> c == '\r' || c == '\n' || c == 0)) {
+            fail("invalid header value: " + header.name());
         }
     }
 
@@ -86,19 +101,19 @@ public final class WorkflowValidator {
     }
 
     private static URI url(String value, String field) {
-        if (value == null || value.isBlank() || value.length() > MAX_URL) fail("invalid " + field);
+        if (value == null || value.isBlank() || value.length() > MAX_URL) fail(INVALID_PREFIX + field);
         try {
             URI uri = new URI(value);
             if (uri.getScheme() == null || !(uri.getScheme().equalsIgnoreCase("http") || uri.getScheme().equalsIgnoreCase("https"))
                     || uri.getHost() == null || uri.getHost().isBlank() || uri.getRawUserInfo() != null
-                    || uri.getRawFragment() != null) fail("invalid " + field);
+                    || uri.getRawFragment() != null) fail(INVALID_PREFIX + field);
             for (String segment : uri.getRawPath().split("/", -1)) {
                 String decodedDots = segment.replaceAll("(?i)%2e", ".");
                 if (!decodedDots.isEmpty() && decodedDots.chars().allMatch(c -> c == '.')) fail("dot path segment in " + field);
             }
             return uri;
-        } catch (URISyntaxException e) {
-            throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "invalid " + field);
+        } catch (URISyntaxException _) {
+            throw new WorkflowException(WorkflowException.Stage.WORKFLOW, INVALID_PREFIX + field);
         }
     }
 
@@ -111,22 +126,22 @@ public final class WorkflowValidator {
             if (required) fail(field + " pointer is required");
             return;
         }
-        if (value.length() > 512 || (!value.isEmpty() && !value.startsWith("/"))) fail("invalid " + field + " pointer");
+        if (value.length() > 512 || (!value.isEmpty() && !value.startsWith("/"))) fail(INVALID_PREFIX + field + " pointer");
         for (int i = 0; i < value.length(); i++) {
             if (value.charAt(i) == '~' && (i + 1 >= value.length()
                     || (value.charAt(i + 1) != '0' && value.charAt(i + 1) != '1'))) {
-                fail("invalid " + field + " pointer escape");
+                fail(INVALID_PREFIX + field + " pointer escape");
             }
             if (value.charAt(i) == '~') i++;
         }
     }
 
     private static void text(String value, int max, String field) {
-        if (value == null || value.isBlank() || value.length() > max) fail("invalid " + field);
+        if (value == null || value.isBlank() || value.length() > max) fail(INVALID_PREFIX + field);
     }
 
     private static void optionalText(String value, int max, String field) {
-        if (value != null && value.length() > max) fail("invalid " + field);
+        if (value != null && value.length() > max) fail(INVALID_PREFIX + field);
     }
 
     private static void fail(String detail) {

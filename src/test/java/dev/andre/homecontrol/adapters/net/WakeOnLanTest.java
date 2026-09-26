@@ -37,7 +37,8 @@ class WakeOnLanTest {
     @Test
     void anInvalidMacIsRejectedBeforeSending() throws Exception {
         try (FakeWakeOnLanReceiver receiver = new FakeWakeOnLanReceiver()) {
-            assertThatThrownBy(() -> new WakeOnLan(receiver.address()).wake("nope"))
+            var preparedReceiver40 = new WakeOnLan(receiver.address());
+            assertThatThrownBy(() -> preparedReceiver40.wake("nope"))
                     .isInstanceOf(IllegalArgumentException.class);
 
             Thread.sleep(500);

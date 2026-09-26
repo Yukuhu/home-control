@@ -30,25 +30,25 @@ public final class WorkflowCastRouteExecutor implements RouteExecutor {
     @Override public boolean executes(Route route) { return route instanceof Route.WorkflowCast; }
 
     @Override public void execute(Route route, Device device) {
-        if (!(route instanceof Route.WorkflowCast workflow)) throw new IllegalArgumentException("Not a workflow route");
+        if (!(route instanceof Route.WorkflowCast(var workflowId, var revision, var entryKey))) throw new IllegalArgumentException("Not a workflow route");
         try {
             requireSource();
             requireCast(device);
-            var definition = store.find(workflow.workflowId())
-                    .filter(d -> d.draft().enabled() && d.revision() == workflow.revision())
+            var definition = store.find(workflowId)
+                    .filter(d -> d.draft().enabled() && d.revision() == revision)
                     .orElseThrow(() -> new WorkflowException(WorkflowException.Stage.WORKFLOW,
                             "Workflow changed; reopen this item"));
             // resolve owns media-address validation; no fetch or DNS work happens under the store lock.
-            var resolved = runner.resolve(definition, workflow.entryKey());
+            var resolved = runner.resolve(definition, entryKey);
             var stream = new PlayableRef.StreamUrl(resolved.url(), resolved.mimeType());
             var action = new Action.CastLoad(CastLoads.DEFAULT_MEDIA_RECEIVER,
                     CastLoads.defaultMediaReceiver(stream, resolved.title()));
-            store.ifCurrent(workflow.workflowId(), workflow.revision(), () -> {
+            store.ifCurrent(workflowId, revision, () -> {
                 requireSource();
                 requireCast(device);
                 try {
                     devices.execute(device.id(), action);
-                } catch (ActionFailedException refused) {
+                } catch (ActionFailedException _) {
                     // A receiver can echo the secret media URL in its error reason.
                     throw new ActionFailedException("Workflow: Cast receiver could not start playback");
                 }

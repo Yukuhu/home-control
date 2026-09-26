@@ -47,13 +47,13 @@ public class DeviceController {
         RemoteKey remoteKey;
         try {
             remoteKey = RemoteKey.valueOf(key.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return text(HttpStatus.BAD_REQUEST, "Unknown key " + key);
         }
         KeyPress keyPress;
         try {
             keyPress = KeyPress.valueOf(press.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return text(HttpStatus.BAD_REQUEST, "Unknown press " + press);
         }
         if (repeat < 1 || repeat > 4) {

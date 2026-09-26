@@ -188,7 +188,8 @@ class YouTubeBrowserAuthorizationTest {
     @ParameterizedTest
     @ValueSource(strings = {"http://192.168.1.10:8080", "https://192.168.1.10", "http://home.example.com", "https://home.local"})
     void unsupportedBrowserOriginsExplainTheDeviceAlternative(String origin) {
-        assertThatThrownBy(() -> YouTubeOAuthCallback.requireSupported(URI.create(origin + "/setup/sources/youtube/callback")))
+        var preparedArg191_0 = URI.create(origin + "/setup/sources/youtube/callback");
+        assertThatThrownBy(() -> YouTubeOAuthCallback.requireSupported(preparedArg191_0))
                 .isInstanceOf(YouTubeException.class).hasMessageContaining("device code");
     }
 

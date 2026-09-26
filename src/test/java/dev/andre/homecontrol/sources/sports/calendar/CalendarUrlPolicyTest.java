@@ -50,7 +50,8 @@ class CalendarUrlPolicyTest {
     @ValueSource(strings = {"127.0.0.1", "::1", "0.0.0.0", "169.254.169.254", "fe80::1", "224.0.0.251", "::ffff:127.0.0.1"})
     void blocksMachineAndLinkAddresses(String address) {
         CalendarUrlPolicy stubbed = new CalendarUrlPolicy(false, literal(address));
-        assertThatThrownBy(() -> stubbed.checkAddress(URI.create("http://example.org/a.ics")))
+        var preparedArg53_0 = URI.create("http://example.org/a.ics");
+        assertThatThrownBy(() -> stubbed.checkAddress(preparedArg53_0))
                 .isInstanceOf(CalendarFetchException.class)
                 .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BLOCKED)
                 .hasMessageContaining("example.org").hasMessageContaining("belongs to this machine");
@@ -66,7 +67,8 @@ class CalendarUrlPolicyTest {
     @Test
     void blocksWhenAnyResolvedAddressIsBlocked() {
         CalendarUrlPolicy stubbed = new CalendarUrlPolicy(false, literal("93.184.216.34", "127.0.0.1"));
-        assertThatThrownBy(() -> stubbed.checkAddress(URI.create("http://rebind.example/a.ics")))
+        var preparedArg69_0 = URI.create("http://rebind.example/a.ics");
+        assertThatThrownBy(() -> stubbed.checkAddress(preparedArg69_0))
                 .isInstanceOf(CalendarFetchException.class)
                 .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BLOCKED);
     }
@@ -77,7 +79,8 @@ class CalendarUrlPolicyTest {
         allowed.checkAddress(URI.create("http://example.org/a.ics"));
 
         CalendarUrlPolicy metadataStillBlocked = new CalendarUrlPolicy(true, literal("169.254.169.254"));
-        assertThatThrownBy(() -> metadataStillBlocked.checkAddress(URI.create("http://example.org/a.ics")))
+        var preparedArg80_0 = URI.create("http://example.org/a.ics");
+        assertThatThrownBy(() -> metadataStillBlocked.checkAddress(preparedArg80_0))
                 .isInstanceOf(CalendarFetchException.class);
     }
 
@@ -86,7 +89,8 @@ class CalendarUrlPolicyTest {
         CalendarUrlPolicy stubbed = new CalendarUrlPolicy(false, host -> {
             throw new java.net.UnknownHostException(host);
         });
-        assertThatThrownBy(() -> stubbed.checkAddress(URI.create("http://nowhere.invalid/a.ics")))
+        var preparedArg89_0 = URI.create("http://nowhere.invalid/a.ics");
+        assertThatThrownBy(() -> stubbed.checkAddress(preparedArg89_0))
                 .isInstanceOf(CalendarFetchException.class)
                 .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNREACHABLE)
                 .hasMessage("Could not find nowhere.invalid");

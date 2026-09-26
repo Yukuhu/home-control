@@ -198,8 +198,8 @@ class YouTubeFixtureContractTest {
         for (JsonNode item : search.path("items")) {
             titles.add(item.path("snippet").path("title").asString(""));
         }
-        assertThat(titles).anyMatch(title -> title.contains("&amp;"));
-        assertThat(titles).anyMatch(title -> title.contains("&#39;"));
+        assertThat(titles).anyMatch(title -> title.contains("&amp;"))
+                .anyMatch(title -> title.contains("&#39;"));
     }
 
     @Test

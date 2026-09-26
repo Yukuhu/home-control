@@ -154,8 +154,8 @@ class PairingServiceTest {
                 sessions,
                 new DataDirectory(blocked));
 
-        assertThatThrownBy(() -> blockedService.begin(
-                "127.0.0.1", fakeDevice.port(), "Living Room Shield"))
+        var preparedArg157_1 = fakeDevice.port();
+        assertThatThrownBy(() -> blockedService.begin("127.0.0.1", preparedArg157_1, "Living Room Shield"))
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(blocked.toString());
 

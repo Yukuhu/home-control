@@ -257,7 +257,7 @@ public class FakeCastReceiver implements AutoCloseable {
                 while ((message = framing.read()) != null) {
                     handle(message);
                 }
-            } catch (IOException | RuntimeException e) {
+            } catch (IOException | RuntimeException _) {
                 // The sender hung up, the test dropped the connection, or the fake is closing.
             } finally {
                 virtualConnections.clear();

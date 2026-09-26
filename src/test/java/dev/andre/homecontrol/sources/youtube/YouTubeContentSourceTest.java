@@ -182,7 +182,8 @@ class YouTubeContentSourceTest {
         fake.respondWhen("GET", "/youtube/v3/playlistItems", r -> EVENING.equals(r.query().get("playlistId")),
                 FakeGoogleServer.Canned.fixture(404, "error-playlist-not-found.json"));
 
-        assertThatThrownBy(() -> source.rail(YouTubePlaylists.railId(EVENING)))
+        var preparedArg185_0 = YouTubePlaylists.railId(EVENING);
+        assertThatThrownBy(() -> source.rail(preparedArg185_0))
                 .isInstanceOf(ContentSourceException.class)
                 .hasMessage("The playlist “Watch this evening” no longer exists or is private to another"
                         + " account; choose it again on the setup page");

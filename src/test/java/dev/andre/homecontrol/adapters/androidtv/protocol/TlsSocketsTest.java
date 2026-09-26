@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.androidtv.protocol;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.junit.jupiter.api.Test;
 
@@ -10,9 +11,12 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLSocket;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigInteger;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.Date;
@@ -24,6 +28,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class TlsSocketsTest {
 
     private final ClientCertificate client = ClientCertificate.generate("client");
+
+    @Test
+    void reportsTheHandshakeFailureTypeAndMessageWithoutAssumingPeerRejection() throws Exception {
+        try (ServerSocket server = new ServerSocket(0)) {
+            Thread.ofVirtual().start(() -> {
+                try (Socket accepted = server.accept()) {
+                    accepted.getOutputStream().write("not TLS".getBytes(StandardCharsets.US_ASCII));
+                } catch (IOException _) {
+                    // The client may close once it detects the invalid TLS response.
+                }
+            });
+
+            assertThatThrownBy(() -> TlsSockets.connect("127.0.0.1", server.getLocalPort(), client, 2_000))
+                    .isInstanceOf(TlsSockets.HandshakeRejectedException.class)
+                    .hasMessageContaining("handshake")
+                    .hasMessageContaining("failed")
+                    .hasMessageContaining("SSLException")
+                    .hasCauseInstanceOf(javax.net.ssl.SSLException.class);
+        }
+    }
 
     @Test
     void rejectsADifferentPinnedCertificateDuringTheHandshake() throws Exception {
@@ -59,13 +83,15 @@ class TlsSocketsTest {
     }
 
     @Test
-    void pairingBootstrapRejectsAForgedSelfSignature() throws Exception {
-        KeyPair differentSigner = ClientCertificate.generate("different-signer").keyPair();
-        X509Certificate forged = certificate(client.keyPair(), differentSigner);
+    void pairingBootstrapAcceptsTheDevicesDummySelfSignatureAfterTlsProvesKeyPossession() throws Exception {
+        ClientCertificate device = dummySignatureIdentity();
+        assertThatThrownBy(() -> device.certificate().verify(device.certificate().getPublicKey()))
+                .isInstanceOf(java.security.SignatureException.class);
 
-        assertThatThrownBy(() -> TlsSockets.PAIRING_TRUST.checkServerTrusted(
-                new X509Certificate[]{forged}, "RSA"))
-                .isInstanceOf(CertificateException.class);
+        try (HandshakeServer server = new HandshakeServer(device);
+             SSLSocket socket = TlsSockets.connect("localhost", server.port(), client, 2_000)) {
+            assertThat(socket.getInputStream().read()).isEqualTo(42);
+        }
     }
 
     @Test
@@ -85,6 +111,34 @@ class TlsSocketsTest {
     private static ClientCertificate expiredIdentity() throws Exception {
         KeyPair keyPair = ClientCertificate.generate("expired-device").keyPair();
         return new ClientCertificate(keyPair, certificate(keyPair, keyPair));
+    }
+
+    private static ClientCertificate dummySignatureIdentity() throws Exception {
+        KeyPair keyPair = ClientCertificate.generate("dummy-signature-device").keyPair();
+        X500Name subject = new X500Name("CN=device");
+        ContentSigner algorithm = new JcaContentSignerBuilder("SHA256WithRSA").build(keyPair.getPrivate());
+        ContentSigner dummy = new ContentSigner() {
+            @Override
+            public org.bouncycastle.asn1.x509.AlgorithmIdentifier getAlgorithmIdentifier() {
+                return algorithm.getAlgorithmIdentifier();
+            }
+
+            @Override
+            public OutputStream getOutputStream() {
+                return OutputStream.nullOutputStream();
+            }
+
+            @Override
+            public byte[] getSignature() {
+                return new byte[]{0};
+            }
+        };
+        X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(
+                new JcaX509v3CertificateBuilder(subject, BigInteger.ONE,
+                        Date.from(Instant.parse("2020-01-01T00:00:00Z")),
+                        Date.from(Instant.parse("2040-01-01T00:00:00Z")), subject, keyPair.getPublic())
+                        .build(dummy));
+        return new ClientCertificate(keyPair, certificate);
     }
 
     private static X509Certificate certificate(KeyPair subjectKey, KeyPair signingKey) throws Exception {

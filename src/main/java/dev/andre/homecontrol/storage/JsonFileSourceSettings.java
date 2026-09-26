@@ -28,6 +28,9 @@ import java.util.TreeMap;
  */
 public class JsonFileSourceSettings {
 
+    private static final String SOURCES = "sources";
+    private static final String PREFERENCES = "preferences";
+
     private static final int VERSION = 1;
 
     private final JsonMapper mapper = JsonMapper.builder().build();
@@ -40,28 +43,28 @@ public class JsonFileSourceSettings {
     /** {@code Map.of()} when the file, or that source within it, does not exist. Never creates the file. */
     public synchronized Map<String, String> get(String sourceId) {
         Map<String, String> values = new LinkedHashMap<>();
-        read().path("sources").path(sourceId).properties()
+        read().path(SOURCES).path(sourceId).properties()
                 .forEach(field -> values.put(field.getKey(), field.getValue().asString("")));
         return values;
     }
 
     public synchronized void put(String sourceId, Map<String, String> settings) {
         ObjectNode root = read();
-        ObjectNode sourceNode = objectChild(root, "sources").putObject(sourceId);
+        ObjectNode sourceNode = objectChild(root, SOURCES).putObject(sourceId);
         new TreeMap<>(settings).forEach(sourceNode::put);
         write(root);
     }
 
     public synchronized void remove(String sourceId) {
         ObjectNode root = read();
-        if (objectChild(root, "sources").remove(sourceId) != null) {
+        if (objectChild(root, SOURCES).remove(sourceId) != null) {
             write(root);
         }
     }
 
     /** Empty when nothing was ever saved. A malformed {@code preferences} object is a named {@link StorageException}. */
     public synchronized Optional<SourcePreferences> preferences() {
-        JsonNode node = read().path("preferences");
+        JsonNode node = read().path(PREFERENCES);
         if (node.isMissingNode() || node.isNull()) {
             return Optional.empty();
         }
@@ -82,8 +85,8 @@ public class JsonFileSourceSettings {
 
     public synchronized void putPreferences(SourcePreferences preferences) {
         ObjectNode root = read();
-        root.remove("preferences");
-        ObjectNode node = root.putObject("preferences");
+        root.remove(PREFERENCES);
+        ObjectNode node = root.putObject(PREFERENCES);
         preferences.railOrder().forEach(node.putArray("railOrder")::add);
         preferences.hiddenRails().forEach(node.putArray("hiddenRails")::add);
         preferences.disabledSources().forEach(node.putArray("disabledSources")::add);
@@ -140,7 +143,7 @@ public class JsonFileSourceSettings {
         if (!Files.exists(file)) {
             ObjectNode root = mapper.createObjectNode();
             root.put("version", VERSION);
-            root.putObject("sources");
+            root.putObject(SOURCES);
             return root;
         }
         try {
@@ -161,14 +164,14 @@ public class JsonFileSourceSettings {
         Path temp = null;
         try {
             Files.createDirectories(parent);
-            temp = Files.createTempFile(parent, "sources", ".json");
+            temp = Files.createTempFile(parent, SOURCES, ".json");
             Files.write(temp, mapper.writeValueAsBytes(root));
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException | JacksonException e) {
             if (temp != null) {
                 try {
                     Files.deleteIfExists(temp);
-                } catch (IOException ignored) {
+                } catch (IOException _) {
                     // Cleanup error; let the original exception propagate
                 }
             }

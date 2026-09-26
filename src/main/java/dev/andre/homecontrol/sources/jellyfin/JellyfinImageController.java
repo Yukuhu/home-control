@@ -42,7 +42,7 @@ public class JellyfinImageController {
         String id;
         try {
             id = JellyfinClient.id(itemId);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return ResponseEntity.badRequest().build();
         }
         if (!TYPES.contains(type) || (tag != null && !TAG.matcher(tag).matches())) {
@@ -57,7 +57,7 @@ public class JellyfinImageController {
         Optional<JellyfinClient.Image> image;
         try {
             image = client.image(settings.get().serverUrl(), id, type, tag, clampedWidth);
-        } catch (JellyfinException e) {
+        } catch (JellyfinException _) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
         if (image.isEmpty()) {

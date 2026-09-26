@@ -165,17 +165,17 @@ public final class FakeMpv implements AutoCloseable {
         }
         try {
             server.close();
-        } catch (IOException ignored) {
+        } catch (IOException _) {
         }
         for (SocketChannel client : clients) {
             try {
                 client.close();
-            } catch (IOException ignored) {
+            } catch (IOException _) {
             }
         }
         try {
             Files.deleteIfExists(socket);
-        } catch (IOException ignored) {
+        } catch (IOException _) {
         }
         log.accept("{\"type\":\"exit\"}");
         quit.countDown();
@@ -188,7 +188,7 @@ public final class FakeMpv implements AutoCloseable {
                 clients.add(client);
                 Thread.ofVirtual().name("fake-mpv-client").start(() -> serveClient(client));
             }
-        } catch (IOException closed) {
+        } catch (IOException _) {
             // server closed
         }
     }
@@ -196,7 +196,7 @@ public final class FakeMpv implements AutoCloseable {
     private void serveClient(SocketChannel client) {
         try {
             MpvIpc.readLines(client, line -> handle(client, line));
-        } catch (IOException closed) {
+        } catch (IOException _) {
             // client gone
         }
         clients.remove(client);
@@ -213,7 +213,7 @@ public final class FakeMpv implements AutoCloseable {
             }
             try {
                 Thread.sleep(100);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 return;
             }
         }
@@ -223,7 +223,7 @@ public final class FakeMpv implements AutoCloseable {
         JsonNode request;
         try {
             request = JSON.readTree(line);
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             return;
         }
         List<String> command = new ArrayList<>();
@@ -401,7 +401,7 @@ public final class FakeMpv implements AutoCloseable {
                 while (buffer.hasRemaining()) {
                     client.write(buffer);
                 }
-            } catch (IOException gone) {
+            } catch (IOException _) {
                 // client closed
             }
         }
@@ -434,7 +434,7 @@ public final class FakeMpv implements AutoCloseable {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     Thread.sleep(60_000);
-                } catch (InterruptedException ignored) {
+                } catch (InterruptedException _) {
                 }
             }));
         }
@@ -459,7 +459,7 @@ public final class FakeMpv implements AutoCloseable {
         synchronized (FakeMpv.class) {
             try {
                 Files.writeString(file, line + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            } catch (IOException ignored) {
+            } catch (IOException _) {
             }
         }
     }

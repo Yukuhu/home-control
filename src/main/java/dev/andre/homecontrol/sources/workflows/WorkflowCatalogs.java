@@ -38,7 +38,7 @@ public final class WorkflowCatalogs {
                     published.set(true);
                 }
             });
-        } catch (WorkflowException changed) {
+        } catch (WorkflowException _) {
             return false;
         }
         return published.get();

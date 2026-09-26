@@ -91,7 +91,7 @@ public class TizenSession implements DeviceHandle {
     void start() {
         try {
             scheduler.scheduleWithFixedDelay(this::poll, 0, properties.pollIntervalSeconds(), TimeUnit.SECONDS);
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             // Closed before it started.
         }
     }
@@ -113,8 +113,8 @@ public class TizenSession implements DeviceHandle {
     @Override
     public void execute(Action action) {
         switch (action) {
-            case Action.PressKey press -> pressKey(press.key(), press.press());
-            case Action.OpenAppLink open -> openAppLink(open.uri());
+            case Action.PressKey(var key, var press) -> pressKey(key, press);
+            case Action.OpenAppLink(var uri) -> openAppLink(uri);
             case Action.SelectInput _ -> throw new UnsupportedActionException(
                     device.name() + " does not list its inputs; use the Source button of the TV remote");
             case Action.SetVolume _ -> throw volumeKeysOnly();
@@ -142,7 +142,7 @@ public class TizenSession implements DeviceHandle {
             TizenRemoteConnection current = requireConnected();
             try {
                 current.key(code, press == KeyPress.START_LONG ? "Press" : "Release");
-            } catch (IOException e) {
+            } catch (IOException _) {
                 throw new DeviceOfflineException(device.name() + " dropped the connection");
             }
             return;
@@ -159,7 +159,7 @@ public class TizenSession implements DeviceHandle {
         TizenRemoteConnection current = requireConnected();
         try {
             current.key(code);
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw new DeviceOfflineException(device.name() + " dropped the connection");
         }
     }
@@ -167,24 +167,24 @@ public class TizenSession implements DeviceHandle {
     private void openAppLink(URI uri) {
         TizenRemoteConnection current = requireConnected();
         switch (TizenLaunches.forUri(uri, current.installedApps())) {
-            case TizenLaunch.Dial launch -> {
+            case TizenLaunch.Dial(var app, var body) -> {
                 try {
-                    dial.launch(device.host(), launch.app(), launch.body());
+                    dial.launch(device.host(), app, body);
                 } catch (DialException e) {
                     throw new ActionFailedException(device.name() + ": " + e.getMessage());
-                } catch (IOException e) {
+                } catch (IOException _) {
                     throw new DeviceOfflineException(device.name() + " did not answer the DIAL request");
                 }
             }
             case TizenLaunch.App app -> {
                 try {
                     current.launchApp(app.appId(), app.actionType());
-                } catch (IOException e) {
+                } catch (IOException _) {
                     throw new DeviceOfflineException(device.name() + " dropped the connection");
                 }
             }
-            case TizenLaunch.Unsupported unsupported -> throw new UnsupportedActionException(
-                    device.name() + ": " + unsupported.reason());
+            case TizenLaunch.Unsupported(var reason) -> throw new UnsupportedActionException(
+                    device.name() + ": " + reason);
         }
         pollNow(); // show the app that just came to the front without waiting for the next interval
     }
@@ -207,7 +207,7 @@ public class TizenSession implements DeviceHandle {
         }
         try {
             scheduler.schedule(this::poll, properties.wakeGraceSeconds(), TimeUnit.SECONDS);
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             // Closed meanwhile.
         }
     }
@@ -379,7 +379,7 @@ public class TizenSession implements DeviceHandle {
         }
         try {
             scheduler.execute(task);
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             // Closed meanwhile.
         }
     }

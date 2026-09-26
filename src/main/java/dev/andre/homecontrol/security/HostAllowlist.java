@@ -114,7 +114,7 @@ public final class HostAllowlist {
         try {
             Inet4Address.ofLiteral(host); // never resolves
             return true;
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return false;
         }
     }
@@ -126,7 +126,7 @@ public final class HostAllowlist {
         try {
             Inet6Address.ofLiteral(literal); // never resolves
             return true;
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return false;
         }
     }
@@ -135,7 +135,7 @@ public final class HostAllowlist {
         try {
             String host = new URI(origin.strip()).getHost();
             return host == null ? null : host.toLowerCase(Locale.ROOT);
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             return null;
         }
     }

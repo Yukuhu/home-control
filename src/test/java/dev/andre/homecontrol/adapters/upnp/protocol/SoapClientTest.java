@@ -64,9 +64,9 @@ class SoapClientTest {
                 if (bytes.length > 0) {
                     exchange.getResponseBody().write(bytes);
                 }
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
-            } catch (IOException ignored) {
+            } catch (IOException _) {
                 // the client gave up
             }
         });

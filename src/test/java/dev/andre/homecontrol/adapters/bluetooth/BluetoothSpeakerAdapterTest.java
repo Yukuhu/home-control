@@ -64,7 +64,7 @@ class BluetoothSpeakerAdapterTest {
     }
 
     @Test
-    void connectStartsASession() throws Exception {
+    void connectStartsASession() {
         Device device = speaker("AA:BB:CC:DD:EE:FF");
         bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true)
                 .uuids(BluetoothDeviceInfo.A2DP_SINK);

@@ -289,7 +289,7 @@ public class FakeUpnpRenderer implements AutoCloseable {
         if (!delay.isZero()) {
             try {
                 Thread.sleep(delay);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 return;
             }

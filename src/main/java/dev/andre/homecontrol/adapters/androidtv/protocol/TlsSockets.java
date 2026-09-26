@@ -18,14 +18,15 @@ import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPublicKey;
 import java.util.Arrays;
 
 /**
  * TLS plumbing for both device ports.
  *
- * <p>The device presents a self-signed certificate, so there is no CA to validate
- * against. Pairing first verifies a self-signed certificate and TLS proves possession
- * of its private key; the on-screen pairing exchange establishes the device's identity.
+ * <p>The device presents a self-issued certificate without a CA; some Android TV devices
+ * put a dummy signature in that certificate. TLS proves possession of its private key,
+ * while the on-screen pairing exchange establishes the device's identity.
  * Afterwards, the recorded certificate fingerprint is checked during the TLS handshake,
  * before the command channel can process any application messages.
  */
@@ -104,12 +105,27 @@ public final class TlsSockets {
             // the server's TrustManager rejection closed the accepted socket before the
             // alert was flushed.
             throw new HandshakeRejectedException(
-                    "The TLS handshake with " + host + ":" + port + " was rejected", e);
+                    "The TLS handshake with " + host + ":" + port + " failed (" + handshakeDetail(e) + ")", e);
         } catch (IOException | RuntimeException e) {
             closeAfterFailure(socket, e);
             throw e;
         }
         return socket;
+    }
+
+    private static String handshakeDetail(Exception failure) {
+        // Only TLS/socket exceptions reach this method. Show their local diagnostic,
+        // never the certificate or application frames; normalize controls for one-line UI/logs.
+        String message = failure.getMessage();
+        if (message == null || message.isBlank()) {
+            return failure.getClass().getSimpleName();
+        }
+        StringBuilder safe = new StringBuilder();
+        for (int i = 0; i < message.length() && safe.length() < 200; i++) {
+            char c = message.charAt(i);
+            safe.append(Character.isISOControl(c) ? ' ' : c);
+        }
+        return failure.getClass().getSimpleName() + ": " + safe.toString().strip();
     }
 
     private static void closeAfterFailure(Socket socket, Throwable failure) {
@@ -176,7 +192,12 @@ public final class TlsSockets {
         public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
             X509Certificate certificate = peerCertificate(chain, authType);
             if (expectedFingerprint == null) {
-                verifySelfSigned(certificate);
+                // Pairing bootstrap: Android TV can put a dummy X.509 self-signature here.
+                // TLS verifies possession of this RSA key; the on-screen code authenticates
+                // the device before its certificate fingerprint is stored for later sessions.
+                if (!(certificate.getPublicKey() instanceof RSAPublicKey)) {
+                    throw new CertificateException("The device did not provide an RSA certificate");
+                }
             } else if (!expectedFingerprint.equals(ClientCertificate.fingerprintOf(certificate))) {
                 throw new CertificatePinException();
             }
@@ -186,27 +207,26 @@ public final class TlsSockets {
         public X509Certificate[] getAcceptedIssuers() {
             return new X509Certificate[0];
         }
-    }
 
-    private static X509Certificate peerCertificate(X509Certificate[] chain, String authType)
-            throws CertificateException {
-        if (chain == null || chain.length == 0 || authType == null || authType.isBlank()) {
-            throw new IllegalArgumentException("A certificate chain and authentication type are required");
+        private static X509Certificate peerCertificate(X509Certificate[] chain, String authType)
+                throws CertificateException {
+            if (chain == null || chain.length == 0 || authType == null || authType.isBlank()) {
+                throw new IllegalArgumentException("A certificate chain and authentication type are required");
+            }
+            if (chain[0] == null) {
+                throw new CertificateException("The peer did not provide a certificate");
+            }
+            return chain[0];
         }
-        if (chain[0] == null) {
-            throw new CertificateException("The peer did not provide a certificate");
-        }
-        return chain[0];
-    }
 
-    private static void verifySelfSigned(X509Certificate certificate) throws CertificateException {
-        // This proves certificate integrity, not a CA-backed device identity. Pairing's
-        // on-screen code authenticates the public key. Do not impose certificate dates:
-        // appliances can have stale clocks and keep their paired identity past expiry.
-        try {
-            certificate.verify(certificate.getPublicKey());
-        } catch (GeneralSecurityException e) {
-            throw new CertificateException("The peer certificate is not correctly self-signed", e);
+        private static void verifySelfSigned(X509Certificate certificate) throws CertificateException {
+            // Outbound Android TV connections do not invoke this client-certificate callback;
+            // test servers use it to reject malformed client identities.
+            try {
+                certificate.verify(certificate.getPublicKey());
+            } catch (GeneralSecurityException e) {
+                throw new CertificateException("The peer certificate is not correctly self-signed", e);
+            }
         }
     }
 

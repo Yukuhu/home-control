@@ -10,6 +10,8 @@ public record SportsSettings(String timeZone, List<CalendarEntry> calendars, Key
                              List<CompetitionEntry> competitions) {
 
     public enum KeyKind { FREE, PERSONAL }
+    private static final String CALENDAR_PREFIX = "calendar:";
+    private static final String THE_SPORTS_DB_PREFIX = "thesportsdb:";
 
     public record CalendarEntry(String id, String label, String host, String provider, Instant addedAt) {
     }
@@ -45,11 +47,11 @@ public record SportsSettings(String timeZone, List<CalendarEntry> calendars, Key
     }
 
     public static String calendarKey(String id) {
-        return "calendar:" + id;
+        return CALENDAR_PREFIX + id;
     }
 
     public static String competitionKey(String leagueId) {
-        return "thesportsdb:" + leagueId;
+        return THE_SPORTS_DB_PREFIX + leagueId;
     }
 
     public Optional<CalendarEntry> calendar(String id) {
@@ -64,11 +66,11 @@ public record SportsSettings(String timeZone, List<CalendarEntry> calendars, Key
         if (competitionKey == null) {
             return Optional.empty();
         }
-        if (competitionKey.startsWith("calendar:")) {
-            return calendar(competitionKey.substring("calendar:".length())).map(CalendarEntry::label);
+        if (competitionKey.startsWith(CALENDAR_PREFIX)) {
+            return calendar(competitionKey.substring(CALENDAR_PREFIX.length())).map(CalendarEntry::label);
         }
-        if (competitionKey.startsWith("thesportsdb:")) {
-            return competition(competitionKey.substring("thesportsdb:".length())).map(CompetitionEntry::name);
+        if (competitionKey.startsWith(THE_SPORTS_DB_PREFIX)) {
+            return competition(competitionKey.substring(THE_SPORTS_DB_PREFIX.length())).map(CompetitionEntry::name);
         }
         return Optional.empty();
     }
@@ -77,11 +79,11 @@ public record SportsSettings(String timeZone, List<CalendarEntry> calendars, Key
         if (competitionKey == null) {
             return Optional.empty();
         }
-        if (competitionKey.startsWith("calendar:")) {
-            return calendar(competitionKey.substring("calendar:".length())).map(CalendarEntry::provider);
+        if (competitionKey.startsWith(CALENDAR_PREFIX)) {
+            return calendar(competitionKey.substring(CALENDAR_PREFIX.length())).map(CalendarEntry::provider);
         }
-        if (competitionKey.startsWith("thesportsdb:")) {
-            return competition(competitionKey.substring("thesportsdb:".length())).map(CompetitionEntry::provider);
+        if (competitionKey.startsWith(THE_SPORTS_DB_PREFIX)) {
+            return competition(competitionKey.substring(THE_SPORTS_DB_PREFIX.length())).map(CompetitionEntry::provider);
         }
         return Optional.empty();
     }

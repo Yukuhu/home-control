@@ -23,8 +23,8 @@ public class YouTubeLoungeResolver implements PlayableResolver {
 
     @Override
     public boolean resolves(PlayableRef ref) {
-        return ref instanceof PlayableRef.AppLink link && "youtube".equals(link.service())
-                && YouTubeVideoIds.fromUrl(link.uri()).isPresent();
+        return ref instanceof PlayableRef.AppLink(var uri, var service) && "youtube".equals(service)
+                && YouTubeVideoIds.fromUrl(uri).isPresent();
     }
 
     @Override

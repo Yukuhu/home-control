@@ -28,7 +28,8 @@ class WorkflowTemplateTest {
     @Test void rejectsDotSegmentsAfterExpansion() {
         var template = new WorkflowTemplate("https://media.example/{A}/play", Set.of("A"));
         for (String value : new String[]{".", ".."}) {
-            assertThatThrownBy(() -> template.expand(Map.of("A", new WorkflowJson.Value(value, false))))
+            var preparedArg31_0 = Map.of("A", new WorkflowJson.Value(value, false));
+            assertThatThrownBy(() -> template.expand(preparedArg31_0))
                     .isInstanceOf(WorkflowException.class);
         }
     }
@@ -36,7 +37,8 @@ class WorkflowTemplateTest {
     @Test void unresolvedVariablesAndOversizedExpansionFail() {
         var template = new WorkflowTemplate("https://media.example/{A}", Set.of("A"));
         assertThatThrownBy(() -> template.expand(Map.of())).isInstanceOf(WorkflowException.class);
-        assertThatThrownBy(() -> template.expand(Map.of("A", new WorkflowJson.Value("x".repeat(8200), false))))
+        var preparedArg39_0 = Map.of("A", new WorkflowJson.Value("x".repeat(8200), false));
+        assertThatThrownBy(() -> template.expand(preparedArg39_0))
                 .isInstanceOf(WorkflowException.class);
     }
 
@@ -56,10 +58,12 @@ class WorkflowTemplateTest {
     @Test void invalidPlaceholdersAndQueryKeysFailAtConstruction() {
         for (String bad : new String[]{"https://media.example/?{A}&id=1", "https://media.example/?{A}=x",
                 "https://{A}/play", "https://media.example/{A", "https://media.example/a}"}) {
-            assertThatThrownBy(() -> new WorkflowTemplate(bad, Set.of("A")))
+            var preparedArg59_1 = Set.of("A");
+            assertThatThrownBy(() -> new WorkflowTemplate(bad, preparedArg59_1))
                     .isInstanceOf(WorkflowException.class);
         }
-        assertThatThrownBy(() -> new WorkflowTemplate("https://media.example/?id={B}", Set.of("A")))
+        var preparedArg62_1 = Set.of("A");
+        assertThatThrownBy(() -> new WorkflowTemplate("https://media.example/?id={B}", preparedArg62_1))
                 .isInstanceOf(WorkflowException.class);
     }
 }

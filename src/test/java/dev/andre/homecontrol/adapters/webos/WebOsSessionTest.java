@@ -145,7 +145,8 @@ class WebOsSessionTest {
         started();
         connected();
 
-        assertThatThrownBy(() -> session.execute(new Action.PressKey(RemoteKey.MEDIA_NEXT)))
+        var failingAction148 = new Action.PressKey(RemoteKey.MEDIA_NEXT);
+        assertThatThrownBy(() -> session.execute(failingAction148))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessageContaining("LG TV");
     }
@@ -233,7 +234,8 @@ class WebOsSessionTest {
         started();
         awaitStatus(DeviceStatus.DISCONNECTED);
 
-        assertThatThrownBy(() -> session.execute(new Action.PressKey(RemoteKey.POWER)))
+        var failingAction236 = new Action.PressKey(RemoteKey.POWER);
+        assertThatThrownBy(() -> session.execute(failingAction236))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("MAC address")
                 .hasMessageContaining("setup page");
@@ -245,7 +247,8 @@ class WebOsSessionTest {
         tv.refuseConnections(true);
         started();
 
-        assertThatThrownBy(() -> session.execute(new Action.PressKey(RemoteKey.HOME)))
+        var failingAction248 = new Action.PressKey(RemoteKey.HOME);
+        assertThatThrownBy(() -> session.execute(failingAction248))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("not connected");
         tv.refuseConnections(false);
@@ -272,7 +275,8 @@ class WebOsSessionTest {
         started();
         connected();
 
-        assertThatThrownBy(() -> session.execute(new Action.CastLoad("CC1AD845", Map.of())))
+        var failingAction275 = new Action.CastLoad("CC1AD845", Map.of());
+        assertThatThrownBy(() -> session.execute(failingAction275))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -350,7 +354,8 @@ class WebOsSessionTest {
         connected();
         tv.ignoreRequests(SsapUris.LAUNCH);
 
-        assertThatThrownBy(() -> session.execute(new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ"))))
+        var failingAction353 = new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ"));
+        assertThatThrownBy(() -> session.execute(failingAction353))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("did not answer in time");
         assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);

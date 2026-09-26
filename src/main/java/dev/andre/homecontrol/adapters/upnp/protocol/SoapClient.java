@@ -31,7 +31,7 @@ public final class SoapClient {
     private static final String ENVELOPE_END = "</s:Body></s:Envelope>";
 
     private static final Pattern SERVICE_TYPE = Pattern.compile("^urn:[A-Za-z0-9.:\\-]+$");
-    private static final Pattern ACTION = Pattern.compile("^[A-Za-z][A-Za-z0-9_]*$");
+    private static final Pattern ACTION = Pattern.compile("^[A-Za-z]\\w*$");
 
     private final HttpClient http;
     private final Duration timeout;
@@ -80,9 +80,9 @@ public final class SoapClient {
             response = DeviceFetch.send(http, httpRequest, MAX_RESPONSE_BYTES, timeout);
         } catch (HttpConnectTimeoutException e) {
             throw e; // unreachable, not slow
-        } catch (HttpTimeoutException e) {
+        } catch (HttpTimeoutException _) {
             throw new SoapTimeoutException("No answer to " + request.action() + " within " + timeout.toMillis() + " ms");
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new InterruptedIOException("Interrupted while calling " + request.action());
         }
@@ -102,7 +102,7 @@ public final class SoapClient {
             Map<String, String> values = new LinkedHashMap<>();
             UpnpXml.childElements(response).forEach(child -> values.put(UpnpXml.localName(child), child.getTextContent()));
             return Collections.unmodifiableMap(values);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new SoapFault(0, "Unreadable answer to " + action);
         }
     }
@@ -116,7 +116,7 @@ public final class SoapClient {
                     .or(() -> UpnpXml.firstDescendant(root, "faultstring").map(e -> e.getTextContent().trim()))
                     .orElse("");
             return code == 0 && description.isEmpty() ? new SoapFault(0, "HTTP 500 for " + action) : new SoapFault(code, description);
-        } catch (IllegalArgumentException e) { // includes NumberFormatException
+        } catch (IllegalArgumentException _) { // includes NumberFormatException
             return new SoapFault(0, "HTTP 500 for " + action);
         }
     }

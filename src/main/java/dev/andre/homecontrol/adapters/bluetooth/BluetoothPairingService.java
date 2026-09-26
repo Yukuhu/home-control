@@ -87,23 +87,9 @@ public class BluetoothPairingService {
                 ignoringAlreadyDone(() -> bluez.pair(adapter.address(), address));
             }
             bluez.trust(adapter.address(), address);
-            String warning = null;
-            if (!info.connected()) {
-                try {
-                    bluez.connect(adapter.address(), address);
-                } catch (BluezException e) {
-                    warning = "Paired " + info.displayName() + ", but it did not connect: " + e.getMessage();
-                }
-            }
+            String warning = connectIfNeeded(adapter, address, info);
             BluetoothDeviceInfo paired = bluez.device(adapter.address(), address).orElse(info);
-            if (paired.servicesKnown() && !paired.audioSink()) {
-                try {
-                    bluez.remove(adapter.address(), address);
-                } catch (BluezException e) {
-                    log.warn("Could not remove {} again: {}", address, e.getMessage());
-                }
-                throw notASpeaker(paired);
-            }
+            rejectNonSpeaker(adapter, address, paired);
             String id = BluetoothSettings.deviceId(address);
             Optional<Device> existing = devices.device(id);
             String name = existing.map(Device::name).orElse(paired.displayName());
@@ -116,6 +102,30 @@ public class BluetoothPairingService {
             return new BluetoothPairing(device, warning);
         } catch (BluezException e) {
             throw new BluetoothSetupException(e.getMessage());
+        }
+    }
+
+    private String connectIfNeeded(BluetoothAdapterInfo adapter, String address, BluetoothDeviceInfo info) {
+        if (info.connected()) {
+            return null;
+        }
+        try {
+            bluez.connect(adapter.address(), address);
+            return null;
+        } catch (BluezException e) {
+            return "Paired " + info.displayName() + ", but it did not connect: " + e.getMessage();
+        }
+    }
+
+    private void rejectNonSpeaker(BluetoothAdapterInfo adapter, String address, BluetoothDeviceInfo paired)
+            throws BluetoothSetupException {
+        if (paired.servicesKnown() && !paired.audioSink()) {
+            try {
+                bluez.remove(adapter.address(), address);
+            } catch (BluezException e) {
+                log.warn("Could not remove {} again: {}", address, e.getMessage());
+            }
+            throw notASpeaker(paired);
         }
     }
 

@@ -134,8 +134,9 @@ public class YouTubeAuthorizationService implements AutoCloseable {
             finish(State.FAILED, "Google did not return an authorization code. Start again.");
         } else {
             try {
-                storeGrant(oauth.exchangeCode(secrets.secret(YouTubeSettings.CLIENT_ID).orElseThrow(),
-                        secrets.secret(YouTubeSettings.CLIENT_SECRET).orElseThrow(), code, request.redirectUri(), request.verifier()));
+                var granted = oauth.exchangeCode(secrets.secret(YouTubeSettings.CLIENT_ID).orElseThrow(),
+                        secrets.secret(YouTubeSettings.CLIENT_SECRET).orElseThrow(), code, request.redirectUri(), request.verifier());
+                storeGrant(granted.accessToken(), granted.refreshToken());
             } catch (YouTubeException e) {
                 finish(State.FAILED, e.getMessage());
             }
@@ -209,22 +210,22 @@ public class YouTubeAuthorizationService implements AutoCloseable {
                 case GoogleOAuthClient.TokenPoll.Expired _ -> {
                     return finish(State.EXPIRED, "The code expired before it was entered. Start again.");
                 }
-                case GoogleOAuthClient.TokenPoll.Failed failed -> {
-                    return finish(State.FAILED, "Google refused the authorization (" + failed.error()
-                            + (failed.description().isBlank() ? "" : ": " + failed.description()) + ")");
+                case GoogleOAuthClient.TokenPoll.Failed(var error, var description) -> {
+                    return finish(State.FAILED, "Google refused the authorization (" + error
+                            + (description.isBlank() ? "" : ": " + description) + ")");
                 }
-                case GoogleOAuthClient.TokenPoll.Granted granted -> {
-                    storeGrant(granted);
+                case GoogleOAuthClient.TokenPoll.Granted(var accessToken, var refreshToken) -> {
+                    storeGrant(accessToken, refreshToken);
                 }
             }
         }
         return false;
     }
 
-    private void storeGrant(GoogleOAuthClient.TokenPoll.Granted granted) {
-        secrets.putSecrets(Map.of(YouTubeSettings.REFRESH_TOKEN, granted.refreshToken()));
+    private void storeGrant(GoogleOAuthClient.AccessToken accessToken, String refreshToken) {
+        secrets.putSecrets(Map.of(YouTubeSettings.REFRESH_TOKEN, refreshToken));
         tokens.reset();
-        tokens.prime(granted.accessToken());
+        tokens.prime(accessToken);
         YouTubeSettings current = YouTubeSettings.from(settings.get(YouTubeSettings.SOURCE_ID));
         settings.put(YouTubeSettings.SOURCE_ID,
                 current.withoutAccount().withConnection(clock.instant(), null, null).toMap());

@@ -70,7 +70,7 @@ public final class ProcessMpvLauncher implements MpvLauncher {
                 throw new IOException("mpv did not finish within " + timeout.toMillis() + " ms");
             }
             return StreamRedaction.redact(output.get(2, TimeUnit.SECONDS));
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             process.destroyForcibly();
             Thread.currentThread().interrupt();
             throw new InterruptedIOException("interrupted while running mpv");
@@ -100,7 +100,8 @@ public final class ProcessMpvLauncher implements MpvLauncher {
             this.process = process;
             try {
                 process.getOutputStream().close();
-            } catch (IOException ignored) {
+            } catch (IOException _) {
+                // The process may have already exited and closed its input stream.
             }
             Thread.ofVirtual().name("mpv-stderr-" + process.pid()).start(this::drainErrors);
         }
@@ -117,7 +118,7 @@ public final class ProcessMpvLauncher implements MpvLauncher {
                         }
                     }
                 }
-            } catch (IOException ignored) {
+            } catch (IOException _) {
                 // process ended
             }
         }
@@ -155,7 +156,7 @@ public final class ProcessMpvLauncher implements MpvLauncher {
                     process.destroyForcibly();
                     process.waitFor(2, TimeUnit.SECONDS);
                 }
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 process.destroyForcibly();
                 Thread.currentThread().interrupt();
             }

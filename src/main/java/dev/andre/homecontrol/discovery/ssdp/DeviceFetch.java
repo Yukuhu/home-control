@@ -58,7 +58,7 @@ public final class DeviceFetch {
         }
         try {
             return InetAddress.getByName(host).equals(sender);
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException _) {
             // Unreachable: an address that passed isIpLiteral never performs a lookup and never fails.
             return false;
         }
@@ -71,7 +71,7 @@ public final class DeviceFetch {
         }
         try {
             return isSafeToFetch(location, InetAddress.getByName(announcedAddress));
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException _) {
             return false;
         }
     }
@@ -118,7 +118,7 @@ public final class DeviceFetch {
                 maxBytes, contentLength(info.headers())));
         try {
             return exchange.get(deadline.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
+        } catch (TimeoutException _) {
             exchange.cancel(true);
             throw new HttpTimeoutException("no complete answer within " + deadline.toMillis() + " ms");
         } catch (InterruptedException e) {
@@ -135,7 +135,7 @@ public final class DeviceFetch {
     public static OptionalLong contentLength(HttpHeaders headers) {
         try {
             return headers.firstValueAsLong("Content-Length");
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             return OptionalLong.empty();
         }
     }

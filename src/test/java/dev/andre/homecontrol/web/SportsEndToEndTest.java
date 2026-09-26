@@ -244,17 +244,17 @@ class SportsEndToEndTest {
                 });
                 String railBody = holder[0].body();
                 List<Map<String, String>> items = tiles(railBody);
-                assertThat(items.size()).isGreaterThanOrEqualTo(2);
+                assertThat(items).hasSizeGreaterThanOrEqualTo(2);
                 Map<String, String> calendarTile = items.stream()
                         .filter(t -> "Calendar Live Match".equals(t.get("data-title"))).findFirst().orElseThrow();
-                assertThat(calendarTile.get("data-subtitle")).isEqualTo("Live · E2E league · DAZN (your setting)");
-                assertThat(calendarTile.get("data-kind")).isEqualTo("LIVE_EVENT");
+                assertThat(calendarTile).containsEntry("data-subtitle", "Live · E2E league · DAZN (your setting)");
+                assertThat(calendarTile).containsEntry("data-kind", "LIVE_EVENT");
                 assertThat(calendarTile.get("data-starts-at")).isNotBlank();
                 assertThat(calendarTile.get("data-ends-at")).isNotBlank();
                 Map<String, String> tsdbTile = items.stream()
                         .filter(t -> "TheSportsDB Live Match".equals(t.get("data-title"))).findFirst().orElseThrow();
-                assertThat(tsdbTile.get("data-subtitle")).isEqualTo("Live · German Bundesliga · DAZN (your setting)");
-                assertThat(tsdbTile.get("data-item")).isEqualTo("tsdb:9000001");
+                assertThat(tsdbTile).containsEntry("data-subtitle", "Live · German Bundesliga · DAZN (your setting)");
+                assertThat(tsdbTile).containsEntry("data-item", "tsdb:9000001");
                 assertThat(railBody).doesNotContain("Calendar Finished Match").doesNotContain(TOKEN)
                         .doesNotContain("dazn.com").doesNotContain("playables").doesNotContain("AppLink");
 

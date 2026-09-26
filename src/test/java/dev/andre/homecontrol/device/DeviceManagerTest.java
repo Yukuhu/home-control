@@ -162,9 +162,11 @@ class DeviceManagerTest {
         try (DeviceManager manager = manager(registry, certificates())) {
             manager.start();
 
-            assertThatThrownBy(() -> manager.execute("nope", new Action.PressKey(RemoteKey.HOME)))
+            var failingAction165 = new Action.PressKey(RemoteKey.HOME);
+            assertThatThrownBy(() -> manager.execute("nope", failingAction165))
                     .isInstanceOf(DeviceNotFoundException.class);
-            assertThatThrownBy(() -> manager.execute("speaker", new Action.PressKey(RemoteKey.HOME)))
+            var failingAction167 = new Action.PressKey(RemoteKey.HOME);
+            assertThatThrownBy(() -> manager.execute("speaker", failingAction167))
                     .isInstanceOf(UnsupportedActionException.class);
             assertThat(manager.capabilities("speaker")).isEmpty();
             assertThat(manager.state("speaker").status()).isEqualTo(DeviceStatus.DISCONNECTED);
@@ -224,7 +226,8 @@ class DeviceManagerTest {
         try (DeviceManager manager = manager(registry, certificates())) {
             // The manager was never started, so "shield" has no handle even though its
             // adapter declares REMOTE_KEYS — that is offline, not unsupported.
-            assertThatThrownBy(() -> manager.execute("shield", new Action.PressKey(RemoteKey.HOME)))
+            var failingAction227 = new Action.PressKey(RemoteKey.HOME);
+            assertThatThrownBy(() -> manager.execute("shield", failingAction227))
                     .isInstanceOf(DeviceOfflineException.class);
         }
     }
@@ -267,7 +270,8 @@ class DeviceManagerTest {
             manager.start();
 
             assertThat(manager.state("bad").status()).isEqualTo(DeviceStatus.DISCONNECTED);
-            assertThatThrownBy(() -> manager.execute("bad", new Action.PressKey(RemoteKey.HOME)))
+            var failingAction270 = new Action.PressKey(RemoteKey.HOME);
+            assertThatThrownBy(() -> manager.execute("bad", failingAction270))
                     .isInstanceOf(DeviceOfflineException.class);
             assertThatCode(() -> manager.execute("good", new Action.PressKey(RemoteKey.HOME)))
                     .as("the failing device's adapter must not stop the other device from getting a handle")

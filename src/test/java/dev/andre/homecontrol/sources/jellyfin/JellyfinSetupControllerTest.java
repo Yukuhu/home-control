@@ -11,6 +11,8 @@ import java.net.URI;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -48,7 +50,7 @@ class JellyfinSetupControllerTest {
                 .andExpect(flash().attributeExists("jellyfinError"));
         mockMvc.perform(post("/setup/sources/jellyfin/players").param("device", "missing").param("player", "vlc"))
                 .andExpect(flash().attributeExists("jellyfinError"));
-        verify(setup, org.mockito.Mockito.never()).save(any());
+        verify(setup, never()).save(any());
     }
 
     @Test
@@ -81,7 +83,7 @@ class JellyfinSetupControllerTest {
                         .param("apiKey", "key-1")
                         .param("loginPassword", "household pw 1")
                         .param("loginPasswordConfirmation", "household pw 1"));
-        verify(setup, org.mockito.Mockito.times(2)).connect(captor.capture(), any());
+        verify(setup, times(2)).connect(captor.capture(), any());
         assertThat(captor.getValue().mode()).isEqualTo(JellyfinSettings.AuthMode.API_KEY);
     }
 

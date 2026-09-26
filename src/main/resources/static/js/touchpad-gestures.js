@@ -20,6 +20,8 @@ export function classify(dx, dy) {
     const distance = horizontal ? Math.abs(dx) : Math.abs(dy);
     const repeat = stepsFor(distance);
     if (repeat === 0) return { kind: "none" };
-    const key = horizontal ? (dx > 0 ? "DPAD_RIGHT" : "DPAD_LEFT") : (dy > 0 ? "DPAD_DOWN" : "DPAD_UP");
+    let key;
+    if (horizontal) key = dx > 0 ? "DPAD_RIGHT" : "DPAD_LEFT";
+    else key = dy > 0 ? "DPAD_DOWN" : "DPAD_UP";
     return { kind: "swipe", key, repeat };
 }

@@ -77,7 +77,7 @@ public final class MpvIpc implements AutoCloseable {
             }
             try {
                 Thread.sleep(25);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 throw new InterruptedIOException("interrupted while waiting for mpv");
             }
@@ -122,11 +122,11 @@ public final class MpvIpc implements AutoCloseable {
                 throw MpvException.refused(name, error);
             }
             return response.path("data");
-        } catch (TimeoutException e) {
+        } catch (TimeoutException _) {
             throw new IOException("mpv did not answer " + name + " within " + timeout.toMillis() + " ms");
         } catch (ExecutionException e) {
             throw new IOException("mpv control socket closed while waiting for " + name, e.getCause());
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new InterruptedIOException("interrupted while waiting for mpv");
         } finally {
@@ -143,7 +143,8 @@ public final class MpvIpc implements AutoCloseable {
         if (closed.compareAndSet(false, true)) {
             try {
                 channel.close();
-            } catch (IOException ignored) {
+            } catch (IOException _) {
+                // Close is best effort; pending commands are still failed below.
             }
             IOException gone = new IOException("mpv control socket is closed");
             pending.values().forEach(waiter -> waiter.completeExceptionally(gone));
@@ -190,7 +191,7 @@ public final class MpvIpc implements AutoCloseable {
         JsonNode message;
         try {
             message = JSON.readTree(text);
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             return;
         }
         if (message.has("event")) {

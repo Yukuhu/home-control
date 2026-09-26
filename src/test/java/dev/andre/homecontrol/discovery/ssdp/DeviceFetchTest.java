@@ -44,7 +44,7 @@ class DeviceFetchTest {
                 for (int i = 0; i < 16; i++) {
                     out.write(chunk);
                 }
-            } catch (IOException ignored) {
+            } catch (IOException _) {
                 // the client hung up once over the cap
             }
         });
@@ -57,7 +57,7 @@ class DeviceFetchTest {
                     out.flush();
                     Thread.sleep(100);
                 }
-            } catch (IOException | InterruptedException ignored) {
+            } catch (IOException | InterruptedException _) {
                 // the client gave up
             }
         });

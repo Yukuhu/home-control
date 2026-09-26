@@ -51,7 +51,7 @@ class TmdbFixtureContractTest {
     @Test
     void everyFixtureIsAJsonObject() throws Exception {
         List<String> names = jsonFixtureNames();
-        assertThat(names.size()).as("at least 13 TMDB fixtures").isGreaterThanOrEqualTo(13);
+        assertThat(names).as("at least 13 TMDB fixtures").hasSizeGreaterThanOrEqualTo(13);
         for (String name : names) {
             assertThat(fixture(name).isObject()).as("fixture " + name + " parses to a JSON object").isTrue();
         }

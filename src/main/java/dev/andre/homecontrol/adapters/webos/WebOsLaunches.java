@@ -13,6 +13,8 @@ import java.util.Locale;
  */
 final class WebOsLaunches {
 
+    private static final String CONTENT_ID_FIELD = "contentId";
+
     static final String YOUTUBE = "youtube.leanback.v4";
     static final String NETFLIX = "netflix";
     static final String PRIME_VIDEO = "amazon";
@@ -27,18 +29,18 @@ final class WebOsLaunches {
                     .map(id -> {
                         String target = "https://www.youtube.com/tv?v=" + id;
                         ObjectNode payload = app(YOUTUBE);
-                        payload.put("contentId", target);
+                        payload.put(CONTENT_ID_FIELD, target);
                         payload.putObject("params").put("contentTarget", target);
                         return new WebOsLaunch(SsapUris.LAUNCH, payload);
                     })
                     .orElseGet(() -> new WebOsLaunch(SsapUris.LAUNCH, app(YOUTUBE)));
-            case "netflix" -> ContentLinks.netflixTitleId(uri)
+            case NETFLIX -> ContentLinks.netflixTitleId(uri)
                     .map(id -> {
                         String contentId = "m=http%3A%2F%2Fapi.netflix.com%2Fcatalog%2Ftitles%2Fmovies%2F"
                                 + id + "&source_type=4";
                         ObjectNode payload = app(NETFLIX);
-                        payload.put("contentId", contentId);
-                        payload.putObject("params").put("contentId", contentId);
+                        payload.put(CONTENT_ID_FIELD, contentId);
+                        payload.putObject("params").put(CONTENT_ID_FIELD, contentId);
                         return new WebOsLaunch(SsapUris.LAUNCH, payload);
                     })
                     .orElseGet(() -> new WebOsLaunch(SsapUris.LAUNCH, app(NETFLIX)));

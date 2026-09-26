@@ -34,16 +34,14 @@ jobs:
       - name: Build and run the full suite
         run: ./gradlew build
 
-      - name: Analyze with SonarCloud and gate pull requests
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          REQUIRE_SONAR_QUALITY_GATE: ${{ github.event_name == 'pull_request' }}
-        run: |
-          if [[ -z "$SONAR_TOKEN" ]]; then
-            echo "::error::SONAR_TOKEN is unavailable; the SonarCloud quality gate cannot be verified."
-            exit 1
-          fi
-          ./gradlew sonar "-Dsonar.qualitygate.wait=$REQUIRE_SONAR_QUALITY_GATE"
+      - name: Upload Java analysis reports for SonarCloud
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: java-analysis
+          path: |
+            build/reports/jacoco/test/jacocoTestReport.xml
+            build/test-results/test/TEST-*.xml
+          if-no-files-found: error
 
       # Java bytecode is architecture-independent, so this one jar serves both
       # platforms the publish job builds for.
@@ -117,7 +115,27 @@ jobs:
         run: ./gradlew installPlaywrightBrowsers
 
       - name: Run the browser tests
-        run: ./gradlew e2eTest
+        run: ./gradlew e2eTest -Pe2eCoverage=true
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: scripts/browser-coverage/package-lock.json
+
+      - name: Convert browser execution coverage to LCOV
+        working-directory: scripts/browser-coverage
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          npm run report
+
+      - name: Upload JavaScript coverage for SonarCloud
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: browser-coverage
+          path: build/reports/browser-coverage/lcov.info
+          if-no-files-found: error
 
       - name: Upload the browser test report and traces
         if: always()
@@ -129,13 +147,51 @@ jobs:
             build/e2e-artifacts
           if-no-files-found: ignore
 
+  sonar:
+    name: SonarCloud quality gate
+    needs: [test, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: java-analysis
+          path: build
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: browser-coverage
+          path: build/reports/browser-coverage
+
+      - name: Analyze both test suites and gate pull requests
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          REQUIRE_SONAR_QUALITY_GATE: ${{ github.event_name == 'pull_request' }}
+        run: |
+          if [[ -z "$SONAR_TOKEN" ]]; then
+            echo "::error::SONAR_TOKEN is unavailable; the SonarCloud quality gate cannot be verified."
+            exit 1
+          fi
+          ./gradlew classes testClasses sonar -x test -x jacocoTestReport \
+            "-Dsonar.qualitygate.wait=$REQUIRE_SONAR_QUALITY_GATE"
+
   release:
     name: Release
     # Conventional commits decide whether there is anything to release at all:
     # feat -> minor, fix/perf -> patch, breaking -> minor while still pre-1.0.
     # A push of only docs/ci/chore/test/refactor commits releases nothing.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, image, e2e]
+    needs: [test, image, e2e, sonar]
     runs-on: ubuntu-latest
     permissions:
       contents: write

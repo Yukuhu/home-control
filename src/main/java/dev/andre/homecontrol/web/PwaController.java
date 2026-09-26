@@ -14,6 +14,8 @@ import java.util.Map;
 @RestController
 public class PwaController {
 
+    private static final String IMAGE_PNG = "image/png";
+
     @GetMapping(path = "/manifest.webmanifest", produces = "application/manifest+json")
     public ResponseEntity<Map<String, Object>> manifest() {
         Map<String, Object> manifest = new LinkedHashMap<>();
@@ -27,9 +29,9 @@ public class PwaController {
         manifest.put("theme_color", "#101917");
         manifest.put("icons", List.of(
                 icon("/icons/icon.svg", "any", "image/svg+xml", "any"),
-                icon("/icons/icon-192.png", "192x192", "image/png", "any"),
-                icon("/icons/icon-512.png", "512x512", "image/png", "any"),
-                icon("/icons/maskable-512.png", "512x512", "image/png", "maskable")));
+                icon("/icons/icon-192.png", "192x192", IMAGE_PNG, "any"),
+                icon("/icons/icon-512.png", "512x512", IMAGE_PNG, "any"),
+                icon("/icons/maskable-512.png", "512x512", IMAGE_PNG, "maskable")));
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePublic())
                 .body(manifest);

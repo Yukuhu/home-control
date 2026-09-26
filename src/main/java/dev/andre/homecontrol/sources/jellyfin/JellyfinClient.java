@@ -32,6 +32,9 @@ import java.util.regex.Pattern;
 /** The only class that speaks HTTP to Jellyfin (spec §7: only sources speak content APIs). */
 public class JellyfinClient {
 
+    private static final String CONTENT_TYPE = "Content-Type";
+    private static final String APPLICATION_JSON = "application/json";
+
     static final String CLIENT_NAME = "Home Control";
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9-]{1,64}");
     private static final Pattern SERVER_VERSION_PATTERN = Pattern.compile("^(\\d+)\\.(\\d+)");
@@ -75,7 +78,7 @@ public class JellyfinClient {
                 throw new URISyntaxException(trimmed, "not a plain http(s) URL");
             }
             return uri;
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             throw new JellyfinException(JellyfinException.Kind.INVALID_INPUT,
                     "Enter the Jellyfin address as http://host:8096 (or https://…)");
         }
@@ -119,7 +122,7 @@ public class JellyfinClient {
         body.put("Pw", password);
         try {
             return send(serverUrl, request(serverUrl, "/Users/AuthenticateByName", Map.of(), deviceId, null)
-                    .header("Content-Type", "application/json")
+                    .header(CONTENT_TYPE, APPLICATION_JSON)
                     .POST(HttpRequest.BodyPublishers.ofByteArray(mapper.writeValueAsBytes(body))));
         } catch (JellyfinException e) {
             if (e.kind() == JellyfinException.Kind.UNAUTHORIZED) {
@@ -140,7 +143,7 @@ public class JellyfinClient {
         if (body == null) {
             builder.POST(HttpRequest.BodyPublishers.noBody());
         } else {
-            builder.header("Content-Type", "application/json")
+            builder.header(CONTENT_TYPE, APPLICATION_JSON)
                     .POST(HttpRequest.BodyPublishers.ofByteArray(mapper.writeValueAsBytes(body)));
         }
         return send(connection.serverUrl(), builder);
@@ -178,15 +181,15 @@ public class JellyfinClient {
         HttpResponse<InputStream> response;
         try {
             response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
-        } catch (HttpConnectTimeoutException e) {
+        } catch (HttpConnectTimeoutException _) {
             throw unreachable(serverUrl, "connection timed out");
-        } catch (HttpTimeoutException e) {
+        } catch (HttpTimeoutException _) {
             throw unreachable(serverUrl, "no answer in time");
         } catch (ConnectException e) {
             throw unreachable(serverUrl, e.getCause() instanceof UnresolvedAddressException ? "unknown host" : "connection refused");
         } catch (IOException e) {
             throw unreachable(serverUrl, e.getClass().getSimpleName());
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw unreachable(serverUrl, "interrupted");
         }
@@ -194,7 +197,7 @@ public class JellyfinClient {
             if (response.statusCode() == 404) {
                 return Optional.empty();
             }
-            String contentType = response.headers().firstValue("Content-Type").orElse("");
+            String contentType = response.headers().firstValue(CONTENT_TYPE).orElse("");
             String bareType = contentType.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
             if (response.statusCode() != 200 || !ALLOWED_IMAGE_TYPES.contains(bareType)
                     || contentLengthExceeds(response, MAX_IMAGE_BYTES)) {
@@ -224,7 +227,7 @@ public class JellyfinClient {
     private HttpRequest.Builder request(URI serverUrl, String path, Map<String, String> query, String deviceId, String token) {
         return HttpRequest.newBuilder(URI.create(serverUrl + path + queryString(query)))
                 .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
-                .header("Accept", "application/json")
+                .header("Accept", APPLICATION_JSON)
                 .header("Authorization", authorization(deviceId, token));
     }
 
@@ -232,15 +235,15 @@ public class JellyfinClient {
         HttpResponse<InputStream> response;
         try {
             response = http.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
-        } catch (HttpConnectTimeoutException e) {
+        } catch (HttpConnectTimeoutException _) {
             throw unreachable(serverUrl, "connection timed out");
-        } catch (HttpTimeoutException e) {
+        } catch (HttpTimeoutException _) {
             throw unreachable(serverUrl, "no answer in time");
         } catch (ConnectException e) {
             throw unreachable(serverUrl, e.getCause() instanceof UnresolvedAddressException ? "unknown host" : "connection refused");
         } catch (IOException e) {
             throw unreachable(serverUrl, e.getClass().getSimpleName());
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw unreachable(serverUrl, "interrupted");
         }
@@ -274,7 +277,7 @@ public class JellyfinClient {
             }
             try {
                 return mapper.readTree(bytes);
-            } catch (JacksonException e) {
+            } catch (JacksonException _) {
                 throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an unreadable answer");
             }
         } catch (IOException e) {

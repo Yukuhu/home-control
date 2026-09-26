@@ -17,6 +17,9 @@ import java.util.Set;
 /** "New from your subscriptions": subscriptions → uploads playlists → newest videos, inside a per-refresh budget. */
 public class SubscriptionsFeed {
 
+    private static final String SNIPPET = "snippet";
+    private static final String MAX_RESULTS = "maxResults";
+
     private static final Logger log = LoggerFactory.getLogger(SubscriptionsFeed.class);
     private static final Set<YouTubeException.Kind> FATAL = Set.of(YouTubeException.Kind.REVOKED,
             YouTubeException.Kind.UNAUTHORIZED, YouTubeException.Kind.FORBIDDEN, YouTubeException.Kind.NOT_CONFIGURED);
@@ -89,15 +92,15 @@ public class SubscriptionsFeed {
         String pageToken = null;
         for (int page = 0; page < properties.maxSubscriptionPages(); page++) {
             Map<String, String> query = new LinkedHashMap<>();
-            query.put("part", "snippet");
+            query.put("part", SNIPPET);
             query.put("mine", "true");
-            query.put("maxResults", "50");
+            query.put(MAX_RESULTS, "50");
             query.put("pageToken", pageToken);
             JsonNode response = api.get(QuotaLedger.Call.SUBSCRIPTIONS_LIST, "subscriptions", query);
             for (JsonNode item : response.path("items")) {
-                String channelId = item.path("snippet").path("resourceId").path("channelId").asString("");
+                String channelId = item.path(SNIPPET).path("resourceId").path("channelId").asString("");
                 if (!channelId.isBlank()) {
-                    fresh.put(channelId, item.path("snippet").path("title").asString(""));
+                    fresh.put(channelId, item.path(SNIPPET).path("title").asString(""));
                 }
             }
             pageToken = response.path("nextPageToken").asString("");
@@ -115,7 +118,7 @@ public class SubscriptionsFeed {
             Map<String, String> query = new LinkedHashMap<>();
             query.put("part", "contentDetails");
             query.put("id", String.join(",", batch));
-            query.put("maxResults", "50");
+            query.put(MAX_RESULTS, "50");
             JsonNode response = api.get(QuotaLedger.Call.CHANNELS_LIST, "channels", query);
             for (String id : batch) {
                 uploads.put(id, "");
@@ -141,7 +144,7 @@ public class SubscriptionsFeed {
             Map<String, String> query = new LinkedHashMap<>();
             query.put("part", "snippet,contentDetails");
             query.put("playlistId", uploads.get(channelId));
-            query.put("maxResults", String.valueOf(properties.videosPerChannel()));
+            query.put(MAX_RESULTS, String.valueOf(properties.videosPerChannel()));
             try {
                 JsonNode response = api.get(QuotaLedger.Call.PLAYLIST_ITEMS_LIST, "playlistItems", query);
                 polled.put(channelId, new Polled(YouTubeVideoMapper.playlistItems(response), now));

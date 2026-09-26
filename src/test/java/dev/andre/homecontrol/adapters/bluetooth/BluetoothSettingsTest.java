@@ -17,7 +17,7 @@ class BluetoothSettingsTest {
         BluetoothSettings settings = new BluetoothSettings("aa-bb-cc-dd-ee-ff", "00:1a:7d:da:71:13", null);
         assertThat(settings.address()).isEqualTo("AA:BB:CC:DD:EE:FF");
         assertThat(settings.adapter()).isEqualTo("00:1A:7D:DA:71:13");
-        assertThat(settings.audioDevice()).isEqualTo("");
+        assertThat(settings.audioDevice()).isEmpty();
         assertThat(settings.toMap()).containsExactly(Map.entry("address", "AA:BB:CC:DD:EE:FF"),
                 Map.entry("adapter", "00:1A:7D:DA:71:13"));
 

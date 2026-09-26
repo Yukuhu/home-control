@@ -220,7 +220,7 @@ public final class WorkflowStore {
                 WorkflowDefinition definition = codec.decode(secrets.secret(key).orElseThrow());
                 if (!definition.id().equals(id)) throw new IllegalArgumentException("ID mismatch");
                 definitions.put(id, definition);
-            } catch (RuntimeException invalid) {
+            } catch (RuntimeException _) {
                 problems.put(id, INVALID);
                 invalidKeys.put(id, key);
             }

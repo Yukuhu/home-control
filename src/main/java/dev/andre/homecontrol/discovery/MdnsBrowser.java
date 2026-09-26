@@ -13,6 +13,10 @@ import javax.jmdns.ServiceListener;
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -58,6 +62,13 @@ public class MdnsBrowser implements AutoCloseable {
 
     private JmDNS jmdns;
 
+    @FunctionalInterface
+    interface AddressLookup {
+        InetAddress resolve() throws IOException;
+    }
+
+    record InterfaceAddress(InetAddress address, boolean up, boolean multicast, boolean loopback) {}
+
     /** Created by {@code HomeControlConfiguration} from {@code shield.discovery-enabled}. */
     public MdnsBrowser(boolean enabled) {
         this.enabled = enabled;
@@ -83,12 +94,52 @@ public class MdnsBrowser implements AutoCloseable {
             return;
         }
         try {
-            jmdns = JmDNS.create(InetAddress.getLocalHost());
+            jmdns = JmDNS.create(bindAddress(System.getProperty("net.mdns.interface"),
+                    InetAddress::getLocalHost, MdnsBrowser::interfaceFallback));
             listeners.keySet().forEach(type -> jmdns.addServiceListener(type, new JmdnsListener(type)));
             log.info("Listening for {}", listeners.keySet());
         } catch (IOException e) {
             log.warn("Could not start mDNS discovery ({}); use manual entry", e.getMessage());
         }
+    }
+
+    static InetAddress bindAddress(String configured, AddressLookup localHost, AddressLookup fallback) throws IOException {
+        if (configured != null) return InetAddress.getByName(configured);
+        try {
+            return localHost.resolve();
+        } catch (UnknownHostException _) {
+            return fallback.resolve();
+        }
+    }
+
+    private static InetAddress interfaceFallback() throws IOException {
+        List<InterfaceAddress> addresses = new ArrayList<>();
+        Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+        if (interfaces != null) {
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface network = interfaces.nextElement();
+                try {
+                    boolean up = network.isUp();
+                    boolean multicast = network.supportsMulticast();
+                    boolean loopback = network.isLoopback();
+                    network.getInetAddresses().asIterator().forEachRemaining(address ->
+                            addresses.add(new InterfaceAddress(address, up, multicast, loopback)));
+                } catch (SocketException _) {
+                    // Another interface may still be available.
+                }
+            }
+        }
+        return selectFallback(addresses).orElseThrow(() ->
+                new UnknownHostException("No multicast-capable IPv4 interface is available"));
+    }
+
+    static Optional<InetAddress> selectFallback(List<InterfaceAddress> addresses) {
+        return addresses.stream()
+                .filter(candidate -> candidate.up() && candidate.multicast() && !candidate.loopback()
+                        && candidate.address() instanceof Inet4Address
+                        && !candidate.address().isLoopbackAddress() && !candidate.address().isAnyLocalAddress())
+                .min(Comparator.comparingInt(candidate -> candidate.address().isSiteLocalAddress() ? 0 : 1))
+                .map(InterfaceAddress::address);
     }
 
     /** Pure mapping so it can be tested without multicast. */

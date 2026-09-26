@@ -167,8 +167,8 @@ public class RailCache implements SmartLifecycle {
                 Entry existing = entries.get(key);
                 if (existing != null && existing.descriptor.equals(descriptor)) {
                     next.put(key, existing);
-                } else if (!next.containsKey(key)) {
-                    next.put(key, new Entry(descriptor,
+                } else {
+                    next.computeIfAbsent(key, ignored -> new Entry(descriptor,
                             RailSnapshot.loading(descriptor, versions.incrementAndGet()), clock.instant()));
                 }
             }
@@ -226,7 +226,7 @@ public class RailCache implements SmartLifecycle {
         events.publishEvent(new RailUpdatedEvent(marked));
         try {
             fetches.execute(() -> fetch(entry));
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             synchronized (this) {
                 entry.inFlight = false;
             }
@@ -239,7 +239,7 @@ public class RailCache implements SmartLifecycle {
         RailSnapshot published;
         try {
             permits.acquire();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             synchronized (this) {
                 entry.inFlight = false;
@@ -257,7 +257,7 @@ public class RailCache implements SmartLifecycle {
                     published = succeed(entry, rail, interval);
                 } catch (ContentSourceException e) {
                     published = fail(entry, e.getMessage(), interval);
-                } catch (IllegalArgumentException e) {
+                } catch (IllegalArgumentException _) {
                     published = fail(entry, found.displayName() + " no longer offers " + descriptor.title(), interval);
                 } catch (RuntimeException e) {
                     log.warn("Rail {} failed to load", RailSnapshot.key(descriptor), e);

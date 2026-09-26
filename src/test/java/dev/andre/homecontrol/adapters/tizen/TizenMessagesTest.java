@@ -12,14 +12,12 @@ class TizenMessagesTest {
 
     @Test
     void theRemoteUrlCarriesTheBase64ClientName() {
-        assertThat(TizenMessages.remoteUri("192.168.1.61", 8002, "Home Control", null).toString())
-                .isEqualTo("wss://192.168.1.61:8002/api/v2/channels/samsung.remote.control?name=SG9tZSBDb250cm9s");
+        assertThat(TizenMessages.remoteUri("192.168.1.61", 8002, "Home Control", null)).hasToString("wss://192.168.1.61:8002/api/v2/channels/samsung.remote.control?name=SG9tZSBDb250cm9s");
     }
 
     @Test
     void aStoredTokenIsAppended() {
-        assertThat(TizenMessages.remoteUri("192.168.1.61", 8002, "Home Control", "73184052").toString())
-                .isEqualTo("wss://192.168.1.61:8002/api/v2/channels/samsung.remote.control?name=SG9tZSBDb250cm9s&token=73184052");
+        assertThat(TizenMessages.remoteUri("192.168.1.61", 8002, "Home Control", "73184052")).hasToString("wss://192.168.1.61:8002/api/v2/channels/samsung.remote.control?name=SG9tZSBDb250cm9s&token=73184052");
     }
 
     @Test

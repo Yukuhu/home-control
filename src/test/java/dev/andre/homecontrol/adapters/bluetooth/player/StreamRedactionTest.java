@@ -18,8 +18,8 @@ class StreamRedactionTest {
     @Test
     void hidesLooseKeys() {
         String redacted = StreamRedaction.redact("api_key=abc&x=1 ApiKey=def token=ghi");
-        assertThat(redacted).doesNotContain("abc").doesNotContain("def").doesNotContain("ghi");
-        assertThat(redacted).contains("api_key=…").contains("ApiKey=…").contains("token=…");
+        assertThat(redacted).doesNotContain("abc").doesNotContain("def").doesNotContain("ghi")
+                .contains("api_key=…").contains("ApiKey=…").contains("token=…");
     }
 
     @Test

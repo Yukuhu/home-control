@@ -24,6 +24,8 @@ import java.util.regex.Pattern;
  */
 public final class IcsParser {
 
+    private static final String VEVENT_COMPONENT = "VEVENT";
+
     static final int MAX_EVENTS = 5_000;
     static final String NOT_A_CALENDAR = "That link did not return a calendar (.ics)";
 
@@ -70,7 +72,7 @@ public final class IcsParser {
                         sawCalendar = true;
                     }
                     stack.push(component);
-                    if (component.equals("VEVENT") && stack.size() == 2) {
+                    if (component.equals(VEVENT_COMPONENT) && stack.size() == 2) {
                         current = new ArrayList<>();
                     }
                 }
@@ -79,10 +81,10 @@ public final class IcsParser {
                         continue;
                     }
                     String component = stack.pop();
-                    if (component.equals("VEVENT") && stack.size() == 1 && current != null) {
+                    if (component.equals(VEVENT_COMPONENT) && stack.size() == 1 && current != null) {
                         try {
                             events.add(event(current));
-                        } catch (IcsFormatException e) {
+                        } catch (IcsFormatException _) {
                             skipped++;
                         }
                         current = null;
@@ -98,7 +100,7 @@ public final class IcsParser {
                         } else if (line.name().equals("X-WR-TIMEZONE")) {
                             zone = line.value().strip();
                         }
-                    } else if (current != null && stack.size() == 2 && "VEVENT".equals(stack.peek())) {
+                    } else if (current != null && stack.size() == 2 && VEVENT_COMPONENT.equals(stack.peek())) {
                         current.add(line);
                     }
                 }
@@ -227,7 +229,7 @@ public final class IcsParser {
                         ? new IcsTime.Local(dateTime, blankToNull(tzid))
                         : new IcsTime.Utc(dateTime.toInstant(ZoneOffset.UTC));
             }
-        } catch (DateTimeException e) {
+        } catch (DateTimeException _) {
             throw new IcsFormatException("Unreadable date or time");
         }
         throw new IcsFormatException("Unreadable date or time");
@@ -245,7 +247,7 @@ public final class IcsParser {
             Duration duration = Duration.ofDays(7 * number(m.group(2)) + number(m.group(3)))
                     .plusHours(number(m.group(4))).plusMinutes(number(m.group(5))).plusSeconds(number(m.group(6)));
             return duration.isZero() || duration.isNegative() ? null : duration;
-        } catch (NumberFormatException | ArithmeticException e) {
+        } catch (NumberFormatException | ArithmeticException _) {
             return null;
         }
     }

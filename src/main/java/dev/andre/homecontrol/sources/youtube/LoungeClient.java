@@ -46,7 +46,7 @@ public class LoungeClient {
         String token;
         try {
             token = response.json().path("screens").path(0).path("loungeToken").asString("");
-        } catch (YouTubeException notJson) {
+        } catch (YouTubeException _) {
             token = "";
         }
         if (token.isBlank()) {
@@ -143,7 +143,7 @@ public class LoungeClient {
                 JsonNode events;
                 try {
                     events = MAPPER.readTree(body.substring(start, i + 1));
-                } catch (JacksonException unreadable) {
+                } catch (JacksonException _) {
                     continue;
                 }
                 for (JsonNode event : events) {

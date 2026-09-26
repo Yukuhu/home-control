@@ -8,7 +8,7 @@ public enum DisconnectCause {
     /** Nothing arrived within the stale timeout, so the connection is presumed dead. */
     STALE,
 
-    /** The device refused our certificate: the pairing is gone and retrying is pointless. */
+    /** TLS authentication failed; the session confirms repeated ambiguous failures before latching. */
     UNPAIRED,
 
     ERROR

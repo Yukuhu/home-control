@@ -51,7 +51,7 @@ final class WebOsPayloads {
     private static Optional<String> parseMac(String candidate) {
         try {
             return Optional.of(MacAddress.normalize(candidate));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

@@ -16,7 +16,7 @@ import java.util.Optional;
 public class PinnedContentSource implements ContentSource {
 
     public static final String SOURCE_ID = "pinned";
-    private static final RailDescriptor RAIL = new RailDescriptor(SOURCE_ID, "pinned", "Pinned");
+    private static final RailDescriptor RAIL = new RailDescriptor(SOURCE_ID, SOURCE_ID, "Pinned");
 
     private final PinnedShortcuts pins;
 

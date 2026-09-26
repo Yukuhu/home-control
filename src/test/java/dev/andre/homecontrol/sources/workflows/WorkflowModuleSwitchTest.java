@@ -55,7 +55,9 @@ class WorkflowModuleSwitchTest {
             assertThat(app.getBean(WorkflowContentSource.class).available()).isFalse();
             client.set(app.getBean(WorkflowHttpClient.class));
         });
-        assertThatThrownBy(() -> client.get().fetch(new WorkflowDraft.Fetch("https://never.example", List.of())))
+        var preparedReceiver58 = client.get();
+        var preparedArg58_0 = new WorkflowDraft.Fetch("https://never.example", List.of());
+        assertThatThrownBy(() -> preparedReceiver58.fetch(preparedArg58_0))
                 .isInstanceOf(WorkflowException.class).hasMessageContaining("closed");
     }
 

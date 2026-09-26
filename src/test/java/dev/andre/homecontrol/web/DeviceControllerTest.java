@@ -21,6 +21,7 @@ import java.net.URI;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.times;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -63,7 +64,7 @@ class DeviceControllerTest {
         mockMvc.perform(post("/devices/shield/key/DPAD_RIGHT").param("repeat", "3"))
                 .andExpect(status().isNoContent());
 
-        verify(devices, org.mockito.Mockito.times(3))
+        verify(devices, times(3))
                 .execute("shield", new Action.PressKey(RemoteKey.DPAD_RIGHT, KeyPress.SHORT));
     }
 
@@ -106,7 +107,7 @@ class DeviceControllerTest {
         mockMvc.perform(post("/devices/shield/key/DPAD_RIGHT").param("repeat", "3"))
                 .andExpect(status().isConflict());
 
-        verify(devices, org.mockito.Mockito.times(1)).execute(eq("shield"), any());
+        verify(devices, times(1)).execute(eq("shield"), any());
     }
 
     @Test

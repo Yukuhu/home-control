@@ -46,7 +46,7 @@ public final class FakeWakeOnLanReceiver implements AutoCloseable {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             try {
                 socket.receive(packet);
-            } catch (IOException e) {
+            } catch (IOException _) {
                 return;
             }
             received.incrementAndGet();

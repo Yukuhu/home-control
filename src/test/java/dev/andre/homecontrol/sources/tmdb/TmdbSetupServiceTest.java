@@ -93,8 +93,8 @@ class TmdbSetupServiceTest {
         fake.respond("GET", "/3/authentication", 401, "authentication-invalid.json");
         MockHttpServletRequest request = new MockHttpServletRequest();
 
-        assertThatThrownBy(() -> setup.connect(
-                new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD), request))
+        var preparedArg96_0 = new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD);
+        assertThatThrownBy(() -> setup.connect(preparedArg96_0, request))
                 .isInstanceOf(TmdbException.class)
                 .extracting(e -> ((TmdbException) e).kind())
                 .isEqualTo(TmdbException.Kind.UNAUTHORIZED);
@@ -108,8 +108,8 @@ class TmdbSetupServiceTest {
     void aMalformedCredentialIsInvalidInput() {
         MockHttpServletRequest request = new MockHttpServletRequest();
 
-        assertThatThrownBy(() -> setup.connect(
-                new TmdbSetupService.ConnectRequest("nope", LOGIN_PASSWORD, LOGIN_PASSWORD), request))
+        var preparedArg111_0 = new TmdbSetupService.ConnectRequest("nope", LOGIN_PASSWORD, LOGIN_PASSWORD);
+        assertThatThrownBy(() -> setup.connect(preparedArg111_0, request))
                 .isInstanceOf(TmdbException.class)
                 .hasMessage("Paste the API Read Access Token or the API key from your TMDB account settings")
                 .extracting(e -> ((TmdbException) e).kind())
@@ -122,8 +122,8 @@ class TmdbSetupServiceTest {
     void theFirstSecretNeedsAGoodPassword() {
         MockHttpServletRequest request = new MockHttpServletRequest();
 
-        assertThatThrownBy(() -> setup.connect(
-                new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, "short", "short"), request))
+        var preparedArg125_0 = new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, "short", "short");
+        assertThatThrownBy(() -> setup.connect(preparedArg125_0, request))
                 .isInstanceOf(PasswordRejectedException.class);
 
         assertThat(secretStore.hasSecrets()).isFalse();
@@ -134,8 +134,9 @@ class TmdbSetupServiceTest {
         setup.connect(new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD),
                 new MockHttpServletRequest());
 
-        assertThatThrownBy(() -> setup.connect(
-                new TmdbSetupService.ConnectRequest(FakeTmdbServer.API_KEY, null, null), new MockHttpServletRequest()))
+        var preparedArg137_0 = new TmdbSetupService.ConnectRequest(FakeTmdbServer.API_KEY, null, null);
+        var preparedArg137_1 = new MockHttpServletRequest();
+        assertThatThrownBy(() -> setup.connect(preparedArg137_0, preparedArg137_1))
                 .isInstanceOf(LoginRequiredException.class);
     }
 

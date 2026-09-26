@@ -125,8 +125,8 @@ class TmdbSetupControllerTest {
         given(login.loginRequired()).willReturn(true);
 
         String body = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
-        assertThat(body).contains("Connected (read access token)").contains("Disconnect");
-        assertThat(body).doesNotContain("loginPassword");
-        assertThat(body).doesNotContain(FakeTmdbServer.READ_TOKEN).doesNotContain(FakeTmdbServer.API_KEY);
+        assertThat(body).contains("Connected (read access token)").contains("Disconnect")
+                .doesNotContain("loginPassword")
+                .doesNotContain(FakeTmdbServer.READ_TOKEN).doesNotContain(FakeTmdbServer.API_KEY);
     }
 }

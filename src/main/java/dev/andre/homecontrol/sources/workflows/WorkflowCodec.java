@@ -15,7 +15,7 @@ public final class WorkflowCodec {
             String encoded = JSON.writeValueAsString(definition);
             checkLength(encoded);
             return encoded;
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "definition could not be serialized");
         }
     }
@@ -33,7 +33,7 @@ public final class WorkflowCodec {
             return definition;
         } catch (WorkflowException e) {
             throw e;
-        } catch (JacksonException | IllegalArgumentException e) {
+        } catch (JacksonException | IllegalArgumentException _) {
             throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "definition could not be parsed");
         }
     }

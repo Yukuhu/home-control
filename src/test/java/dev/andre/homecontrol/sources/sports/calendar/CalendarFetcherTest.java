@@ -75,7 +75,8 @@ class CalendarFetcherTest {
     @Test
     void mapsStatusesToUnauthorizedNotFoundAndBadResponse() {
         server.respond("/401", 401, "text/plain", "");
-        assertThatThrownBy(() -> fetcher.fetch(server.url("/401")))
+        var preparedArg78_0 = server.url("/401");
+        assertThatThrownBy(() -> fetcher.fetch(preparedArg78_0))
                 .isInstanceOf(CalendarFetchException.class)
                 .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNAUTHORIZED)
                 .hasMessageContaining("refused access");
@@ -102,7 +103,8 @@ class CalendarFetcherTest {
     void capsTheBody() {
         byte[] tooLarge = new byte[properties.maxBytes() + 1];
         server.respondBytes("/too-large.ics", 200, "text/calendar", tooLarge);
-        assertThatThrownBy(() -> fetcher.fetch(server.url("/too-large.ics")))
+        var preparedArg105_0 = server.url("/too-large.ics");
+        assertThatThrownBy(() -> fetcher.fetch(preparedArg105_0))
                 .isInstanceOf(CalendarFetchException.class)
                 .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.TOO_LARGE)
                 .hasMessageContaining("2 MB");
@@ -113,7 +115,8 @@ class CalendarFetcherTest {
         server.delay(Duration.ofSeconds(3));
         server.respond("/slow.ics", 200, "text/calendar", "BEGIN:VCALENDAR\nEND:VCALENDAR\n");
 
-        assertThatThrownBy(() -> fetcher.fetch(server.url("/slow.ics")))
+        var preparedArg116_0 = server.url("/slow.ics");
+        assertThatThrownBy(() -> fetcher.fetch(preparedArg116_0))
                 .isInstanceOf(CalendarFetchException.class)
                 .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNREACHABLE)
                 .hasMessageContaining("Could not reach 127.0.0.1");
@@ -140,13 +143,15 @@ class CalendarFetcherTest {
         CalendarFetcher blockedFetcher = new CalendarFetcher(properties, new CalendarUrlPolicy(true, resolver));
         server.redirect("/hop", 302, "http://metadata.test/latest");
 
-        assertThatThrownBy(() -> blockedFetcher.fetch(server.url("/hop")))
+        var preparedArg143_0 = server.url("/hop");
+        assertThatThrownBy(() -> blockedFetcher.fetch(preparedArg143_0))
                 .isInstanceOf(CalendarFetchException.class)
                 .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BLOCKED)
                 .hasMessageContaining("metadata.test");
 
         server.redirect("/ftp", 302, "ftp://x/y");
-        assertThatThrownBy(() -> blockedFetcher.fetch(server.url("/ftp")))
+        var preparedArg149_0 = server.url("/ftp");
+        assertThatThrownBy(() -> blockedFetcher.fetch(preparedArg149_0))
                 .isInstanceOf(CalendarFetchException.class)
                 .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BAD_RESPONSE)
                 .hasMessage("127.0.0.1 redirected to a link Home Control does not follow");

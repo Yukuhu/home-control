@@ -62,24 +62,29 @@ public record ZoneGroupState(List<Group> groups) {
         for (Element group : groupElements) {
             List<Member> members = new ArrayList<>();
             for (Element member : UpnpXml.childElements(group)) {
-                if (!"ZoneGroupMember".equals(UpnpXml.localName(member))) {
-                    continue; // Satellite elements are children of members, never of groups
-                }
-                String uuid = member.getAttribute("UUID");
-                URI location;
-                try {
-                    location = URI.create(member.getAttribute("Location"));
-                } catch (IllegalArgumentException e) {
-                    continue;
-                }
-                if (uuid.isBlank() || !SonosEndpoints.isLanLocation(location, allowLoopback)) {
-                    continue; // device-supplied: never a member we would call outside the LAN or by host name
-                }
-                members.add(new Member(uuid, location, member.getAttribute("ZoneName"), "1".equals(member.getAttribute("Invisible"))));
+                parseMember(member, allowLoopback).ifPresent(members::add);
             }
             groups.add(new Group(group.getAttribute("Coordinator"), group.getAttribute("ID"), members));
         }
         return new ZoneGroupState(groups);
+    }
+
+    private static Optional<Member> parseMember(Element member, boolean allowLoopback) {
+        if (!"ZoneGroupMember".equals(UpnpXml.localName(member))) {
+            return Optional.empty(); // Satellite elements are children of members, never of groups.
+        }
+        String uuid = member.getAttribute("UUID");
+        URI location;
+        try {
+            location = URI.create(member.getAttribute("Location"));
+        } catch (IllegalArgumentException _) {
+            return Optional.empty();
+        }
+        if (uuid.isBlank() || !SonosEndpoints.isLanLocation(location, allowLoopback)) {
+            return Optional.empty(); // Never call a device-supplied location outside the LAN or by host name.
+        }
+        return Optional.of(new Member(uuid, location, member.getAttribute("ZoneName"),
+                "1".equals(member.getAttribute("Invisible"))));
     }
 
     public Optional<Group> groupOf(String uuid) {

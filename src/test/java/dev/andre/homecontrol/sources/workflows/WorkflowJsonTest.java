@@ -16,9 +16,9 @@ class WorkflowJsonTest {
         assertThat(entries).extracting(WorkflowJson.Entry::title).containsExactly("News", "Music");
         assertThat(entries).extracting(WorkflowJson.Entry::key).doesNotHaveDuplicates();
         var values = WorkflowJson.values(draft.variables(), root, entries.getFirst().node());
-        assertThat(values.get("A")).isEqualTo(new WorkflowJson.Value("news", false));
-        assertThat(values.get("C")).isEqualTo(new WorkflowJson.Value("example-token", true));
-        assertThat(values.get("D")).isEqualTo(new WorkflowJson.Value("hd", false));
+        assertThat(values).containsEntry("A", new WorkflowJson.Value("news", false));
+        assertThat(values).containsEntry("C", new WorkflowJson.Value("example-token", true));
+        assertThat(values).containsEntry("D", new WorkflowJson.Value("hd", false));
         assertThat(values.get("C").toString()).doesNotContain("example-token");
     }
 
@@ -49,15 +49,17 @@ class WorkflowJsonTest {
     @Test void missingNullAndContainerMappingsFail() {
         var root = parse("{\"empty\":null,\"object\":{},\"array\":[]}");
         for (String pointer : new String[]{"/missing", "/empty", "/object", "/array"}) {
-            assertThatThrownBy(() -> WorkflowJson.values(
-                    java.util.List.of(new Variable("A", Scope.ROOT, pointer, false)), root, null))
+            var preparedArg52_0 = java.util.List.of(new Variable("A", Scope.ROOT, pointer, false));
+            assertThatThrownBy(() -> WorkflowJson.values(preparedArg52_0, root, null))
                     .isInstanceOf(WorkflowException.class).hasMessageContaining("A");
         }
     }
 
     @Test void rejectsDuplicateIdsAndOversizedCatalog() {
-        assertThatThrownBy(() -> WorkflowJson.entries(channels(), parse(
-                "{\"channels\":[{\"id\":1,\"title\":\"A\"},{\"id\":1.0,\"title\":\"B\"}]}")))
+        var preparedArg59_0 = channels();
+        var preparedArg59_1 = parse(
+                "{\"channels\":[{\"id\":1,\"title\":\"A\"},{\"id\":1.0,\"title\":\"B\"}]}");
+        assertThatThrownBy(() -> WorkflowJson.entries(preparedArg59_0, preparedArg59_1))
                 .isInstanceOf(WorkflowException.class).hasMessageContaining("ID");
         var items = new StringBuilder("{\"channels\":[");
         for (int i = 0; i < 201; i++) {
@@ -65,13 +67,17 @@ class WorkflowJsonTest {
             items.append("{\"id\":").append(i).append(",\"title\":\"T\"}");
         }
         items.append("]}");
-        assertThatThrownBy(() -> WorkflowJson.entries(channels(), parse(items.toString())))
+        var preparedArg68_0 = channels();
+        var preparedArg68_1 = parse(items.toString());
+        assertThatThrownBy(() -> WorkflowJson.entries(preparedArg68_0, preparedArg68_1))
                 .isInstanceOf(WorkflowException.class);
     }
 
     @Test void invalidRequiredTitlesAndArtworkAreHandled() {
-        assertThatThrownBy(() -> WorkflowJson.entries(channels(), parse(
-                "{\"channels\":[{\"id\":\"a\",\"title\":\" \"}]}")))
+        var preparedArg73_0 = channels();
+        var preparedArg73_1 = parse(
+                "{\"channels\":[{\"id\":\"a\",\"title\":\" \"}]}");
+        assertThatThrownBy(() -> WorkflowJson.entries(preparedArg73_0, preparedArg73_1))
                 .isInstanceOf(WorkflowException.class).hasMessageContaining("title");
         var draft = channels();
         var withArt = new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(), draft.fetch(),
@@ -135,7 +141,8 @@ class WorkflowJsonTest {
                 """));
         assertThat(entries).extracting(WorkflowJson.Entry::key).doesNotHaveDuplicates();
         assertThat(entries.get(1).key()).isEqualTo(WorkflowJson.stableKey(parse("9007199254740993")));
-        assertThatThrownBy(() -> WorkflowJson.stableKey(parse("1.0000000000000001")))
+        var preparedArg138_0 = parse("1.0000000000000001");
+        assertThatThrownBy(() -> WorkflowJson.stableKey(preparedArg138_0))
                 .isInstanceOf(WorkflowException.class).hasMessageContaining("invalid entry ID");
         assertThat(WorkflowJson.stableKey(parse("10e-1"))).isEqualTo(WorkflowJson.stableKey(parse("1")));
         assertThat(WorkflowJson.stableKey(parse("-0.0"))).isEqualTo(WorkflowJson.stableKey(parse("0")));
@@ -157,9 +164,11 @@ class WorkflowJsonTest {
             String boundary = "1" + "0".repeat(999);
             assertThat(WorkflowJson.stableKey(parse("1e999"))).isEqualTo(WorkflowJson.stableKey(parse(boundary)));
             for (String number : new String[]{"1e1000", "1e100000000", "1e-100000000", "1e2147483647", "10e2147483647"}) {
-                assertThatThrownBy(() -> WorkflowJson.stableKey(parse(number))).isInstanceOf(WorkflowException.class);
+                var preparedArg160_0 = parse(number);
+                assertThatThrownBy(() -> WorkflowJson.stableKey(preparedArg160_0)).isInstanceOf(WorkflowException.class);
             }
-            assertThatThrownBy(() -> parse("1".repeat(1001))).isInstanceOf(WorkflowException.class);
+            var preparedArg162_0 = "1".repeat(1001);
+            assertThatThrownBy(() -> parse(preparedArg162_0)).isInstanceOf(WorkflowException.class);
             assertThatThrownBy(() -> parse("1e2147483648")).isInstanceOf(WorkflowException.class);
         });
     }

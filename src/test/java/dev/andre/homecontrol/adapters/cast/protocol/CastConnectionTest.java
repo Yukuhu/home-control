@@ -141,7 +141,10 @@ class CastConnectionTest {
 
     @Test
     void theStaleTimeoutMustExceedTheHeartbeatInterval() {
-        assertThatThrownBy(() -> CastConnection.open("127.0.0.1", receiver.port(), Duration.ofSeconds(3), Duration.ofSeconds(3), listener))
+        var preparedArg144_1 = receiver.port();
+        var preparedArg144_2 = Duration.ofSeconds(3);
+        var preparedArg144_3 = Duration.ofSeconds(3);
+        assertThatThrownBy(() -> CastConnection.open("127.0.0.1", preparedArg144_1, preparedArg144_2, preparedArg144_3, listener))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

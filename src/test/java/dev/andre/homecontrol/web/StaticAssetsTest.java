@@ -79,7 +79,7 @@ class StaticAssetsTest {
                 .andExpect(content().string(allOf(
                         containsString("sheet-pin"),
                         containsString("/setup/sources/pinned/upgrade"),
-                        containsString("not this event"),
+                        containsString("Home Control cannot open this event directly"),
                         containsString("LIVE_EVENT"))));
     }
 }

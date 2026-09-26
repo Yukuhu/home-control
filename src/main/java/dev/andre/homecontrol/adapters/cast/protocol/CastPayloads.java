@@ -60,7 +60,7 @@ public final class CastPayloads {
 
     public static ObjectNode setVolumeLevel(double level) {
         ObjectNode node = type("SET_VOLUME");
-        node.putObject("volume").put("level", Math.max(0.0, Math.min(1.0, level)));
+        node.putObject("volume").put("level", Math.clamp(level, 0.0, 1.0));
         return node;
     }
 

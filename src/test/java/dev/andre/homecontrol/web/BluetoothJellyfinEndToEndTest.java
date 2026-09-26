@@ -216,7 +216,7 @@ class BluetoothJellyfinEndToEndTest {
                         .startsWith(jellyfin.url() + "/Audio/" + TRACK + "/stream.flac?static=true")
                         .contains("ApiKey=" + ACCESS_TOKEN));                      // the player needs the key …
                 List<JsonNode> starts = FakeMpvScript.log(LOG).stream().filter(l -> "start".equals(l.path("type").asString(""))).toList();
-                assertThat(starts).allSatisfy(start -> assertThat(start.toString())
+                assertThat(starts).isNotEmpty().allSatisfy(start -> assertThat(start.toString())
                         .doesNotContain("ApiKey").doesNotContain("/Audio/"));      // … but never on the command line
                 await().atMost(Duration.ofSeconds(20)).until(() -> devices.state(ID).nowPlaying() != null
                         && devices.state(ID).nowPlaying().title().equals("Bunny Song"));

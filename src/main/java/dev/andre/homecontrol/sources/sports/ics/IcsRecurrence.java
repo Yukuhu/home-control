@@ -76,7 +76,7 @@ public record IcsRecurrence(Frequency frequency, int interval, Integer count, Ic
                         return Optional.empty();
                     }
                 }
-            } catch (NumberFormatException | IcsFormatException e) {
+            } catch (NumberFormatException | IcsFormatException _) {
                 return Optional.empty();
             }
         }

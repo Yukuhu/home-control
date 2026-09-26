@@ -130,7 +130,7 @@ public class JellyfinSessions {
             for (InetAddress address : InetAddress.getAllByName(host)) {
                 addresses.add(normalizeAddress(address.getHostAddress()));
             }
-        } catch (UnknownHostException | SecurityException ignored) {
+        } catch (UnknownHostException | SecurityException _) {
             // the literal host is all we can compare
         }
         return addresses;
@@ -144,7 +144,7 @@ public class JellyfinSessions {
     private static Instant instant(String value) {
         try {
             return Instant.parse(value);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             return Instant.EPOCH;
         }
     }

@@ -22,7 +22,7 @@ public final class Hosts {
         }
         try {
             return InetAddress.getByName(a).equals(InetAddress.getByName(b));
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException _) {
             return false;
         }
     }

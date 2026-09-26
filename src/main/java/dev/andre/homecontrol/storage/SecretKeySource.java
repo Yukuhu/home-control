@@ -106,7 +106,7 @@ public final class SecretKeySource {
         byte[] key = null;
         try {
             key = Base64.getDecoder().decode(Files.readString(keyFile, StandardCharsets.US_ASCII).strip());
-        } catch (IOException | IllegalArgumentException e) {
+        } catch (IOException | IllegalArgumentException _) {
             // no cause: a decoding error could quote the file's content
             throw new StorageException("Could not read " + keyFile + "; it must hold " + KEY_BYTES
                     + " base64-encoded bytes", null);

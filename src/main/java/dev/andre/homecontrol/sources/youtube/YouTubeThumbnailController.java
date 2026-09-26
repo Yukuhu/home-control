@@ -18,6 +18,8 @@ import java.util.Set;
 @ConditionalOnProperty(name = "home-control.youtube.enabled", havingValue = "true", matchIfMissing = true)
 public class YouTubeThumbnailController {
 
+    private static final String LOAD_ERROR = "Could not load the thumbnail";
+
     // Google's thumbnail CDN only ever serves these; anything else is treated as a failure rather
     // than trusted and passed through, so a compromised or misbehaving upstream can't get the
     // browser to render or sniff an unexpected content type as an image.
@@ -39,18 +41,18 @@ public class YouTubeThumbnailController {
         YouTubeHttp.Response response;
         try {
             response = http.get(YouTubeHttp.uri(properties.thumbnailBaseUrl(), "/vi/" + videoId + "/mqdefault.jpg", Map.of()), Map.of());
-        } catch (YouTubeException e) {
-            return ResponseEntity.status(502).body("Could not load the thumbnail".getBytes());
+        } catch (YouTubeException _) {
+            return ResponseEntity.status(502).body(LOAD_ERROR.getBytes());
         }
         if (response.status() == 404) {
             return ResponseEntity.notFound().build();
         }
         if (!response.ok()) {
-            return ResponseEntity.status(502).body("Could not load the thumbnail".getBytes());
+            return ResponseEntity.status(502).body(LOAD_ERROR.getBytes());
         }
         String contentType = baseType(response.contentType());
         if (!ALLOWED_TYPES.contains(contentType)) {
-            return ResponseEntity.status(502).body("Could not load the thumbnail".getBytes());
+            return ResponseEntity.status(502).body(LOAD_ERROR.getBytes());
         }
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))

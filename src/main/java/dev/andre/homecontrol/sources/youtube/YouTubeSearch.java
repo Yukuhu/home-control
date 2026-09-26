@@ -49,7 +49,7 @@ public class YouTubeSearch {
 
     public List<YouTubeVideo> search(String query, int limit) {
         String key = cacheKey(query);
-        int wanted = Math.min(Math.max(limit, 1), MAX_RESULTS);
+        int wanted = Math.clamp(limit, 1, MAX_RESULTS);
         Optional<List<YouTubeVideo>> hit = cached(key, wanted);
         if (hit.isPresent()) {
             return hit.get();

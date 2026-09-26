@@ -19,6 +19,8 @@ import java.util.function.Supplier;
 /** Live and upcoming sport, read from whichever feeds the household configured. */
 public class SportsContentSource implements ContentSource {
 
+    private static final String SPORTS = "sports";
+
     private final SportsSettingsService settings;
     private final SportsSchedule schedule;
     private final SportsTimeZones zones;
@@ -41,7 +43,7 @@ public class SportsContentSource implements ContentSource {
 
     @Override
     public String id() {
-        return "sports";
+        return SPORTS;
     }
 
     @Override
@@ -56,7 +58,7 @@ public class SportsContentSource implements ContentSource {
 
     @Override
     public List<RailDescriptor> rails() {
-        return available() ? List.of(new RailDescriptor("sports", LiveTodayRail.ID, LiveTodayRail.TITLE)) : List.of();
+        return available() ? List.of(new RailDescriptor(SPORTS, LiveTodayRail.ID, LiveTodayRail.TITLE)) : List.of();
     }
 
     @Override
@@ -73,7 +75,7 @@ public class SportsContentSource implements ContentSource {
         List<ContentItem> items = LiveTodayRail.select(events, now, zone, properties.railSize()).stream()
                 .map(event -> SportsItems.toItem(event, currentSettings, zone, locale, now, links))
                 .toList();
-        return new Rail(new RailDescriptor("sports", LiveTodayRail.ID, LiveTodayRail.TITLE), items, now);
+        return new Rail(new RailDescriptor(SPORTS, LiveTodayRail.ID, LiveTodayRail.TITLE), items, now);
     }
 
     @Override

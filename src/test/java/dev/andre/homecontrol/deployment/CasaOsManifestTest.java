@@ -21,32 +21,32 @@ class CasaOsManifestTest {
         }
 
         Map<String, Object> service = map(map(manifest, "services"), "shield-remote");
-        assertThat(service.get("image")).isEqualTo("ghcr.io/yukuhu/home-control:latest");
-        assertThat(service.get("network_mode")).isEqualTo("host");
-        assertThat(service.get("restart")).isEqualTo("unless-stopped");
+        assertThat(service).containsEntry("image", "ghcr.io/yukuhu/home-control:latest");
+        assertThat(service).containsEntry("network_mode", "host");
+        assertThat(service).containsEntry("restart", "unless-stopped");
         assertThat(service).doesNotContainKeys("ports", "environment");
 
         List<Map<String, Object>> volumes = maps(service, "volumes");
         assertThat(volumes).singleElement().satisfies(volume -> {
-            assertThat(volume.get("type")).isEqualTo("bind");
-            assertThat(volume.get("source")).isEqualTo("/DATA/AppData/$AppID/data");
-            assertThat(volume.get("target")).isEqualTo("/data");
+            assertThat(volume).containsEntry("type", "bind");
+            assertThat(volume).containsEntry("source", "/DATA/AppData/$AppID/data");
+            assertThat(volume).containsEntry("target", "/data");
         });
 
         Map<String, Object> serviceMetadata = map(service, "x-casaos");
         assertThat(maps(serviceMetadata, "ports")).singleElement().satisfies(port ->
-                assertThat(port.get("container")).isEqualTo("8080"));
+                assertThat(port).containsEntry("container", "8080"));
         assertThat(maps(serviceMetadata, "volumes")).singleElement().satisfies(volume ->
-                assertThat(volume.get("container")).isEqualTo("/data"));
+                assertThat(volume).containsEntry("container", "/data"));
 
         Map<String, Object> metadata = map(manifest, "x-casaos");
-        assertThat(metadata.get("id")).isEqualTo("dev.andre.shield-remote");
-        assertThat(metadata.get("main")).isEqualTo("shield-remote");
-        assertThat(metadata.get("index")).isEqualTo("/");
-        assertThat(metadata.get("port_map")).isEqualTo("8080");
-        assertThat(metadata.get("scheme")).isEqualTo("http");
-        assertThat(metadata.get("category")).isEqualTo("Home");
-        assertThat(metadata.get("architectures")).isEqualTo(List.of("amd64", "arm64"));
+        assertThat(metadata).containsEntry("id", "dev.andre.shield-remote");
+        assertThat(metadata).containsEntry("main", "shield-remote");
+        assertThat(metadata).containsEntry("index", "/");
+        assertThat(metadata).containsEntry("port_map", "8080");
+        assertThat(metadata).containsEntry("scheme", "http");
+        assertThat(metadata).containsEntry("category", "Home");
+        assertThat(metadata).containsEntry("architectures", List.of("amd64", "arm64"));
     }
 
     @SuppressWarnings("unchecked")

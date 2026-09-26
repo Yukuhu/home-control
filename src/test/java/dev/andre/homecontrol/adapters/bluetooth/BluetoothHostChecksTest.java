@@ -101,7 +101,7 @@ class BluetoothHostChecksTest {
         assertThat(byId.get("bluez").detail()).isEqualTo("Needs the D-Bus socket first");
         assertThat(byId.get("adapter").ok()).isFalse();
         assertThat(byId.get("adapter").detail()).isEqualTo("Needs BlueZ first");
-        assertThat(bluez.reads()).isEqualTo(0);
+        assertThat(bluez.reads()).isZero();
     }
 
     @Test
@@ -145,7 +145,7 @@ class BluetoothHostChecksTest {
     }
 
     @Test
-    void mpvMissing() throws IOException {
+    void mpvMissing() {
         launcher.startFailure = new MpvNotInstalledException("mpv", new IOException("error=2"));
         Map<String, HostCheck> byId = byId(checks().results());
         assertThat(byId.get("mpv").ok()).isFalse();

@@ -46,7 +46,7 @@ public class TmdbSetupService {
         return secrets.secret(TmdbSettings.CREDENTIAL_SECRET).flatMap(value -> {
             try {
                 return Optional.of(TmdbCredential.parse(value));
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException _) {
                 return Optional.empty();
             }
         });

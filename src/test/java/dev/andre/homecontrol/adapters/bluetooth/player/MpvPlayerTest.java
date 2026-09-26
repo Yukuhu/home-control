@@ -41,8 +41,7 @@ class MpvPlayerTest {
         Path b = MpvPlayer.socketFor(Path.of("/tmp/x"), "bluetooth-aa-bb-cc-dd-ee-ff");
         Path c = MpvPlayer.socketFor(Path.of("/tmp/x"), "bluetooth-11-22-33-44-55-66");
         assertThat(a.toString()).matches("/tmp/x/mpv-[0-9a-f]{12}\\.sock");
-        assertThat(a).isEqualTo(b);
-        assertThat(a).isNotEqualTo(c);
+        assertThat(a).isEqualTo(b).isNotEqualTo(c);
     }
 
     @Test

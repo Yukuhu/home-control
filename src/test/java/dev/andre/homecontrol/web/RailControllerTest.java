@@ -21,7 +21,7 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -52,7 +52,7 @@ class RailControllerTest {
     }
 
     private void mockJellyfin() {
-        ContentSource jellyfin = org.mockito.Mockito.mock(ContentSource.class);
+        ContentSource jellyfin = mock(ContentSource.class);
         given(jellyfin.displayName()).willReturn("Jellyfin");
         given(sources.find("jellyfin")).willReturn(Optional.of(jellyfin));
         given(sources.all()).willReturn(List.of(jellyfin));

@@ -5,6 +5,8 @@ import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
+import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
+import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
 import dev.andre.homecontrol.core.RemoteKey;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +16,7 @@ import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,6 +63,23 @@ class AndroidTvSessionTest {
     void reachesConnectedOnceTheHandshakeCompletes() {
         session.start();
 
+        await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+    }
+
+    @Test
+    void staysConnectingAfterTlsUntilTheRemoteHandshakeCompletes() throws Exception {
+        FakeRemoteServer.ConnectionGate gate = fakeDevice.pauseNextRemoteHandshake();
+        session.start();
+        gate.awaitEntered();
+
+        // This queued callback runs after connect() returns, proving TLS is complete.
+        session.onPower(true);
+        await().until(() -> session.state().powerOn());
+        assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTING);
+        assertThatThrownBy(() -> session.sendKey(RemoteKey.DPAD_UP))
+                .isInstanceOf(DeviceOfflineException.class);
+
+        gate.release();
         await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
     }
 
@@ -257,6 +277,46 @@ class AndroidTvSessionTest {
 
             await().atMost(Duration.ofSeconds(30))
                     .until(() -> retrying.state().status() == DeviceStatus.UNPAIRED);
+        }
+    }
+
+    @Test
+    void latchesWhenRemoteRejectsAfterTlsBeforeConfiguration() {
+        // On real hardware a certificate alert can reach the reader only after the
+        // client-side TLS handshake appears successful. Hold the fake before Configure
+        // and deliver that verdict through the same asynchronous listener path.
+        var gates = new ArrayDeque<FakeRemoteServer.ConnectionGate>();
+        for (int i = 0; i < 5; i++) {
+            gates.add(fakeDevice.pauseNextRemoteHandshake());
+        }
+        AtomicBoolean publishedConnected = new AtomicBoolean();
+        Device device = AndroidTvSettings.device("shield-after-tls", "Test Shield", "127.0.0.1",
+                fakeDevice.port(), null, Instant.now());
+        ClientCertificate credential = ClientCertificate.generate("shield-remote");
+
+        try (AndroidTvSession retrying = new AndroidTvSession(device,
+                credential, FAST_RETRY, state -> {
+                    if (state.status() == DeviceStatus.CONNECTED) {
+                        publishedConnected.set(true);
+                    }
+                }, listener -> {
+                    FakeRemoteServer.ConnectionGate gate = gates.remove();
+                    RemoteConnection opened = RemoteConnection.connect("127.0.0.1", fakeDevice.port(),
+                            credential, 10_000, listener);
+                    try {
+                        listener.onDisconnected(DisconnectCause.UNPAIRED);
+                        return opened;
+                    } finally {
+                        opened.close();
+                        gate.release();
+                    }
+                })) {
+            retrying.start();
+
+            await().atMost(Duration.ofSeconds(20))
+                    .until(() -> retrying.state().status() == DeviceStatus.UNPAIRED);
+            assertThat(fakeDevice.connections()).isEqualTo(5);
+            assertThat(publishedConnected).isFalse();
         }
     }
 

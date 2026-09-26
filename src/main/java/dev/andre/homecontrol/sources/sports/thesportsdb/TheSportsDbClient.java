@@ -66,11 +66,11 @@ public class TheSportsDbClient {
             try (InputStream in = response.body()) {
                 body = in.readNBytes(MAX_BODY_BYTES + 1);
             }
-        } catch (IOException e) {
+        } catch (IOException _) {
             // No cause attached: the request URI (which the JDK's IOException/timeout messages can
             // quote in full, e.g. via a wrapped ConnectException) embeds the API key in its path.
             throw new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
         }
@@ -94,7 +94,7 @@ public class TheSportsDbClient {
         JsonNode node;
         try {
             node = JSON.readTree(body);
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             throw new TheSportsDbException(TheSportsDbException.Kind.BAD_RESPONSE, "TheSportsDB answered with something that is not JSON");
         }
         if (node == null || !node.isObject()) {

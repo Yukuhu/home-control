@@ -73,7 +73,7 @@ public final class WorkflowJson {
             JsonNode root = JSON.readTree(parser);
             if (root == null || parser.nextToken() != null) fail(WorkflowException.Stage.PARSE, "invalid JSON response");
             return root;
-        } catch (JacksonException | NumberFormatException e) {
+        } catch (JacksonException | NumberFormatException _) {
             throw new WorkflowException(WorkflowException.Stage.PARSE, "invalid JSON response");
         }
     }
@@ -146,7 +146,7 @@ public final class WorkflowJson {
                     throw new ArithmeticException();
                 }
                 typed = "n:" + number.toBigIntegerExact();
-            } catch (ArithmeticException e) {
+            } catch (ArithmeticException _) {
                 throw new WorkflowException(WorkflowException.Stage.SELECT, "invalid entry ID");
             }
         } else {
@@ -165,7 +165,7 @@ public final class WorkflowJson {
         try {
             URI uri = new URI(raw);
             return safeArtworkUri(uri) ? uri : null;
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             return null;
         }
     }
@@ -193,7 +193,9 @@ public final class WorkflowJson {
     private static boolean publicIpv4(String host) {
         int[] octets = parseIpv4(host);
         if (octets.length == 0) return false;
-        int a = octets[0], b = octets[1], c = octets[2];
+        int a = octets[0];
+        int b = octets[1];
+        int c = octets[2];
         return a > 0 && a < 224 && a != 10 && a != 127
                 && !(a == 100 && b >= 64 && b <= 127)
                 && !(a == 169 && b == 254)
@@ -211,7 +213,7 @@ public final class WorkflowJson {
             if (parts[i].isEmpty() || parts[i].length() > 3) return new int[0];
             try {
                 octets[i] = Integer.parseInt(parts[i]);
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException _) {
                 return new int[0];
             }
             if (octets[i] > 255 || (parts[i].length() > 1 && parts[i].charAt(0) == '0')) return new int[0];
@@ -231,7 +233,7 @@ public final class WorkflowJson {
                     && (bytes[2] & 255) == 0x0d && (bytes[3] & 255) == 0xb8;
             int word = ipv6FirstWord(bytes);
             return !documentation && ALLOCATED_RIR_IPV6.stream().anyMatch(prefix -> prefix.contains(word));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return false;
         }
     }

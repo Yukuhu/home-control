@@ -122,7 +122,7 @@ public final class ReconnectingPoller implements AutoCloseable {
         cancelPending();
         try {
             pending = loop.schedule(task, delay.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (RejectedExecutionException ignored) {
+        } catch (RejectedExecutionException _) {
             // closing
         }
     }
@@ -140,7 +140,7 @@ public final class ReconnectingPoller implements AutoCloseable {
         }
         try {
             loop.execute(task);
-        } catch (RejectedExecutionException ignored) {
+        } catch (RejectedExecutionException _) {
             // closing
         }
     }

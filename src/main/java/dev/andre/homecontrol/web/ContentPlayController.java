@@ -37,6 +37,8 @@ import java.util.Set;
 @RestController
 public class ContentPlayController {
 
+    private static final String NO_DEVICE_PREFIX = "No device with id ";
+
     private static final int MAX_SKIP = 8;
     private static final int MAX_SKIP_LENGTH = 64;
 
@@ -56,7 +58,7 @@ public class ContentPlayController {
     @PostMapping(path = "/devices/{id}/play", params = {"source", "item"}, produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> play(@PathVariable String id, @RequestParam String source, @RequestParam String item) {
         if (devices.device(id).isEmpty()) {
-            return text(HttpStatus.NOT_FOUND, "No device with id " + id);
+            return text(HttpStatus.NOT_FOUND, NO_DEVICE_PREFIX + id);
         }
         Optional<ContentItem> content = find(source, item);
         if (content.isEmpty()) {
@@ -68,22 +70,22 @@ public class ContentPlayController {
     @GetMapping(path = "/devices/{id}/route", params = {"source", "item"}, produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> route(@PathVariable String id, @RequestParam String source, @RequestParam String item) {
         if (devices.device(id).isEmpty()) {
-            return text(HttpStatus.NOT_FOUND, "No device with id " + id);
+            return text(HttpStatus.NOT_FOUND, NO_DEVICE_PREFIX + id);
         }
         Optional<ContentItem> content = find(source, item);
         if (content.isEmpty()) {
             return notFound(source);
         }
         Route route = playback.plan(content.get(), id);
-        return route instanceof Route.Unroutable unroutable
-                ? text(HttpStatus.UNPROCESSABLE_CONTENT, unroutable.reason())
+        return route instanceof Route.Unroutable(var reason)
+                ? text(HttpStatus.UNPROCESSABLE_CONTENT, reason)
                 : text(HttpStatus.OK, route.describe(content.get().kind()));
     }
 
     @GetMapping(path = "/devices/{id}/route-preview", params = {"source", "item"}, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> preview(@PathVariable String id, @RequestParam String source, @RequestParam String item) {
         if (devices.device(id).isEmpty()) {
-            return text(HttpStatus.NOT_FOUND, "No device with id " + id);
+            return text(HttpStatus.NOT_FOUND, NO_DEVICE_PREFIX + id);
         }
         Optional<ContentItem> content = find(source, item);
         if (content.isEmpty()) {
@@ -102,7 +104,7 @@ public class ContentPlayController {
             return text(HttpStatus.BAD_REQUEST, "Too many or too long route keys to skip");
         }
         if (devices.device(id).isEmpty()) {
-            return text(HttpStatus.NOT_FOUND, "No device with id " + id);
+            return text(HttpStatus.NOT_FOUND, NO_DEVICE_PREFIX + id);
         }
         Optional<ContentItem> content = find(source, item);
         if (content.isEmpty()) {
@@ -110,15 +112,15 @@ public class ContentPlayController {
         }
         ContentKind kind = content.get().kind();
         return switch (playback.attempt(content.get(), id, Set.copyOf(skips))) {
-            case PlayAttempt.Played played -> ResponseEntity.ok(new PlayResultView(true, id, played.device().name(),
-                    RouteView.of(played.route(), kind), RouteView.of(first(played.remaining()), kind),
-                    played.route().describe(kind)));
-            case PlayAttempt.Failed failed -> ResponseEntity.status(statusOf(failed.cause())).body(new PlayResultView(false, id,
-                    failed.device().name(), RouteView.of(failed.route(), kind), RouteView.of(first(failed.remaining()), kind),
-                    failed.cause().getMessage()));
-            case PlayAttempt.Unroutable unroutable -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(
-                    new PlayResultView(false, id, unroutable.device().name(), null, null,
-                            unroutable.device().name() + ": " + unroutable.reason()));
+            case PlayAttempt.Played(var device, var route, var remaining) -> ResponseEntity.ok(new PlayResultView(true, id, device.name(),
+                    RouteView.of(route, kind), RouteView.of(first(remaining), kind),
+                    route.describe(kind)));
+            case PlayAttempt.Failed(var failedDevice, var failedRoute, var failedRemaining, var cause) -> ResponseEntity.status(statusOf(cause)).body(new PlayResultView(false, id,
+                    failedDevice.name(), RouteView.of(failedRoute, kind), RouteView.of(first(failedRemaining), kind),
+                    cause.getMessage()));
+            case PlayAttempt.Unroutable(var unroutableDevice, var unroutableReason) -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(
+                    new PlayResultView(false, id, unroutableDevice.name(), null, null,
+                            unroutableDevice.name() + ": " + unroutableReason));
         };
     }
 
@@ -128,8 +130,8 @@ public class ContentPlayController {
 
     private static HttpStatus statusOf(RuntimeException cause) {
         return switch (cause) {
-            case DeviceOfflineException ignored -> HttpStatus.CONFLICT;
-            case UnsupportedActionException ignored -> HttpStatus.UNPROCESSABLE_CONTENT;
+            case DeviceOfflineException _ -> HttpStatus.CONFLICT;
+            case UnsupportedActionException _ -> HttpStatus.UNPROCESSABLE_CONTENT;
             default -> HttpStatus.BAD_GATEWAY;
         };
     }

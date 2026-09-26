@@ -105,6 +105,7 @@ public class AndroidTvAdapter implements DeviceAdapter {
 
         @Override
         public void close() {
+            // No connection was opened for this handle; pairing must be restored first.
         }
     }
 }

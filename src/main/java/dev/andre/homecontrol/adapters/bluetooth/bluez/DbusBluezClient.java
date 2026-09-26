@@ -37,6 +37,8 @@ import java.util.Optional;
  */
 public final class DbusBluezClient implements BluezClient {
 
+    private static final String ADDRESS_PROPERTY = "Address";
+
     private static final Logger log = LoggerFactory.getLogger(DbusBluezClient.class);
     private static final String BLUEZ = "org.bluez";
     private static final String ADAPTER_INTERFACE = "org.bluez.Adapter1";
@@ -67,7 +69,7 @@ public final class DbusBluezClient implements BluezClient {
                 if (properties != null) {
                     String objectPath = path.getPath();
                     adapters.add(new BluetoothAdapterInfo(objectPath.substring(objectPath.lastIndexOf('/') + 1),
-                            text(properties, "Address"), text(properties, "Alias"), flag(properties, "Powered")));
+                            text(properties, ADDRESS_PROPERTY), text(properties, "Alias"), flag(properties, "Powered")));
                 }
             });
             adapters.sort(Comparator.comparing(BluetoothAdapterInfo::id));
@@ -90,14 +92,14 @@ public final class DbusBluezClient implements BluezClient {
             Adapter1 remote = connection.getRemoteObject(BLUEZ, adapterPath(managedObjects(connection), adapterAddress), Adapter1.class);
             try {
                 remote.StartDiscovery();
-            } catch (BluezInProgressException alreadyScanning) {
+            } catch (BluezInProgressException _) {
                 // another client (bluetoothctl, a desktop) is scanning: the results are shared
             }
             return remote;
         });
         try {
             Thread.sleep(duration.toMillis());
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         } finally {
             try {
@@ -135,7 +137,7 @@ public final class DbusBluezClient implements BluezClient {
         call("pair " + address, connection -> {
             try {
                 device1(connection, adapterAddress, address).Pair();
-            } catch (BluezAlreadyExistsException alreadyPaired) {
+            } catch (BluezAlreadyExistsException _) {
                 // paired before
             }
             return null;
@@ -160,7 +162,7 @@ public final class DbusBluezClient implements BluezClient {
         call("connect " + address, connection -> {
             try {
                 device1(connection, adapterAddress, address).Connect();
-            } catch (BluezAlreadyConnectedException alreadyConnected) {
+            } catch (BluezAlreadyConnectedException _) {
                 // fine
             }
             return null;
@@ -172,7 +174,7 @@ public final class DbusBluezClient implements BluezClient {
         call("disconnect " + address, connection -> {
             try {
                 device1(connection, adapterAddress, address).Disconnect();
-            } catch (BluezNotConnectedException notConnected) {
+            } catch (BluezNotConnectedException _) {
                 // fine
             }
             return null;
@@ -211,8 +213,7 @@ public final class DbusBluezClient implements BluezClient {
         try {
             return action.run(current);
         } catch (DBusException | DBusExecutionException e) {
-            String name = e instanceof DBusExecutionException execution && execution.getType() != null
-                    ? execution.getType() : e.getClass().getName();
+            String name = e.getClass().getName();
             BluezFailure failure = BluezFailures.classify(name, e.getMessage());
             if (!current.isConnected()) {
                 close();
@@ -249,7 +250,7 @@ public final class DbusBluezClient implements BluezClient {
             throws BluezException {
         for (Map.Entry<DBusPath, Map<String, Map<String, Variant<?>>>> entry : objects.entrySet()) {
             Map<String, Variant<?>> properties = entry.getValue().get(ADAPTER_INTERFACE);
-            if (properties != null && adapterAddress.equalsIgnoreCase(text(properties, "Address"))) {
+            if (properties != null && adapterAddress.equalsIgnoreCase(text(properties, ADDRESS_PROPERTY))) {
                 return entry.getKey().getPath();
             }
         }
@@ -261,7 +262,7 @@ public final class DbusBluezClient implements BluezClient {
         return objects.entrySet().stream()
                 .filter(entry -> {
                     Map<String, Variant<?>> properties = entry.getValue().get(DEVICE_INTERFACE);
-                    return properties != null && address.equalsIgnoreCase(text(properties, "Address"))
+                    return properties != null && address.equalsIgnoreCase(text(properties, ADDRESS_PROPERTY))
                             && adapterPath.equals(objectPath(properties.get("Adapter")));
                 })
                 .map(entry -> entry.getKey().getPath())
@@ -277,7 +278,7 @@ public final class DbusBluezClient implements BluezClient {
     }
 
     private static BluetoothDeviceInfo device(Map<String, Variant<?>> properties) {
-        String address = text(properties, "Address");
+        String address = text(properties, ADDRESS_PROPERTY);
         String name = text(properties, "Name");
         if (name == null || name.isBlank()) {
             String alias = text(properties, "Alias");

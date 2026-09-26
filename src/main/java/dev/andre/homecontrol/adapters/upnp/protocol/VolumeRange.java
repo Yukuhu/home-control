@@ -21,7 +21,7 @@ public final class VolumeRange {
                     return max > 0 ? max : DEFAULT_MAXIMUM;
                 }
             }
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             // unreadable SCPD or a non-numeric maximum
         }
         return DEFAULT_MAXIMUM;
@@ -34,6 +34,6 @@ public final class VolumeRange {
 
     public static int toPercent(int value, int max) {
         int range = max > 0 ? max : DEFAULT_MAXIMUM;
-        return (int) Math.clamp(Math.round(value * 100.0 / range), 0, 100);
+        return Math.clamp(Math.round(value * 100.0 / range), 0, 100);
     }
 }

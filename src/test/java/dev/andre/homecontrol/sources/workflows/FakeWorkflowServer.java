@@ -110,7 +110,7 @@ public final class FakeWorkflowServer implements AutoCloseable {
                 e.getResponseBody().flush();
             }
             entered.countDown();
-            try { release.await(); } catch (InterruptedException ex) { Thread.currentThread().interrupt(); return; }
+            try { release.await(); } catch (InterruptedException _) { Thread.currentThread().interrupt(); return; }
             if (!afterHeaders) e.sendResponseHeaders(200, 0);
             e.getResponseBody().write('}');
         });

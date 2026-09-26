@@ -38,7 +38,7 @@ public final class RendererCommands {
                 // Several renderers take a new URI only when stopped.
                 try {
                     soap.call(avTransport.controlUrl(), UpnpActions.stop(avTransport.serviceType()));
-                } catch (SoapFault ignored) {
+                } catch (SoapFault _) {
                     // already stopped
                 }
                 soap.call(avTransport.controlUrl(), load);
@@ -73,7 +73,7 @@ public final class RendererCommands {
         try {
             return new VolumeReading(VolumeRange.toPercent(Integer.parseInt(volume), max),
                     mute.equals("1") || mute.equalsIgnoreCase("true"));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new SoapFault(0, "Unreadable volume");
         }
     }
@@ -92,9 +92,9 @@ public final class RendererCommands {
             return call.call();
         } catch (SoapFault fault) {
             throw new RendererFaultException(deviceName + " refused to " + what + " (" + fault.getMessage() + ")", fault.errorCode());
-        } catch (SoapTimeoutException e) {
+        } catch (SoapTimeoutException _) {
             throw new ActionFailedException(deviceName + " did not answer in time when asked to " + what);
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw new DeviceOfflineException(deviceName + " could not be reached to " + what);
         }
     }

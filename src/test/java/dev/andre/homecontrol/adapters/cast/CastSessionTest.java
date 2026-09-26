@@ -182,9 +182,11 @@ class CastSessionTest {
     void remoteKeysAndAppLinksAreNotCastActions() {
         start(receiver.port());
 
-        assertThatThrownBy(() -> session.execute(new Action.PressKey(RemoteKey.HOME)))
+        var failingAction185 = new Action.PressKey(RemoteKey.HOME);
+        assertThatThrownBy(() -> session.execute(failingAction185))
                 .isInstanceOf(UnsupportedActionException.class);
-        assertThatThrownBy(() -> session.execute(new Action.OpenAppLink(URI.create("https://youtube.com"))))
+        var failingAction187 = new Action.OpenAppLink(URI.create("https://youtube.com"));
+        assertThatThrownBy(() -> session.execute(failingAction187))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -244,7 +246,8 @@ class CastSessionTest {
         // Another sender replaced the app; the session still knows only the old session id.
         receiver.runApp("233637DE", "YouTube");
 
-        assertThatThrownBy(() -> session.execute(new Action.Stop()))
+        var failingAction247 = new Action.Stop();
+        assertThatThrownBy(() -> session.execute(failingAction247))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessage("Living Room TV refused to stop Default Media Receiver (INVALID_REQUEST: INVALID_SESSION_ID)");
     }
@@ -255,7 +258,8 @@ class CastSessionTest {
         start(receiver.port());
         awaitStatus();
 
-        assertThatThrownBy(() -> session.execute(new Action.SetVolume(10)))
+        var failingAction258 = new Action.SetVolume(10);
+        assertThatThrownBy(() -> session.execute(failingAction258))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("did not answer");
     }
@@ -269,7 +273,8 @@ class CastSessionTest {
         start(port);
         await().until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
 
-        assertThatThrownBy(() -> session.execute(new Action.SetVolume(10)))
+        var failingAction272 = new Action.SetVolume(10);
+        assertThatThrownBy(() -> session.execute(failingAction272))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("not connected");
     }
@@ -281,7 +286,8 @@ class CastSessionTest {
         await().until(() -> session.state().connected() && session.state().currentApp() != null);
         receiver.runApp("233637DE", "YouTube");
 
-        assertThatThrownBy(() -> session.execute(new Action.Stop()))
+        var failingAction284 = new Action.Stop();
+        assertThatThrownBy(() -> session.execute(failingAction284))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessage("Living Room TV refused to stop CC1AD845 (INVALID_REQUEST: INVALID_SESSION_ID)");
     }
@@ -335,7 +341,8 @@ class CastSessionTest {
         start(receiver.port());
         awaitStatus();
 
-        assertThatThrownBy(() -> session.execute(bunny()))
+        var preparedArg350_0 = bunny();
+        assertThatThrownBy(() -> session.execute(preparedArg350_0))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("LAUNCH_ERROR: NOT_FOUND");
         assertThat(receiver.received(MEDIA, "LOAD")).isEmpty();
@@ -347,7 +354,8 @@ class CastSessionTest {
         start(receiver.port());
         awaitStatus();
 
-        assertThatThrownBy(() -> session.execute(bunny()))
+        var failedLoad = bunny();
+        assertThatThrownBy(() -> session.execute(failedLoad))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("LOAD_FAILED");
     }
@@ -361,7 +369,8 @@ class CastSessionTest {
         start(port);
         await().until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
 
-        assertThatThrownBy(() -> session.execute(bunny())).isInstanceOf(DeviceOfflineException.class);
+        var preparedArg364_0 = bunny();
+        assertThatThrownBy(() -> session.execute(preparedArg364_0)).isInstanceOf(DeviceOfflineException.class);
     }
 
     @Test
@@ -486,7 +495,8 @@ class CastSessionTest {
         start(receiver.port());
         awaitStatus();
 
-        assertThatThrownBy(() -> session.execute(playNow()))
+        var preparedArg499_0 = playNow();
+        assertThatThrownBy(() -> session.execute(preparedArg499_0))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("refused to play it (Missing one or more required params");
     }
@@ -496,7 +506,8 @@ class CastSessionTest {
         start(receiver.port());
         awaitStatus();
 
-        assertThatThrownBy(() -> session.execute(playNow()))
+        var unansweredPlayback = playNow();
+        assertThatThrownBy(() -> session.execute(unansweredPlayback))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("did not answer in time");
     }
@@ -510,7 +521,8 @@ class CastSessionTest {
         start(port);
         await().until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
 
-        assertThatThrownBy(() -> session.execute(playNow()))
+        var preparedArg513_0 = playNow();
+        assertThatThrownBy(() -> session.execute(preparedArg513_0))
                 .isInstanceOf(DeviceOfflineException.class);
     }
 
@@ -535,7 +547,7 @@ class CastSessionTest {
 
         assertThat(reply).containsEntry("type", "mdxSessionStatus");
         assertThat(reply.get("data")).isInstanceOfSatisfying(Map.class,
-                data -> assertThat(data.get("screenId")).isEqualTo("fixture-screen-6hq3r1ukd0n5mc3t2v8p"));
+                data -> assertThat(data).containsEntry("screenId", "fixture-screen-6hq3r1ukd0n5mc3t2v8p"));
         assertThat(receiver.last(RECEIVER, "LAUNCH").orElseThrow().payload().path("appId").asString("")).isEqualTo("233637DE");
         List<CastIncoming> sent = receiver.received(MDX, "getMdxSessionStatus");
         assertThat(sent).hasSize(1);

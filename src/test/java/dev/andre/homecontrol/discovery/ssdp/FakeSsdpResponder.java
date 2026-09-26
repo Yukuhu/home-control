@@ -72,7 +72,7 @@ public class FakeSsdpResponder implements AutoCloseable {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             try {
                 socket.receive(packet);
-            } catch (IOException e) {
+            } catch (IOException _) {
                 return;
             }
             SsdpMessage.parse(packet.getData(), packet.getLength())
@@ -84,7 +84,7 @@ public class FakeSsdpResponder implements AutoCloseable {
                             byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
                             try {
                                 socket.send(new DatagramPacket(bytes, bytes.length, packet.getSocketAddress()));
-                            } catch (IOException ignored) {
+                            } catch (IOException _) {
                                 // The discovery side closed; the test is over.
                             }
                         }
