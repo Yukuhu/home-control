@@ -18,7 +18,11 @@ page shows the same checks under **Bluetooth speakers** once the module is on.
 2. **BlueZ is installed and running.** `sudo apt install bluez` then
    `sudo systemctl enable --now bluetooth`; `systemctl status bluetooth` says `active (running)`.
 3. **The D-Bus system socket exists** at `/run/dbus/system_bus_socket` (it does on every systemd
-   host). The container reaches it through the mount `/run/dbus:/run/dbus:ro`.
+   host). The container reaches it through the mount `/run/dbus:/run/dbus:ro`. The D-Bus client
+   also needs the host's machine id, which the image does not have: mount
+   `/etc/machine-id:/etc/machine-id:ro` (both mounts are in `compose.bluetooth.yaml` and the CasaOS
+   Bluetooth manifest). A host without `/etc/machine-id` has `/var/lib/dbus/machine-id`; mount
+   that to `/etc/machine-id` instead.
 4. **The container may talk to BlueZ.** BlueZ's D-Bus policy (`/etc/dbus-1/system.d/bluetooth.conf`)
    allows `root`; the published image runs as root, so nothing is needed. Rootless Docker and
    user-namespace remapping do not work. BlueZ does not use polkit for these calls. On hosts
@@ -76,7 +80,7 @@ CasaOS: import `casaos/docker-compose.bluetooth.yml` **instead of** `casaos/dock
 ## Other audio setups
 
 - **bluealsa** instead of PipeWire/PulseAudio: possible, but the published image lacks the
-  bluez-alsa ALSA plugin. Extend the image with it, mount `/run/dbus` as above and set
+  bluez-alsa ALSA plugin. Extend the image with it, mount `/run/dbus` and `/etc/machine-id` as above and set
   `HOME_CONTROL_BLUETOOTH_AUDIO_DEVICE_TEMPLATE=alsa/bluealsa:DEV={mac},PROFILE=a2dp`.
 - **A fixed output** (for example a speaker the host always uses): set the speaker's audio device
   on the setup page to one of the ids `mpv --audio-device=help` prints inside the container.
@@ -90,6 +94,7 @@ Control; switching the module off (`HOME_CONTROL_BLUETOOTH_ENABLED=false`) remov
 | What you see | Cause | Fix |
 |---|---|---|
 | ✗ D-Bus system socket — "No D-Bus system socket (nothing at /run/dbus/system_bus_socket)" | `/run/dbus` is not mounted into the container | Add `/run/dbus:/run/dbus:ro` (use `compose.bluetooth.yaml` or the CasaOS Bluetooth manifest). |
+| ✗ BlueZ — "The container has no D-Bus machine id" | `/etc/machine-id` is not mounted into the container | Add `/etc/machine-id:/etc/machine-id:ro` (use `compose.bluetooth.yaml` or the CasaOS Bluetooth manifest). |
 | ✗ BlueZ — "BlueZ is not running on the host" | `bluez` missing or `bluetooth.service` stopped | `sudo apt install bluez && sudo systemctl enable --now bluetooth` |
 | ✗ BlueZ — "The host's D-Bus refused this container" | Rootless Docker, user-namespace remapping, a non-root container user, or AppArmor denying D-Bus | Run the container as root (default); with AppArmor add `security_opt: [apparmor:unconfined]`. |
 | ✗ Bluetooth adapter — "No Bluetooth adapter found on the host" | No controller (many NAS and virtual machines), USB dongle unplugged, hard-blocked radio | Plug in a dongle; `bluetoothctl list`; `sudo rfkill unblock bluetooth`. |

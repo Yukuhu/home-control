@@ -14,6 +14,10 @@ class BluezFailuresTest {
 
     static Stream<Arguments> cases() {
         return Stream.of(
+                Arguments.of("org.freedesktop.dbus.exceptions.AddressResolvingException",
+                        "Cannot Resolve Session Bus Address: MachineId file can not be found", NO_MACHINE_ID),
+                Arguments.of("org.freedesktop.dbus.exceptions.AddressResolvingException",
+                        "Cannot Resolve Session Bus Address: MachineId file is empty.", NO_MACHINE_ID),
                 Arguments.of("org.freedesktop.dbus.errors.ServiceUnknown",
                         "The name org.bluez was not provided by any .service files", BLUEZ_NOT_RUNNING),
                 Arguments.of("org.freedesktop.DBus.Error.AccessDenied", "Rejected send message, 1 matched rules", ACCESS_DENIED),
@@ -46,6 +50,8 @@ class BluezFailuresTest {
 
     @org.junit.jupiter.api.Test
     void messagesNameTheFix() {
+        assertThat(BluezFailures.message(NO_MACHINE_ID, "x"))
+                .contains("/etc/machine-id:/etc/machine-id:ro").contains("docs/bluetooth-speakers.md");
         assertThat(BluezFailures.message(BLUEZ_NOT_RUNNING, "x")).contains("systemctl enable --now bluetooth");
         assertThat(BluezFailures.message(NO_ADAPTER, "x")).contains("rfkill unblock bluetooth");
         assertThat(BluezFailures.message(ADAPTER_OFF, "x")).contains("rfkill unblock bluetooth");
