@@ -4,6 +4,8 @@ package dev.andre.homecontrol.adapters.bluetooth.bluez;
 public enum BluezFailure {
     /** No D-Bus system socket at the configured path. */
     NO_DBUS_SOCKET,
+    /** The container has no D-Bus machine id; the D-Bus client will not connect without one. */
+    NO_MACHINE_ID,
     /** The host's D-Bus refused this container. */
     ACCESS_DENIED,
     /** BlueZ is not running on the host. */

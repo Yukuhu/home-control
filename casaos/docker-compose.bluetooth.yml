@@ -19,6 +19,10 @@ services:
         target: /run/dbus
         read_only: true
       - type: bind
+        source: /etc/machine-id
+        target: /etc/machine-id
+        read_only: true
+      - type: bind
         source: /run/user/1000/pulse
         target: /run/pulse
     x-casaos:
@@ -33,6 +37,9 @@ services:
         - container: /run/dbus
           description:
             en_US: Host D-Bus system bus, where BlueZ runs (read-only)
+        - container: /etc/machine-id
+          description:
+            en_US: Host machine id, which the D-Bus client needs (read-only)
         - container: /run/pulse
           description:
             en_US: Host PipeWire or PulseAudio socket directory of the audio user

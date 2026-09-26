@@ -20,6 +20,8 @@ services:
       # The host's D-Bus system bus, where BlueZ lives. The directory, not the socket
       # file, so a restart of dbus on the host does not leave a stale mount.
       - /run/dbus:/run/dbus:ro
+      # The host's machine id. The image has none, and the D-Bus client will not connect without one.
+      - /etc/machine-id:/etc/machine-id:ro
       # The host user's PipeWire (pipewire-pulse) or PulseAudio socket directory.
       - /run/user/${HOST_AUDIO_UID:-1000}/pulse:/run/pulse
       # PulseAudio (not PipeWire) also checks its cookie:

@@ -29,6 +29,7 @@ class BluetoothDeploymentTest {
         List<String> volumes = stringList(service, "volumes");
         assertThat(volumes).containsExactlyInAnyOrder(
                 "/run/dbus:/run/dbus:ro",
+                "/etc/machine-id:/etc/machine-id:ro",
                 "/run/user/${HOST_AUDIO_UID:-1000}/pulse:/run/pulse");
 
         assertThat(service).doesNotContainKeys("network_mode", "image", "ports");
@@ -54,19 +55,22 @@ class BluetoothDeploymentTest {
         assertThat(environment).containsEntry("PULSE_SERVER", "unix:/run/pulse/native");
 
         List<Map<String, Object>> volumes = maps(service, "volumes");
-        assertThat(volumes).hasSize(3);
+        assertThat(volumes).hasSize(4);
         assertThat(volumes.get(0)).containsEntry("source", "/DATA/AppData/$AppID/data");
         assertThat(volumes.get(0)).containsEntry("target", "/data");
         assertThat(volumes.get(1)).containsEntry("source", "/run/dbus");
         assertThat(volumes.get(1)).containsEntry("target", "/run/dbus");
         assertThat(volumes.get(1)).containsEntry("read_only", true);
-        assertThat(volumes.get(2)).containsEntry("source", "/run/user/1000/pulse");
-        assertThat(volumes.get(2)).containsEntry("target", "/run/pulse");
+        assertThat(volumes.get(2)).containsEntry("source", "/etc/machine-id");
+        assertThat(volumes.get(2)).containsEntry("target", "/etc/machine-id");
+        assertThat(volumes.get(2)).containsEntry("read_only", true);
+        assertThat(volumes.get(3)).containsEntry("source", "/run/user/1000/pulse");
+        assertThat(volumes.get(3)).containsEntry("target", "/run/pulse");
 
         Map<String, Object> serviceMetadata = map(service, "x-casaos");
         List<Map<String, Object>> metadataVolumes = maps(serviceMetadata, "volumes");
         List<Object> containers = metadataVolumes.stream().map(v -> v.get("container")).toList();
-        assertThat(containers).containsExactlyInAnyOrder("/data", "/run/dbus", "/run/pulse");
+        assertThat(containers).containsExactlyInAnyOrder("/data", "/run/dbus", "/etc/machine-id", "/run/pulse");
 
         Map<String, Object> metadata = map(manifest, "x-casaos");
         assertThat(metadata).containsEntry("id", "dev.andre.shield-remote");
@@ -130,6 +134,7 @@ class BluetoothDeploymentTest {
     void hostDocumentationCoversTheChecklist() throws Exception {
         String text = Files.readString(Path.of("docs/bluetooth-speakers.md"));
         assertThat(text).contains("/run/dbus:/run/dbus:ro")
+                .contains("/etc/machine-id:/etc/machine-id:ro")
                 .contains("systemctl enable --now bluetooth")
                 .contains("rfkill unblock bluetooth")
                 .contains("loginctl enable-linger")
@@ -148,6 +153,7 @@ class BluetoothDeploymentTest {
         String text = Files.readString(Path.of("docs/bluetooth-speakers.md"));
         assertThat(text).contains("## Failure modes")
                 .contains("No D-Bus system socket")
+                .contains("The container has no D-Bus machine id")
                 .contains("BlueZ is not running on the host")
                 .contains("refused this container")
                 .contains("No Bluetooth adapter found")

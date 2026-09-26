@@ -15,6 +15,10 @@ public final class BluezFailures {
 
     public static BluezFailure classify(String errorName, String message) {
         String text = ((errorName == null ? "" : errorName) + " " + (message == null ? "" : message)).toLowerCase(Locale.ROOT);
+        // dbus-java reads a machine id before it even opens the socket: "MachineId file can not be found" / "is empty".
+        if (has(text, "machineid")) {
+            return NO_MACHINE_ID;
+        }
         if (has(text, "serviceunknown", "namehasnoowner", "was not provided by any")) {
             return BLUEZ_NOT_RUNNING;
         }
@@ -54,6 +58,8 @@ public final class BluezFailures {
         String why = detail == null || detail.isBlank() ? "" : " (" + detail.strip() + ")";
         return switch (failure) {
             case NO_DBUS_SOCKET -> "No D-Bus system socket" + why + ". Mount /run/dbus into the container, " + DOCS + ".";
+            case NO_MACHINE_ID -> "The container has no D-Bus machine id" + why
+                    + ". Mount the host's machine id into the container: /etc/machine-id:/etc/machine-id:ro, " + DOCS + ".";
             case ACCESS_DENIED -> "The host's D-Bus refused this container" + why + ". Run the container as root; "
                     + "with AppArmor add security_opt apparmor:unconfined, " + DOCS + ".";
             case BLUEZ_NOT_RUNNING -> "BlueZ is not running on the host" + why
