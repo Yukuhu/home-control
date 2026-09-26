@@ -18,6 +18,27 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class RemoteLayoutE2eTest extends E2eApplicationTest {
 
     @BrowserTest
+    void screenReaderProgressInLongRailsDoesNotWidenThePage(String browser) {
+        try (BrowserSession session = Browsers.openDesktop(browser, baseUrl(), traceName)) {
+            Page page = session.page();
+            page.navigate("/?device=living");
+            Locator railTiles = page.locator("#rails .tiles").first();
+            assertThat(railTiles.locator(".tile .visually-hidden")).hasCount(1);
+            // Real "Continue watching" rails carry hidden "n% watched" text on tiles far past the right edge.
+            railTiles.evaluate("""
+                    el => {
+                        const watched = el.querySelector('li:has(.visually-hidden)');
+                        for (let i = 0; i < 20; i++) el.append(watched.cloneNode(true));
+                    }
+                    """);
+            for (int[] size : new int[][] {{1440, 900}, {390, 844}}) {
+                page.setViewportSize(size[0], size[1]);
+                assertNoHorizontalOverflow(page);
+            }
+        }
+    }
+
+    @BrowserTest
     void phoneRemoteOpensAboveThePageAndKeepsFocusAndScrollingInside(String browser) {
         try (BrowserSession session = Browsers.open(browser, baseUrl(), traceName, true)) {
             Page page = session.page();
