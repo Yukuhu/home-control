@@ -82,6 +82,29 @@ class TouchpadE2eTest extends E2eApplicationTest {
     }
 
     @BrowserTest
+    void closingTheRemoteDuringAHoldEndsIt(String browser) {
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+            page.clock().install();
+            page.navigate("/?device=living&remote=open");
+            selectTouchpad(page);
+            double[] center = centerOf(page.locator("#touchpad"));
+            page.mouse().move(center[0], center[1]);
+            page.mouse().down();
+            page.clock().runFor(500);
+            await().until(() -> fakeDevices.recorded("living").contains(
+                    new Action.PressKey(RemoteKey.DPAD_CENTER, KeyPress.START_LONG)));
+
+            page.locator("#remote-drawer").evaluate("el => el.close()");
+
+            await().until(() -> fakeDevices.recorded("living").contains(
+                    new Action.PressKey(RemoteKey.DPAD_CENTER, KeyPress.END_LONG)));
+            assertThat(page.locator("#remote-drawer")).isHidden();
+            page.mouse().up();
+        }
+    }
+
+    @BrowserTest
     void theModeIsRememberedAcrossReloads(String browser) {
         try (BrowserSession session = open(browser)) {
             Page page = session.page();

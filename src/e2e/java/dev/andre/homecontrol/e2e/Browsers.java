@@ -43,8 +43,12 @@ public final class Browsers {
     }
 
     public static BrowserSession open(String browser, String baseUrl, String traceName) {
+        return open(browser, baseUrl, traceName, false);
+    }
+
+    public static BrowserSession open(String browser, String baseUrl, String traceName, boolean mobile) {
         BrowserContext context = browser(browser).newContext(new Browser.NewContextOptions()
-                .setBaseURL(baseUrl)
+                .setBaseURL(baseUrl).setIsMobile(mobile)
                 .setViewportSize(390, 844)
                 .setHasTouch(true)
                 .setLocale("en-US"));
