@@ -51,7 +51,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.apache.httpcomponents.client5:httpclient5")
-    implementation("com.google.protobuf:protobuf-java:4.36.1")
+    implementation("com.google.protobuf:protobuf-java:4.36.2")
     implementation("org.jmdns:jmdns:3.6.3")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.86")
     // Argon2id for the login hash and the HOME_CONTROL_SECRET key (already transitive via bcpkix; used directly now).
@@ -72,7 +72,7 @@ tasks.named<Test>("test") {
 }
 
 protobuf {
-    protoc { artifact = "com.google.protobuf:protoc:4.36.1" }
+    protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
 }
 
 tasks.withType<Test> {
