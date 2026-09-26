@@ -172,5 +172,15 @@ visibility. Browser coverage is now 90.19% of lines and 93.97% of branches.
 - CI runs both Chromium and WebKit and imports Java test results, JaCoCo, and LCOV
   before the SonarCloud quality gate.
 
-This branch has not yet been analyzed by SonarCloud; no claim is made that its
-quality gate passes or that the entire backlog is resolved.
+SonarCloud analyzed PR #90 at `60a9098`. Its gate failed new-code reliability
+(C against required A) and coverage (76.8% against required 80%). Security and
+maintainability were A, duplication was 0.8%, and hotspot review was 100%.
+The PR analysis reports 169 open findings (168 code smells and one bug); main
+still reports 1,195 unresolved findings. Those are different analysis scopes and
+cannot be subtracted to claim a backlog reduction. The mobile follow-up awaits
+reanalysis; no claim is made that the gate passes or the entire backlog is resolved.
+
+The sole PR reliability finding was `java:S6218` on the private `FetchResponse`
+record's byte-array component. It is now a private class with the same accessors;
+callers only consume its body and redirect location, so no array equality semantics
+are introduced. All 39 existing `WorkflowHttpClientTest` tests pass.
