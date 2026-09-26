@@ -103,6 +103,7 @@ export function initTouchpad(root = document) {
     });
 
     pad.addEventListener("pointercancel", () => cancel());
+    drawer.addEventListener("close", () => cancel());
     pad.addEventListener("lostpointercapture", (event) => { if (gesture && event.pointerId === gesture.id) cancel(); });
 
     // Keyboard path without gestures (vNext §5.7).

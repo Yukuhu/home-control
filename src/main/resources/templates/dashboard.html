@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="theme-color" content="#101917">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -68,7 +68,7 @@
     <section id="rails" th:replace="~{fragments/rails :: rails}"></section>
 </main>
 
-<aside id="remote-drawer" class="drawer" hx-swap="none" th:with="id=${selected.id()}"
+<dialog id="remote-drawer" class="drawer" hx-swap="none" th:with="id=${selected.id()}"
        th:attr="hidden=${!remoteOpen} ? 'hidden'" data-mode="buttons" aria-label="Remote">
     <header class="drawer-header">
         <div><p class="eyebrow">REMOTE CONTROL</p><h2 th:text="${selected.name()}">Shield</h2></div>
@@ -187,7 +187,7 @@
         <p class="hint" th:if="${localAudio}">This speaker plays through the server: direct audio links and Jellyfin music work. The server must be able to reach the URL.</p></details>
     </section>
     <details class="keyboard-help" th:if="${remoteKeys}"><summary>Keyboard shortcuts</summary><p>With no button or field focused: <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> to navigate, <kbd>Enter</kbd> to select, <kbd>Space</kbd> to play or pause, <kbd>H</kbd> for Home, <kbd>M</kbd> to mute.</p></details>
-</aside>
+</dialog>
 
 <dialog id="play-sheet" class="sheet" aria-labelledby="sheet-title">
     <form method="dialog" class="sheet-close-form">
