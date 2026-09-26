@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.core.playback;
 
+import dev.andre.homecontrol.core.RedactedUris;
+
 import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -69,12 +71,10 @@ public sealed interface PlayableRef {
             return "direct stream";
         }
 
-        /** Stream URLs may carry an ApiKey; print them without the query. */
+        /** Stream URLs may carry an ApiKey or, pasted by hand, user:password@; print them without either. */
         @Override
         public String toString() {
-            String where = url.getScheme() == null ? url.getRawPath()
-                    : url.getScheme() + "://" + url.getRawAuthority() + url.getRawPath();
-            return "StreamUrl[url=" + where + (url.getRawQuery() == null ? "" : "?…") + ", mimeType=" + mimeType + "]";
+            return "StreamUrl[url=" + RedactedUris.withoutQuery(url) + ", mimeType=" + mimeType + "]";
         }
     }
 

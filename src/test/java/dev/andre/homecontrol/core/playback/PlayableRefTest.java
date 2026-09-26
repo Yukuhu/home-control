@@ -23,6 +23,16 @@ class PlayableRefTest {
     }
 
     @Test
+    void aStreamUrlPrintsWithoutTheUserInfoOfAPastedLink() {
+        // AppLinks.parseHttpUrl accepts user:password@ in a hand-pasted media link.
+        var stream = new PlayableRef.StreamUrl(URI.create("https://me:hunter2@nas.local:8443/films/movie.mp4"), "video/mp4");
+
+        assertThat(stream.toString())
+                .isEqualTo("StreamUrl[url=https://nas.local:8443/films/movie.mp4, mimeType=video/mp4]")
+                .doesNotContain("hunter2");
+    }
+
+    @Test
     void aStreamUrlWithoutSchemeOrQueryPrintsItsPath() {
         assertThat(new PlayableRef.StreamUrl(URI.create("/media/song.flac"), "audio/flac").toString())
                 .isEqualTo("StreamUrl[url=/media/song.flac, mimeType=audio/flac]");
