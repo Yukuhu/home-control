@@ -3,7 +3,7 @@ plugins {
     jacoco
     id("org.springframework.boot") version "4.1.1"
     id("com.google.protobuf") version "0.10.0"
-    id("org.sonarqube") version "7.4.0.8496"
+    id("org.sonarqube") version "7.5.0.8588"
 }
 
 group = "dev.andre"
