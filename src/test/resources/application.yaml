@@ -11,6 +11,13 @@ server:
         max-age: 30d
         secure: false
 
+spring:
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+
 shield:
   data-dir: build/test-data
   keystore-password: shield

@@ -15,6 +15,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -71,6 +72,17 @@ class StaticAssetsTest {
                 .andExpect(content().string(containsString("beforeinstallprompt")))
                 .andExpect(content().string(containsString("location.protocol === \"https:\"")));
         mockMvc.perform(get("/offline.html")).andExpect(status().isOk());
+    }
+
+    @Test
+    void browsersRevalidateStylesAndScriptsSoARedeployIsPickedUp() throws Exception {
+        for (String path : new String[] {"/app.css", "/js/app.js"}) {
+            String lastModified = mockMvc.perform(get(path)).andExpect(status().isOk())
+                    .andExpect(header().string("Cache-Control", "no-cache"))
+                    .andReturn().getResponse().getHeader("Last-Modified");
+            mockMvc.perform(get(path).header("If-Modified-Since", lastModified))
+                    .andExpect(status().isNotModified());
+        }
     }
 
     @Test

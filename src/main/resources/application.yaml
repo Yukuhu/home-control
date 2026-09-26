@@ -11,6 +11,14 @@ server:
         max-age: 30d
         secure: ${HOME_CONTROL_SECURE_COOKIE:false}
 
+spring:
+  web:
+    resources:
+      cache:
+        # Asset URLs are not versioned, so browsers must revalidate or they keep a pre-redeploy app.css.
+        cachecontrol:
+          no-cache: true
+
 shield:
   data-dir: ./data
   keystore-password: ${SHIELD_KEYSTORE_PASSWORD:shield}
