@@ -143,4 +143,27 @@ class PinnedSetupControllerTest {
         mockMvc.perform(get("/setup"))
                 .andExpect(content().string(containsString("No pinned links yet.")));
     }
+
+    @Test
+    void renameMoveAndRemoveReportRefusalsAndStorageFailures() throws Exception {
+        willThrow(new IllegalArgumentException("A title needs 1 to 80 characters")).given(pins).rename("p-aaaaaaaaaaaa", "");
+        willThrow(new IllegalArgumentException("No pinned link p-000000000000")).given(pins).move("p-000000000000", true);
+        willThrow(new StorageException("disk full", null)).given(pins).rename("p-aaaaaaaaaaaa", "New title");
+        willThrow(new StorageException("disk full", null)).given(pins).move("p-aaaaaaaaaaaa", true);
+        given(pins.find("p-aaaaaaaaaaaa")).willReturn(Optional.of(pin("p-aaaaaaaaaaaa", "A title")));
+        willThrow(new StorageException("disk full", null)).given(pins).remove("p-aaaaaaaaaaaa");
+
+        mockMvc.perform(post("/setup/sources/pinned/p-aaaaaaaaaaaa/title").param("title", ""))
+                .andExpect(redirectedUrl("/setup#pinned"))
+                .andExpect(flash().attribute("pinnedError", "A title needs 1 to 80 characters"));
+        mockMvc.perform(post("/setup/sources/pinned/p-000000000000/move").param("direction", "up"))
+                .andExpect(flash().attribute("pinnedError", "No pinned link p-000000000000"));
+        mockMvc.perform(post("/setup/sources/pinned/p-aaaaaaaaaaaa/title").param("title", "New title"))
+                .andExpect(flash().attribute("pinnedError", "Could not save pinned links: disk full"));
+        mockMvc.perform(post("/setup/sources/pinned/p-aaaaaaaaaaaa/move").param("direction", "up"))
+                .andExpect(flash().attribute("pinnedError", "Could not save pinned links: disk full"));
+        mockMvc.perform(post("/setup/sources/pinned/p-aaaaaaaaaaaa/remove"))
+                .andExpect(redirectedUrl("/setup#pinned"))
+                .andExpect(flash().attribute("pinnedError", "Could not save pinned links: disk full"));
+    }
 }

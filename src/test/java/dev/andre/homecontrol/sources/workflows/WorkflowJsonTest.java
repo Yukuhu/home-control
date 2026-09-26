@@ -120,6 +120,121 @@ class WorkflowJsonTest {
         }
     }
 
+    @Test void generatedArtworkRejectsEveryNonPublicIpv4Range() {
+        for (String host : new String[]{"0.0.0.0", "0.1.2.3", "10.0.0.1", "10.255.255.255", "127.0.0.1",
+                "127.255.255.254", "100.64.0.1", "100.127.255.254", "169.254.169.254", "172.16.0.1",
+                "172.31.255.255", "192.168.1.1", "192.0.0.8", "192.0.2.1", "198.18.0.1", "198.19.255.254",
+                "198.51.100.7", "203.0.113.9", "224.0.0.251", "239.255.255.250", "255.255.255.255"}) {
+            assertThat(WorkflowJson.artwork("https://" + host + "/cover.png")).as(host).isNull();
+        }
+    }
+
+    @Test void generatedArtworkAcceptsPublicIpv4NextToReservedBoundaries() {
+        for (String host : new String[]{"1.1.1.1", "9.255.255.255", "11.0.0.1", "100.63.255.255",
+                "100.128.0.1", "126.255.255.255", "128.0.0.1", "169.253.0.1", "169.255.0.1", "172.15.255.255",
+                "172.32.0.1", "192.0.1.1", "192.0.3.1", "192.1.0.1", "192.167.1.1", "192.169.0.1", "198.17.0.1",
+                "198.20.0.1", "198.51.99.1", "198.51.101.1", "203.0.112.1", "203.1.113.1", "223.255.255.254"}) {
+            assertThat(WorkflowJson.artwork("https://" + host + "/cover.png")).as(host)
+                    .isEqualTo(java.net.URI.create("https://" + host + "/cover.png"));
+        }
+    }
+
+    @Test void generatedArtworkRejectsAmbiguousIpv4AndNonGlobalIpv6Literals() {
+        // Leading zeros are octal to some resolvers: 010.0.0.1 could mean 8.0.0.1.
+        for (String host : new String[]{"010.0.0.1", "8.8.8.08", "0177.0.0.1", "256.1.1.1", "1.2.3",
+                "[::1]", "[::]", "[fc00::1]", "[fe80::1]", "[ff02::1]", "[::ffff:127.0.0.1]",
+                "[::ffff:8.8.8.8]", "[fe80::1%25eth0]", "[2001:db8:1::1]"}) {
+            assertThat(WorkflowJson.artwork("https://" + host + "/cover.png")).as(host).isNull();
+        }
+    }
+
+    @Test void generatedArtworkNeedsAPlainHttpsUrlOnAQualifiedHost() {
+        for (String url : new String[]{"http://cdn.example.com/a.png", "ftp://cdn.example.com/a.png",
+                "//cdn.example.com/a.png", "/a.png", "https://user@cdn.example.com/a.png",
+                "https://cdn.example.com/a.png#x", "https://cdn.example.com/a.png?size=1",
+                "https://cdn.example.com/art/../admin", "https://cdn.example.com/./a.png",
+                "https://cdn/a.png", "https://PRINTER.LOCAL/a.png", "https://a.b.localhost/a.png",
+                "https://cdn example.com/a.png", "not a url"}) {
+            assertThat(WorkflowJson.artwork(url)).as(url).isNull();
+        }
+        assertThat(WorkflowJson.artwork(null)).isNull();
+        assertThat(WorkflowJson.artwork("HTTPS://CDN.Example.COM./a.png"))
+                .isEqualTo(java.net.URI.create("HTTPS://CDN.Example.COM./a.png"));
+    }
+
+    @Test void generatedEntriesRejectInvalidIdsTitlesAndArrays() {
+        var draft = channels();
+        assertSelectFails(draft, "{\"items\":[]}", "entry array is missing or invalid");
+        assertSelectFails(draft, "{\"channels\":{\"id\":\"a\"}}", "entry array is missing or invalid");
+        assertSelectFails(draft, "{\"channels\":[" + "{\"id\":1,\"title\":\"A\"},".repeat(200)
+                + "{\"id\":2,\"title\":\"B\"}]}", "too many entries");
+        assertSelectFails(draft, "{\"channels\":[{\"title\":\"A\"}]}", "entry 0 has invalid ID");
+        assertSelectFails(draft, "{\"channels\":[{\"id\":\"\",\"title\":\"A\"}]}", "entry 0 has invalid ID");
+        assertSelectFails(draft, "{\"channels\":[{\"id\":{\"x\":1},\"title\":\"A\"}]}", "entry 0 has invalid ID");
+        assertSelectFails(draft, "{\"channels\":[{\"id\":\"a\",\"title\":\"A\"},{\"id\":\"a\",\"title\":\"B\"}]}",
+                "entry 1 has duplicate ID");
+        assertSelectFails(draft, "{\"channels\":[{\"id\":\"a\"}]}", "entry 0 has invalid title");
+        assertSelectFails(draft, "{\"channels\":[{\"id\":\"a\",\"title\":\"  \"}]}", "entry 0 has invalid title");
+        assertSelectFails(draft, "{\"channels\":[{\"id\":\"a\",\"title\":7}]}", "entry 0 has invalid title");
+        assertSelectFails(draft, "{\"channels\":[{\"id\":\"a\",\"title\":\"" + "x".repeat(121) + "\"}]}",
+                "entry 0 has invalid title");
+        String atTheLimits = java.util.stream.IntStream.range(0, 200)
+                .mapToObj(i -> "{\"id\":" + i + ",\"title\":\"" + "x".repeat(120) + "\"}")
+                .collect(java.util.stream.Collectors.joining(",", "{\"channels\":[", "]}"));
+        assertThat(WorkflowJson.entries(draft, parse(atTheLimits))).hasSize(200);
+    }
+
+    private static void assertSelectFails(WorkflowDraft draft, String json, String detail) {
+        var root = parse(json);
+        assertThatThrownBy(() -> WorkflowJson.entries(draft, root)).as(json)
+                .isInstanceOf(WorkflowException.class)
+                .hasMessage("Choose entries: " + detail);
+    }
+
+    @Test void generatedEntriesKeepOnlyShortTextSubtitlesAndTextArtwork() {
+        var draft = channels();
+        var withExtras = new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(), draft.fetch(),
+                new Listing("/channels", "/id", "/title", "/sub", "/art"), null, draft.variables(), draft.cast());
+        var entries = WorkflowJson.entries(withExtras, parse("""
+                {"channels":[{"id":"a","title":"A","sub":"Live","art":"https://cdn.example.com/a.png"},
+                             {"id":"b","title":"B","sub":7,"art":{"url":"https://cdn.example.com/b.png"}},
+                             {"id":"c","title":"C","sub":"%s"},
+                             {"id":"d","title":"D","sub":"%s"}]}
+                """.formatted("x".repeat(240), "x".repeat(241))));
+        assertThat(entries).extracting(WorkflowJson.Entry::subtitle)
+                .containsExactly("Live", null, "x".repeat(240), null);
+        assertThat(entries).extracting(WorkflowJson.Entry::artwork)
+                .containsExactly(java.net.URI.create("https://cdn.example.com/a.png"), null, null, null);
+        assertThat(entries.getFirst().toString()).isEqualTo("Entry[key=" + entries.getFirst().key() + "]");
+    }
+
+    @Test void mappingsNeedAScalarValue() {
+        for (String json : new String[]{"{}", "{\"auth\":{\"token\":null}}", "{\"auth\":{\"token\":{}}}",
+                "{\"auth\":{\"token\":[\"t\"]}}"}) {
+            var root = parse(json);
+            var variables = java.util.List.of(new Variable("C", Scope.ROOT, "/auth/token", true));
+            assertThatThrownBy(() -> WorkflowJson.values(variables, root, null))
+                    .isInstanceOf(WorkflowException.class)
+                    .hasMessage("Map fields: mapping C has no scalar value")
+                    .extracting(e -> ((WorkflowException) e).stage()).isEqualTo(WorkflowException.Stage.MAP);
+        }
+        var values = WorkflowJson.values(java.util.List.of(new Variable("B", Scope.ROOT, "/on", false)),
+                parse("{\"on\":true}"), null);
+        assertThat(values).containsEntry("B", new WorkflowJson.Value("true", false));
+    }
+
+    @Test void rejectsMissingOversizedAndEmptyBodies() {
+        assertThatThrownBy(() -> WorkflowJson.parse(null)).isInstanceOf(WorkflowException.class)
+                .hasMessage("Parse JSON: invalid JSON response size");
+        var oversized = new byte[2 * 1024 * 1024 + 1];
+        assertThatThrownBy(() -> WorkflowJson.parse(oversized)).isInstanceOf(WorkflowException.class)
+                .hasMessage("Parse JSON: invalid JSON response size");
+        for (String body : new String[]{"", "   ", "{", "nope"}) {
+            assertThatThrownBy(() -> parse(body)).as(body).isInstanceOf(WorkflowException.class)
+                    .hasMessage("Parse JSON: invalid JSON response");
+        }
+    }
+
     @Test void singleModeUsesSavedDisplayAndKey() {
         var draft = WorkflowFixtures.single(java.net.URI.create("https://api.example/catalog"));
         var entries = WorkflowJson.entries(draft, parse("{}"));

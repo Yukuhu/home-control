@@ -66,4 +66,36 @@ class SecretKeySourceTest {
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining("secret.key");
     }
+
+    @Test
+    void aKeyFileThatIsNotBase64IsRefusedWithoutQuotingIt() throws Exception {
+        Files.writeString(dir.resolve("secret.key"), "pasted-by-mistake: hunter2 %%%\n");
+
+        var preparedReceiver = source(null);
+        assertThatThrownBy(() -> preparedReceiver.forWriting(null))
+                .isInstanceOf(StorageException.class)
+                .hasMessage("Could not read " + dir.resolve("secret.key") + "; it must hold 32 base64-encoded bytes")
+                .hasNoCause();
+    }
+
+    @Test
+    void anUnknownKeySourceIsNamed() {
+        var header = new SecretKeySource.KeyHeader("vault", null, 0, 0, 0);
+
+        var preparedReceiver = source("correct horse battery staple");
+        assertThatThrownBy(() -> preparedReceiver.keyFor(header))
+                .isInstanceOf(StorageException.class)
+                .hasMessage("secrets.json names an unknown key source");
+    }
+
+    @Test
+    void aKeyFileThatCannotBeCreatedPointsAtTheDataDirectory() throws Exception {
+        Files.writeString(dir.resolve("not-a-directory"), "x");
+        var unwritable = new SecretKeySource(null, dir.resolve("not-a-directory/secret.key"), new SecureRandom());
+
+        assertThatThrownBy(() -> unwritable.forWriting(null))
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining("Could not create")
+                .hasMessageContaining("check that /data is bind-mounted and writable");
+    }
 }
