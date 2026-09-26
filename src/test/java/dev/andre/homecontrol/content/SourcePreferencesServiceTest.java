@@ -63,4 +63,26 @@ class SourcePreferencesServiceTest {
         assertThat(new JsonFileSourceSettings(file).preferences()).isEmpty();
         assertThat(published).isEmpty();
     }
+
+    @Test
+    void preferencesSavedBeforeLocaleAndRegionExistedGetThePropertyDefaults() {
+        Path file = dir.resolve("sources.json");
+        JsonFileSourceSettings settings = new JsonFileSourceSettings(file);
+        settings.putPreferences(new SourcePreferences(List.of(), java.util.Set.of(), java.util.Set.of("jellyfin"),
+                Map.of(), null, "AT", List.of()));
+
+        SourcePreferences noLocale = service(file).current();
+
+        assertThat(noLocale.locale()).isEqualTo("de-DE");
+        assertThat(noLocale.region()).isEqualTo("AT");
+        assertThat(noLocale.disabledSources()).containsExactly("jellyfin");
+
+        settings.putPreferences(new SourcePreferences(List.of(), java.util.Set.of(), java.util.Set.of(),
+                Map.of(), "en-GB", null, List.of()));
+
+        SourcePreferences noRegion = service(file).current();
+
+        assertThat(noRegion.locale()).isEqualTo("en-GB");
+        assertThat(noRegion.region()).isEqualTo("DE");
+    }
 }

@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
+import dev.andre.homecontrol.adapters.androidtv.PairingOutcome;
 import dev.andre.homecontrol.adapters.androidtv.PairingService;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
@@ -15,6 +16,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.time.Instant;
 import java.util.EnumSet;
@@ -33,6 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -67,6 +70,74 @@ class SetupControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("setup"))
                 .andExpect(content().string(containsString("/data")))
+                .andExpect(content().string(containsString("bind-mounted and writable")));
+    }
+
+    @Test
+    void beginningAndroidTvPairingAsksForTheCodeShownOnTheTv() throws Exception {
+        mockMvc.perform(post("/setup/pair").param("host", "192.168.1.50").param("name", "Living Room Shield"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("setup"))
+                .andExpect(model().attribute("awaitingCode", true))
+                .andExpect(model().attributeDoesNotExist("error"))
+                .andExpect(content().string(containsString("action=\"/setup/code\"")));
+
+        verify(pairing).begin("192.168.1.50", "Living Room Shield");
+    }
+
+    @Test
+    void anUnreachableAndroidTvIsReportedInsteadOfAskingForACode() throws Exception {
+        willThrow(new IOException("Connection refused")).given(pairing).begin("192.168.1.50", null);
+
+        mockMvc.perform(post("/setup/pair").param("host", "192.168.1.50"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("awaitingCode", false))
+                .andExpect(model().attribute("error", "Could not connect to 192.168.1.50: Connection refused"))
+                .andExpect(content().string(not(containsString("action=\"/setup/code\""))));
+    }
+
+    @Test
+    void theRightPairingCodeFinishesOnTheDashboard() throws Exception {
+        given(pairing.submit("A1B2C3")).willReturn(new PairingOutcome.Paired());
+
+        mockMvc.perform(post("/setup/code").param("code", "A1B2C3"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+    }
+
+    @Test
+    void aWrongPairingCodeAsksToStartAgain() throws Exception {
+        given(pairing.submit("ZZZZZZ")).willReturn(new PairingOutcome.WrongCode());
+
+        mockMvc.perform(post("/setup/code").param("code", "ZZZZZZ"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("setup"))
+                .andExpect(model().attribute("awaitingCode", false))
+                .andExpect(model().attribute("error",
+                        "That code was not accepted. The device will show a new one — start again."))
+                .andExpect(content().string(containsString("That code was not accepted.")));
+    }
+
+    @Test
+    void aFailedPairingShowsItsReason() throws Exception {
+        given(pairing.submit("A1B2C3")).willReturn(new PairingOutcome.Failed("The TV closed the connection"));
+
+        mockMvc.perform(post("/setup/code").param("code", "A1B2C3"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("awaitingCode", false))
+                .andExpect(content().string(containsString("The TV closed the connection")));
+    }
+
+    @Test
+    void aPairingThatCannotBeSavedShowsTheStorageError() throws Exception {
+        given(pairing.submit("A1B2C3")).willThrow(new StorageException(
+                "Could not write /data/devices.json; check that /data is bind-mounted and writable",
+                new AccessDeniedException("/data/devices.json")));
+
+        mockMvc.perform(post("/setup/code").param("code", "A1B2C3"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("setup"))
+                .andExpect(model().attribute("awaitingCode", false))
                 .andExpect(content().string(containsString("bind-mounted and writable")));
     }
 
