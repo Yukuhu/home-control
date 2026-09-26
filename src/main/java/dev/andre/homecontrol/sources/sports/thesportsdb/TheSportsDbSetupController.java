@@ -24,6 +24,11 @@ import java.util.List;
         havingValue = "true", matchIfMissing = true)
 public class TheSportsDbSetupController {
 
+    private static final String MESSAGE = "sportsMessage";
+    private static final String ERROR = "sportsError";
+    private static final String SAVE_ERROR = "Could not save sports settings";
+    private static final String REDIRECT = "redirect:/setup#sports";
+
     private static final Logger log = LoggerFactory.getLogger(TheSportsDbSetupController.class);
 
     public record LeagueView(String id, String name, String sport, String country, boolean added) {
@@ -44,28 +49,28 @@ public class TheSportsDbSetupController {
     public String add(@RequestParam(required = false) String leagueId, RedirectAttributes redirect) {
         try {
             SportsSettings.CompetitionEntry entry = competitions.add(leagueId);
-            redirect.addFlashAttribute("sportsMessage", "Added " + entry.name());
+            redirect.addFlashAttribute(MESSAGE, "Added " + entry.name());
         } catch (IllegalArgumentException | TheSportsDbException e) {
-            redirect.addFlashAttribute("sportsError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (StorageException e) {
-            log.warn("Could not save sports settings", e);
-            redirect.addFlashAttribute("sportsError", "Could not save sports settings");
+            log.warn(SAVE_ERROR, e);
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR);
         }
-        return "redirect:/setup#sports";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/sports/competitions/{leagueId}/remove")
     public String remove(@PathVariable String leagueId, RedirectAttributes redirect) {
         try {
             SportsSettings.CompetitionEntry entry = competitions.remove(leagueId);
-            redirect.addFlashAttribute("sportsMessage", "Removed " + entry.name());
+            redirect.addFlashAttribute(MESSAGE, "Removed " + entry.name());
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("sportsError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (StorageException e) {
-            log.warn("Could not save sports settings", e);
-            redirect.addFlashAttribute("sportsError", "Could not save sports settings");
+            log.warn(SAVE_ERROR, e);
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR);
         }
-        return "redirect:/setup#sports";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/sports/thesportsdb/search")
@@ -80,12 +85,12 @@ public class TheSportsDbSetupController {
                     .toList();
             redirect.addFlashAttribute("sportsSearch", new SearchView(country, sport, views));
         } catch (IllegalArgumentException | ContentSourceException e) {
-            redirect.addFlashAttribute("sportsError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (StorageException e) {
-            log.warn("Could not save sports settings", e);
-            redirect.addFlashAttribute("sportsError", "Could not save sports settings");
+            log.warn(SAVE_ERROR, e);
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR);
         }
-        return "redirect:/setup#sports";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/sports/thesportsdb/key")
@@ -94,27 +99,27 @@ public class TheSportsDbSetupController {
                       HttpServletRequest request, RedirectAttributes redirect) {
         try {
             competitions.usePersonalKey(new SportsCompetitions.PersonalKey(key, loginPassword, loginPasswordConfirmation), request);
-            redirect.addFlashAttribute("sportsMessage", "Using your TheSportsDB key");
-        } catch (LoginRequiredException e) {
-            redirect.addFlashAttribute("sportsError", "Log in again to change sources");
+            redirect.addFlashAttribute(MESSAGE, "Using your TheSportsDB key");
+        } catch (LoginRequiredException _) {
+            redirect.addFlashAttribute(ERROR, "Log in again to change sources");
         } catch (IllegalArgumentException | ContentSourceException | PasswordRejectedException e) {
-            redirect.addFlashAttribute("sportsError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (StorageException e) {
-            log.warn("Could not save sports settings", e);
-            redirect.addFlashAttribute("sportsError", "Could not save sports settings");
+            log.warn(SAVE_ERROR, e);
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR);
         }
-        return "redirect:/setup#sports";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/sports/thesportsdb/free-key")
     public String freeKey(RedirectAttributes redirect) {
         try {
             competitions.useFreeKey();
-            redirect.addFlashAttribute("sportsMessage", "Using the free TheSportsDB key");
+            redirect.addFlashAttribute(MESSAGE, "Using the free TheSportsDB key");
         } catch (StorageException e) {
-            log.warn("Could not save sports settings", e);
-            redirect.addFlashAttribute("sportsError", "Could not save sports settings");
+            log.warn(SAVE_ERROR, e);
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR);
         }
-        return "redirect:/setup#sports";
+        return REDIRECT;
     }
 }

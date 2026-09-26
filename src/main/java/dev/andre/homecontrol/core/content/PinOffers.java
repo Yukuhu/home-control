@@ -24,11 +24,11 @@ public final class PinOffers {
         }
         String service = null;
         for (PlayableRef ref : item.playables()) {
-            if (!(ref instanceof PlayableRef.AppLink link) || !ServiceLinks.isAppHome(link.uri())) {
+            if (!(ref instanceof PlayableRef.AppLink(var uri, var appService)) || !ServiceLinks.isAppHome(uri)) {
                 return Optional.empty();
             }
             if (service == null) {
-                service = link.service();
+                service = appService;
             }
         }
         return Optional.of(new Offer(item.sourceId() + "/" + item.id(), service));

@@ -57,8 +57,8 @@ class WorkflowSetupControllerTest {
     void setupIncludesModeEditAndSavedRevisionTestWithoutFetching(boolean generated) throws Exception {
         if (generated) when(store.all()).thenReturn(List.of(new WorkflowDefinition(1, id, 3, WorkflowFixtures.generated())));
         String html = mvc.perform(get("/setup")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        assertThat(html).contains(generated ? "Generated tiles" : "Single tile", ">Edit</a>", "/setup/workflows/" + id + "/test", "Fetches fresh data", "without playback");
-        assertThat(html).containsPattern("(?s)action=\"/setup/workflows/" + id + "/test\".*?name=\"expectedRevision\" value=\"3\"");
+        assertThat(html).contains(generated ? "Generated tiles" : "Single tile", ">Edit</a>", "/setup/workflows/" + id + "/test", "Fetches fresh data", "without playback")
+                .containsPattern("(?s)action=\"/setup/workflows/" + id + "/test\".*?name=\"expectedRevision\" value=\"3\"");
         verifyNoInteractions(testService);
     }
 

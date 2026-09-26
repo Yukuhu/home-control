@@ -23,7 +23,7 @@
     <nav class="header-nav" aria-label="Main navigation">
         <a href="/" aria-current="page">Home</a><a href="/setup">Setup</a>
     </nav>
-    <span id="connection-status" class="connection-status" role="status">Connecting…</span>
+    <output id="connection-status" class="connection-status">Connecting…</output>
 </header>
 <main id="content">
     <div class="page-heading dashboard-heading">
@@ -61,7 +61,7 @@
                hx-get="/search/results" hx-trigger="input changed delay:350ms, search"
                hx-target="#search-results" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator=".search-pending">
         <span class="search-icon" aria-hidden="true">⌕</span>
-        <span class="search-pending htmx-indicator" role="status">Searching…</span>
+        <output class="search-pending htmx-indicator">Searching…</output>
     </form>
     </section>
     <div id="search-results" aria-live="polite"></div>
@@ -221,6 +221,6 @@
         <p id="sheet-pin-error" class="error" role="alert" hidden></p>
     </form>
 </dialog>
-<div id="toast" hidden role="status" aria-live="polite"><span class="toast-text"></span><button type="button" class="toast-action" hidden></button></div>
+<output id="toast" hidden aria-live="polite"><span class="toast-text"></span><button type="button" class="toast-action" hidden></button></output>
 </body>
 </html>

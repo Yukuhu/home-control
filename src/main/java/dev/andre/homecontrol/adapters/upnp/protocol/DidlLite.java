@@ -41,7 +41,7 @@ public final class DidlLite {
                     .map(element -> element.getTextContent().strip())
                     .filter(text -> !text.isEmpty())
                     .findFirst();
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

@@ -19,12 +19,12 @@ class BluetoothDeploymentTest {
         Map<String, Object> service = map(map(manifest, "services"), "shield-remote");
 
         Map<String, Object> build = map(service, "build");
-        assertThat(build.get("context")).isEqualTo(".");
-        assertThat(map(build, "args").get("WITH_MPV")).isEqualTo("true");
+        assertThat(build).containsEntry("context", ".");
+        assertThat(map(build, "args")).containsEntry("WITH_MPV", "true");
 
         Map<String, Object> environment = map(service, "environment");
-        assertThat(environment.get("HOME_CONTROL_BLUETOOTH_ENABLED")).isEqualTo("true");
-        assertThat(environment.get("PULSE_SERVER")).isEqualTo("unix:/run/pulse/native");
+        assertThat(environment).containsEntry("HOME_CONTROL_BLUETOOTH_ENABLED", "true");
+        assertThat(environment).containsEntry("PULSE_SERVER", "unix:/run/pulse/native");
 
         List<String> volumes = stringList(service, "volumes");
         assertThat(volumes).containsExactlyInAnyOrder(
@@ -45,23 +45,23 @@ class BluetoothDeploymentTest {
         Map<String, Object> manifest = load("casaos/docker-compose.bluetooth.yml");
         Map<String, Object> service = map(map(manifest, "services"), "shield-remote");
 
-        assertThat(service.get("image")).isEqualTo("ghcr.io/yukuhu/home-control:latest-bluetooth");
-        assertThat(service.get("network_mode")).isEqualTo("host");
-        assertThat(service.get("restart")).isEqualTo("unless-stopped");
+        assertThat(service).containsEntry("image", "ghcr.io/yukuhu/home-control:latest-bluetooth");
+        assertThat(service).containsEntry("network_mode", "host");
+        assertThat(service).containsEntry("restart", "unless-stopped");
 
         Map<String, Object> environment = map(service, "environment");
-        assertThat(environment.get("HOME_CONTROL_BLUETOOTH_ENABLED")).isEqualTo("true");
-        assertThat(environment.get("PULSE_SERVER")).isEqualTo("unix:/run/pulse/native");
+        assertThat(environment).containsEntry("HOME_CONTROL_BLUETOOTH_ENABLED", "true");
+        assertThat(environment).containsEntry("PULSE_SERVER", "unix:/run/pulse/native");
 
         List<Map<String, Object>> volumes = maps(service, "volumes");
         assertThat(volumes).hasSize(3);
-        assertThat(volumes.get(0).get("source")).isEqualTo("/DATA/AppData/$AppID/data");
-        assertThat(volumes.get(0).get("target")).isEqualTo("/data");
-        assertThat(volumes.get(1).get("source")).isEqualTo("/run/dbus");
-        assertThat(volumes.get(1).get("target")).isEqualTo("/run/dbus");
-        assertThat(volumes.get(1).get("read_only")).isEqualTo(true);
-        assertThat(volumes.get(2).get("source")).isEqualTo("/run/user/1000/pulse");
-        assertThat(volumes.get(2).get("target")).isEqualTo("/run/pulse");
+        assertThat(volumes.get(0)).containsEntry("source", "/DATA/AppData/$AppID/data");
+        assertThat(volumes.get(0)).containsEntry("target", "/data");
+        assertThat(volumes.get(1)).containsEntry("source", "/run/dbus");
+        assertThat(volumes.get(1)).containsEntry("target", "/run/dbus");
+        assertThat(volumes.get(1)).containsEntry("read_only", true);
+        assertThat(volumes.get(2)).containsEntry("source", "/run/user/1000/pulse");
+        assertThat(volumes.get(2)).containsEntry("target", "/run/pulse");
 
         Map<String, Object> serviceMetadata = map(service, "x-casaos");
         List<Map<String, Object>> metadataVolumes = maps(serviceMetadata, "volumes");
@@ -69,9 +69,9 @@ class BluetoothDeploymentTest {
         assertThat(containers).containsExactlyInAnyOrder("/data", "/run/dbus", "/run/pulse");
 
         Map<String, Object> metadata = map(manifest, "x-casaos");
-        assertThat(metadata.get("id")).isEqualTo("dev.andre.shield-remote");
-        assertThat(metadata.get("main")).isEqualTo("shield-remote");
-        assertThat(metadata.get("architectures")).isEqualTo(List.of("amd64", "arm64"));
+        assertThat(metadata).containsEntry("id", "dev.andre.shield-remote");
+        assertThat(metadata).containsEntry("main", "shield-remote");
+        assertThat(metadata).containsEntry("architectures", List.of("amd64", "arm64"));
     }
 
     @Test
@@ -108,23 +108,22 @@ class BluetoothDeploymentTest {
         Map<String, Object> metaBluetooth = releaseSteps.stream()
                 .filter(step -> "meta-bluetooth".equals(step.get("id"))).findFirst().orElseThrow();
         Map<String, Object> metaWith = map(metaBluetooth, "with");
-        assertThat((String) metaWith.get("flavor")).contains("suffix=-bluetooth");
-        assertThat((String) metaWith.get("flavor")).contains("latest=false");
+        assertThat((String) metaWith.get("flavor")).contains("suffix=-bluetooth").contains("latest=false");
 
         Map<String, Object> buildBluetooth = releaseSteps.stream()
                 .filter(step -> "Build and push the Bluetooth variant".equals(step.get("name"))).findFirst().orElseThrow();
         Map<String, Object> buildWith = map(buildBluetooth, "with");
-        assertThat(buildWith.get("build-args")).isEqualTo("WITH_MPV=true");
-        assertThat(buildWith.get("platforms")).isEqualTo("linux/amd64,linux/arm64");
-        assertThat(buildWith.get("tags")).isEqualTo("${{ steps.meta-bluetooth.outputs.tags }}");
+        assertThat(buildWith).containsEntry("build-args", "WITH_MPV=true");
+        assertThat(buildWith).containsEntry("platforms", "linux/amd64,linux/arm64");
+        assertThat(buildWith).containsEntry("tags", "${{ steps.meta-bluetooth.outputs.tags }}");
 
         Map<String, Object> image = map(jobs, "image");
         List<Map<String, Object>> imageSteps = maps(image, "steps");
         Map<String, Object> imageBluetooth = imageSteps.stream()
                 .filter(step -> "Build Dockerfile with mpv".equals(step.get("name"))).findFirst().orElseThrow();
         Map<String, Object> imageWith = map(imageBluetooth, "with");
-        assertThat(imageWith.get("build-args")).isEqualTo("WITH_MPV=true");
-        assertThat(imageWith.get("push")).isEqualTo(false);
+        assertThat(imageWith).containsEntry("build-args", "WITH_MPV=true");
+        assertThat(imageWith).containsEntry("push", false);
     }
 
     @Test

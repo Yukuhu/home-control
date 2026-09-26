@@ -80,7 +80,8 @@ class CertificateStoreTest {
         Path file = dir.resolve("keystore.p12");
         new CertificateStore(file, "correct".toCharArray()).loadOrCreate("shield");
 
-        assertThatThrownBy(() -> new CertificateStore(file, "wrong".toCharArray()).load("shield"))
+        var preparedReceiver83 = new CertificateStore(file, "wrong".toCharArray());
+        assertThatThrownBy(() -> preparedReceiver83.load("shield"))
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("password");

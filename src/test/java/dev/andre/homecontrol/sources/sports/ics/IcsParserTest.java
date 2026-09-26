@@ -147,7 +147,8 @@ class IcsParserTest {
 
     @Test
     void refusesHtml() {
-        assertThatThrownBy(() -> IcsParser.parse(fixture("not-a-calendar.html")))
+        var preparedArg150_0 = fixture("not-a-calendar.html");
+        assertThatThrownBy(() -> IcsParser.parse(preparedArg150_0))
                 .isInstanceOf(IcsFormatException.class)
                 .hasMessage("That link did not return a calendar (.ics)");
     }
@@ -176,7 +177,8 @@ class IcsParserTest {
         }
         text.append("END:VCALENDAR\n");
 
-        assertThatThrownBy(() -> IcsParser.parse(text.toString()))
+        var preparedArg179_0 = text.toString();
+        assertThatThrownBy(() -> IcsParser.parse(preparedArg179_0))
                 .isInstanceOf(IcsFormatException.class)
                 .hasMessage("The calendar has more than 5000 events");
     }

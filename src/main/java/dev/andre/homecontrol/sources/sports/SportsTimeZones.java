@@ -38,7 +38,7 @@ public class SportsTimeZones {
         ZoneId zone;
         try {
             zone = ZoneId.of(id.strip());
-        } catch (DateTimeException e) {
+        } catch (DateTimeException _) {
             return Optional.empty();
         }
         return zone.getId().contains("/") || zone.getId().equals("UTC") ? Optional.of(zone) : Optional.empty();

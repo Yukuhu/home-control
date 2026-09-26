@@ -92,7 +92,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
         long interval = properties.livenessIntervalSeconds();
         try {
             scheduler.scheduleWithFixedDelay(this::checkLiveness, interval, interval, TimeUnit.SECONDS);
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             // Closed before it started.
         }
     }
@@ -111,9 +111,9 @@ public class WebOsSession implements DeviceHandle, InputListing {
         }
         try {
             current.request(SsapUris.SYSTEM_INFO, SsapMessages.empty());
-        } catch (SsapTimeoutException e) {
+        } catch (SsapTimeoutException _) {
             lost(current, "no answer to the liveness check");
-        } catch (SsapException e) {
+        } catch (SsapException _) {
             // The TV answered; it is alive even if it refuses this request.
         } catch (IOException e) {
             lost(current, e.getMessage());
@@ -150,17 +150,17 @@ public class WebOsSession implements DeviceHandle, InputListing {
     @Override
     public void execute(Action action) {
         switch (action) {
-            case Action.PressKey press -> pressKey(press.key(), press.press());
-            case Action.OpenAppLink open -> {
-                WebOsLaunch launch = WebOsLaunches.forUri(open.uri());
-                call(launch.ssapUri(), launch.payload(), "open " + open.uri());
+            case Action.PressKey(var key, var press) -> pressKey(key, press);
+            case Action.OpenAppLink(var uri) -> {
+                WebOsLaunch launch = WebOsLaunches.forUri(uri);
+                call(launch.ssapUri(), launch.payload(), "open " + uri);
             }
-            case Action.SelectInput select -> call(SsapUris.SWITCH_INPUT,
-                    SsapMessages.empty().put("inputId", select.inputId()), "switch to input " + select.inputId());
-            case Action.SetVolume volume -> call(SsapUris.SET_VOLUME,
-                    SsapMessages.empty().put("volume", Math.clamp(volume.level(), 0, 100)), "set the volume");
-            case Action.Mute mute -> call(SsapUris.SET_MUTE, SsapMessages.empty().put("mute", mute.muted()),
-                    mute.muted() ? "mute" : "unmute");
+            case Action.SelectInput(var inputId) -> call(SsapUris.SWITCH_INPUT,
+                    SsapMessages.empty().put("inputId", inputId), "switch to input " + inputId);
+            case Action.SetVolume(var level) -> call(SsapUris.SET_VOLUME,
+                    SsapMessages.empty().put("volume", Math.clamp(level, 0, 100)), "set the volume");
+            case Action.Mute(var muted) -> call(SsapUris.SET_MUTE, SsapMessages.empty().put("mute", muted),
+                    muted ? "mute" : "unmute");
             case Action.Stop _ -> call(SsapUris.MEDIA_STOP, SsapMessages.empty(), "stop playback");
             case Action.CastLoad _ -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
             case Action.CastMessage _ -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
@@ -196,11 +196,11 @@ public class WebOsSession implements DeviceHandle, InputListing {
         SsapConnection current = requireConnected();
         try {
             current.button(name);
-        } catch (SsapTimeoutException e) {
+        } catch (SsapTimeoutException _) {
             throw new ActionFailedException(device.name() + " did not answer in time when asked to press " + name);
         } catch (SsapException e) {
             throw new ActionFailedException(device.name() + " refused the " + name + " button: " + e.getMessage());
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw new DeviceOfflineException(device.name() + " dropped the connection");
         }
     }
@@ -209,13 +209,13 @@ public class WebOsSession implements DeviceHandle, InputListing {
         SsapConnection current = requireConnected();
         try {
             current.request(uri, payload);
-        } catch (SsapTimeoutException e) {
+        } catch (SsapTimeoutException _) {
             // Reachable but silent is a refusal (502), not an offline device; the liveness check
             // decides separately whether the whole connection is gone.
             throw new ActionFailedException(device.name() + " did not answer in time when asked to " + what);
         } catch (SsapException e) {
             throw new ActionFailedException(device.name() + " could not " + what + ": " + e.getMessage());
-        } catch (IOException e) {
+        } catch (IOException _) {
             throw new DeviceOfflineException(device.name() + " dropped the connection");
         }
     }
@@ -225,7 +225,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
         if (current != null && state.powerOn()) {
             try {
                 current.fire(SsapUris.TURN_OFF, SsapMessages.empty());
-            } catch (IOException e) {
+            } catch (IOException _) {
                 throw new DeviceOfflineException(device.name() + " dropped the connection");
             }
             update(s -> s.withPower(false));
@@ -356,10 +356,10 @@ public class WebOsSession implements DeviceHandle, InputListing {
             return;
         }
         Duration delay = backoff;
-        backoff = Duration.ofSeconds(Math.min(Math.max(1, backoff.toSeconds() * 2), properties.reconnectMaxDelaySeconds()));
+        backoff = Duration.ofSeconds(Math.clamp(backoff.toSeconds() * 2, 1, properties.reconnectMaxDelaySeconds()));
         try {
             pendingConnect = scheduler.schedule(this::connect, delay.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             // Closed meanwhile.
         }
     }
@@ -410,7 +410,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
                     task.run();
                 }
             });
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             // Closed meanwhile.
         }
     }

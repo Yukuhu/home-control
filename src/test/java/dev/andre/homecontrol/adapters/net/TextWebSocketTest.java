@@ -36,7 +36,7 @@ class TextWebSocketTest {
 
     @BeforeEach
     void startEchoServer() throws IOException {
-        server = FakeWebSocketServer.plain((connection, text) -> connection.send(text));
+        server = FakeWebSocketServer.plain(FakeWebSocketServer.Connection::send);
     }
 
     @AfterEach
@@ -88,7 +88,7 @@ class TextWebSocketTest {
     }
 
     @Test
-    void aSocketThatOpensAfterTheTimeoutIsAborted() throws Exception {
+    void aSocketThatOpensAfterTheTimeoutIsAborted() {
         java.util.concurrent.CompletableFuture<java.net.http.WebSocket> opening = new java.util.concurrent.CompletableFuture<>();
         java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
         java.util.concurrent.atomic.AtomicBoolean aborted = new java.util.concurrent.atomic.AtomicBoolean();

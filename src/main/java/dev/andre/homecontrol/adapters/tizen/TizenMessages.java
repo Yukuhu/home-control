@@ -17,6 +17,9 @@ import java.util.List;
  */
 final class TizenMessages {
 
+    private static final String METHOD_FIELD = "method";
+    private static final String PARAMS_FIELD = "params";
+
     static final JsonMapper JSON = JsonMapper.builder().build();
 
     private TizenMessages() {
@@ -43,8 +46,8 @@ final class TizenMessages {
     /** {@code command}: {@code Click}, or {@code Press} / {@code Release} around a held key. */
     static String key(String code, String command) {
         ObjectNode message = JSON.createObjectNode();
-        message.put("method", "ms.remote.control");
-        ObjectNode params = message.putObject("params");
+        message.put(METHOD_FIELD, "ms.remote.control");
+        ObjectNode params = message.putObject(PARAMS_FIELD);
         params.put("Cmd", command);
         params.put("DataOfCmd", code);
         params.put("Option", "false");
@@ -54,8 +57,8 @@ final class TizenMessages {
 
     static String launchApp(String appId, String actionType) {
         ObjectNode message = JSON.createObjectNode();
-        message.put("method", "ms.channel.emit");
-        ObjectNode params = message.putObject("params");
+        message.put(METHOD_FIELD, "ms.channel.emit");
+        ObjectNode params = message.putObject(PARAMS_FIELD);
         params.put("event", "ed.apps.launch");
         params.put("to", "host");
         ObjectNode data = params.putObject("data");
@@ -67,8 +70,8 @@ final class TizenMessages {
 
     static String installedAppsRequest() {
         ObjectNode message = JSON.createObjectNode();
-        message.put("method", "ms.channel.emit");
-        ObjectNode params = message.putObject("params");
+        message.put(METHOD_FIELD, "ms.channel.emit");
+        ObjectNode params = message.putObject(PARAMS_FIELD);
         params.put("event", "ed.installedApp.get");
         params.put("to", "host");
         return JSON.writeValueAsString(message);

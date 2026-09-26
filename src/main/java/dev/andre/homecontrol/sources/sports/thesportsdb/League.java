@@ -49,7 +49,7 @@ public record League(String id, String name, String sport, String country, URI b
         }
         try {
             return new URI(raw);
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             return null;
         }
     }

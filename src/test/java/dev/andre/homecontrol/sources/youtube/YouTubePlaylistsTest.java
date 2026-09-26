@@ -94,8 +94,8 @@ class YouTubePlaylistsTest {
         assertThat(railId).matches("^pl-[0-9a-f]{16}$");
         byte[] digest = MessageDigest.getInstance("SHA-256").digest(EVENING.getBytes(StandardCharsets.UTF_8));
         String expected = "pl-" + HexFormat.of().formatHex(digest).substring(0, 16);
-        assertThat(railId).isEqualTo(expected);
-        assertThat(railId).isNotEqualTo(YouTubePlaylists.railId(KIDS));
+        assertThat(railId).isEqualTo(expected)
+                .isNotEqualTo(YouTubePlaylists.railId(KIDS));
         assertThat(("youtube/" + railId)).matches("^[a-z0-9][a-z0-9._-]{0,63}/[a-z0-9][a-z0-9._-]{0,63}$");
     }
 

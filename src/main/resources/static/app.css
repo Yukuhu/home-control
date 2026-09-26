@@ -87,6 +87,7 @@ main#content { max-width: 1600px; margin: 0 auto; padding: 3.25rem clamp(1.25rem
 .rail .retry { margin-left: auto; font-size: .75rem; }
 .rail.refreshing h2::after { content: ' ↻'; color: var(--muted); }
 .tiles { display: grid; grid-auto-flow: column; grid-auto-columns: clamp(135px, 15vw, 185px); gap: 1rem; overflow-x: auto; padding: 4px 4px 14px; margin: -4px; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.tiles { list-style: none; }
 .tiles > * { min-width: 0; }
 .tile { display: grid; justify-content: stretch; align-items: stretch; width: 100%; min-width: 0; align-content: start; gap: .35rem; padding: 0; border: 0; border-radius: .8rem; background: none; text-align: left; scroll-snap-align: start; }
 .tile:hover { background: none; border: 0; }

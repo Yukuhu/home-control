@@ -49,7 +49,7 @@ import static org.mockito.Mockito.verify;
 class PlaybackServiceTest {
 
     private final DeviceManager devices = mock(DeviceManager.class);
-    private final PlaybackService service = new PlaybackService(devices,
+    private final PlaybackService defaultService = new PlaybackService(devices,
             new PlaybackPlanner(List.of(new AppLinkStrategy())));
     private final Device shield = new Device("shield", "Shield", DeviceKind.ANDROID_TV, "10.0.0.5",
             Map.of("androidtv", Map.of()), Instant.now());
@@ -177,7 +177,7 @@ class PlaybackServiceTest {
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
         URI uri = URI.create("https://www.youtube.com/watch?v=abc");
 
-        Route route = service.play(AppLinks.fromUrl(uri.toString()), "shield");
+        Route route = defaultService.play(AppLinks.fromUrl(uri.toString()), "shield");
 
         assertThat(route).isEqualTo(new Route.OpenAppLink(uri, "youtube"));
         verify(devices).execute("shield", new Action.OpenAppLink(uri));
@@ -188,7 +188,8 @@ class PlaybackServiceTest {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.noneOf(Capability.class));
 
-        assertThatThrownBy(() -> service.play(AppLinks.fromUrl("https://example.org/a"), "shield"))
+        var preparedArg191_0 = AppLinks.fromUrl("https://example.org/a");
+        assertThatThrownBy(() -> defaultService.play(preparedArg191_0, "shield"))
                 .isInstanceOf(UnroutableException.class)
                 .hasMessageContaining("Shield")
                 .hasMessageContaining("cannot open app links");
@@ -199,7 +200,8 @@ class PlaybackServiceTest {
     void anUnknownDeviceIsNotFound() {
         given(devices.device("ghost")).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.play(AppLinks.fromUrl("https://example.org/a"), "ghost"))
+        var preparedArg202_0 = AppLinks.fromUrl("https://example.org/a");
+        assertThatThrownBy(() -> defaultService.play(preparedArg202_0, "ghost"))
                 .isInstanceOf(DeviceNotFoundException.class);
     }
 
@@ -207,8 +209,8 @@ class PlaybackServiceTest {
     void executesACastRoute() {
         PlaybackService castService = new PlaybackService(devices,
                 new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastLoadStrategy(), new CastStreamStrategy())));
-        Device kitchen = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9", Map.of("cast", Map.of()), Instant.now());
-        given(devices.device("kitchen")).willReturn(Optional.of(kitchen));
+        Device castDevice = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9", Map.of("cast", Map.of()), Instant.now());
+        given(devices.device("kitchen")).willReturn(Optional.of(castDevice));
         given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME));
 
         Route route = castService.play(AppLinks.fromUrl("http://nas.local/films/bunny.mp4"), "kitchen");
@@ -372,8 +374,8 @@ class PlaybackServiceTest {
     void executesACastMessageRoute() {
         PlaybackPlanner castMessagePlanner = new PlaybackPlanner(List.of(new CastMessageStrategy()));
         PlaybackService castMessageService = new PlaybackService(devices, castMessagePlanner);
-        Device kitchen = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9", Map.of("cast", Map.of()), Instant.now());
-        given(devices.device("kitchen")).willReturn(Optional.of(kitchen));
+        Device castDevice = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9", Map.of("cast", Map.of()), Instant.now());
+        given(devices.device("kitchen")).willReturn(Optional.of(castDevice));
         given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
         PlayableRef.CastMessage message = new PlayableRef.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
                 Map.of("command", "PlayNow"), "the Jellyfin receiver");

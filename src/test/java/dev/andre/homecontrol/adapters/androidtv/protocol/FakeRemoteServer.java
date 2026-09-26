@@ -60,11 +60,17 @@ public class FakeRemoteServer implements AutoCloseable {
     /** Holds an accepted connection until the test observes the event it needs. */
     public static final class ConnectionGate {
         private final boolean serveAfterRelease;
+        private final boolean pauseAfterTls;
         private final CountDownLatch entered = new CountDownLatch(1);
         private final CountDownLatch released = new CountDownLatch(1);
 
         private ConnectionGate(boolean serveAfterRelease) {
+            this(serveAfterRelease, false);
+        }
+
+        private ConnectionGate(boolean serveAfterRelease, boolean pauseAfterTls) {
             this.serveAfterRelease = serveAfterRelease;
+            this.pauseAfterTls = pauseAfterTls;
         }
 
         public void awaitEntered() throws InterruptedException {
@@ -179,6 +185,13 @@ public class FakeRemoteServer implements AutoCloseable {
         return gate;
     }
 
+    /** Completes TLS, then waits before starting the Remote v2 configure exchange. */
+    public ConnectionGate pauseNextRemoteHandshake() {
+        ConnectionGate gate = new ConnectionGate(true, true);
+        script.add(gate);
+        return gate;
+    }
+
     /** How many normally served connections have since ended, from either side. */
     public int connectionsEnded() {
         return connectionsEnded.get();
@@ -226,6 +239,9 @@ public class FakeRemoteServer implements AutoCloseable {
                 ConnectionGate gate = script.poll();
                 activeGate = gate;
                 if (gate != null) {
+                    if (gate.pauseAfterTls) {
+                        accepted.startHandshake();
+                    }
                     if (serverSocket.isClosed()) {
                         gate.release();
                     }

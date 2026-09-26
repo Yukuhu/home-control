@@ -30,7 +30,7 @@ class InsecureTlsTest {
 
     @Test
     void connectsToATvCertificateIssuedForAnotherHost() throws Exception {
-        try (FakeWebSocketServer server = FakeWebSocketServer.tls((connection, text) -> connection.send(text));
+        try (FakeWebSocketServer server = FakeWebSocketServer.tls(FakeWebSocketServer.Connection::send);
              TextWebSocket socket = TextWebSocket.connect(InsecureTls.httpClient(Duration.ofSeconds(2)),
                      URI.create(server.url("/")), Duration.ofSeconds(2), listener)) {
             socket.send("over tls");
@@ -41,7 +41,7 @@ class InsecureTlsTest {
 
     @Test
     void theDefaultClientStillRejectsThatCertificate() throws Exception {
-        try (FakeWebSocketServer server = FakeWebSocketServer.tls((connection, text) -> connection.send(text))) {
+        try (FakeWebSocketServer server = FakeWebSocketServer.tls(FakeWebSocketServer.Connection::send)) {
             assertThatThrownBy(() -> TextWebSocket.connect(HttpClient.newHttpClient(),
                     URI.create(server.url("/")), Duration.ofSeconds(2), listener))
                     .isInstanceOf(IOException.class)

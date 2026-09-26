@@ -133,7 +133,8 @@ class SonosSessionTest {
     void joiningAnUnknownSpeakerFails() {
         SonosSession session = connected(kitchen);
 
-        assertThatThrownBy(() -> session.execute(new Action.JoinGroup("RINCON_NOPE")))
+        var failingAction136 = new Action.JoinGroup("RINCON_NOPE");
+        assertThatThrownBy(() -> session.execute(failingAction136))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("cannot find that speaker");
     }
@@ -152,11 +153,15 @@ class SonosSessionTest {
     void rejectsWhatASpeakerCannotDo() {
         SonosSession session = connected(living);
 
-        assertThatThrownBy(() -> session.execute(new Action.PressKey(RemoteKey.HOME))).isInstanceOf(UnsupportedActionException.class);
-        assertThatThrownBy(() -> session.execute(new Action.OpenAppLink(URI.create("https://x"))))
+        var failingAction155 = new Action.PressKey(RemoteKey.HOME);
+        assertThatThrownBy(() -> session.execute(failingAction155)).isInstanceOf(UnsupportedActionException.class);
+        var failingAction156 = new Action.OpenAppLink(URI.create("https://x"));
+        assertThatThrownBy(() -> session.execute(failingAction156))
                 .isInstanceOf(UnsupportedActionException.class);
-        assertThatThrownBy(() -> session.execute(new Action.SelectInput("HDMI_1"))).isInstanceOf(UnsupportedActionException.class);
-        assertThatThrownBy(() -> session.execute(new Action.PlayMedia(URI.create("http://h/film.mp4"), "video/mp4", "Film", null)))
+        var failingAction158 = new Action.SelectInput("HDMI_1");
+        assertThatThrownBy(() -> session.execute(failingAction158)).isInstanceOf(UnsupportedActionException.class);
+        var failingAction159 = new Action.PlayMedia(URI.create("http://h/film.mp4"), "video/mp4", "Film", null);
+        assertThatThrownBy(() -> session.execute(failingAction159))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("Living Room cannot play video/mp4");
     }
@@ -206,7 +211,8 @@ class SonosSessionTest {
         living.hangUp(true);
 
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
-        assertThatThrownBy(() -> session.execute(new Action.Pause())).isInstanceOf(DeviceOfflineException.class);
+        var failingAction209 = new Action.Pause();
+        assertThatThrownBy(() -> session.execute(failingAction209)).isInstanceOf(DeviceOfflineException.class);
         assertThat(session.speakerTopology()).isEmpty();
     }
 }

@@ -17,15 +17,20 @@ function showPin(offer) {
     pinOffer = offer;
     document.getElementById("sheet-pin-error").hidden = true;
     if (!offer) { form.hidden = true; return; }
-    const isLiveEvent = sheetKind === "LIVE_EVENT";
-    document.getElementById("sheet-pin-text").textContent = offer.serviceName
-        ? (isLiveEvent
-            ? `This opens the ${offer.serviceName} app, not this event. Paste the ${offer.serviceName} link for this event to open it directly.`
-            : `This opens the ${offer.serviceName} app, not this title. Paste the ${offer.serviceName} link for this title to open it directly.`)
-        : isLiveEvent
-            ? "Home Control cannot open this event directly. Paste a link to it (for example the event's page on your streaming service) to pin it."
-            : "Home Control cannot open this title on your services. Paste a link to it (Netflix, Prime Video, YouTube, DAZN or any web link) to pin it.";
+    document.getElementById("sheet-pin-text").textContent = pinHint(offer.serviceName);
     form.hidden = false;
+}
+
+function pinHint(serviceName) {
+    const isLiveEvent = sheetKind === "LIVE_EVENT";
+    if (serviceName) {
+        const kind = isLiveEvent ? "event" : "title";
+        return `This opens the ${serviceName} app, not this ${kind}. Paste the ${serviceName} link for this ${kind} to open it directly.`;
+    }
+    if (isLiveEvent) {
+        return "Home Control cannot open this event directly. Paste a link to it (for example the event's page on your streaming service) to pin it.";
+    }
+    return "Home Control cannot open this title on your services. Paste a link to it (Netflix, Prime Video, YouTube, DAZN or any web link) to pin it.";
 }
 
 async function submitPin(event) {
@@ -61,7 +66,7 @@ async function submitPin(event) {
 function form(fields) {
     const body = new URLSearchParams();
     for (const [key, value] of Object.entries(fields)) {
-        for (const v of [].concat(value)) body.append(key, v);
+        for (const v of [value].flat()) body.append(key, v);
     }
     return body;
 }
@@ -202,7 +207,7 @@ export function initPlaySheet() {
         (button) => selectDevice(button.dataset.sheetDevice));
     document.addEventListener("click", (event) => {
         const tile = event.target.closest("button.tile");
-        if (tile && tile.dataset.item) openPlaySheet(tile);
+        if (tile?.dataset.item) openPlaySheet(tile);
         const device = event.target.closest("[data-sheet-device]");
         if (device) selectDevice(device.dataset.sheetDevice);
     });

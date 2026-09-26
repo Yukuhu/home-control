@@ -58,7 +58,7 @@ public class LoginService {
         }
         try {
             return login.get().version().equals(session.getAttribute(SESSION_ATTRIBUTE));
-        } catch (IllegalStateException invalidated) {
+        } catch (IllegalStateException _) {
             return false;
         }
     }
@@ -88,7 +88,7 @@ public class LoginService {
         if (session != null) {
             try {
                 session.invalidate();
-            } catch (IllegalStateException alreadyInvalidated) {
+            } catch (IllegalStateException _) {
                 // nothing left to end
             }
         }
@@ -177,7 +177,7 @@ public class LoginService {
         boolean acquired;
         try {
             acquired = verifications.tryAcquire(2, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new LoginBusyException();
         }

@@ -32,9 +32,14 @@ import java.util.regex.Pattern;
  */
 public class JsonFilePinStore {
 
+    private static final String SUBTITLE = "subtitle";
+    private static final String ARTWORK = "artwork";
+
     private static final Logger log = LoggerFactory.getLogger(JsonFilePinStore.class);
 
     private static final int VERSION = 1;
+    private static final String VERSION_KEY = "version";
+    private static final String UPGRADE_OF_KEY = "upgradeOf";
     private static final Pattern ID = Pattern.compile("^p-[0-9a-f]{12}$");
     private static final Pattern UPGRADE_OF =
             Pattern.compile("^[a-z0-9][a-z0-9._-]{0,63}/[A-Za-z0-9._:-]{1,128}$");
@@ -60,7 +65,7 @@ public class JsonFilePinStore {
         if (root == null || !root.isObject()) {
             throw new StorageException("Could not read pinned shortcuts in " + file + "; fix or delete it", null);
         }
-        int version = root.path("version").isIntegralNumber() ? root.path("version").asInt() : -1;
+        int version = root.path(VERSION_KEY).isIntegralNumber() ? root.path(VERSION_KEY).asInt() : -1;
         if (version != VERSION) {
             String reason = version > VERSION ? "; it was written by a newer Home Control" : "";
             throw new StorageException("Could not read pinned shortcuts in " + file + reason + "; fix or delete it", null);
@@ -107,22 +112,22 @@ public class JsonFilePinStore {
         } else {
             try {
                 kind = ContentKind.valueOf(kindNode.asString(""));
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException _) {
                 log.warn("Skipping pinned shortcut at index {}: invalid kind", index);
                 return null;
             }
         }
         String service = AppLinks.serviceOf(url.getHost().toLowerCase(Locale.ROOT), url.getPath());
-        String subtitle = entry.path("subtitle").isString() ? entry.path("subtitle").asString() : null;
-        URI artwork = parseArtwork(entry.path("artwork"));
-        String upgradeOf = entry.path("upgradeOf").isString() ? entry.path("upgradeOf").asString() : null;
+        String subtitle = entry.path(SUBTITLE).isString() ? entry.path(SUBTITLE).asString() : null;
+        URI artwork = parseArtwork(entry.path(ARTWORK));
+        String upgradeOf = entry.path(UPGRADE_OF_KEY).isString() ? entry.path(UPGRADE_OF_KEY).asString() : null;
         if (upgradeOf != null && !UPGRADE_OF.matcher(upgradeOf).matches()) {
             upgradeOf = null;
         }
         Instant createdAt;
         try {
             createdAt = Instant.parse(entry.path("createdAt").asString(""));
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             createdAt = Instant.EPOCH;
         }
         return new Pin(id, url, service, title, subtitle, artwork, kind, upgradeOf, createdAt);
@@ -139,14 +144,14 @@ public class JsonFilePinStore {
         }
         try {
             return new URI(raw);
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             return null;
         }
     }
 
     public synchronized void save(List<Pin> pins) {
         ObjectNode root = mapper.createObjectNode();
-        root.put("version", VERSION);
+        root.put(VERSION_KEY, VERSION);
         ArrayNode pinsNode = root.putArray("pins");
         for (Pin pin : pins) {
             ObjectNode node = pinsNode.addObject();
@@ -155,20 +160,20 @@ public class JsonFilePinStore {
             node.put("service", pin.service());
             node.put("title", pin.title());
             if (pin.subtitle() == null) {
-                node.putNull("subtitle");
+                node.putNull(SUBTITLE);
             } else {
-                node.put("subtitle", pin.subtitle());
+                node.put(SUBTITLE, pin.subtitle());
             }
             if (pin.artwork() == null) {
-                node.putNull("artwork");
+                node.putNull(ARTWORK);
             } else {
-                node.put("artwork", pin.artwork().toString());
+                node.put(ARTWORK, pin.artwork().toString());
             }
             node.put("kind", pin.kind().name());
             if (pin.upgradeOf() == null) {
-                node.putNull("upgradeOf");
+                node.putNull(UPGRADE_OF_KEY);
             } else {
-                node.put("upgradeOf", pin.upgradeOf());
+                node.put(UPGRADE_OF_KEY, pin.upgradeOf());
             }
             node.put("createdAt", pin.createdAt().toString());
         }
@@ -184,7 +189,7 @@ public class JsonFilePinStore {
             if (temp != null) {
                 try {
                     Files.deleteIfExists(temp);
-                } catch (IOException ignored) {
+                } catch (IOException _) {
                     // Cleanup error; let the original exception propagate
                 }
             }

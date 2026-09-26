@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.PlaybackState;
+import dev.andre.homecontrol.core.SpeakerTopology;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
@@ -226,7 +227,7 @@ class SpeakersEndToEndTest {
                 .andExpect(status().isNoContent())
                 .andExpect(header().string("HX-Refresh", "true"));
         assertThat(HOUSEHOLD.coordinatorOf(KITCHEN)).isEqualTo(LIVING);
-        await().atMost(WAIT).until(() -> devices.speakerTopology(KITCHEN_ID).map(topology -> topology.grouped()).orElse(false));
+        await().atMost(WAIT).until(() -> devices.speakerTopology(KITCHEN_ID).map(SpeakerTopology::grouped).orElse(false));
 
         // 12. Playing on the grouped kitchen plays through the living room coordinator.
         LIVING_ROOM.clearCalls();

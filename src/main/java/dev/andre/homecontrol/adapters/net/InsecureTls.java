@@ -42,26 +42,32 @@ public final class InsecureTls {
     private static final class AcceptAny extends X509ExtendedTrustManager {
         @Override
         public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket) {
+            // Outbound device connections never use this client-certificate callback.
         }
 
         @Override
         public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket) {
+            // Device TLS presents self-signed certificates; this protocol intentionally skips CA validation.
         }
 
         @Override
         public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine) {
+            // Outbound device connections never use this client-certificate callback.
         }
 
         @Override
         public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine) {
+            // Device TLS presents self-signed certificates; this protocol intentionally skips CA validation.
         }
 
         @Override
         public void checkClientTrusted(X509Certificate[] chain, String authType) {
+            // Outbound device connections never use this client-certificate callback.
         }
 
         @Override
         public void checkServerTrusted(X509Certificate[] chain, String authType) {
+            // Device TLS presents self-signed certificates; this protocol intentionally skips CA validation.
         }
 
         @Override

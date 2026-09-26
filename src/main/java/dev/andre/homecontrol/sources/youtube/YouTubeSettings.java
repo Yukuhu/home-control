@@ -120,7 +120,7 @@ public record YouTubeSettings(Instant connectedAt, String channelId, String chan
         }
         try {
             return Instant.parse(value);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             return null;
         }
     }

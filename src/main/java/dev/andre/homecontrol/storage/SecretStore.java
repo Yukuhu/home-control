@@ -36,6 +36,9 @@ import java.util.regex.Pattern;
  */
 public class SecretStore {
 
+    private static final String LOGIN = "login";
+    private static final String VERSION_KEY = "version";
+
     private static final Logger log = LoggerFactory.getLogger(SecretStore.class);
 
     static final String FORMAT = "home-control-secrets";
@@ -147,7 +150,7 @@ public class SecretStore {
         try {
             JsonNode root = mapper.readTree(Files.readAllBytes(file));
             if (root == null || !FORMAT.equals(root.path("format").asString(""))
-                    || root.path("version").asInt(0) != VERSION || !CIPHER.equals(root.path("cipher").asString(""))) {
+                    || root.path(VERSION_KEY).asInt(0) != VERSION || !CIPHER.equals(root.path("cipher").asString(""))) {
                 throw new StorageException(file + " is not a version " + VERSION + " Home Control secrets file", null);
             }
             parsed = parseHeader(root.path("key"));
@@ -162,16 +165,16 @@ public class SecretStore {
         byte[] plaintext = decrypt(keys.keyFor(parsed), nonce, ciphertext, parsed);
         try {
             JsonNode document = mapper.readTree(plaintext);
-            JsonNode loginNode = document.path("login");
+            JsonNode loginNode = document.path(LOGIN);
             LoginCredential loaded = loginNode.isObject()
-                    ? new LoginCredential(loginNode.path("passwordHash").asString(""), loginNode.path("version").asString(""))
+                    ? new LoginCredential(loginNode.path("passwordHash").asString(""), loginNode.path(VERSION_KEY).asString(""))
                     : null;
             Map<String, String> values = new LinkedHashMap<>();
             document.path("secrets").properties().forEach(entry -> values.put(entry.getKey(), entry.getValue().asString("")));
             header = parsed;
             login = loaded;
             secrets = Map.copyOf(values);
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             // no cause: a parser message could quote the decrypted content
             throw new StorageException(file + " was decrypted but its content is not valid", null);
         } finally {
@@ -214,11 +217,11 @@ public class SecretStore {
     private void write(LoginCredential nextLogin, Map<String, String> nextSecrets) {
         ObjectNode document = mapper.createObjectNode();
         if (nextLogin == null) {
-            document.putNull("login");
+            document.putNull(LOGIN);
         } else {
-            ObjectNode loginNode = document.putObject("login");
+            ObjectNode loginNode = document.putObject(LOGIN);
             loginNode.put("passwordHash", nextLogin.passwordHash());
-            loginNode.put("version", nextLogin.version());
+            loginNode.put(VERSION_KEY, nextLogin.version());
         }
         ObjectNode secretsNode = document.putObject("secrets");
         new TreeMap<>(nextSecrets).forEach(secretsNode::put);
@@ -242,7 +245,7 @@ public class SecretStore {
 
         ObjectNode root = mapper.createObjectNode();
         root.put("format", FORMAT);
-        root.put("version", VERSION);
+        root.put(VERSION_KEY, VERSION);
         ObjectNode key = root.putObject("key");
         SecretKeySource.KeyHeader h = keyed.header();
         key.put("source", h.source());

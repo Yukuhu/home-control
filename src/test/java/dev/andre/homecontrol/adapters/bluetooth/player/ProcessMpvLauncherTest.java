@@ -62,10 +62,10 @@ class ProcessMpvLauncherTest {
             assertThat(ipc.command(Duration.ofSeconds(2), "get_property", "volume").asDouble(-1)).isEqualTo(30.0);
             try {
                 ipc.command(Duration.ofSeconds(2), "quit");
-            } catch (IOException acceptable) {
+            } catch (IOException _) {
                 // the socket may close before the reply arrives
             }
-            assertThat(process.onExit().get(10, TimeUnit.SECONDS)).isEqualTo(0);
+            assertThat(process.onExit().get(10, TimeUnit.SECONDS)).isZero();
         } finally {
             ipc.close();
         }

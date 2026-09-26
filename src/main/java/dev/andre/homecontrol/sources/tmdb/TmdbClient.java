@@ -84,7 +84,7 @@ public class TmdbClient {
         JsonNode node;
         try {
             node = JSON.readTree(body);
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             throw new TmdbException(TmdbException.Kind.BAD_RESPONSE, "TMDB answered with something that is not JSON");
         }
         if (node == null || !node.isObject()) {

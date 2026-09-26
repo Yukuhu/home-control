@@ -32,6 +32,7 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.any;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -366,7 +367,7 @@ class DashboardPageTest {
         given(devices.device("bedroom")).willReturn(Optional.of(bedroom));
         given(devices.state(any())).willReturn(DeviceState.initial());
         given(devices.capabilities(any())).willReturn(EnumSet.of(Capability.REMOTE_KEYS));
-        ContentSource source = org.mockito.Mockito.mock(ContentSource.class);
+        ContentSource source = mock(ContentSource.class);
         given(source.displayName()).willReturn("Jellyfin");
         given(sources.all()).willReturn(List.of(source));
         given(sources.find("jellyfin")).willReturn(Optional.of(source));

@@ -42,7 +42,8 @@ class SourcePreferencesTest {
         assertThatThrownBy(() -> defaults.withLocale("de-DE", "Germany", List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Use a two-letter country code such as DE");
-        assertThatThrownBy(() -> defaults.withLocale("de-DE", "DE", List.of("hulu")))
+        var preparedArg45_2 = List.of("hulu");
+        assertThatThrownBy(() -> defaults.withLocale("de-DE", "DE", preparedArg45_2))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown streaming service hulu");
     }
@@ -59,11 +60,17 @@ class SourcePreferencesTest {
 
     @Test
     void rejectsMalformedRailKeys() {
-        assertThatThrownBy(() -> SourcePreferences.defaults("de-DE", "DE").withRailOrder(List.of("jellyfin")))
+        var preparedReceiver62 = SourcePreferences.defaults("de-DE", "DE");
+        var preparedArg62_0 = List.of("jellyfin");
+        assertThatThrownBy(() -> preparedReceiver62.withRailOrder(preparedArg62_0))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> SourcePreferences.defaults("de-DE", "DE").withRailOrder(List.of("../x")))
+        var preparedReceiver64 = SourcePreferences.defaults("de-DE", "DE");
+        var preparedArg64_0 = List.of("../x");
+        assertThatThrownBy(() -> preparedReceiver64.withRailOrder(preparedArg64_0))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> SourcePreferences.defaults("de-DE", "DE").withRailOrder(List.of("a/b/c")))
+        var preparedReceiver66 = SourcePreferences.defaults("de-DE", "DE");
+        var preparedArg66_0 = List.of("a/b/c");
+        assertThatThrownBy(() -> preparedReceiver66.withRailOrder(preparedArg66_0))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -75,10 +82,15 @@ class SourcePreferencesTest {
                 .withSourceEnabled("jellyfin", false)
                 .withRefreshMinutes("jellyfin", 10);
 
-        assertThatThrownBy(() -> prefs.railOrder().add("x")).isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> prefs.hiddenRails().add("x")).isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> prefs.disabledSources().add("x")).isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> prefs.refreshMinutes().put("x", 1)).isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> prefs.providers().add("x")).isInstanceOf(UnsupportedOperationException.class);
+        var preparedReceiver78 = prefs.railOrder();
+        assertThatThrownBy(() -> preparedReceiver78.add("x")).isInstanceOf(UnsupportedOperationException.class);
+        var preparedReceiver79 = prefs.hiddenRails();
+        assertThatThrownBy(() -> preparedReceiver79.add("x")).isInstanceOf(UnsupportedOperationException.class);
+        var preparedReceiver80 = prefs.disabledSources();
+        assertThatThrownBy(() -> preparedReceiver80.add("x")).isInstanceOf(UnsupportedOperationException.class);
+        var preparedReceiver81 = prefs.refreshMinutes();
+        assertThatThrownBy(() -> preparedReceiver81.put("x", 1)).isInstanceOf(UnsupportedOperationException.class);
+        var preparedReceiver82 = prefs.providers();
+        assertThatThrownBy(() -> preparedReceiver82.add("x")).isInstanceOf(UnsupportedOperationException.class);
     }
 }

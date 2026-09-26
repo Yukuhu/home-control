@@ -138,7 +138,7 @@ class BluetoothSpeakerEndToEndTest {
     }
 
     @AfterAll
-    static void tearDown() throws Exception {
+    static void tearDown() {
         BLUEZ.close();
         await().atMost(WAIT).untilAsserted(() -> {
             for (JsonNode line : FakeMpvScript.log(LOG).stream().filter(l -> "start".equals(l.path("type").asString(""))).toList()) {
@@ -192,8 +192,8 @@ class BluetoothSpeakerEndToEndTest {
         await().atMost(WAIT).untilAsserted(() -> assertThat(starts()).hasSize(1));
         List<String> argsOfFirstStart = new ArrayList<>();
         starts().getFirst().path("args").forEach(a -> argsOfFirstStart.add(a.asString("")));
-        assertThat(argsOfFirstStart).anyMatch(a -> a.equals("--audio-device=pulse/bluez_output.AA_BB_CC_DD_EE_FF.1"));
-        assertThat(argsOfFirstStart).noneMatch(a -> a.contains("127.0.0.1:9"));
+        assertThat(argsOfFirstStart).anyMatch(a -> a.equals("--audio-device=pulse/bluez_output.AA_BB_CC_DD_EE_FF.1"))
+                .noneMatch(a -> a.contains("127.0.0.1:9"));
         await().atMost(WAIT).untilAsserted(() -> assertThat(ipcCommands())
                 .contains(List.of("loadfile", "http://127.0.0.1:9/music/Bunny%20Song.mp3", "replace")));
         await().atMost(WAIT).untilAsserted(() -> {

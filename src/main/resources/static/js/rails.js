@@ -2,7 +2,8 @@ import { on } from "./events.js";
 
 // Rails re-render on the server; SSE only says which rail changed.
 function railElement(sourceId, railId) {
-    return document.querySelector(`.rail[data-rail="${CSS.escape(`${sourceId}/${railId}`)}"]`);
+    const key = CSS.escape(`${sourceId}/${railId}`);
+    return document.querySelector(`.rail[data-rail="${key}"]`);
 }
 
 // Highest version any `rail` event has named per rail, and whether a fetch for it is in flight.

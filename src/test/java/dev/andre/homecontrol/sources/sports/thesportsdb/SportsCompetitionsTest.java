@@ -166,6 +166,6 @@ class SportsCompetitionsTest {
     @Test
     void personalKeyToStringIsRedacted() {
         SportsCompetitions.PersonalKey key = new SportsCompetitions.PersonalKey("9876543210", "pw", "pw");
-        assertThat(key.toString()).isEqualTo("PersonalKey[redacted]");
+        assertThat(key).hasToString("PersonalKey[redacted]");
     }
 }

@@ -21,9 +21,9 @@ class BluetoothClassLoadingTest {
     void aDisabledModuleLoadsNoDbusClass() throws Exception {
         List<String> loaded = loadedClasses("false");
         assertThat(loaded).noneMatch(line -> line.contains(" org.freedesktop.dbus.")
-                || line.contains(" org.bluez.") || line.contains(" com.github.hypfvieh."));
+                || line.contains(" org.bluez.") || line.contains(" com.github.hypfvieh."))
         // BluetoothProperties may load (@ConfigurationPropertiesScan registers every properties record); nothing else may.
-        assertThat(loaded).noneMatch(line -> line.contains(" dev.andre.homecontrol.adapters.bluetooth.")
+                .noneMatch(line -> line.contains(" dev.andre.homecontrol.adapters.bluetooth.")
                 && !line.contains(" dev.andre.homecontrol.adapters.bluetooth.BluetoothProperties "));
     }
 

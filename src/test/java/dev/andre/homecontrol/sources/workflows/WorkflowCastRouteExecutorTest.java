@@ -50,7 +50,7 @@ class WorkflowCastRouteExecutorTest {
         assertThat(payload).containsEntry("contentUrl", "https://media.example/play?token=fresh-secret")
                 .containsEntry("contentId", "https://media.example/play?token=fresh-secret")
                 .containsEntry("contentType", "audio/aac");
-        assertThat(payload.get("metadata")).isEqualTo(Map.of("metadataType", 0, "title", "News"));
+        assertThat(payload).containsEntry("metadata", Map.of("metadataType", 0, "title", "News"));
         verify(runner).resolve(fixture.definition, "single");
     }
 
@@ -82,9 +82,9 @@ class WorkflowCastRouteExecutorTest {
                 var action = ArgumentCaptor.forClass(Action.class);
                 verify(devices).execute(eq("tv"), action.capture());
                 @SuppressWarnings("unchecked") var payload = (Map<String, Object>) ((Action.CastLoad) action.getValue()).load().get("media");
-                assertThat(payload.get("contentUrl")).isEqualTo(server.url("/media") + "?id=news&token=fresh-secret");
+                assertThat(payload).containsEntry("contentUrl", server.url("/media") + "?id=news&token=fresh-secret");
                 assertThat(payload.toString()).doesNotContain("old-secret");
-                assertThat(payload.get("metadata")).isEqualTo(Map.of("metadataType", 0, "title", "Fresh News"));
+                assertThat(payload).containsEntry("metadata", Map.of("metadataType", 0, "title", "Fresh News"));
                 assertThat(server.count("/catalog")).isEqualTo(2);
                 assertThat(server.count("/media")).isZero();
                 // A subsequent user retry fetches again; a missing entry never sends another command.
@@ -126,7 +126,8 @@ class WorkflowCastRouteExecutorTest {
         fixture.store.update(ID, 1, fixture.definition.draft(), fixture.request);
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(ActionFailedException.class);
         fixture.store.setEnabled(ID, 2, false, fixture.request);
-        assertThatThrownBy(() -> executor.execute(new Route.WorkflowCast(ID, 3, "single"), tv)).isInstanceOf(ActionFailedException.class);
+        var preparedArg129_0 = new Route.WorkflowCast(ID, 3, "single");
+        assertThatThrownBy(() -> executor.execute(preparedArg129_0, tv)).isInstanceOf(ActionFailedException.class);
         fixture.store.remove(ID, 3, fixture.request);
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(ActionFailedException.class);
         verifyNoInteractions(runner);

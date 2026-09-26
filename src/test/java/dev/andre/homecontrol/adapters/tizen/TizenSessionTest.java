@@ -163,7 +163,8 @@ class TizenSessionTest {
         start(PAIRED);
         connected();
 
-        assertThatThrownBy(() -> session.execute(new Action.PressKey(RemoteKey.MEDIA_NEXT)))
+        var failingAction166 = new Action.PressKey(RemoteKey.MEDIA_NEXT);
+        assertThatThrownBy(() -> session.execute(failingAction166))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -172,13 +173,17 @@ class TizenSessionTest {
         start(PAIRED);
         connected();
 
-        assertThatThrownBy(() -> session.execute(new Action.SetVolume(20)))
+        var failingAction175 = new Action.SetVolume(20);
+        assertThatThrownBy(() -> session.execute(failingAction175))
                 .isInstanceOf(UnsupportedActionException.class).hasMessageContaining("volume up, down and mute");
-        assertThatThrownBy(() -> session.execute(new Action.Mute(true)))
+        var failingAction177 = new Action.Mute(true);
+        assertThatThrownBy(() -> session.execute(failingAction177))
                 .isInstanceOf(UnsupportedActionException.class).hasMessageContaining("volume up, down and mute");
-        assertThatThrownBy(() -> session.execute(new Action.SelectInput("HDMI1")))
+        var failingAction179 = new Action.SelectInput("HDMI1");
+        assertThatThrownBy(() -> session.execute(failingAction179))
                 .isInstanceOf(UnsupportedActionException.class).hasMessageContaining("Source button");
-        assertThatThrownBy(() -> session.execute(new Action.CastLoad("CC1AD845", Map.of())))
+        var failingAction181 = new Action.CastLoad("CC1AD845", Map.of());
+        assertThatThrownBy(() -> session.execute(failingAction181))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -220,7 +225,8 @@ class TizenSessionTest {
         start(PAIRED);
         connected();
 
-        assertThatThrownBy(() -> session.execute(new Action.OpenAppLink(URI.create("https://example.org/a"))))
+        var failingAction223 = new Action.OpenAppLink(URI.create("https://example.org/a"));
+        assertThatThrownBy(() -> session.execute(failingAction223))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessageContaining("cannot open web links");
     }
@@ -231,7 +237,8 @@ class TizenSessionTest {
         connected();
         Thread.sleep(500);
 
-        assertThatThrownBy(() -> session.execute(new Action.OpenAppLink(URI.create("https://app.primevideo.com/detail?gti=x"))))
+        var failingAction234 = new Action.OpenAppLink(URI.create("https://app.primevideo.com/detail?gti=x"));
+        assertThatThrownBy(() -> session.execute(failingAction234))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessageContaining("Prime Video is not installed");
     }
@@ -242,7 +249,8 @@ class TizenSessionTest {
         start(PAIRED);
         connected();
 
-        assertThatThrownBy(() -> session.execute(new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ"))))
+        var failingAction245 = new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ"));
+        assertThatThrownBy(() -> session.execute(failingAction245))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("not available over DIAL");
     }
@@ -309,7 +317,8 @@ class TizenSessionTest {
         start(PAIRED);
         awaitStatus(DeviceStatus.DISCONNECTED);
 
-        assertThatThrownBy(() -> session.execute(new Action.PressKey(RemoteKey.POWER)))
+        var failingAction312 = new Action.PressKey(RemoteKey.POWER);
+        assertThatThrownBy(() -> session.execute(failingAction312))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("setup page");
         assertThat(receiver.received()).isZero();

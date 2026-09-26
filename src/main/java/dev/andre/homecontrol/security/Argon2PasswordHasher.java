@@ -59,7 +59,7 @@ public final class Argon2PasswordHasher {
         try {
             salt = Base64.getDecoder().decode(matcher.group(4));
             expected = Base64.getDecoder().decode(matcher.group(5));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return false;
         }
         if (salt.length < 8 || expected.length < 16 || expected.length > 64) {

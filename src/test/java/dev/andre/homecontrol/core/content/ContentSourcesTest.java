@@ -78,7 +78,8 @@ class ContentSourcesTest {
         ContentSource first = source("jellyfin", true, true);
         ContentSource second = source("jellyfin", false, true);
 
-        assertThatThrownBy(() -> new ContentSources(List.of(first, second)))
+        var preparedArg81_0 = List.of(first, second);
+        assertThatThrownBy(() -> new ContentSources(preparedArg81_0))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

@@ -24,6 +24,11 @@ import java.util.Map;
 @ConditionalOnProperty(name = "home-control.sports.enabled", havingValue = "true", matchIfMissing = true)
 public class SportsSetupController {
 
+    private static final String MESSAGE = "sportsMessage";
+    private static final String SAVE_ERROR = "Could not save sports settings";
+    private static final String REDIRECT = "redirect:/setup#sports";
+    private static final String ERROR = "sportsError";
+
     private static final Logger log = LoggerFactory.getLogger(SportsSetupController.class);
 
     private final SportsCalendars calendars;
@@ -44,20 +49,20 @@ public class SportsSetupController {
         try {
             SportsSettings.CalendarEntry entry = calendars.add(
                     new SportsCalendars.AddCalendar(url, label, loginPassword, loginPasswordConfirmation), request);
-            redirect.addFlashAttribute("sportsMessage", "Added " + entry.label());
-        } catch (LoginRequiredException e) {
+            redirect.addFlashAttribute(MESSAGE, "Added " + entry.label());
+        } catch (LoginRequiredException _) {
             failedAdd(redirect, label, "Log in again to change sources");
         } catch (IllegalArgumentException | ContentSourceException | PasswordRejectedException | IllegalStateException e) {
             failedAdd(redirect, label, e.getMessage());
         } catch (StorageException e) {
-            log.warn("Could not save sports settings", e);
-            failedAdd(redirect, label, "Could not save sports settings");
+            log.warn(SAVE_ERROR, e);
+            failedAdd(redirect, label, SAVE_ERROR);
         }
-        return "redirect:/setup#sports";
+        return REDIRECT;
     }
 
     private void failedAdd(RedirectAttributes redirect, String label, String message) {
-        redirect.addFlashAttribute("sportsError", message);
+        redirect.addFlashAttribute(ERROR, message);
         redirect.addFlashAttribute("sportsForm", Map.of("label", label == null ? "" : label));
     }
 
@@ -65,14 +70,14 @@ public class SportsSetupController {
     public String remove(@PathVariable String id, RedirectAttributes redirect) {
         try {
             SportsSettings.CalendarEntry entry = calendars.remove(id);
-            redirect.addFlashAttribute("sportsMessage", "Removed " + entry.label());
+            redirect.addFlashAttribute(MESSAGE, "Removed " + entry.label());
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("sportsError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (StorageException e) {
-            log.warn("Could not save sports settings", e);
-            redirect.addFlashAttribute("sportsError", "Could not save sports settings");
+            log.warn(SAVE_ERROR, e);
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR);
         }
-        return "redirect:/setup#sports";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/sports/time-zone")
@@ -80,20 +85,20 @@ public class SportsSetupController {
         try {
             String stripped = timeZone == null ? "" : timeZone.strip();
             if (!stripped.isEmpty() && SportsTimeZones.parse(stripped).isEmpty()) {
-                redirect.addFlashAttribute("sportsError", "Use a time zone such as Europe/Berlin");
-                return "redirect:/setup#sports";
+                redirect.addFlashAttribute(ERROR, "Use a time zone such as Europe/Berlin");
+                return REDIRECT;
             }
             String stored = stripped.isEmpty() ? null : stripped;
             settings.update(s -> s.withTimeZone(stored));
             String message = stored != null
                     ? "Times are shown in " + stored
                     : "Times are shown in " + zones.effective() + " (default)";
-            redirect.addFlashAttribute("sportsMessage", message);
+            redirect.addFlashAttribute(MESSAGE, message);
         } catch (StorageException e) {
-            log.warn("Could not save sports settings", e);
-            redirect.addFlashAttribute("sportsError", "Could not save sports settings");
+            log.warn(SAVE_ERROR, e);
+            redirect.addFlashAttribute(ERROR, SAVE_ERROR);
         }
-        return "redirect:/setup#sports";
+        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/sports/providers")
@@ -106,13 +111,13 @@ public class SportsSetupController {
         });
         try {
             settings.update(current -> SportsProviders.apply(current, mapping));
-            flash.addFlashAttribute("sportsMessage",
+            flash.addFlashAttribute(MESSAGE,
                     "Saved. These are your own settings; Home Control does not check broadcast rights.");
         } catch (IllegalArgumentException e) {
-            flash.addFlashAttribute("sportsError", e.getMessage());
+            flash.addFlashAttribute(ERROR, e.getMessage());
         } catch (StorageException e) {
-            log.warn("Could not save sports settings", e);
-            flash.addFlashAttribute("sportsError", "Could not save sports settings");
+            log.warn(SAVE_ERROR, e);
+            flash.addFlashAttribute(ERROR, SAVE_ERROR);
         }
         return "redirect:/setup#sports-providers";
     }

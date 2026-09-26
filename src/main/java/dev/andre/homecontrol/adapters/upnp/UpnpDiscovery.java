@@ -87,7 +87,7 @@ public class UpnpDiscovery implements AutoCloseable {
             if (attempt < DESCRIPTION_RETRIES) {
                 try {
                     worker.schedule(() -> seen(usn, attempt + 1), 1, TimeUnit.SECONDS);
-                } catch (RejectedExecutionException ignored) {
+                } catch (RejectedExecutionException _) {
                     // closing
                 }
             }
@@ -146,7 +146,7 @@ public class UpnpDiscovery implements AutoCloseable {
     private void submit(Runnable task) {
         try {
             worker.execute(task);
-        } catch (RejectedExecutionException ignored) {
+        } catch (RejectedExecutionException _) {
             // closing
         }
     }

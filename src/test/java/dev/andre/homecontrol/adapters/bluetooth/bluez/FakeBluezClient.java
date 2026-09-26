@@ -265,7 +265,7 @@ public final class FakeBluezClient implements BluezClient {
     private static void sleep(Duration delay) {
         try {
             Thread.sleep(delay.toMillis());
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }

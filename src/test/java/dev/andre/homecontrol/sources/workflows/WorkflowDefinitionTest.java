@@ -181,8 +181,10 @@ class WorkflowDefinitionTest {
         variables.clear();
         assertThat(copied.fetch().headers()).hasSize(1);
         assertThat(copied.variables()).hasSize(2);
-        assertThatThrownBy(() -> copied.fetch().headers().clear()).isInstanceOf(UnsupportedOperationException.class);
-        assertThatThrownBy(() -> copied.variables().clear()).isInstanceOf(UnsupportedOperationException.class);
+        var preparedReceiver184 = copied.fetch().headers();
+        assertThatThrownBy(() -> preparedReceiver184.clear()).isInstanceOf(UnsupportedOperationException.class);
+        var preparedReceiver185 = copied.variables();
+        assertThatThrownBy(() -> preparedReceiver185.clear()).isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> codec.decode("{\"schemaVersion\":1,\"secret\":\"saved-secret\", malformed"))
                 .isInstanceOf(WorkflowException.class).hasMessageNotContaining("saved-secret");
     }

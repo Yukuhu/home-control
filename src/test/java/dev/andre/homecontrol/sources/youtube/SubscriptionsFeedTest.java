@@ -81,7 +81,7 @@ class SubscriptionsFeedTest {
         List<FakeGoogleServer.Recorded> channelCalls = fake.requests("/youtube/v3/channels").stream()
                 .filter(r -> "contentDetails".equals(r.query().get("part"))).toList();
         assertThat(channelCalls).hasSize(1);
-        assertThat(channelCalls.getFirst().query().get("id")).isEqualTo(KURZGESAGT + "," + BLENDER + "," + NASA);
+        assertThat(channelCalls.getFirst().query()).containsEntry("id", KURZGESAGT + "," + BLENDER + "," + NASA);
         List<FakeGoogleServer.Recorded> playlistCalls = fake.requests("/youtube/v3/playlistItems");
         assertThat(playlistCalls).hasSize(3);
         playlistCalls.forEach(r -> {

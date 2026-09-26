@@ -212,7 +212,7 @@ class SsdpDiscoveryTest {
     }
 
     @Test
-    void disabledDiscoveryOpensNoSockets() throws IOException, InterruptedException {
+    void disabledDiscoveryOpensNoSockets() throws InterruptedException {
         try (SsdpDiscovery disabled = new SsdpDiscovery(
                 new SsdpProperties(false, "127.0.0.1", responder.port(), 0, 1, 1))) {
             disabled.start();

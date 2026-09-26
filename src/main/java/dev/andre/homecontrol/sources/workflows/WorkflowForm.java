@@ -12,22 +12,38 @@ public final class WorkflowForm {
     public boolean enabled = true;
     public Mode mode = Mode.SINGLE;
     public ContentKind kind = ContentKind.VIDEO;
-    public String title = "", subtitle = "", artwork = "";
-    public String arrayPointer = "", idPointer = "", titlePointer = "", subtitlePointer = "", artworkPointer = "";
-    public boolean includeSubtitlePointer, includeArtworkPointer;
+    public String title = "";
+    public String subtitle = "";
+    public String artwork = "";
+    public String arrayPointer = "";
+    public String idPointer = "";
+    public String titlePointer = "";
+    public String subtitlePointer = "";
+    public String artworkPointer = "";
+    public boolean includeSubtitlePointer;
+    public boolean includeArtworkPointer;
     public List<VariableRow> variables = new ArrayList<>();
-    public Replacement urlMode = Replacement.REPLACE, templateMode = Replacement.REPLACE, headersMode = Replacement.REPLACE;
-    public String url = "", template = "", mimeType = "video/mp4";
+    public Replacement urlMode = Replacement.REPLACE;
+    public Replacement templateMode = Replacement.REPLACE;
+    public Replacement headersMode = Replacement.REPLACE;
+    public String url = "";
+    public String template = "";
+    public String mimeType = "video/mp4";
     public List<HeaderRow> headers = new ArrayList<>();
     public long expectedRevision;
-    public String loginPassword = "", loginPasswordConfirmation = "";
+    public String loginPassword = "";
+    public String loginPasswordConfirmation = "";
 
     public static final class VariableRow {
-        public String name = "", pointer = "";
+        public String name = "";
+        public String pointer = "";
         public Scope scope = Scope.ROOT;
         public boolean sensitive = true;
     }
-    public static final class HeaderRow { public String name = "", value = ""; }
+    public static final class HeaderRow {
+        public String name = "";
+        public String value = "";
+    }
 
     public static WorkflowForm from(WorkflowDefinition saved) {
         WorkflowForm form = new WorkflowForm();

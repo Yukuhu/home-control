@@ -232,7 +232,7 @@ public class SsdpDiscovery implements AutoCloseable {
             services.computeIfPresent(service.usn(), (usn, current) -> current.withDescription(description));
         } catch (IOException | IllegalArgumentException e) {
             log.debug("No description for {}: {}", service.usn(), e.getMessage());
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }
@@ -240,7 +240,7 @@ public class SsdpDiscovery implements AutoCloseable {
     private static Optional<URI> toUri(String value) {
         try {
             return Optional.of(URI.create(value));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

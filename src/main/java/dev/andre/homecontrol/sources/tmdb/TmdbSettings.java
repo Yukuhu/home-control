@@ -30,13 +30,13 @@ public record TmdbSettings(TmdbCredential.Kind credentialKind, Instant connected
         TmdbCredential.Kind credentialKind;
         try {
             credentialKind = TmdbCredential.Kind.valueOf(kind);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
         Instant connectedAt;
         try {
             connectedAt = Instant.parse(map.getOrDefault("connectedAt", ""));
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             connectedAt = Instant.EPOCH;
         }
         return Optional.of(new TmdbSettings(credentialKind, connectedAt));

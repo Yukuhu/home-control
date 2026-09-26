@@ -53,6 +53,8 @@ import static dev.andre.homecontrol.adapters.sonos.protocol.SonosEndpoints.AV_TR
  */
 public class SonosSession implements DeviceHandle, GroupListing {
 
+    private static final String LOOK_UP_GROUPS = "look up the speaker groups";
+
     private static final Logger log = LoggerFactory.getLogger(SonosSession.class);
     /** Sonos: "Command not supported or not a coordinator". */
     private static final int NOT_COORDINATOR = 800;
@@ -137,11 +139,11 @@ public class SonosSession implements DeviceHandle, GroupListing {
         }
         try {
             switch (action) {
-                case Action.PlayMedia play -> {
-                    Action.PlayMedia forSonos = new Action.PlayMedia(SonosUris.forPlayback(play.url(), play.mimeType()),
-                            play.mimeType(), play.title(), play.subtitle());
+                case Action.PlayMedia(var url, var mimeType, var title, var subtitle) -> {
+                    Action.PlayMedia forSonos = new Action.PlayMedia(SonosUris.forPlayback(url, mimeType),
+                            mimeType, title, subtitle);
                     onCoordinator(coordinator -> commands.playUri(coordinator, sink, forSonos, "*"));
-                    lastPlayed = new PlayedItem(forSonos.url().toString(), play.title());
+                    lastPlayed = new PlayedItem(forSonos.url().toString(), title);
                 }
                 case Action.Pause _ -> onCoordinator(coordinator ->
                         commands.transport(coordinator, UpnpActions.pause(AV_TRANSPORT), "pause"));
@@ -149,9 +151,9 @@ public class SonosSession implements DeviceHandle, GroupListing {
                         commands.transport(coordinator, UpnpActions.play(AV_TRANSPORT), "resume playback"));
                 case Action.Stop _ -> onCoordinator(coordinator ->
                         commands.transport(coordinator, UpnpActions.stop(AV_TRANSPORT), "stop playback"));
-                case Action.SetVolume volume -> commands.setVolume(renderingControl(), volume.level(), 100);
-                case Action.Mute mute -> commands.setMute(renderingControl(), mute.muted());
-                case Action.JoinGroup join -> join(join.memberId());
+                case Action.SetVolume(var level) -> commands.setVolume(renderingControl(), level, 100);
+                case Action.Mute(var muted) -> commands.setMute(renderingControl(), muted);
+                case Action.JoinGroup(var memberId) -> join(memberId);
                 case Action.LeaveGroup _ -> leave();
                 case Action.PressKey _ -> throw unsupported("has no remote keys");
                 case Action.OpenAppLink _ -> throw unsupported("cannot open app links");
@@ -165,7 +167,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
     }
 
     private void join(String memberId) {
-        ZoneGroupState current = commands.run("look up the speaker groups", this::readTopology);
+        ZoneGroupState current = commands.run(LOOK_UP_GROUPS, this::readTopology);
         ZoneGroupState.Group target = current.groupOf(memberId)
                 .orElseThrow(() -> new ActionFailedException(device.name() + " cannot find that speaker; it may have left the network"));
         if (target.contains(settings.uuid())) {
@@ -178,7 +180,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
     }
 
     private void leave() {
-        ZoneGroupState current = commands.run("look up the speaker groups", this::readTopology);
+        ZoneGroupState current = commands.run(LOOK_UP_GROUPS, this::readTopology);
         boolean alone = current.groupOf(settings.uuid()).map(group -> group.visibleMembers().size() <= 1).orElse(true);
         if (alone) {
             return;
@@ -196,7 +198,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
             topology = parsed;
             topologyReadAt = clock.instant();
             return parsed;
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new SoapFault(0, "Unreadable zone group state");
         }
     }
@@ -212,7 +214,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
             if (fault.errorCode() != NOT_COORDINATOR) {
                 throw fault;
             }
-            commands.run("look up the speaker groups", this::readTopology);
+            commands.run(LOOK_UP_GROUPS, this::readTopology);
             command.accept(coordinatorAvTransport());
         }
     }
@@ -243,26 +245,6 @@ public class SonosSession implements DeviceHandle, GroupListing {
         return new UnsupportedActionException(device.name() + " is a Sonos speaker and " + what);
     }
 
-    private void readState() throws IOException, SoapFault {
-        ServiceEndpoint coordinator = coordinatorAvTransport();
-        TransportInfo info = commands.transportInfo(coordinator);
-        VolumeReading volume = commands.volume(renderingControl(), 100);
-        transport = info;
-        NowPlaying nowPlaying = null;
-        if (info.active()) {
-            // A grouped room shows its coordinator's track; its title comes from the coordinator's metadata.
-            PositionInfo position;
-            try {
-                position = commands.positionInfo(coordinator);
-            } catch (SoapFault fault) {
-                position = new PositionInfo("", "", null, null);
-            }
-            nowPlaying = NowPlayings.of(info, position, lastPlayed);
-        }
-        publish(state.withStatus(DeviceStatus.CONNECTED).withPower(true).withVolume(volume.percent(), 100, volume.muted())
-                .withNowPlaying(nowPlaying));
-    }
-
     private synchronized void publish(DeviceState next) {
         DeviceState previous = state;
         state = next;
@@ -284,12 +266,32 @@ public class SonosSession implements DeviceHandle, GroupListing {
 
     private final class Link implements ReconnectingPoller.Link {
 
+        private void readState() throws IOException, SoapFault {
+            ServiceEndpoint coordinator = coordinatorAvTransport();
+            TransportInfo info = commands.transportInfo(coordinator);
+            VolumeReading volume = commands.volume(renderingControl(), 100);
+            transport = info;
+            NowPlaying nowPlaying = null;
+            if (info.active()) {
+                // A grouped room shows its coordinator's track; its title comes from the coordinator's metadata.
+                PositionInfo position;
+                try {
+                    position = commands.positionInfo(coordinator);
+                } catch (SoapFault _) {
+                    position = new PositionInfo("", "", null, null);
+                }
+                nowPlaying = NowPlayings.of(info, position, lastPlayed);
+            }
+            publish(state.withStatus(DeviceStatus.CONNECTED).withPower(true).withVolume(volume.percent(), 100, volume.muted())
+                    .withNowPlaying(nowPlaying));
+        }
+
         @Override
         public void connect() throws Exception {
             readTopology();
             try {
                 sink = commands.sink(own(SonosEndpoints.CONNECTION_MANAGER_PATH, SonosEndpoints.CONNECTION_MANAGER));
-            } catch (SoapFault fault) {
+            } catch (SoapFault _) {
                 sink = ProtocolInfo.UNKNOWN;
             }
             readState();

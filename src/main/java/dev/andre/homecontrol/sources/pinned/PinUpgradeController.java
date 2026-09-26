@@ -18,6 +18,8 @@ import java.util.Map;
 @ConditionalOnProperty(name = "home-control.pinned.enabled", havingValue = "true", matchIfMissing = true)
 public class PinUpgradeController {
 
+    private static final String MESSAGE = "message";
+
     private static final Logger log = LoggerFactory.getLogger(PinUpgradeController.class);
 
     private final PinnedShortcuts pins;
@@ -31,13 +33,13 @@ public class PinUpgradeController {
         try {
             Pin pin = pins.addUpgrade(url, upgradeOf);
             return ResponseEntity.ok(Map.of("id", pin.id(), "title", pin.title(),
-                    "message", "Pinned " + pin.title() + ". It now opens directly."));
+                    MESSAGE, "Pinned " + pin.title() + ". It now opens directly."));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of(MESSAGE, e.getMessage()));
         } catch (StorageException e) {
             log.warn("Could not save a pinned link", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Could not save the pinned link"));
+                    .body(Map.of(MESSAGE, "Could not save the pinned link"));
         }
     }
 }

@@ -78,12 +78,14 @@ class YouTubeHttpTest {
     void anUnreachableHostIsUnreachableWithoutTheQuery() throws IOException {
         fake = new FakeGoogleServer();
         YouTubeHttp http = new YouTubeHttp(fake.properties());
+        URI unreachable = URI.create("http://127.0.0.1:9/x?access_token=secret");
+        Map<String, String> noHeaders = Map.of();
 
-        assertThatThrownBy(() -> http.get(URI.create("http://127.0.0.1:9/x?access_token=secret"), Map.of()))
+        assertThatThrownBy(() -> http.get(unreachable, noHeaders))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
                 .isEqualTo(YouTubeException.Kind.UNREACHABLE);
-        assertThatThrownBy(() -> http.get(URI.create("http://127.0.0.1:9/x?access_token=secret"), Map.of()))
+        assertThatThrownBy(() -> http.get(unreachable, noHeaders))
                 .hasMessage("Could not reach 127.0.0.1")
                 .satisfies(e -> assertThat(e.getMessage()).doesNotContain("secret"));
     }
@@ -108,12 +110,14 @@ class YouTubeHttpTest {
         fake.respond("GET", "/big", new FakeGoogleServer.Canned(200, "application/json",
                 new byte[YouTubeHttp.MAX_RESPONSE_BYTES + 1]));
         YouTubeHttp http = new YouTubeHttp(fake.properties());
+        URI oversized = URI.create(fake.base() + "/big");
+        Map<String, String> noHeaders = Map.of();
 
-        assertThatThrownBy(() -> http.get(URI.create(fake.base() + "/big"), Map.of()))
+        assertThatThrownBy(() -> http.get(oversized, noHeaders))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
                 .isEqualTo(YouTubeException.Kind.BAD_RESPONSE);
-        assertThatThrownBy(() -> http.get(URI.create(fake.base() + "/big"), Map.of()))
+        assertThatThrownBy(() -> http.get(oversized, noHeaders))
                 .hasMessage("Google sent an oversized response");
     }
 }

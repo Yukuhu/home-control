@@ -76,13 +76,13 @@ public final class IcsOccurrences {
             return switch (time) {
                 case IcsTime.Utc _ -> ZoneOffset.UTC;
                 case IcsTime.Date _ -> calendarZone;
-                case IcsTime.Local local -> {
-                    if (local.tzid() == null) {
+                case IcsTime.Local(_, var tzid) -> {
+                    if (tzid == null) {
                         yield calendarZone;
                     }
-                    Optional<ZoneId> zone = IcsZones.resolve(local.tzid());
+                    Optional<ZoneId> zone = IcsZones.resolve(tzid);
                     if (zone.isEmpty()) {
-                        unknown.add(local.tzid());
+                        unknown.add(tzid);
                     }
                     yield zone.orElse(calendarZone);
                 }
@@ -91,9 +91,9 @@ public final class IcsOccurrences {
 
         static LocalDateTime local(IcsTime time) {
             return switch (time) {
-                case IcsTime.Utc utc -> LocalDateTime.ofInstant(utc.instant(), ZoneOffset.UTC);
-                case IcsTime.Date date -> date.date().atStartOfDay();
-                case IcsTime.Local local -> local.dateTime();
+                case IcsTime.Utc(var instant) -> LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
+                case IcsTime.Date(var dateValue) -> dateValue.atStartOfDay();
+                case IcsTime.Local(var localDateTime, _) -> localDateTime;
             };
         }
 
@@ -132,8 +132,8 @@ public final class IcsOccurrences {
             this.allDay = event.start() instanceof IcsTime.Date;
             if (allDay) {
                 long d = 1;
-                if (event.end() instanceof IcsTime.Date end) {
-                    d = ChronoUnit.DAYS.between(first.toLocalDate(), end.date());
+                if (event.end() instanceof IcsTime.Date(var endDate)) {
+                    d = ChronoUnit.DAYS.between(first.toLocalDate(), endDate);
                 } else if (event.duration() != null) {
                     d = event.duration().toDays();
                 }
@@ -147,8 +147,8 @@ public final class IcsOccurrences {
                 this.days = 0;
             }
             for (IcsTime exdate : event.exdates()) {
-                if (exdate instanceof IcsTime.Date date) {
-                    exDates.add(date.date());
+                if (exdate instanceof IcsTime.Date(var dateValue)) {
+                    exDates.add(dateValue);
                 } else {
                     exInstants.add(zones.instant(exdate));
                 }
@@ -215,9 +215,9 @@ public final class IcsOccurrences {
 
         private boolean pastUntil(LocalDateTime candidate, Instant start) {
             return switch (rule.until()) {
-                case IcsTime.Date date -> candidate.toLocalDate().isAfter(date.date());
-                case IcsTime.Utc utc -> start.isAfter(utc.instant());
-                case IcsTime.Local local -> candidate.isAfter(local.dateTime());
+                case IcsTime.Date(var dateValue) -> candidate.toLocalDate().isAfter(dateValue);
+                case IcsTime.Utc(var instant) -> start.isAfter(instant);
+                case IcsTime.Local(var localDateTime, _) -> candidate.isAfter(localDateTime);
             };
         }
 

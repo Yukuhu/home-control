@@ -61,7 +61,8 @@ class SecretKeySourceTest {
     void aKeyFileOfTheWrongLengthIsRefused() throws Exception {
         Files.writeString(dir.resolve("secret.key"), Base64.getEncoder().encodeToString(new byte[16]) + "\n");
 
-        assertThatThrownBy(() -> source(null).forWriting(null))
+        var preparedReceiver64 = source(null);
+        assertThatThrownBy(() -> preparedReceiver64.forWriting(null))
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining("secret.key");
     }

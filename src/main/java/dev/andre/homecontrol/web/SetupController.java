@@ -8,6 +8,8 @@ import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.adapters.androidtv.PairingService;
 import dev.andre.homecontrol.adapters.androidtv.PairingOutcome;
 import dev.andre.homecontrol.storage.StorageException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
@@ -30,6 +32,7 @@ import java.util.stream.Collectors;
 @Controller
 public class SetupController {
 
+    private static final Logger log = LoggerFactory.getLogger(SetupController.class);
     private static final String SETUP_VIEW = "setup";
     private static final String ERROR_ATTRIBUTE = "error";
 
@@ -67,7 +70,8 @@ public class SetupController {
             model.addAttribute(ERROR_ATTRIBUTE, e.getMessage());
             populateSetupModel(model, false);
         } catch (IOException e) {
-            model.addAttribute(ERROR_ATTRIBUTE, "Could not reach " + host + ": " + e.getMessage());
+            log.warn("Could not begin Android TV pairing with {}", host, e);
+            model.addAttribute(ERROR_ATTRIBUTE, "Could not connect to " + host + ": " + e.getMessage());
             populateSetupModel(model, false);
         }
         return SETUP_VIEW;

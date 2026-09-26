@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -107,7 +108,7 @@ class TheSportsDbSetupControllerTest {
         mockMvc.perform(post("/setup/sources/sports/competitions/4331/remove"))
                 .andExpect(flash().attribute("sportsMessage", "Removed German Bundesliga"));
 
-        org.mockito.Mockito.doThrow(new IllegalArgumentException("TheSportsDB has no competition 999"))
+        doThrow(new IllegalArgumentException("TheSportsDB has no competition 999"))
                 .when(competitions).add("999");
         mockMvc.perform(post("/setup/sources/sports/competitions").param("leagueId", "999"))
                 .andExpect(flash().attribute("sportsError", "TheSportsDB has no competition 999"));
@@ -172,9 +173,8 @@ class TheSportsDbSetupControllerTest {
                 .contains("action=\"/setup/sources/sports/competitions/4331/remove\"")
                 .contains("name=\"key\"").contains("type=\"password\"")
                 .contains("Data from <a href=\"https://www.thesportsdb.com\"")
-                .doesNotContain("9876543210");
-
-        assertThat(body).contains("id=\"sports-providers\"")
+                .doesNotContain("9876543210")
+                .contains("id=\"sports-providers\"")
                 .contains("name=\"provider:thesportsdb:4331\"")
                 .contains("German Bundesliga")
                 .contains("English Premier League")

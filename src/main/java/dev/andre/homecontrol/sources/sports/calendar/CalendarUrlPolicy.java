@@ -71,7 +71,7 @@ public class CalendarUrlPolicy {
         InetAddress[] addresses;
         try {
             addresses = resolver.resolve(lookup);
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException _) {
             throw new CalendarFetchException(CalendarFetchException.Kind.UNREACHABLE, "Could not find " + host);
         }
         for (InetAddress address : addresses) {

@@ -238,7 +238,7 @@ class StreamingLaunchersEndToEndTest {
                 // 13. Unified search reaches TMDB with the configured language.
                 HttpResponse<String> search = send(browser, getJson("/search?q=matrix"));
                 assertThat(search.body()).contains("Matrix").contains("tmdb");
-                assertThat(TMDB.last("GET", "/3/search/multi").query().get("language")).isEqualTo("de-DE");
+                assertThat(TMDB.last("GET", "/3/search/multi").query()).containsEntry("language", "de-DE");
 
                 // 14. Pinned shortcuts and secrets on disk.
                 JsonNode pinnedFile = MAPPER.readTree(Files.readAllBytes(dataDir.resolve("pinned.json")));

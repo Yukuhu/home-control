@@ -57,6 +57,9 @@ import java.util.stream.Collectors;
 @Service
 public class DeviceManager implements AutoCloseable {
 
+    private static final String NO_DEVICE_PREFIX = "No device with id ";
+    private static final String NOT_CONNECTED_SUFFIX = " is not connected";
+
     private static final Logger log = LoggerFactory.getLogger(DeviceManager.class);
 
     private final DeviceRegistry registry;
@@ -153,7 +156,7 @@ public class DeviceManager implements AutoCloseable {
      */
     public void execute(String id, Action action) {
         Device device = registry.findById(id)
-                .orElseThrow(() -> new DeviceNotFoundException("No device with id " + id));
+                .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
         Map<String, DeviceHandle> deviceHandles = handles.getOrDefault(id, Map.of());
         if (action instanceof Action.Stop) {
             stopEverywhere(device, deviceHandles, action);
@@ -169,7 +172,7 @@ public class DeviceManager implements AutoCloseable {
             DeviceHandle handle = deviceHandles.get(adapterId);
             if (handle == null) {
                 if (firstOffline == null) {
-                    firstOffline = new DeviceOfflineException(device.name() + " is not connected");
+                    firstOffline = new DeviceOfflineException(device.name() + NOT_CONNECTED_SUFFIX);
                 }
                 continue;
             }
@@ -213,7 +216,7 @@ public class DeviceManager implements AutoCloseable {
             DeviceHandle handle = deviceHandles.get(adapterId);
             if (handle == null) {
                 if (firstOffline == null) {
-                    firstOffline = new DeviceOfflineException(device.name() + " is not connected");
+                    firstOffline = new DeviceOfflineException(device.name() + NOT_CONNECTED_SUFFIX);
                 }
                 continue;
             }
@@ -256,7 +259,7 @@ public class DeviceManager implements AutoCloseable {
      */
     public Map<String, Object> query(String id, CastAppQuery query) {
         Device device = registry.findById(id)
-                .orElseThrow(() -> new DeviceNotFoundException("No device with id " + id));
+                .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
         Map<String, DeviceHandle> deviceHandles = handles.getOrDefault(id, Map.of());
         DeviceOfflineException firstOffline = null;
         UnsupportedActionException lastUnsupported = null;
@@ -268,7 +271,7 @@ public class DeviceManager implements AutoCloseable {
             DeviceHandle handle = deviceHandles.get(adapterId);
             if (handle == null) {
                 if (firstOffline == null) {
-                    firstOffline = new DeviceOfflineException(device.name() + " is not connected");
+                    firstOffline = new DeviceOfflineException(device.name() + NOT_CONNECTED_SUFFIX);
                 }
                 continue;
             }
@@ -406,7 +409,7 @@ public class DeviceManager implements AutoCloseable {
         String normalized = clear ? null : MacAddress.normalize(mac);
         synchronized (lock) {
             Device device = registry.findById(id)
-                    .orElseThrow(() -> new DeviceNotFoundException("No device with id " + id));
+                    .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
             Device updated = device;
             for (String adapterId : device.adapters().keySet()) {
                 if (adapters.get(adapterId) instanceof WakeOnLanAdapter) {
@@ -558,9 +561,9 @@ public class DeviceManager implements AutoCloseable {
         Device merged;
         synchronized (lock) {
             Device target = registry.findById(targetId)
-                    .orElseThrow(() -> new IllegalArgumentException("No device with id " + targetId));
+                    .orElseThrow(() -> new IllegalArgumentException(NO_DEVICE_PREFIX + targetId));
             Device source = registry.findById(sourceId)
-                    .orElseThrow(() -> new IllegalArgumentException("No device with id " + sourceId));
+                    .orElseThrow(() -> new IllegalArgumentException(NO_DEVICE_PREFIX + sourceId));
             merged = target;
             for (Map.Entry<String, Map<String, String>> entry : source.adapters().entrySet()) {
                 String adapterId = entry.getKey();
@@ -588,7 +591,7 @@ public class DeviceManager implements AutoCloseable {
     public Device split(String id, String adapterId) {
         synchronized (lock) {
             Device device = registry.findById(id)
-                    .orElseThrow(() -> new IllegalArgumentException("No device with id " + id));
+                    .orElseThrow(() -> new IllegalArgumentException(NO_DEVICE_PREFIX + id));
             if (!device.hasAdapter(adapterId)) {
                 throw new IllegalArgumentException(device.name() + " has no " + adapterId + " connection");
             }

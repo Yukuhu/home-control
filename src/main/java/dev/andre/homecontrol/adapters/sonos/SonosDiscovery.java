@@ -130,7 +130,7 @@ public class SonosDiscovery implements AutoCloseable {
     private void submit(Runnable task) {
         try {
             worker.execute(task);
-        } catch (RejectedExecutionException ignored) {
+        } catch (RejectedExecutionException _) {
             // closing
         }
     }

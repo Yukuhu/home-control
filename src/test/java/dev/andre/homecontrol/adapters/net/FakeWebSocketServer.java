@@ -81,7 +81,7 @@ public final class FakeWebSocketServer implements AutoCloseable {
                 }
                 out.write(payload);
                 out.flush();
-            } catch (IOException e) {
+            } catch (IOException _) {
                 close();
             }
         }
@@ -97,7 +97,7 @@ public final class FakeWebSocketServer implements AutoCloseable {
         public void close() {
             try {
                 socket.close();
-            } catch (IOException ignored) {
+            } catch (IOException _) {
                 // Already gone.
             }
         }
@@ -165,13 +165,13 @@ public final class FakeWebSocketServer implements AutoCloseable {
             Socket socket;
             try {
                 socket = server.accept();
-            } catch (IOException e) {
+            } catch (IOException _) {
                 return;
             }
             if (refusing) {
                 try {
                     socket.close();
-                } catch (IOException ignored) {
+                } catch (IOException _) {
                     // Refused anyway.
                 }
                 continue;
@@ -253,7 +253,7 @@ public final class FakeWebSocketServer implements AutoCloseable {
                     }
                 }
             }
-        } catch (IOException | GeneralSecurityException e) {
+        } catch (IOException | GeneralSecurityException _) {
             // The client went away.
         } finally {
             if (connection != null) {
@@ -294,7 +294,7 @@ public final class FakeWebSocketServer implements AutoCloseable {
         dropAll();
         try {
             server.close();
-        } catch (IOException ignored) {
+        } catch (IOException _) {
             // Closing anyway.
         }
     }

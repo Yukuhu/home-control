@@ -31,7 +31,7 @@ public final class WorkflowUrlPolicy {
                     || uri.getRawUserInfo() != null || uri.getRawFragment() != null
                     || uri.getPort() == 0 || uri.getPort() > 65_535) throw invalidUrl();
             return uri;
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             throw invalidUrl();
         }
     }
@@ -57,7 +57,7 @@ public final class WorkflowUrlPolicy {
 
     static InetAddress literal(String host) {
         try { return InetAddress.ofLiteral(host); }
-        catch (IllegalArgumentException e) { return null; }
+        catch (IllegalArgumentException _) { return null; }
     }
 
     public boolean sameOrigin(URI first, URI second) {

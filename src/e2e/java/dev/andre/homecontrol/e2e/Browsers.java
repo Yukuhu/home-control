@@ -4,6 +4,7 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Tracing;
 
 import java.nio.file.Path;
@@ -56,6 +57,12 @@ public final class Browsers {
         context.tracing().start(new Tracing.StartOptions().setScreenshots(true).setSnapshots(true));
         Path trace = Path.of(System.getProperty("e2e.artifacts", "build/e2e-artifacts"),
                 traceName.replaceAll("[^A-Za-z0-9._-]", "_") + "-" + browser + ".zip");
-        return new BrowserSession(context, context.newPage(), trace);
+        try {
+            Page page = context.newPage();
+            return new BrowserSession(context, page, trace, BrowserCoverage.start(page, browser, trace));
+        } catch (RuntimeException e) {
+            context.close();
+            throw e;
+        }
     }
 }

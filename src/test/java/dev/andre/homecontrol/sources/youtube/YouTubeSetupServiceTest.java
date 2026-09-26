@@ -302,10 +302,12 @@ class YouTubeSetupServiceTest {
         given(playlists.getIfAvailable()).willReturn(p);
         given(p.loaded(anyString())).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.choosePlaylists(List.of("PLnotLoaded00000000000000000000")))
+        var preparedArg305_0 = List.of("PLnotLoaded00000000000000000000");
+        assertThatThrownBy(() -> service.choosePlaylists(preparedArg305_0))
                 .isInstanceOf(YouTubeException.class)
                 .hasMessage("Load your playlists again, then choose");
-        assertThatThrownBy(() -> service.choosePlaylists(List.of("../etc")))
+        var preparedArg308_0 = List.of("../etc");
+        assertThatThrownBy(() -> service.choosePlaylists(preparedArg308_0))
                 .isInstanceOf(YouTubeException.class)
                 .hasMessage("Load your playlists again, then choose");
 

@@ -54,7 +54,8 @@ class JellyfinClientTest {
     @Test
     void refusesAServerThatIsNotJellyfin() throws IOException {
         fake = new FakeJellyfinServer().respondJson("GET", "/System/Info/Public", 200, "{\"hello\":\"world\"}");
-        assertThatThrownBy(() -> client.publicInfo(fake.url()))
+        var preparedArg57_0 = fake.url();
+        assertThatThrownBy(() -> client.publicInfo(preparedArg57_0))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
                 .isEqualTo(JellyfinException.Kind.NOT_JELLYFIN);
@@ -64,14 +65,16 @@ class JellyfinClientTest {
 
         fake = new FakeJellyfinServer().respondBytes("GET", "/System/Info/Public", 200, "text/html",
                 "<html>".getBytes());
-        assertThatThrownBy(() -> client.publicInfo(fake.url()))
+        var preparedArg67_0 = fake.url();
+        assertThatThrownBy(() -> client.publicInfo(preparedArg67_0))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
                 .isEqualTo(JellyfinException.Kind.NOT_JELLYFIN);
         fake.close();
 
         fake = new FakeJellyfinServer();
-        assertThatThrownBy(() -> client.publicInfo(fake.url()))
+        var preparedArg74_0 = fake.url();
+        assertThatThrownBy(() -> client.publicInfo(preparedArg74_0))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
                 .isEqualTo(JellyfinException.Kind.NOT_JELLYFIN);
@@ -81,7 +84,8 @@ class JellyfinClientTest {
     void refusesJellyfinOlderThan10_9() throws IOException {
         fake = new FakeJellyfinServer().respond("GET", "/System/Info/Public", 200, "system-info-public-old.json");
 
-        assertThatThrownBy(() -> client.publicInfo(fake.url()))
+        var preparedArg84_0 = fake.url();
+        assertThatThrownBy(() -> client.publicInfo(preparedArg84_0))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
                 .isEqualTo(JellyfinException.Kind.UNSUPPORTED_VERSION);
@@ -109,7 +113,8 @@ class JellyfinClientTest {
     void aRejectedLoginIsNamed() throws IOException {
         fake = new FakeJellyfinServer().respondJson("POST", "/Users/AuthenticateByName", 401, "{}");
 
-        assertThatThrownBy(() -> client.authenticateByName(fake.url(), "dev-1", "andre", "wrong"))
+        var preparedArg112_0 = fake.url();
+        assertThatThrownBy(() -> client.authenticateByName(preparedArg112_0, "dev-1", "andre", "wrong"))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
                 .isEqualTo(JellyfinException.Kind.UNAUTHORIZED);
@@ -215,7 +220,8 @@ class JellyfinClientTest {
 
         fake = new FakeJellyfinServer().respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 200,
                 "text/html", "<html>".getBytes());
-        assertThatThrownBy(() -> client.image(fake.url(), itemId, "Primary", null, 480))
+        var preparedArg218_0 = fake.url();
+        assertThatThrownBy(() -> client.image(preparedArg218_0, itemId, "Primary", null, 480))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
                 .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);
@@ -224,7 +230,8 @@ class JellyfinClientTest {
         // A raster-only allowlist: an SVG served from our own origin could carry a script.
         fake = new FakeJellyfinServer().respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 200,
                 "image/svg+xml", "<svg onload=\"alert(1)\"></svg>".getBytes());
-        assertThatThrownBy(() -> client.image(fake.url(), itemId, "Primary", null, 480))
+        var preparedArg227_0 = fake.url();
+        assertThatThrownBy(() -> client.image(preparedArg227_0, itemId, "Primary", null, 480))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
                 .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);
@@ -232,7 +239,8 @@ class JellyfinClientTest {
 
         fake = new FakeJellyfinServer().respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 200,
                 "image/jpeg", new byte[JellyfinClient.MAX_IMAGE_BYTES + 1]);
-        assertThatThrownBy(() -> client.image(fake.url(), itemId, "Primary", null, 480))
+        var preparedArg235_0 = fake.url();
+        assertThatThrownBy(() -> client.image(preparedArg235_0, itemId, "Primary", null, 480))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
                 .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);

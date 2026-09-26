@@ -2,7 +2,6 @@ package dev.andre.homecontrol.sources.youtube;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import dev.andre.homecontrol.storage.SecretStore;
 
@@ -12,6 +11,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -96,7 +96,7 @@ class GoogleTokensTest {
         assertThat(tokens.revoked()).isTrue();
 
         tokens.reset();
-        Mockito.doReturn(new GoogleOAuthClient.AccessToken("ya29.a", clock.instant().plus(Duration.ofHours(1))))
+        doReturn(new GoogleOAuthClient.AccessToken("ya29.a", clock.instant().plus(Duration.ofHours(1))))
                 .when(oauth).refresh("cid", "csecret", "rt");
         assertThat(tokens.accessToken()).isEqualTo("ya29.a");
         assertThat(tokens.revoked()).isFalse();

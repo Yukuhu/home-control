@@ -114,7 +114,7 @@ public class ContentController {
         if (query.length() < 2 || query.length() > 100) {
             return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body("Search for 2 to 100 characters");
         }
-        int clamped = Math.max(1, Math.min(50, limit));
+        int clamped = Math.clamp(limit, 1, 50);
         SearchOutcome outcome;
         if (source != null && !source.isBlank()) {
             try {

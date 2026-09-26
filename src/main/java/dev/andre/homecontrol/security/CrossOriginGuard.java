@@ -53,7 +53,7 @@ public final class CrossOriginGuard {
         URI uri;
         try {
             uri = new URI(origin);
-        } catch (URISyntaxException e) {
+        } catch (URISyntaxException _) {
             return null;
         }
         String scheme = uri.getScheme();

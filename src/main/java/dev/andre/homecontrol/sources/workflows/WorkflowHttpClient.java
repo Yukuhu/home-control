@@ -176,18 +176,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
         }
     }
 
-    private static final class FetchResponse {
-        private final byte[] body;
-        private final String redirectLocation;
-
-        private FetchResponse(byte[] body, String redirectLocation) {
-            this.body = body;
-            this.redirectLocation = redirectLocation;
-        }
-
-        byte[] body() { return body; }
-        String redirectLocation() { return redirectLocation; }
-    }
+    private record FetchResponse(byte[] body, String redirectLocation) {}
 
     private static void validateHeader(WorkflowDraft.Header header) {
         if (header == null || header.name() == null || !header.name().matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+")) {
@@ -226,18 +215,18 @@ public final class WorkflowHttpClient implements AutoCloseable {
                 if (error == null) operation.result.complete(value);
                 else operation.result.completeExceptionally(error);
             });
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException _) {
             operations.remove(operation);
             permits.release();
             throw failure(stage, CLIENT_CLOSED);
         }
         try {
             return operation.result.get(operation.remaining(), TimeUnit.NANOSECONDS);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             operation.cancel();
             Thread.currentThread().interrupt();
             throw failure(stage, "request interrupted");
-        } catch (TimeoutException e) {
+        } catch (TimeoutException _) {
             operation.cancel();
             throw failure(stage, "request timed out");
         } catch (ExecutionException e) {

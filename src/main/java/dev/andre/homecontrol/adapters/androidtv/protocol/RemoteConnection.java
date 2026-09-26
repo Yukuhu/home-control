@@ -73,14 +73,10 @@ public class RemoteConnection implements AutoCloseable {
         try {
             socket = TlsSockets.connect(host, port, credential, staleTimeoutMillis, expectedFingerprint);
         } catch (TlsSockets.HandshakeRejectedException e) {
-            // Only the HANDSHAKE phase means "the device refused our certificate"; retrying
-            // with the same certificate is pointless, so it maps to UnpairedException.
-            // TlsSockets decides which phase a failure came from and is the only place that
-            // can: a connect-phase ConnectException is itself a SocketException, so catching
-            // SSLException/SocketException here would classify an unreachable or rebooting
-            // device as unpaired and stop it from ever being retried (spec §8 class 1).
-            // Every other IOException from connect() is a network failure and passes through.
-            throw new UnpairedException("the device refused our certificate", e);
+            // A handshake failure can indicate a rejected credential, but also a TLS or
+            // protocol problem. Keep it distinct from TCP connect failures so the session
+            // can confirm repeated ambiguous verdicts before asking the user to re-pair.
+            throw new UnpairedException(e.getMessage(), e);
         }
         try {
             return new RemoteConnection(socket, listener);
@@ -253,6 +249,7 @@ public class RemoteConnection implements AutoCloseable {
             write(RemoteMessage.newBuilder()
                     .setRemoteSetActive(RemoteSetActive.newBuilder().setActive(CLIENT_FEATURES))
                     .build());
+            listener.onReady();
         } else if (message.hasRemotePingRequest()) {
             write(RemoteMessage.newBuilder()
                     .setRemotePingResponse(RemotePingResponse.newBuilder()

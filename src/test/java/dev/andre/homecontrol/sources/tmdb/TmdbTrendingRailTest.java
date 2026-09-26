@@ -157,7 +157,8 @@ class TmdbTrendingRailTest {
     void withoutProvidersTheRailExplainsWhatToDo() {
         providersConfigured = List.of();
 
-        assertThatThrownBy(() -> source().rail("trending"))
+        var preparedReceiver160 = source();
+        assertThatThrownBy(() -> preparedReceiver160.rail("trending"))
                 .isInstanceOf(ContentSourceException.class)
                 .hasMessage("Choose your streaming services in Setup to see what is trending on them");
         assertThat(fake.requests()).isEmpty();
@@ -182,7 +183,8 @@ class TmdbTrendingRailTest {
         fake.respondJson("GET", "/3/movie/550/watch/providers", 500, "{}");
         fake.respondJson("GET", "/3/tv/94997/watch/providers", 500, "{}");
 
-        assertThatThrownBy(() -> source().rail("trending"))
+        var preparedReceiver185 = source();
+        assertThatThrownBy(() -> preparedReceiver185.rail("trending"))
                 .isInstanceOf(TmdbException.class)
                 .hasMessage("TMDB had a server error (HTTP 500)");
     }

@@ -7,14 +7,12 @@ import com.microsoft.playwright.Tracing;
 import java.nio.file.Path;
 
 /** One browser context and its page for one test; closing saves the Playwright trace. */
-public record BrowserSession(BrowserContext context, Page page, Path trace) implements AutoCloseable {
+public record BrowserSession(BrowserContext context, Page page, Path trace, BrowserCoverage coverage) implements AutoCloseable {
 
     @Override
     public void close() {
-        try {
+        try (context; coverage) {
             context.tracing().stop(new Tracing.StopOptions().setPath(trace));
-        } finally {
-            context.close();
         }
     }
 }

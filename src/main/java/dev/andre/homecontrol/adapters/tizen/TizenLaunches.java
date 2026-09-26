@@ -18,6 +18,8 @@ import java.util.Optional;
  */
 final class TizenLaunches {
 
+    private static final String YOUTUBE_NAME = "YouTube";
+
     static final Map<String, String> WELL_KNOWN_IDS = wellKnownIds();
 
     private TizenLaunches() {
@@ -27,8 +29,8 @@ final class TizenLaunches {
         String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
         return switch (AppLinks.serviceOf(host, uri.getPath())) {
             case "youtube" -> ContentLinks.youtubeVideoId(uri)
-                    .<TizenLaunch>map(id -> new TizenLaunch.Dial("YouTube", "v=" + id))
-                    .orElseGet(() -> app("YouTube", installed));
+                    .<TizenLaunch>map(id -> new TizenLaunch.Dial(YOUTUBE_NAME, "v=" + id))
+                    .orElseGet(() -> app(YOUTUBE_NAME, installed));
             case "netflix" -> app("Netflix", installed);
             case "primevideo" -> app("Prime Video", installed);
             default -> new TizenLaunch.Unsupported("Samsung TVs cannot open web links; they open YouTube videos"
@@ -59,7 +61,7 @@ final class TizenLaunches {
 
     private static Map<String, String> wellKnownIds() {
         Map<String, String> ids = new LinkedHashMap<>();
-        ids.put("YouTube", "111299001912");
+        ids.put(YOUTUBE_NAME, "111299001912");
         ids.put("Netflix", "3201907018807");
         ids.put("Prime Video", "3201910019365");
         return ids;

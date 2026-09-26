@@ -29,6 +29,8 @@ import java.util.regex.Pattern;
 /** The household's pinned shortcuts: one JSON file, one writer, in-memory after first load. */
 public class PinnedShortcuts implements PinnedLinks {
 
+    private static final String PINNED = "pinned";
+
     private static final int MAX_URL_LENGTH = 2048;
     private static final int MAX_TITLE = 120;
     private static final Pattern UPGRADE_OF =
@@ -106,7 +108,7 @@ public class PinnedShortcuts implements PinnedLinks {
             store.save(next);
             pins = next;
         }
-        events.publishEvent(new ContentChangedEvent("pinned"));
+        events.publishEvent(new ContentChangedEvent(PINNED));
         return pin;
     }
 
@@ -181,7 +183,7 @@ public class PinnedShortcuts implements PinnedLinks {
                 pins = next;
             }
         }
-        events.publishEvent(new ContentChangedEvent("pinned"));
+        events.publishEvent(new ContentChangedEvent(PINNED));
         events.publishEvent(new ContentChangedEvent(sourceId));
         return pin;
     }
@@ -205,7 +207,7 @@ public class PinnedShortcuts implements PinnedLinks {
             store.save(next);
             pins = next;
         }
-        events.publishEvent(new ContentChangedEvent("pinned"));
+        events.publishEvent(new ContentChangedEvent(PINNED));
     }
 
     public void move(String id, boolean up) {
@@ -226,7 +228,7 @@ public class PinnedShortcuts implements PinnedLinks {
             }
         }
         if (changed) {
-            events.publishEvent(new ContentChangedEvent("pinned"));
+            events.publishEvent(new ContentChangedEvent(PINNED));
         }
     }
 
@@ -239,7 +241,7 @@ public class PinnedShortcuts implements PinnedLinks {
             store.save(next);
             pins = next;
         }
-        events.publishEvent(new ContentChangedEvent("pinned"));
+        events.publishEvent(new ContentChangedEvent(PINNED));
     }
 
     private static int indexOf(List<Pin> current, String id) {

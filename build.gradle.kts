@@ -41,6 +41,7 @@ sonar {
         property("sonar.projectKey", "Yukuhu_home-control")
         property("sonar.organization", "yukuhu")
         property("sonar.gradle.scanAll", "true")
+        property("sonar.javascript.lcov.reportPaths", "build/reports/browser-coverage/lcov.info")
     }
 }
 
@@ -110,6 +111,15 @@ val e2eTest by tasks.registering(Test::class) {
     environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
     systemProperty("e2e.browsers", (findProperty("e2eBrowsers") as String?) ?: "chromium,webkit")
     systemProperty("e2e.artifacts", layout.buildDirectory.dir("e2e-artifacts").get().asFile.absolutePath)
+    val browserCoverage = providers.gradleProperty("e2eCoverage").map(String::toBoolean).orElse(false)
+    val browserCoverageDirectory = layout.buildDirectory.dir("coverage/browser-raw")
+    inputs.property("browserCoverage", browserCoverage)
+    systemProperty("e2e.coverage", browserCoverage.get().toString())
+    systemProperty("e2e.coverage.dir", browserCoverageDirectory.get().asFile.absolutePath)
+    if (browserCoverage.get()) {
+        outputs.dir(browserCoverageDirectory)
+        doFirst { delete(browserCoverageDirectory) }
+    }
     maxParallelForks = 1
 }
 

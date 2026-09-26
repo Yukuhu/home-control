@@ -109,7 +109,7 @@ public final class FakeCalendarServer implements AutoCloseable {
             if (!wait.isZero()) {
                 try {
                     Thread.sleep(wait);
-                } catch (InterruptedException e) {
+                } catch (InterruptedException _) {
                     Thread.currentThread().interrupt();
                 }
             }

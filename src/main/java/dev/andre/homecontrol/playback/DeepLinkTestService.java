@@ -110,7 +110,7 @@ public class DeepLinkTestService {
                     return Optional.of(next.currentApp());
                 }
             }
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
         return Optional.empty();

@@ -7,6 +7,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
@@ -46,7 +47,7 @@ class SportsSettingsServiceTest {
     void aFailingSaveKeepsTheOldStateAndPublishesNothing() {
         JsonFileSportsStore store = mock(JsonFileSportsStore.class);
         given(store.load()).willReturn(SportsSettings.empty());
-        org.mockito.Mockito.doThrow(new StorageException("disk full", null)).when(store).save(any());
+        doThrow(new StorageException("disk full", null)).when(store).save(any());
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
         SportsSettingsService service = new SportsSettingsService(store, events);
 

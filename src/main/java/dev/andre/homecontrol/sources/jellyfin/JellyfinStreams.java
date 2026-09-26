@@ -20,6 +20,8 @@ import java.util.Optional;
  */
 public class JellyfinStreams {
 
+    private static final String AUDIO = "Audio";
+
     static final long MAX_BITRATE = 120_000_000L;
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final Map<String, String> VIDEO_TYPES = Map.of("mp4", "video/mp4", "m4v", "video/mp4", "webm", "video/webm");
@@ -57,10 +59,10 @@ public class JellyfinStreams {
         ArrayNode direct = profile.putArray("DirectPlayProfiles");
         directPlay(direct, "mp4,m4v", "Video", "h264", "aac,mp3");
         directPlay(direct, "webm", "Video", "vp8,vp9", "vorbis,opus");
-        directPlay(direct, "mp3", "Audio", null, "mp3");
-        directPlay(direct, "m4a,mp4", "Audio", null, "aac");
-        directPlay(direct, "flac", "Audio", null, "flac");
-        directPlay(direct, "ogg,webm", "Audio", null, "vorbis,opus");
+        directPlay(direct, "mp3", AUDIO, null, "mp3");
+        directPlay(direct, "m4a,mp4", AUDIO, null, "aac");
+        directPlay(direct, "flac", AUDIO, null, "flac");
+        directPlay(direct, "ogg,webm", AUDIO, null, "vorbis,opus");
         profile.putArray("TranscodingProfiles");
         profile.putArray("ContainerProfiles");
         profile.putArray("CodecProfiles");
@@ -69,7 +71,7 @@ public class JellyfinStreams {
     }
 
     public static Optional<PlayableRef.StreamUrl> fromPlaybackInfo(URI deviceServerUrl, String token, JsonNode item, JsonNode info) {
-        boolean audio = "Audio".equals(item.path("MediaType").asString(""));
+        boolean audio = AUDIO.equals(item.path("MediaType").asString(""));
         Map<String, String> types = audio ? AUDIO_TYPES : VIDEO_TYPES;
         String itemId = JellyfinClient.id(item.path("Id").asString(""));
         for (JsonNode source : info.path("MediaSources")) {

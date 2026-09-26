@@ -163,7 +163,7 @@ public class JellyfinSetupService {
     private void revokeQuietly(JellyfinConnection connection) {
         try {
             client.post(connection, "/Sessions/Logout", Map.of(), null);
-        } catch (JellyfinException ignored) {
+        } catch (JellyfinException _) {
             // best effort: the token stays valid on the server until an admin removes the device
         }
     }

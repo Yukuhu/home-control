@@ -30,6 +30,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.times;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -175,8 +176,8 @@ class SportsSetupControllerTest {
                 .contains("Could not refresh: nas.local answered HTTP 500")
                 .contains("action=\"/setup/sources/sports/calendars/c-3f9a1c2b7d4e/remove\"")
                 .contains("name=\"url\"").contains("value=\"Europe/Berlin\"")
-                .doesNotContain("token-abc123").doesNotContain("https://calendar");
-        assertThat(body).contains("name=\"loginPassword\"");
+                .doesNotContain("token-abc123").doesNotContain("https://calendar")
+                .contains("name=\"loginPassword\"");
 
         given(login.loginRequired()).willReturn(true);
         String body2 = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
@@ -212,7 +213,7 @@ class SportsSetupControllerTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<java.util.function.UnaryOperator<SportsSettings>> captor =
                 ArgumentCaptor.forClass(java.util.function.UnaryOperator.class);
-        verify(settings, org.mockito.Mockito.times(1)).update(captor.capture());
+        verify(settings, times(1)).update(captor.capture());
         SportsSettings result = captor.getValue().apply(fixture);
         assertThat(result.calendar("c-3f9a1c2b7d4e").orElseThrow().provider()).isEqualTo("dazn");
         assertThat(result.competition("4331").orElseThrow().provider()).isNull();
@@ -245,8 +246,8 @@ class SportsSetupControllerTest {
                 .contains("<option value=\"dazn\" selected")
                 .contains("<option value=\"\">Not set</option>")
                 .contains("Save your settings")
-                .contains("Events of a competition set to DAZN, Netflix or Prime Video open that app. For other services, paste a link to the event in the play sheet.");
-        assertThat(body).doesNotContain("Available on").doesNotContain("Official")
+                .contains("Events of a competition set to DAZN, Netflix or Prime Video open that app. For other services, paste a link to the event in the play sheet.")
+                .doesNotContain("Available on").doesNotContain("Official")
                 .doesNotContain("Broadcast by").doesNotContain("Live on DAZN");
     }
 

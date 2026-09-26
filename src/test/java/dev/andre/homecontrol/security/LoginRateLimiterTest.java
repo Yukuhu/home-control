@@ -102,7 +102,7 @@ class LoginRateLimiterTest {
                 pool.execute(() -> {
                     try {
                         start.await();
-                    } catch (InterruptedException e) {
+                    } catch (InterruptedException _) {
                         Thread.currentThread().interrupt();
                         return;
                     }

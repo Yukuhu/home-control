@@ -22,7 +22,7 @@ public record SonosSettings(String uuid, int port) {
         int port;
         try {
             port = Integer.parseInt(settings.getOrDefault(PORT_KEY, String.valueOf(SonosEndpoints.DEFAULT_PORT)));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             port = SonosEndpoints.DEFAULT_PORT;
         }
         return new SonosSettings(settings.get(UUID_KEY), port);

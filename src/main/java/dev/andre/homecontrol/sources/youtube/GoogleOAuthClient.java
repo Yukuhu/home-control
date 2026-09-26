@@ -13,6 +13,13 @@ import java.util.Map;
 /** Google's OAuth 2.0 device and browser authorization grants. */
 public class GoogleOAuthClient {
 
+    private static final String CLIENT_ID = "client_id";
+    private static final String SCOPE_PARAMETER = "scope";
+    private static final String TOKEN_PATH = "/token";
+    private static final String CLIENT_SECRET = "client_secret";
+    private static final String GRANT_TYPE = "grant_type";
+    private static final String REFRESH_TOKEN = "refresh_token";
+
     public static final String SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
     public static final String DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
     static final URI DEFAULT_VERIFICATION_URL = URI.create("https://www.google.com/device");
@@ -67,8 +74,8 @@ public class GoogleOAuthClient {
 
     public DeviceCode requestDeviceCode(String clientId) {
         Map<String, String> form = new LinkedHashMap<>();
-        form.put("client_id", clientId);
-        form.put("scope", SCOPE);
+        form.put(CLIENT_ID, clientId);
+        form.put(SCOPE_PARAMETER, SCOPE);
         YouTubeHttp.Response response = http.postForm(URI.create(base + "/device/code"), form, Map.of());
         if (!response.ok()) {
             throw failure(response);
@@ -88,29 +95,29 @@ public class GoogleOAuthClient {
 
     public URI authorizationUrl(String clientId, URI redirectUri, String state, String challenge) {
         return YouTubeHttp.uri(URI.create("https://accounts.google.com"), "/o/oauth2/v2/auth", Map.of(
-                "client_id", clientId, "redirect_uri", redirectUri.toString(), "response_type", "code",
-                "scope", SCOPE, "access_type", "offline", "prompt", "consent select_account",
+                CLIENT_ID, clientId, "redirect_uri", redirectUri.toString(), "response_type", "code",
+                SCOPE_PARAMETER, SCOPE, "access_type", "offline", "prompt", "consent select_account",
                 "state", state, "code_challenge", challenge, "code_challenge_method", "S256"));
     }
 
     public TokenPoll.Granted exchangeCode(String clientId, String clientSecret, String code,
                                           URI redirectUri, String verifier) {
-        YouTubeHttp.Response response = http.postForm(URI.create(base + "/token"), Map.of(
-                "client_id", clientId, "client_secret", clientSecret, "code", code,
+        YouTubeHttp.Response response = http.postForm(URI.create(base + TOKEN_PATH), Map.of(
+                CLIENT_ID, clientId, CLIENT_SECRET, clientSecret, "code", code,
                 "redirect_uri", redirectUri.toString(), "code_verifier", verifier,
-                "grant_type", "authorization_code"), Map.of());
+                GRANT_TYPE, "authorization_code"), Map.of());
         if (!response.ok()) {
             // Never echo Google error descriptions or codes: they may contain submitted credentials.
             throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE,
                     "Google could not complete sign-in. Check the Web application client and callback URL, then try again.");
         }
         JsonNode json = response.json();
-        String scope = json.path("scope").asString("");
+        String scope = json.path(SCOPE_PARAMETER).asString("");
         if (!scope.isBlank() && java.util.Arrays.stream(scope.split("\\s+")).noneMatch(SCOPE::equals)) {
             throw new YouTubeException(YouTubeException.Kind.UNAUTHORIZED,
                     "YouTube read-only access was not granted. Sign in again and allow access to YouTube.");
         }
-        String refresh = json.path("refresh_token").asString("");
+        String refresh = json.path(REFRESH_TOKEN).asString("");
         if (refresh.isBlank()) {
             throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE,
                     "Google did not return offline access. Sign in again and accept the consent request.");
@@ -120,14 +127,14 @@ public class GoogleOAuthClient {
 
     public TokenPoll poll(String clientId, String clientSecret, String deviceCode) {
         Map<String, String> form = new LinkedHashMap<>();
-        form.put("client_id", clientId);
-        form.put("client_secret", clientSecret);
+        form.put(CLIENT_ID, clientId);
+        form.put(CLIENT_SECRET, clientSecret);
         form.put("device_code", deviceCode);
-        form.put("grant_type", DEVICE_GRANT);
-        YouTubeHttp.Response response = http.postForm(URI.create(base + "/token"), form, Map.of());
+        form.put(GRANT_TYPE, DEVICE_GRANT);
+        YouTubeHttp.Response response = http.postForm(URI.create(base + TOKEN_PATH), form, Map.of());
         if (response.ok()) {
             JsonNode json = response.json();
-            String refresh = json.path("refresh_token").asString("");
+            String refresh = json.path(REFRESH_TOKEN).asString("");
             if (refresh.isBlank()) {
                 return new TokenPoll.Failed("no_refresh_token", "Google did not return a refresh token");
             }
@@ -147,11 +154,11 @@ public class GoogleOAuthClient {
 
     public AccessToken refresh(String clientId, String clientSecret, String refreshToken) {
         Map<String, String> form = new LinkedHashMap<>();
-        form.put("client_id", clientId);
-        form.put("client_secret", clientSecret);
-        form.put("refresh_token", refreshToken);
-        form.put("grant_type", "refresh_token");
-        YouTubeHttp.Response response = http.postForm(URI.create(base + "/token"), form, Map.of());
+        form.put(CLIENT_ID, clientId);
+        form.put(CLIENT_SECRET, clientSecret);
+        form.put(REFRESH_TOKEN, refreshToken);
+        form.put(GRANT_TYPE, REFRESH_TOKEN);
+        YouTubeHttp.Response response = http.postForm(URI.create(base + TOKEN_PATH), form, Map.of());
         if (response.ok()) {
             return accessToken(response.json());
         }
@@ -178,7 +185,7 @@ public class GoogleOAuthClient {
     private static String errorCode(YouTubeHttp.Response response) {
         try {
             return response.json().path("error").asString("");
-        } catch (YouTubeException notJson) {
+        } catch (YouTubeException _) {
             return "";
         }
     }

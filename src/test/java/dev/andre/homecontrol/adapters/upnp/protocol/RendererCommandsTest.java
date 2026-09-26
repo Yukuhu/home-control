@@ -70,7 +70,8 @@ class RendererCommandsTest {
     void refusesAFormatTheRendererCannotPlay() {
         Action.PlayMedia film = new Action.PlayMedia(URI.create("http://h/film.mp4"), "video/mp4", "Film", null);
 
-        assertThatThrownBy(() -> commands.playUri(av, ProtocolInfo.parseSink(AUDIO_SINK), film, "*"))
+        var preparedArg73_1 = ProtocolInfo.parseSink(AUDIO_SINK);
+        assertThatThrownBy(() -> commands.playUri(av, preparedArg73_1, film, "*"))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("Kitchen Speaker cannot play video/mp4");
         assertThat(fake.calls()).isEmpty();
@@ -79,12 +80,14 @@ class RendererCommandsTest {
     @Test
     void mapsFaultsTimeoutsAndLostConnections() {
         fake.fail("Play", 701, "Transition not available", 1);
-        assertThatThrownBy(() -> commands.transport(av, UpnpActions.play(AV_TRANSPORT), "resume playback"))
+        var preparedArg82_1 = UpnpActions.play(AV_TRANSPORT);
+        assertThatThrownBy(() -> commands.transport(av, preparedArg82_1, "resume playback"))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessage("Kitchen Speaker refused to resume playback (UPnP error 701: Transition not available)");
 
         fake.hangUp(true);
-        assertThatThrownBy(() -> commands.transport(av, UpnpActions.play(AV_TRANSPORT), "resume playback"))
+        var preparedArg87_1 = UpnpActions.play(AV_TRANSPORT);
+        assertThatThrownBy(() -> commands.transport(av, preparedArg87_1, "resume playback"))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("Kitchen Speaker could not be reached to resume playback");
     }
@@ -93,7 +96,8 @@ class RendererCommandsTest {
     void aMalformedServiceTypeIsAFailedCommand() {
         ServiceEndpoint bad = new ServiceEndpoint("urn:x\"/>", av.controlUrl(), null);
 
-        assertThatThrownBy(() -> commands.transport(bad, UpnpActions.play(bad.serviceType()), "resume playback"))
+        var preparedArg96_1 = UpnpActions.play(bad.serviceType());
+        assertThatThrownBy(() -> commands.transport(bad, preparedArg96_1, "resume playback"))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("Kitchen Speaker refused to resume playback");
         assertThat(fake.calls()).isEmpty();

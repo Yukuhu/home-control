@@ -17,6 +17,8 @@ import java.util.Optional;
 @ConditionalOnProperty(name = "home-control.jellyfin.enabled", havingValue = "true", matchIfMissing = true)
 public class JellyfinSetupAdvice {
 
+    private static final String PASSWORD = "password";
+
     /** A Jellyfin app session that could be linked to a device; {@code linkedDeviceId} is blank when unlinked. */
     public record SessionOption(String jellyfinDeviceId, String label, String linkedDeviceId) {
     }
@@ -50,12 +52,12 @@ public class JellyfinSetupAdvice {
         LoginService loginService = login.getIfAvailable();
         boolean needsPassword = loginService == null || !loginService.loginRequired();
         if (service == null) {
-            return new View(false, null, null, null, null, null, "password", false, needsPassword,
+            return new View(false, null, null, null, null, null, PASSWORD, false, needsPassword,
                     List.of(), null, List.of());
         }
         Optional<JellyfinSettings> settings = service.settings();
         if (settings.isEmpty()) {
-            return new View(false, null, null, null, null, null, "password", false, needsPassword,
+            return new View(false, null, null, null, null, null, PASSWORD, false, needsPassword,
                     List.of(), null, List.of());
         }
         JellyfinSettings s = settings.orElseThrow();
@@ -86,7 +88,7 @@ public class JellyfinSetupAdvice {
                         s.player(d.id()).name().toLowerCase(java.util.Locale.ROOT))).toList();
         return new View(true, s.serverName(), s.serverVersion(), s.serverUrl().toString(),
                 s.deviceServerUrl().toString(), s.userName(),
-                s.authMode() == JellyfinSettings.AuthMode.API_KEY ? "api-key" : "password",
+                s.authMode() == JellyfinSettings.AuthMode.API_KEY ? "api-key" : PASSWORD,
                 s.deviceAddressLooksLocal(), needsPassword, sessionOptions, sessionsError, deviceOptions);
     }
 }

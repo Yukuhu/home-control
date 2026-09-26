@@ -66,7 +66,7 @@ class QuotaLedgerTest {
         assertThat(root.path("version").asInt()).isEqualTo(1);
         assertThat(root.path("day").asString()).isEqualTo("2026-09-16");
         assertThat(root.path("units").asInt()).isEqualTo(2);
-        assertThat(root.path("searches").asInt()).isEqualTo(0);
+        assertThat(root.path("searches").asInt()).isZero();
         assertThat(root.path("calls").path("subscriptions.list").asInt()).isEqualTo(1);
         assertThat(root.path("calls").path("channels.list").asInt()).isEqualTo(1);
     }
@@ -77,13 +77,13 @@ class QuotaLedgerTest {
         QuotaLedger ledger = new QuotaLedger(file, clock, 10000, 20);
         ledger.charge(QuotaLedger.Call.SUBSCRIPTIONS_LIST);
 
-        assertThat(ledger.usage().day().toString()).isEqualTo("2026-09-16");
+        assertThat(ledger.usage().day()).hasToString("2026-09-16");
         assertThat(ledger.usage().units()).isEqualTo(1);
 
         clock.advance(Duration.ofMinutes(1));
 
-        assertThat(ledger.usage().day().toString()).isEqualTo("2026-09-17");
-        assertThat(ledger.usage().units()).isEqualTo(0);
+        assertThat(ledger.usage().day()).hasToString("2026-09-17");
+        assertThat(ledger.usage().units()).isZero();
     }
 
     @Test
@@ -167,6 +167,6 @@ class QuotaLedgerTest {
         QuotaLedger ledger = new QuotaLedger(file, clock, 10000, 20);
 
         assertThat(ledger.usage().units()).isZero();
-        assertThat(ledger.usage().day().toString()).isEqualTo("2026-09-16");
+        assertThat(ledger.usage().day()).hasToString("2026-09-16");
     }
 }

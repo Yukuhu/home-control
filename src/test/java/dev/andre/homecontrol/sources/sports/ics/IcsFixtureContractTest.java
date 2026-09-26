@@ -45,12 +45,13 @@ class IcsFixtureContractTest {
         for (String name : VALID_FIXTURES) {
             IcsCalendar calendar = IcsParser.parse(fixture(name));
             assertThat(calendar.skippedEvents()).isZero();
-            assertThat(calendar.events().size()).isGreaterThanOrEqualTo(3);
+            assertThat(calendar.events()).hasSizeGreaterThanOrEqualTo(3);
         }
         IcsCalendar broken = IcsParser.parse(fixture("broken.ics"));
         assertThat(broken.skippedEvents()).isGreaterThan(0);
 
-        org.junit.jupiter.api.Assertions.assertThrows(IcsFormatException.class, () -> IcsParser.parse(fixture("not-a-calendar.html")));
+        String invalidFixture = fixture("not-a-calendar.html");
+        org.junit.jupiter.api.Assertions.assertThrows(IcsFormatException.class, () -> IcsParser.parse(invalidFixture));
 
         Path dir = Path.of(IcsFixtureContractTest.class.getResource("/fixtures/ics").toURI());
         try (Stream<Path> listing = Files.list(dir)) {

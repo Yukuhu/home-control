@@ -62,13 +62,15 @@ class ContentItemTest {
     @Test
     void timesAreValidated() {
         Instant start = Instant.parse("2026-09-19T13:30:00Z");
+        Instant beforeStart = start.minusSeconds(1);
+        List<PlayableRef> noPlayables = List.of();
 
         assertThatThrownBy(() -> new ContentItem("id", "src", ContentKind.LIVE_EVENT, "Title", null, null,
-                List.of(), null, null, start))
+                noPlayables, null, null, start))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("endsAt needs startsAt");
         assertThatThrownBy(() -> new ContentItem("id", "src", ContentKind.LIVE_EVENT, "Title", null, null,
-                List.of(), null, start, start.minusSeconds(1)))
+                noPlayables, null, start, beforeStart))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("endsAt must not be before startsAt");
 

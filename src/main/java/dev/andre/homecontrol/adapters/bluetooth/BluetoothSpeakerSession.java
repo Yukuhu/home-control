@@ -95,13 +95,13 @@ public class BluetoothSpeakerSession implements DeviceHandle {
                     player.stop();
                     title = null;
                 }
-                case Action.SetVolume set -> {
-                    volume = set.level();
-                    whilePlaying("change the volume", () -> player.volume(set.level()));
+                case Action.SetVolume(var level) -> {
+                    volume = level;
+                    whilePlaying("change the volume", () -> player.volume(level));
                 }
-                case Action.Mute mute -> {
-                    muted = mute.muted();
-                    whilePlaying("mute", () -> player.mute(mute.muted()));
+                case Action.Mute(var requestedMute) -> {
+                    muted = requestedMute;
+                    whilePlaying("mute", () -> player.mute(requestedMute));
                 }
                 default -> throw new UnsupportedActionException(device.name()
                         + " is a Bluetooth speaker and cannot handle " + action.getClass().getSimpleName());
@@ -137,11 +137,11 @@ public class BluetoothSpeakerSession implements DeviceHandle {
             String audioDevice = audioDevices.resolve(settings.address(), settings.audioDevice());
             player.play(play.url(), audioDevice, volume, muted);
             title = play.title();
-        } catch (MpvNotInstalledException e) {
+        } catch (MpvNotInstalledException _) {
             throw new ActionFailedException(MPV_MISSING);
         } catch (AudioDeviceNotFoundException e) {
             throw new ActionFailedException(device.name() + ": " + e.getMessage());
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new ActionFailedException(device.name() + ": the audio output id is not usable; fix it on the setup page");
         } catch (IOException | MpvException e) {
             throw new ActionFailedException(device.name() + " could not play the stream: " + StreamRedaction.redact(e.getMessage()));
@@ -219,10 +219,16 @@ public class BluetoothSpeakerSession implements DeviceHandle {
             PlayerStatus now = playing.get();
             volume = now.volume();
             muted = now.muted();
-            String shown = title != null && !title.isBlank() ? title
-                    : now.metadataTitle() != null ? now.metadataTitle() : "Unknown title";
-            PlaybackState playbackState = now.paused() ? PlaybackState.PAUSED
-                    : now.buffering() ? PlaybackState.BUFFERING : PlaybackState.PLAYING;
+            String shown = title;
+            if (shown == null || shown.isBlank()) {
+                shown = now.metadataTitle() != null ? now.metadataTitle() : "Unknown title";
+            }
+            PlaybackState playbackState = PlaybackState.PLAYING;
+            if (now.paused()) {
+                playbackState = PlaybackState.PAUSED;
+            } else if (now.buffering()) {
+                playbackState = PlaybackState.BUFFERING;
+            }
             nowPlaying = new NowPlaying(shown, playbackState, now.positionSeconds(), now.durationSeconds());
         }
         publish(state.withStatus(status).withPower(status == DeviceStatus.CONNECTED)

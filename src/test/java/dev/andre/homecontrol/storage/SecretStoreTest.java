@@ -90,7 +90,8 @@ class SecretStoreTest {
     void secretsAreNeverStoredWithoutALogin() {
         SecretStore store = store(null);
 
-        assertThatThrownBy(() -> store.putSecrets(Map.of("jellyfin.token", "x")))
+        var preparedArg93_0 = Map.of("jellyfin.token", "x");
+        assertThatThrownBy(() -> store.putSecrets(preparedArg93_0))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(Files.exists(dir.resolve("secrets.json"))).isFalse();
     }
@@ -100,7 +101,9 @@ class SecretStoreTest {
         SecretStore store = store(null);
         store.putFirstSecrets(Map.of("a", "1"), new LoginCredential("h", "v1"));
 
-        assertThatThrownBy(() -> store.putFirstSecrets(Map.of("b", "2"), new LoginCredential("h2", "v2")))
+        var preparedArg103_0 = Map.of("b", "2");
+        var preparedArg103_1 = new LoginCredential("h2", "v2");
+        assertThatThrownBy(() -> store.putFirstSecrets(preparedArg103_0, preparedArg103_1))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(store.login()).contains(new LoginCredential("h", "v1"));
     }
@@ -182,9 +185,13 @@ class SecretStoreTest {
     @Test
     void rejectsBadSecretNamesAndValues() {
         SecretStore store = store(null);
-        assertThatThrownBy(() -> store.putFirstSecrets(Map.of("Bad Name", "x"), new LoginCredential("h", "v")))
+        var preparedArg185_0 = Map.of("Bad Name", "x");
+        var preparedArg185_1 = new LoginCredential("h", "v");
+        assertThatThrownBy(() -> store.putFirstSecrets(preparedArg185_0, preparedArg185_1))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> store.putFirstSecrets(Map.of("ok", ""), new LoginCredential("h", "v")))
+        var preparedArg187_0 = Map.of("ok", "");
+        var preparedArg187_1 = new LoginCredential("h", "v");
+        assertThatThrownBy(() -> store.putFirstSecrets(preparedArg187_0, preparedArg187_1))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

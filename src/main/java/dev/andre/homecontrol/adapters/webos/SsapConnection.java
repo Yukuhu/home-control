@@ -30,6 +30,9 @@ import java.util.function.Consumer;
  */
 final class SsapConnection implements AutoCloseable {
 
+    private static final String PAYLOAD_FIELD = "payload";
+    private static final String ERROR_FIELD = "error";
+
     static final String REGISTER_ID = "register_0";
 
     private static final Logger log = LoggerFactory.getLogger(SsapConnection.class);
@@ -96,7 +99,7 @@ final class SsapConnection implements AutoCloseable {
         if (answer == null) {
             throw new IOException("The TV did not answer the registration within " + requestTimeout.toSeconds() + " seconds");
         }
-        if (type(answer).equals("response") && answer.path("payload").path("pairingType").asString("").equals("PROMPT")) {
+        if (type(answer).equals("response") && answer.path(PAYLOAD_FIELD).path("pairingType").asString("").equals("PROMPT")) {
             if (clientKey != null) {
                 throw new SsapPairingException(SsapPairingException.Reason.KEY_REJECTED,
                         "The TV no longer accepts the stored pairing");
@@ -109,15 +112,15 @@ final class SsapConnection implements AutoCloseable {
         }
         return switch (type(answer)) {
             case "registered" -> {
-                String key = answer.path("payload").path("client-key").asString("");
+                String key = answer.path(PAYLOAD_FIELD).path("client-key").asString("");
                 if (key.isEmpty()) {
                     throw new SsapException("The TV registered this client without a client key");
                 }
                 yield key;
             }
-            case "error" -> throw new SsapPairingException(
+            case ERROR_FIELD -> throw new SsapPairingException(
                     clientKey == null ? SsapPairingException.Reason.DECLINED : SsapPairingException.Reason.KEY_REJECTED,
-                    answer.path("error").asString("The TV refused the registration"));
+                    answer.path(ERROR_FIELD).asString("The TV refused the registration"));
             case "closed" -> throw new IOException("The TV closed the connection during registration");
             default -> throw new SsapException("Unexpected registration answer of type " + type(answer));
         };
@@ -153,6 +156,7 @@ final class SsapConnection implements AutoCloseable {
             pointer = TextWebSocket.connect(http, URI.create(path), connectTimeout, new TextWebSocket.Listener() {
                 @Override
                 public void onText(String text) {
+                    // Pointer input is a write-only channel; incoming text has no protocol meaning.
                 }
 
                 @Override
@@ -165,10 +169,10 @@ final class SsapConnection implements AutoCloseable {
     }
 
     static JsonNode payloadOf(String uri, JsonNode message) throws SsapException {
-        JsonNode payload = message.path("payload");
-        if (type(message).equals("error")) {
+        JsonNode payload = message.path(PAYLOAD_FIELD);
+        if (type(message).equals(ERROR_FIELD)) {
             String errorText = payload.path("errorText").asString("");
-            throw new SsapException(uri + " failed: " + message.path("error").asString("unknown error")
+            throw new SsapException(uri + " failed: " + message.path(ERROR_FIELD).asString("unknown error")
                     + (errorText.isEmpty() ? "" : " (" + errorText + ")"));
         }
         JsonNode returnValue = payload.path("returnValue");
@@ -187,7 +191,7 @@ final class SsapConnection implements AutoCloseable {
         try {
             socket.send(SsapMessages.command(id, type, uri, payload));
             return answer.get(requestTimeout.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
+        } catch (TimeoutException _) {
             throw new SsapTimeoutException("No answer from the TV to " + uri + " within " + requestTimeout.toSeconds() + " seconds");
         } catch (ExecutionException e) {
             throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause());
@@ -212,7 +216,7 @@ final class SsapConnection implements AutoCloseable {
         JsonNode message;
         try {
             message = SsapMessages.JSON.readTree(text);
-        } catch (JacksonException e) {
+        } catch (JacksonException _) {
             log.debug("Ignoring a message from the TV that is not JSON");
             return;
         }
@@ -228,7 +232,7 @@ final class SsapConnection implements AutoCloseable {
         Consumer<JsonNode> subscriber = subscriptions.get(id);
         if (subscriber != null && type(message).equals("response")) {
             try {
-                subscriber.accept(message.path("payload"));
+                subscriber.accept(message.path(PAYLOAD_FIELD));
             } catch (RuntimeException e) {
                 log.warn("Applying a webOS state update failed", e);
             }

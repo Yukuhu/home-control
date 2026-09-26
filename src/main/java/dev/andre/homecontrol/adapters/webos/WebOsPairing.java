@@ -19,6 +19,8 @@ import java.util.Map;
  */
 public class WebOsPairing implements PromptPairing {
 
+    private static final String DEFAULT_DEVICE_NAME = "LG webOS TV";
+
     private final WebOsProperties properties;
     private final SsdpDiscovery ssdp;
     private final DeviceManager devices;
@@ -38,7 +40,7 @@ public class WebOsPairing implements PromptPairing {
 
     @Override
     public String displayName() {
-        return "LG webOS TV";
+        return DEFAULT_DEVICE_NAME;
     }
 
     @Override
@@ -84,9 +86,9 @@ public class WebOsPairing implements PromptPairing {
                     try {
                         String model = connection.request(SsapUris.SYSTEM_INFO, SsapMessages.empty())
                                 .path("modelName").asString("");
-                        return model.isEmpty() ? "LG webOS TV" : "LG " + model;
-                    } catch (IOException e) {
-                        return "LG webOS TV";
+                        return model.isEmpty() ? DEFAULT_DEVICE_NAME : "LG " + model;
+                    } catch (IOException _) {
+                        return DEFAULT_DEVICE_NAME;
                     }
                 });
     }

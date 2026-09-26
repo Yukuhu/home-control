@@ -24,6 +24,7 @@ import java.util.function.UnaryOperator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.times;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -151,13 +152,13 @@ class SourcesSetupControllerTest {
 
         mockMvc.perform(post("/setup/sources/preferences/jellyfin/interval").param("minutes", ""))
                 .andExpect(flash().attribute("sourcesMessage", "Jellyfin uses its default refresh interval"));
-        verify(prefs, org.mockito.Mockito.times(2)).update(captor.capture());
+        verify(prefs, times(2)).update(captor.capture());
         SourcePreferences withStoredInterval = SourcePreferences.defaults("de-DE", "DE").withRefreshMinutes("jellyfin", 10);
         assertThat(captor.getValue().apply(withStoredInterval).refreshMinutes()).isEmpty();
 
         mockMvc.perform(post("/setup/sources/preferences/jellyfin/interval").param("minutes", "abc"))
                 .andExpect(flash().attribute("sourcesError", "Refresh every 1 to 1440 minutes"));
-        verify(prefs, org.mockito.Mockito.times(2)).update(any());
+        verify(prefs, times(2)).update(any());
     }
 
     @Test
@@ -218,6 +219,8 @@ class SourcesSetupControllerTest {
 
     @Test
     void theseFormsAreUnderTheGuardedPrefix() {
+        assertThat(handlerMapping.getHandlerMethods().values())
+                .anyMatch(method -> method.getBeanType().equals(SourcesSetupController.class));
         handlerMapping.getHandlerMethods().forEach((info, method) -> {
             if (method.getBeanType().equals(SourcesSetupController.class)) {
                 assertThat(info.getPatternValues())

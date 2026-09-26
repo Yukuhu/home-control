@@ -4,12 +4,12 @@ import { toast } from "./toast.js";
 import { bindChoiceKeys } from "./choice-keys.js";
 
 const MODE_KEY = "homecontrol.remote.mode.v1";
-const MODES = ["buttons", "touchpad"];
+const MODES = new Set(["buttons", "touchpad"]);
 
 function readMode() {
     try {
         const value = localStorage.getItem(MODE_KEY);
-        return MODES.includes(value) ? value : "buttons";
+        return MODES.has(value) ? value : "buttons";
     } catch {
         return "buttons";
     }
@@ -83,12 +83,12 @@ export function initTouchpad(root = document) {
     });
 
     pad.addEventListener("pointermove", (event) => {
-        if (!gesture || event.pointerId !== gesture.id || gesture.holding) return;
+        if (event.pointerId !== gesture?.id || gesture.holding) return;
         if (!withinSlop(event.clientX - gesture.x, event.clientY - gesture.y)) clearTimeout(gesture.holdTimer);
     });
 
     pad.addEventListener("pointerup", (event) => {
-        if (!gesture || event.pointerId !== gesture.id) return;
+        if (event.pointerId !== gesture?.id) return;
         const { x, y, holding, start } = gesture;
         clearTimeout(gesture.holdTimer);
         gesture = null;
@@ -104,7 +104,7 @@ export function initTouchpad(root = document) {
 
     pad.addEventListener("pointercancel", () => cancel());
     drawer.addEventListener("close", () => cancel());
-    pad.addEventListener("lostpointercapture", (event) => { if (gesture && event.pointerId === gesture.id) cancel(); });
+    pad.addEventListener("lostpointercapture", (event) => { if (event.pointerId === gesture?.id) cancel(); });
 
     // Keyboard path without gestures (vNext §5.7).
     pad.addEventListener("keydown", (event) => {

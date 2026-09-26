@@ -23,6 +23,10 @@ import java.util.regex.Pattern;
 @Controller
 @ConditionalOnProperty(name = "home-control.workflows.enabled", havingValue = "true", matchIfMissing = true)
 public final class WorkflowSetupController {
+
+    private static final String INVALID = "invalid";
+    private static final String CHANGED = "changed";
+    private static final String WORKFLOW_FORM = "workflowForm";
     private static final String VIEW = "workflow-editor";
     private static final String BASE = "/setup/workflows";
     private static final String ENABLED = "enabled";
@@ -43,7 +47,7 @@ public final class WorkflowSetupController {
         this.store = store; this.login = login; this.tests = tests;
     }
 
-    @ModelAttribute("workflowForm")
+    @ModelAttribute(WORKFLOW_FORM)
     WorkflowForm emptyForm(HttpServletRequest request) {
         WorkflowForm form = new WorkflowForm();
         if (!request.getRequestURI().equals(request.getContextPath() + BASE)
@@ -53,7 +57,7 @@ public final class WorkflowSetupController {
         return form;
     }
 
-    @InitBinder("workflowForm")
+    @InitBinder(WORKFLOW_FORM)
     void bindWorkflow(WebDataBinder binder, HttpServletRequest request) {
         if (binder instanceof ExtendedServletRequestDataBinder servletBinder) {
             servletBinder.addHeaderPredicate(ignored -> false);
@@ -68,7 +72,8 @@ public final class WorkflowSetupController {
 
     private static BindingFields allowedFields(HttpServletRequest request) {
         Set<String> allowed = new HashSet<>(SCALARS);
-        Set<Integer> variables = new HashSet<>(), headers = new HashSet<>();
+        Set<Integer> variables = new HashSet<>();
+        Set<Integer> headers = new HashSet<>();
         boolean invalid = false;
         for (var parameter : request.getParameterMap().entrySet()) {
             if (!allowParameter(parameter.getKey(), parameter.getValue(), allowed, variables, headers)) invalid = true;
@@ -123,13 +128,13 @@ public final class WorkflowSetupController {
     }
 
     @PostMapping(BASE)
-    public String create(@ModelAttribute("workflowForm") WorkflowForm form, BindingResult binding,
+    public String create(@ModelAttribute(WORKFLOW_FORM) WorkflowForm form, BindingResult binding,
                          HttpServletRequest request, HttpServletResponse response, Model model) {
         return save(null, form, binding, request, response, model);
     }
 
     @PostMapping(BASE + "/{id}")
-    public String update(@PathVariable String id, @ModelAttribute("workflowForm") WorkflowForm form, BindingResult binding,
+    public String update(@PathVariable String id, @ModelAttribute(WORKFLOW_FORM) WorkflowForm form, BindingResult binding,
                          HttpServletRequest request, HttpServletResponse response, Model model) {
         return save(id, form, binding, request, response, model);
     }
@@ -141,7 +146,7 @@ public final class WorkflowSetupController {
         boolean suppressed = java.util.Arrays.stream(binding.getSuppressedFields())
                 .anyMatch(field -> !field.equals("id") || request.getParameterMap().containsKey("id"));
         if (suppressed || Boolean.TRUE.equals(request.getAttribute("workflowInvalidFields"))) {
-            binding.reject("invalid", "Some submitted fields are invalid. Check the form and try again.");
+            binding.reject(INVALID, "Some submitted fields are invalid. Check the form and try again.");
         }
         try {
             authenticate(request);
@@ -149,7 +154,7 @@ public final class WorkflowSetupController {
             if (id != null && saved == null) {
                 response.setStatus(404); binding.reject("missing", "This workflow no longer exists.");
             } else if (saved != null && saved.revision() != form.expectedRevision) {
-                response.setStatus(409); binding.reject("changed", "Workflow changed; reopen this item before saving.");
+                response.setStatus(409); binding.reject(CHANGED, "Workflow changed; reopen this item before saving.");
             }
             if (binding.hasErrors()) return editor(id, form, binding, model);
             var draft = form.toDraft(saved);
@@ -158,43 +163,48 @@ public final class WorkflowSetupController {
                     : store.update(id, form.expectedRevision, draft, request);
             form.clearSecrets();
             return "redirect:" + BASE + "/" + changed.id();
-        } catch (LoginRequiredException failure) {
+        } catch (LoginRequiredException _) {
             response.setStatus(401); binding.reject("login", "Log in again before changing workflows.");
-        } catch (PasswordRejectedException failure) {
+        } catch (PasswordRejectedException _) {
             binding.rejectValue("loginPassword", "password", "Passwords must match and contain 10–1024 characters.");
         } catch (WorkflowException failure) {
-            if ("Workflow: Workflow changed; reopen this item".equals(failure.getMessage())) {
-                response.setStatus(409);
-                binding.reject("changed", "Workflow changed; reopen this item before saving.");
-            } else {
-                String field = validationField(failure, form);
-                if (field == null) binding.reject("settings", "Check the source URL, media template, fields and headers.");
-                else binding.rejectValue(field, "settings", "Check this field's format and limits.");
-            }
-        } catch (RuntimeException failure) {
+            rejectSaveFailure(failure, form, binding, response);
+        } catch (RuntimeException _) {
             binding.reject("save", "Could not save the workflow. Check the settings and try again.");
         }
         return editor(id, form, binding, model);
+    }
+
+    private static void rejectSaveFailure(WorkflowException failure, WorkflowForm form, BindingResult binding,
+                                          HttpServletResponse response) {
+        if ("Workflow: Workflow changed; reopen this item".equals(failure.getMessage())) {
+            response.setStatus(409);
+            binding.reject(CHANGED, "Workflow changed; reopen this item before saving.");
+            return;
+        }
+        String field = validationField(failure, form);
+        if (field == null) binding.reject("settings", "Check the source URL, media template, fields and headers.");
+        else binding.rejectValue(field, "settings", "Check this field's format and limits.");
     }
 
     @PostMapping(BASE + "/{id}/test")
     public String test(@PathVariable String id, HttpServletRequest request, HttpServletResponse response, Model model) {
         privateResponse(response);
         WorkflowForm form = new WorkflowForm();
-        var binding = new DirectFieldBindingResult(form, "workflowForm");
+        var binding = new DirectFieldBindingResult(form, WORKFLOW_FORM);
         try {
             authenticate(request);
             var saved = store.find(id).orElse(null);
             if (saved == null) return missing(model, response);
             form = WorkflowForm.from(saved);
-            binding = new DirectFieldBindingResult(form, "workflowForm");
+            binding = new DirectFieldBindingResult(form, WORKFLOW_FORM);
             var result = tests.test(id, revision(request), request);
             model.addAttribute("testResult", result);
-        } catch (LoginRequiredException failure) {
+        } catch (LoginRequiredException _) {
             response.setStatus(401); binding.reject("login", "Log in again before testing workflows.");
-        } catch (WorkflowException failure) {
-            response.setStatus(409); binding.reject("changed", "Workflow changed; reopen this item before testing.");
-        } catch (RuntimeException failure) {
+        } catch (WorkflowException _) {
+            response.setStatus(409); binding.reject(CHANGED, "Workflow changed; reopen this item before testing.");
+        } catch (RuntimeException _) {
             binding.reject("test", "Could not test this workflow. Reopen it and try again.");
         }
         return editor(id, form, binding, model);
@@ -224,15 +234,15 @@ public final class WorkflowSetupController {
         privateResponse(response);
         try {
             authenticate(request); operation.run(); return "redirect:/setup#workflows";
-        } catch (LoginRequiredException failure) {
+        } catch (LoginRequiredException _) {
             response.setStatus(401);
-        } catch (IllegalArgumentException failure) {
+        } catch (IllegalArgumentException _) {
             response.setStatus(400);
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException _) {
             response.setStatus(409);
         }
         WorkflowForm form = id == null ? new WorkflowForm() : store.find(id).map(WorkflowForm::from).orElseGet(WorkflowForm::new);
-        var binding = new DirectFieldBindingResult(form, "workflowForm");
+        var binding = new DirectFieldBindingResult(form, WORKFLOW_FORM);
         binding.reject("action", "Could not change this workflow. Reopen Setup and try again.");
         return editor(id, form, binding, model);
     }
@@ -240,25 +250,25 @@ public final class WorkflowSetupController {
     private String missing(Model model, HttpServletResponse response) {
         response.setStatus(404);
         WorkflowForm form = new WorkflowForm();
-        var binding = new DirectFieldBindingResult(form, "workflowForm");
+        var binding = new DirectFieldBindingResult(form, WORKFLOW_FORM);
         binding.reject("missing", "This workflow no longer exists. Return to Setup.");
         return editor(null, form, binding, model);
     }
 
     private String editor(String id, WorkflowForm form, BindingResult original, Model model) {
         form.clearSecrets();
-        var safe = new DirectFieldBindingResult(form, "workflowForm");
+        var safe = new DirectFieldBindingResult(form, WORKFLOW_FORM);
         List<ErrorView> errors = new ArrayList<>();
         if (original != null) for (var error : original.getAllErrors()) {
             String field = error instanceof FieldError f && safeField(f.getField()) ? ((FieldError) error).getField() : null;
             String message = (error instanceof FieldError f && f.isBindingFailure()) ? "Choose a valid value for this field." : error.getDefaultMessage();
             // Never retain rejected values, formatter arguments, causes, or user-selected message codes.
-            if (field == null) safe.reject("invalid", message);
-            else safe.addError(new FieldError("workflowForm", field, null, false, new String[]{"invalid"}, null, message));
+            if (field == null) safe.reject(INVALID, message);
+            else safe.addError(new FieldError(WORKFLOW_FORM, field, null, false, new String[]{INVALID}, null, message));
             errors.add(new ErrorView(field == null ? "workflow-form" : fieldId(field), message));
         }
-        model.addAttribute("workflowForm", form);
-        model.addAttribute(BindingResult.MODEL_KEY_PREFIX + "workflowForm", safe);
+        model.addAttribute(WORKFLOW_FORM, form);
+        model.addAttribute(BindingResult.MODEL_KEY_PREFIX + WORKFLOW_FORM, safe);
         model.addAttribute("workflowId", id);
         model.addAttribute("needsLoginPassword", !login.loginRequired());
         model.addAttribute("errors", List.copyOf(errors));

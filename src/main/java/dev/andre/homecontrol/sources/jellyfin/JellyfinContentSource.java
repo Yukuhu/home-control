@@ -15,6 +15,11 @@ import java.util.Optional;
 /** Continue watching, next up and latest-in-library rails, read straight from Jellyfin every time. */
 public class JellyfinContentSource implements ContentSource {
 
+    private static final String ITEMS = "Items";
+    private static final String FALSE = "false";
+    private static final String INCLUDE_ITEM_TYPES = "includeItemTypes";
+    private static final String USER_ID = "userId";
+
     static final RailDescriptor RESUME = new RailDescriptor(JellyfinSettings.SOURCE_ID, "resume", "Continue watching");
     static final RailDescriptor NEXT_UP = new RailDescriptor(JellyfinSettings.SOURCE_ID, "next-up", "Next up");
     static final RailDescriptor LATEST = new RailDescriptor(JellyfinSettings.SOURCE_ID, "latest", "Latest in library");
@@ -59,16 +64,16 @@ public class JellyfinContentSource implements ContentSource {
         JellyfinConnection connection = connection();
         return switch (railId) {
             case "resume" -> new Rail(RESUME, JellyfinItemMapper.toItems(client.get(connection, "/UserItems/Resume",
-                    listQuery(connection, "mediaTypes", "Video")).path("Items")), clock.instant());
+                    listQuery(connection, "mediaTypes", "Video")).path(ITEMS)), clock.instant());
             case "next-up" -> new Rail(NEXT_UP, JellyfinItemMapper.toItems(client.get(connection, "/Shows/NextUp",
-                    listQuery(connection, "enableResumable", "false")).path("Items")), clock.instant());
+                    listQuery(connection, "enableResumable", FALSE)).path(ITEMS)), clock.instant());
             case "latest" -> new Rail(LATEST, JellyfinItemMapper.toItems(client.get(connection, "/Items/Latest",
-                    listQuery(connection, "includeItemTypes", "Movie,Episode", "groupItems", "false"))), clock.instant());
+                    listQuery(connection, INCLUDE_ITEM_TYPES, "Movie,Episode", "groupItems", FALSE))), clock.instant());
             case "music-recent" -> new Rail(MUSIC_RECENT, JellyfinItemMapper.toItems(client.get(connection, "/Items",
-                    listQuery(connection, "includeItemTypes", "Audio", "recursive", "true", "filters", "IsPlayed",
-                            "sortBy", "DatePlayed", "sortOrder", "Descending")).path("Items")), clock.instant());
+                    listQuery(connection, INCLUDE_ITEM_TYPES, "Audio", "recursive", "true", "filters", "IsPlayed",
+                            "sortBy", "DatePlayed", "sortOrder", "Descending")).path(ITEMS)), clock.instant());
             case "music-latest" -> new Rail(MUSIC_LATEST, JellyfinItemMapper.toItems(client.get(connection, "/Items/Latest",
-                    listQuery(connection, "includeItemTypes", "Audio", "groupItems", "false"))), clock.instant());
+                    listQuery(connection, INCLUDE_ITEM_TYPES, "Audio", "groupItems", FALSE))), clock.instant());
             default -> throw new IllegalArgumentException("Jellyfin has no rail '" + railId + "'");
         };
     }
@@ -79,11 +84,11 @@ public class JellyfinContentSource implements ContentSource {
         String id;
         try {
             id = JellyfinClient.id(itemId);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
         try {
-            return JellyfinItemMapper.toItem(client.get(connection, "/Items/" + id, Map.of("userId", connection.userId())));
+            return JellyfinItemMapper.toItem(client.get(connection, "/Items/" + id, Map.of(USER_ID, connection.userId())));
         } catch (JellyfinException e) {
             if (e.kind() == JellyfinException.Kind.NOT_FOUND) {
                 return Optional.empty();
@@ -101,15 +106,15 @@ public class JellyfinContentSource implements ContentSource {
     public List<ContentItem> search(String query, int limit) {
         JellyfinConnection connection = connection();
         Map<String, String> params = new LinkedHashMap<>();
-        params.put("userId", connection.userId());
+        params.put(USER_ID, connection.userId());
         params.put("searchTerm", query);
         params.put("recursive", "true");
-        params.put("includeItemTypes", "Movie,Episode,Video,MusicVideo,Audio");
+        params.put(INCLUDE_ITEM_TYPES, "Movie,Episode,Video,MusicVideo,Audio");
         params.put("limit", String.valueOf(limit));
         params.put("enableUserData", "true");
         params.put("enableImageTypes", IMAGE_TYPES);
         params.put("imageTypeLimit", "1");
-        return JellyfinItemMapper.toItems(client.get(connection, "/Items", params).path("Items"));
+        return JellyfinItemMapper.toItems(client.get(connection, "/Items", params).path(ITEMS));
     }
 
     /** Continue watching changes while the household watches. */
@@ -125,7 +130,7 @@ public class JellyfinContentSource implements ContentSource {
 
     Map<String, String> listQuery(JellyfinConnection connection, String... extra) {
         Map<String, String> query = new LinkedHashMap<>();
-        query.put("userId", connection.userId());
+        query.put(USER_ID, connection.userId());
         query.put("limit", String.valueOf(properties.railSize()));
         for (int i = 0; i + 1 < extra.length; i += 2) {
             query.put(extra[i], extra[i + 1]);

@@ -37,7 +37,7 @@ public final class SonosEndpoints {
             InetAddress address = InetAddress.getByName(location.getHost()); // an IP literal: no lookup
             return address.isSiteLocalAddress() || address.isLinkLocalAddress()
                     || (allowLoopback && address.isLoopbackAddress());
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException _) {
             return false;
         }
     }
@@ -49,7 +49,7 @@ public final class SonosEndpoints {
         }
         try {
             return InetAddress.getByName(host).isLoopbackAddress();
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException _) {
             return false;
         }
     }
