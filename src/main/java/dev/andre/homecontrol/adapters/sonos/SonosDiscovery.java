@@ -96,7 +96,7 @@ public class SonosDiscovery implements AutoCloseable {
             refreshedAt.put(household, clock.instant());
             Map<String, DiscoveredDevice> previous = households.getOrDefault(household, Map.of());
             Map<String, DiscoveredDevice> current = new LinkedHashMap<>();
-            rooms.forEach(room -> current.put(room.attributes().get(SonosSettings.UUID), room));
+            rooms.forEach(room -> current.put(room.attributes().get(SonosSettings.UUID_KEY), room));
             households.put(household, current);
             current.forEach((id, room) -> {
                 if (!room.equals(previous.get(id))) {
@@ -117,7 +117,7 @@ public class SonosDiscovery implements AutoCloseable {
     static List<DiscoveredDevice> toDevices(ZoneGroupState state) {
         return state.visibleMembers().stream()
                 .map(member -> new DiscoveredDevice(SonosSettings.ADAPTER_ID, member.zoneName(), member.host(), member.port(),
-                        Map.of(SonosSettings.UUID, member.uuid())))
+                        Map.of(SonosSettings.UUID_KEY, member.uuid())))
                 .toList();
     }
 

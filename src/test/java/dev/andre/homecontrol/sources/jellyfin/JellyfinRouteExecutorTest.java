@@ -65,8 +65,9 @@ class JellyfinRouteExecutorTest {
     void aClosedSessionOrUnreachableServerIsAFailedAction() {
         willThrow(new JellyfinException(JellyfinException.Kind.NOT_FOUND, "The Jellyfin app on that device has closed its session"))
                 .given(sessions).playNow("s1", "item-1", 600L);
+        Route route = new Route.JellyfinSession("s1", "item-1", 600L, "Web");
 
-        assertThatThrownBy(() -> executor.execute(new Route.JellyfinSession("s1", "item-1", 600L, "Web"), browser))
+        assertThatThrownBy(() -> executor.execute(route, browser))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessage("Jellyfin could not start playback on Browser (The Jellyfin app on that device has closed its session)");
     }
@@ -192,8 +193,9 @@ class JellyfinRouteExecutorTest {
     @Test
     void aLaunchThatNeverReachesJellyfinCannotUseAnOldSession() {
         given(devices.state("shield")).willReturn(ready().withCurrentApp("launcher"));
+        Route route = new Route.JellyfinSession("stale", "item-1", 0, "Android TV");
 
-        assertThatThrownBy(() -> executor.execute(new Route.JellyfinSession("stale", "item-1", 0, "Android TV"), shield))
+        assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("installed");
 
         verify(devices).execute("shield", LAUNCH);
@@ -204,8 +206,9 @@ class JellyfinRouteExecutorTest {
     void aMissingSessionTimesOutWithoutSendingPlayback() {
         given(devices.state("shield")).willReturn(ready());
         given(sessions.sessionFor(shield)).willReturn(Optional.empty());
+        Route route = new Route.JellyfinApp("item-1", 0);
 
-        assertThatThrownBy(() -> executor.execute(new Route.JellyfinApp("item-1", 0), shield))
+        assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("Jellyfin").hasMessageContaining("sign in");
 
         verify(sessions, never()).playNow(anyString(), anyString(), anyLong());
@@ -214,8 +217,9 @@ class JellyfinRouteExecutorTest {
     @Test
     void aFailedWakeNeverLaunchesOrPlays() {
         given(devices.state("shield")).willReturn(ready().withPower(false));
+        Route route = new Route.JellyfinApp("item-1", 0);
 
-        assertThatThrownBy(() -> executor.execute(new Route.JellyfinApp("item-1", 0), shield))
+        assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("wake");
 
         verify(devices, never()).execute(eq("shield"), isA(Action.OpenAppLink.class));
@@ -225,8 +229,9 @@ class JellyfinRouteExecutorTest {
     @Test
     void anOfflineDeviceDoesNotReceiveCommands() {
         given(devices.state("shield")).willReturn(DeviceState.initial());
+        Route route = new Route.JellyfinApp("item-1", 0);
 
-        assertThatThrownBy(() -> executor.execute(new Route.JellyfinApp("item-1", 0), shield))
+        assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(DeviceOfflineException.class).hasMessageContaining("connect");
 
         verify(devices, never()).execute(anyString(), any());
@@ -237,32 +242,39 @@ class JellyfinRouteExecutorTest {
     void aStalledSessionLookupCannotOutliveTheStartupDeadlineOrPlayLater() throws Exception {
         given(devices.state("shield")).willReturn(ready());
         CountDownLatch cancelled = new CountDownLatch(1);
+        CountDownLatch releaseLookup = new CountDownLatch(1);
         given(sessions.sessionFor(shield)).willAnswer(_ -> {
             try {
-                Thread.sleep(2_000);
-            } catch (InterruptedException e) {
+                releaseLookup.await();
+            } catch (InterruptedException _) {
                 cancelled.countDown();
                 Thread.currentThread().interrupt();
             }
             return Optional.of(session("late"));
         });
         var bounded = new JellyfinRouteExecutor(sessions, devices, Duration.ofMillis(100));
+        Route route = new Route.JellyfinApp("item-1", 0);
 
-        assertTimeout(Duration.ofSeconds(1), () ->
-                assertThatThrownBy(() -> bounded.execute(new Route.JellyfinApp("item-1", 0), shield))
-                        .isInstanceOf(ActionFailedException.class).hasMessageContaining("ready"));
+        try {
+            assertTimeout(Duration.ofSeconds(1), () ->
+                    assertThatThrownBy(() -> bounded.execute(route, shield))
+                            .isInstanceOf(ActionFailedException.class).hasMessageContaining("ready"));
 
-        assertThat(cancelled.await(1, TimeUnit.SECONDS)).isTrue();
-        verify(sessions, never()).playNow(anyString(), anyString(), anyLong());
+            assertThat(cancelled.await(1, TimeUnit.SECONDS)).isTrue();
+            verify(sessions, never()).playNow(anyString(), anyString(), anyLong());
+        } finally {
+            releaseLookup.countDown();
+        }
     }
 
     @Test
     void interruptionStopsStartupWithoutPlayback() {
         given(devices.state("shield")).willReturn(ready());
         given(sessions.sessionFor(shield)).willReturn(Optional.empty());
+        Route route = new Route.JellyfinApp("item-1", 0);
         Thread.currentThread().interrupt();
         try {
-            assertThatThrownBy(() -> executor.execute(new Route.JellyfinApp("item-1", 0), shield))
+            assertThatThrownBy(() -> executor.execute(route, shield))
                     .isInstanceOf(ActionFailedException.class).hasMessageContaining("interrupted");
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
             verify(sessions, never()).playNow(anyString(), anyString(), anyLong());

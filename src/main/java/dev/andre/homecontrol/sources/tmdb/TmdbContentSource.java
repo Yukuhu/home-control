@@ -28,8 +28,8 @@ import java.util.stream.Collectors;
 /** TMDB: titles, artwork, where they stream, and what is trending on the household's own services. */
 public class TmdbContentSource implements ContentSource {
 
-    public static final String ID = "tmdb";
-    private static final RailDescriptor TRENDING = new RailDescriptor(ID, "trending", "Trending on your services");
+    public static final String SOURCE_ID = "tmdb";
+    private static final RailDescriptor TRENDING = new RailDescriptor(SOURCE_ID, "trending", "Trending on your services");
 
     private final TmdbSetupService setup;
     private final TmdbClient client;
@@ -66,7 +66,7 @@ public class TmdbContentSource implements ContentSource {
 
     @Override
     public String id() {
-        return ID;
+        return SOURCE_ID;
     }
 
     @Override
@@ -199,7 +199,7 @@ public class TmdbContentSource implements ContentSource {
     private List<PlayableRef> playablesFor(String itemId, List<String> keys) {
         PinnedLinks links = pinnedLinks.getIfAvailable();
         if (links != null) {
-            Optional<PlayableRef.AppLink> pinned = links.linkFor(ID, itemId);
+            Optional<PlayableRef.AppLink> pinned = links.linkFor(SOURCE_ID, itemId);
             if (pinned.isPresent()) {
                 return List.of(pinned.get());
             }

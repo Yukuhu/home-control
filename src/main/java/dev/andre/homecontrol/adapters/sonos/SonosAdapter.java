@@ -23,7 +23,7 @@ import java.util.function.Consumer;
 /** Sonos rooms (spec §4.1): media renderers with grouping. Pairing-free. */
 public class SonosAdapter implements DeviceAdapter {
 
-    public static final String ID = SonosSettings.ADAPTER_ID;
+    public static final String ADAPTER_ID = SonosSettings.ADAPTER_ID;
 
     private final SonosProperties properties;
     private final SonosDiscovery discovery;
@@ -42,7 +42,7 @@ public class SonosAdapter implements DeviceAdapter {
 
     @Override
     public String id() {
-        return ID;
+        return ADAPTER_ID;
     }
 
     @Override
@@ -73,6 +73,6 @@ public class SonosAdapter implements DeviceAdapter {
 
     @Override
     public Optional<Map<String, String>> settingsFor(DiscoveredDevice found) {
-        return ID.equals(found.adapterId()) ? Optional.of(SonosSettings.from(found).toMap()) : Optional.empty();
+        return ADAPTER_ID.equals(found.adapterId()) ? Optional.of(SonosSettings.from(found).toMap()) : Optional.empty();
     }
 }

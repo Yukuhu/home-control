@@ -11,7 +11,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="$(sed -n 's/^val playwrightVersion = "\(.*\)"$/\1/p' "$ROOT/build.gradle.kts")"
-if [ -z "$VERSION" ]; then
+if [[ -z "$VERSION" ]]; then
   echo "playwrightVersion not found in build.gradle.kts" >&2
   exit 1
 fi

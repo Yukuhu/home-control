@@ -265,7 +265,7 @@ public class TizenSession implements DeviceHandle {
                     return false;
                 }
                 opened.token().filter(token -> !token.equals(settings.token()))
-                        .ifPresent(token -> learned.store(Map.of(TizenSettings.TOKEN, token)));
+                        .ifPresent(token -> learned.store(Map.of(TizenSettings.TOKEN_KEY, token)));
                 opened.requestInstalledApps();
                 return true;
             }

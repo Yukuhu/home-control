@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -155,20 +156,23 @@ class MpvIpcTest {
     @Test
     void waitsForTheSocketToAppear() throws Exception {
         Path delayed = dir.resolve("delayed.sock");
-        FakeMpv[] holder = new FakeMpv[1];
-        Thread.ofVirtual().start(() -> {
+        CountDownLatch retrying = new CountDownLatch(1);
+        AtomicInteger attempts = new AtomicInteger();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var connection = executor.submit(() -> MpvIpc.connect(delayed, Duration.ofSeconds(3), () -> {
+                if (attempts.incrementAndGet() == 2) retrying.countDown();
+                return true;
+            }, listener()));
             try {
-                Thread.sleep(300);
-                holder[0] = FakeMpv.serve(delayed, FakeMpv.Options.defaults(), 50, line -> { });
-            } catch (Exception ignored) {
-            }
-        });
-        try {
-            MpvIpc ipc = MpvIpc.connect(delayed, Duration.ofSeconds(2), () -> true, listener());
-            ipc.close();
-        } finally {
-            if (holder[0] != null) {
-                holder[0].close();
+                assertThat(retrying.await(2, TimeUnit.SECONDS)).as("Connection retries while the socket is absent").isTrue();
+                assertThat(connection.isDone()).isFalse();
+                try (FakeMpv delayedServer = FakeMpv.serve(delayed, FakeMpv.Options.defaults(), 50, line -> { });
+                     MpvIpc ipc = connection.get(2, TimeUnit.SECONDS)) {
+                    assertThat(ipc.command(Duration.ofSeconds(1), "get_property", "volume").asDouble(-1))
+                            .isEqualTo(delayedServer.volume());
+                }
+            } finally {
+                connection.cancel(true);
             }
         }
     }

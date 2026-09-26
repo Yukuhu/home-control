@@ -19,7 +19,7 @@ import java.util.function.Consumer;
 /** Google Cast receivers: Chromecast, Cast TVs and speakers, the Shield's built-in Cast. */
 public class CastAdapter implements DeviceAdapter {
 
-    public static final String ID = CastSettings.ADAPTER_ID;
+    public static final String ADAPTER_ID = CastSettings.ADAPTER_ID;
 
     private final CastDiscovery discovery;
     private final CastProperties properties;
@@ -31,7 +31,7 @@ public class CastAdapter implements DeviceAdapter {
 
     @Override
     public String id() {
-        return ID;
+        return ADAPTER_ID;
     }
 
     @Override
@@ -70,16 +70,16 @@ public class CastAdapter implements DeviceAdapter {
     /** The mDNS {@code id} survives an address change; otherwise the receiver's own address decides. */
     @Override
     public boolean carries(Device device, DiscoveredDevice found) {
-        if (!device.hasAdapter(ID)) {
+        if (!device.hasAdapter(ADAPTER_ID)) {
             return false;
         }
-        String castId = device.adapterSettings(ID).get(CastSettings.CAST_ID);
+        String castId = device.adapterSettings(ADAPTER_ID).get(CastSettings.CAST_ID);
         return (castId != null && castId.equals(found.attributes().get("id")))
                 || hostOf(device).equalsIgnoreCase(found.host());
     }
 
     @Override
     public Optional<Map<String, String>> settingsFor(DiscoveredDevice found) {
-        return ID.equals(found.adapterId()) ? Optional.of(CastSettings.from(found).toMap()) : Optional.empty();
+        return ADAPTER_ID.equals(found.adapterId()) ? Optional.of(CastSettings.from(found).toMap()) : Optional.empty();
     }
 }

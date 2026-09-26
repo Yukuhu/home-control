@@ -34,7 +34,7 @@ import java.util.function.Consumer;
  */
 public class WebOsAdapter implements WakeOnLanAdapter {
 
-    public static final String ID = WebOsSettings.ADAPTER_ID;
+    public static final String ADAPTER_ID = WebOsSettings.ADAPTER_ID;
     public static final String SEARCH_TARGET = "urn:lge-com:service:webos-second-screen:1";
 
     private final WebOsProperties properties;
@@ -59,7 +59,7 @@ public class WebOsAdapter implements WakeOnLanAdapter {
 
     @Override
     public String id() {
-        return ID;
+        return ADAPTER_ID;
     }
 
     @Override
@@ -98,7 +98,7 @@ public class WebOsAdapter implements WakeOnLanAdapter {
     @Override
     public List<DiscoveredDevice> discovered() {
         return ssdp.services(SEARCH_TARGET).stream()
-                .map(service -> new DiscoveredDevice(ID, name(service), service.address(), properties.port()))
+                .map(service -> new DiscoveredDevice(ADAPTER_ID, name(service), service.address(), properties.port()))
                 .toList();
     }
 

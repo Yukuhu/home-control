@@ -47,63 +47,7 @@ public final class TextWebSocket implements AutoCloseable {
     public static TextWebSocket connect(HttpClient client, URI uri, Duration timeout, Listener listener)
             throws IOException {
         AtomicBoolean closed = new AtomicBoolean();
-        WebSocket.Listener adapter = new WebSocket.Listener() {
-            private final StringBuilder partial = new StringBuilder();
-
-            @Override
-            public void onOpen(WebSocket webSocket) {
-                webSocket.request(1);
-            }
-
-            @Override
-            public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-                if (closed.get()) {
-                    return null;
-                }
-                if (partial.length() + data.length() > MAX_MESSAGE_CHARS) {
-                    // A TV's messages are small; a runaway one must not grow the heap. Protocol error.
-                    partial.setLength(0);
-                    if (closed.compareAndSet(false, true)) {
-                        webSocket.sendClose(MESSAGE_TOO_BIG, "")
-                                .orTimeout(1, TimeUnit.SECONDS)
-                                .whenComplete((ignored, error) -> webSocket.abort());
-                        listener.onClosed("the device sent a message larger than " + MAX_MESSAGE_CHARS + " characters");
-                    }
-                    return null;
-                }
-                partial.append(data);
-                if (last) {
-                    String text = partial.toString();
-                    partial.setLength(0);
-                    listener.onText(text);
-                }
-                webSocket.request(1);
-                return null;
-            }
-
-            @Override
-            public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
-                webSocket.request(1);
-                return null;
-            }
-
-            @Override
-            public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-                if (closed.compareAndSet(false, true)) {
-                    listener.onClosed("closed by the device (" + statusCode
-                            + (reason == null || reason.isEmpty() ? "" : ", " + reason) + ")");
-                }
-                return null;
-            }
-
-            @Override
-            public void onError(WebSocket webSocket, Throwable error) {
-                if (closed.compareAndSet(false, true)) {
-                    // The class name only: JDK connection exceptions can echo the full URI and its query.
-                    listener.onClosed(error.getClass().getSimpleName());
-                }
-            }
-        };
+        WebSocket.Listener adapter = new TextListener(closed, listener);
         CompletableFuture<WebSocket> opening = client.newWebSocketBuilder()
                 .connectTimeout(timeout)
                 .buildAsync(uri, adapter);
@@ -120,6 +64,73 @@ public final class TextWebSocket implements AutoCloseable {
             abandon(opening, closed);
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while opening " + withoutQuery(uri), e);
+        }
+    }
+
+    private static final class TextListener implements WebSocket.Listener {
+        private final AtomicBoolean closed;
+        private final Listener listener;
+        private final StringBuilder partial = new StringBuilder();
+
+        private TextListener(AtomicBoolean closed, Listener listener) {
+            this.closed = closed;
+            this.listener = listener;
+        }
+
+        @Override
+        public void onOpen(WebSocket webSocket) {
+            webSocket.request(1);
+        }
+
+        @Override
+        public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+            acceptText(webSocket, data, last);
+            return null;
+        }
+
+        private void acceptText(WebSocket webSocket, CharSequence data, boolean last) {
+            if (closed.get()) return;
+            if (partial.length() + data.length() > MAX_MESSAGE_CHARS) {
+                // A TV's messages are small; a runaway one must not grow the heap. Protocol error.
+                partial.setLength(0);
+                if (closed.compareAndSet(false, true)) {
+                    webSocket.sendClose(MESSAGE_TOO_BIG, "")
+                            .orTimeout(1, TimeUnit.SECONDS)
+                            .whenComplete((ignored, error) -> webSocket.abort());
+                    listener.onClosed("the device sent a message larger than " + MAX_MESSAGE_CHARS + " characters");
+                }
+                return;
+            }
+            partial.append(data);
+            if (last) {
+                String text = partial.toString();
+                partial.setLength(0);
+                listener.onText(text);
+            }
+            webSocket.request(1);
+        }
+
+        @Override
+        public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
+            webSocket.request(1);
+            return null;
+        }
+
+        @Override
+        public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+            if (closed.compareAndSet(false, true)) {
+                listener.onClosed("closed by the device (" + statusCode
+                        + (reason == null || reason.isEmpty() ? "" : ", " + reason) + ")");
+            }
+            return null;
+        }
+
+        @Override
+        public void onError(WebSocket webSocket, Throwable error) {
+            if (closed.compareAndSet(false, true)) {
+                // The class name only: JDK connection exceptions can echo the full URI and its query.
+                listener.onClosed(error.getClass().getSimpleName());
+            }
         }
     }
 

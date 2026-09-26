@@ -29,7 +29,7 @@ public class TizenPairing implements PromptPairing {
 
     @Override
     public String adapterId() {
-        return TizenAdapter.ID;
+        return TizenAdapter.ADAPTER_ID;
     }
 
     @Override
@@ -49,12 +49,12 @@ public class TizenPairing implements PromptPairing {
             return switch (connection.awaitAuthorization(Duration.ofSeconds(properties.pairingTimeoutSeconds()))) {
                 case CONNECTED -> {
                     Map<String, String> settings = new LinkedHashMap<>();
-                    settings.put(TizenSettings.PAIRED, "true");
-                    connection.token().ifPresent(token -> settings.put(TizenSettings.TOKEN, token));
+                    settings.put(TizenSettings.PAIRED_KEY, "true");
+                    connection.token().ifPresent(token -> settings.put(TizenSettings.TOKEN_KEY, token));
                     String deviceName = name != null && !name.isBlank() ? name.trim()
                             : rest.deviceInfo(host).map(TizenDeviceInfo::name).filter(n -> !n.isBlank()).orElse("Samsung TV");
                     yield new PromptPairingResult.Paired(
-                            devices.attach(host, deviceName, DeviceKind.TIZEN, TizenAdapter.ID, settings));
+                            devices.attach(host, deviceName, DeviceKind.TIZEN, TizenAdapter.ADAPTER_ID, settings));
                 }
                 case UNAUTHORIZED -> new PromptPairingResult.Declined("The TV declined the connection request");
                 case NO_ANSWER -> new PromptPairingResult.Failed("Nobody allowed the connection on the TV within "

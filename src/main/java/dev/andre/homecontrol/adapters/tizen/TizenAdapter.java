@@ -30,7 +30,7 @@ import java.util.function.Consumer;
  */
 public class TizenAdapter implements WakeOnLanAdapter {
 
-    public static final String ID = TizenSettings.ADAPTER_ID;
+    public static final String ADAPTER_ID = TizenSettings.ADAPTER_ID;
     public static final String SEARCH_TARGET = "urn:samsung.com:device:RemoteControlReceiver:1";
 
     private final TizenProperties properties;
@@ -55,7 +55,7 @@ public class TizenAdapter implements WakeOnLanAdapter {
 
     @Override
     public String id() {
-        return ID;
+        return ADAPTER_ID;
     }
 
     @Override
@@ -94,7 +94,7 @@ public class TizenAdapter implements WakeOnLanAdapter {
     @Override
     public List<DiscoveredDevice> discovered() {
         return ssdp.services(SEARCH_TARGET).stream()
-                .map(service -> new DiscoveredDevice(ID, service.friendlyName().orElse("Samsung TV"),
+                .map(service -> new DiscoveredDevice(ADAPTER_ID, service.friendlyName().orElse("Samsung TV"),
                         service.address(), properties.port()))
                 .toList();
     }

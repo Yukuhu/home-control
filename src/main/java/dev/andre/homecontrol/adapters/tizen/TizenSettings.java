@@ -13,12 +13,12 @@ import java.util.Map;
 public record TizenSettings(String token, boolean paired, String macAddress, boolean macAddressManual) {
 
     public static final String ADAPTER_ID = "tizen";
-    static final String TOKEN = "token";
-    static final String PAIRED = "paired";
+    static final String TOKEN_KEY = "token";
+    static final String PAIRED_KEY = "paired";
 
     public static TizenSettings of(Device device) {
         Map<String, String> settings = device.adapterSettings(ADAPTER_ID);
-        return new TizenSettings(blankToNull(settings.get(TOKEN)), "true".equals(settings.get(PAIRED)),
+        return new TizenSettings(blankToNull(settings.get(TOKEN_KEY)), "true".equals(settings.get(PAIRED_KEY)),
                 blankToNull(settings.get(WakeOnLanAdapter.MAC_ADDRESS)),
                 "true".equals(settings.get(WakeOnLanAdapter.MAC_ADDRESS_MANUAL)));
     }

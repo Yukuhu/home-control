@@ -32,6 +32,7 @@ import java.util.Arrays;
 public final class TlsSockets {
 
     private static final int CONNECT_TIMEOUT_MS = 5_000;
+    private static final SecureRandom KEY_PASSWORD_RANDOM = new SecureRandom();
 
     private TlsSockets() {
     }
@@ -134,9 +135,8 @@ public final class TlsSockets {
         // This password only protects a transient key entry. Persistent credentials retain
         // the configured CertificateStore password, so existing pairings are unaffected.
         char[] password = new char[32];
-        SecureRandom random = new SecureRandom();
         for (int i = 0; i < password.length; i++) {
-            password[i] = (char) ('!' + random.nextInt(94));
+            password[i] = (char) ('!' + KEY_PASSWORD_RANDOM.nextInt(94));
         }
         try {
             KeyStore keyStore = KeyStore.getInstance("PKCS12");

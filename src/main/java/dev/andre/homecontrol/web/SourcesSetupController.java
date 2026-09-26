@@ -20,6 +20,8 @@ import java.util.List;
 public class SourcesSetupController {
 
     private static final String REDIRECT = "redirect:/setup#sources";
+    private static final String ERROR = "sourcesError";
+    private static final String MESSAGE = "sourcesMessage";
 
     private final SourcePreferencesService prefs;
     private final StoredRailPreferences rails;
@@ -33,29 +35,38 @@ public class SourcesSetupController {
 
     @PostMapping("/setup/sources/preferences/{sourceId}/enabled")
     public String enabled(@PathVariable String sourceId, @RequestParam boolean enabled, RedirectAttributes redirect) {
+        updateEnabled(sourceId, enabled, redirect);
+        return REDIRECT;
+    }
+
+    private void updateEnabled(String sourceId, boolean enabled, RedirectAttributes redirect) {
         ContentSource source = sources.find(sourceId).orElse(null);
         if (source == null) {
-            redirect.addFlashAttribute("sourcesError", "No content source " + sourceId);
-            return REDIRECT;
+            redirect.addFlashAttribute(ERROR, "No content source " + sourceId);
+            return;
         }
         try {
             prefs.update(p -> p.withSourceEnabled(sourceId, enabled));
-            redirect.addFlashAttribute("sourcesMessage", enabled
+            redirect.addFlashAttribute(MESSAGE, enabled
                     ? source.displayName() + " is shown on the dashboard"
                     : source.displayName() + " is hidden from the dashboard and search");
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("sourcesError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
-        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/preferences/{sourceId}/interval")
     public String interval(@PathVariable String sourceId, @RequestParam(required = false) String minutes,
                            RedirectAttributes redirect) {
+        updateInterval(sourceId, minutes, redirect);
+        return REDIRECT;
+    }
+
+    private void updateInterval(String sourceId, String minutes, RedirectAttributes redirect) {
         ContentSource source = sources.find(sourceId).orElse(null);
         if (source == null) {
-            redirect.addFlashAttribute("sourcesError", "No content source " + sourceId);
-            return REDIRECT;
+            redirect.addFlashAttribute(ERROR, "No content source " + sourceId);
+            return;
         }
         Integer parsed;
         if (minutes == null || minutes.isBlank()) {
@@ -63,33 +74,37 @@ public class SourcesSetupController {
         } else {
             try {
                 parsed = Integer.parseInt(minutes.trim());
-            } catch (NumberFormatException e) {
-                redirect.addFlashAttribute("sourcesError", "Refresh every 1 to 1440 minutes");
-                return REDIRECT;
+            } catch (NumberFormatException _) {
+                redirect.addFlashAttribute(ERROR, "Refresh every 1 to 1440 minutes");
+                return;
             }
         }
         try {
             prefs.update(p -> p.withRefreshMinutes(sourceId, parsed));
-            redirect.addFlashAttribute("sourcesMessage", parsed != null
+            redirect.addFlashAttribute(MESSAGE, parsed != null
                     ? source.displayName() + " refreshes every " + parsed + " minutes"
                     : source.displayName() + " uses its default refresh interval");
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("sourcesError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
-        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/preferences/rails/move")
     public String move(@RequestParam String rail, @RequestParam String direction, RedirectAttributes redirect) {
+        moveRail(rail, direction, redirect);
+        return REDIRECT;
+    }
+
+    private void moveRail(String rail, String direction, RedirectAttributes redirect) {
         if (!direction.equals("up") && !direction.equals("down")) {
-            redirect.addFlashAttribute("sourcesError", "Choose up or down");
-            return REDIRECT;
+            redirect.addFlashAttribute(ERROR, "Choose up or down");
+            return;
         }
         List<String> order = new ArrayList<>(railKeys());
         int index = order.indexOf(rail);
         if (index < 0) {
-            redirect.addFlashAttribute("sourcesError", "No rail " + rail);
-            return REDIRECT;
+            redirect.addFlashAttribute(ERROR, "No rail " + rail);
+            return;
         }
         int swapWith = direction.equals("up") ? index - 1 : index + 1;
         if (swapWith >= 0 && swapWith < order.size()) {
@@ -97,31 +112,34 @@ public class SourcesSetupController {
         }
         try {
             prefs.update(p -> p.withRailOrder(order));
-            redirect.addFlashAttribute("sourcesMessage", "Rail order saved");
+            redirect.addFlashAttribute(MESSAGE, "Rail order saved");
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("sourcesError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
-        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/preferences/rails/visibility")
     public String visibility(@RequestParam String rail, @RequestParam boolean visible, RedirectAttributes redirect) {
+        updateVisibility(rail, visible, redirect);
+        return REDIRECT;
+    }
+
+    private void updateVisibility(String rail, boolean visible, RedirectAttributes redirect) {
         String title = rails.allRailsInOrder(sources.all()).stream()
                 .filter(d -> key(d).equals(rail))
                 .map(RailDescriptor::title)
                 .findFirst()
                 .orElse(null);
         if (title == null) {
-            redirect.addFlashAttribute("sourcesError", "No rail " + rail);
-            return REDIRECT;
+            redirect.addFlashAttribute(ERROR, "No rail " + rail);
+            return;
         }
         try {
             prefs.update(p -> p.withRailVisible(rail, visible));
-            redirect.addFlashAttribute("sourcesMessage", visible ? title + " is shown" : title + " is hidden");
+            redirect.addFlashAttribute(MESSAGE, visible ? title + " is shown" : title + " is hidden");
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("sourcesError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
-        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/preferences/locale")
@@ -130,9 +148,9 @@ public class SourcesSetupController {
         List<String> selected = providers == null ? List.of() : providers;
         try {
             prefs.update(p -> p.withLocale(locale, region, selected));
-            redirect.addFlashAttribute("sourcesMessage", "Language and services saved");
+            redirect.addFlashAttribute(MESSAGE, "Language and services saved");
         } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("sourcesError", e.getMessage());
+            redirect.addFlashAttribute(ERROR, e.getMessage());
         }
         return REDIRECT;
     }

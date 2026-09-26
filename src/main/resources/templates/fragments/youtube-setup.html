@@ -42,7 +42,7 @@
     </th:block>
 
     <th:block th:with="authorization=${youtube.authorization()}">
-        <div id="youtube-authorization" th:replace="~{fragments/youtube-setup :: authorization}"></div>
+        <div th:replace="~{fragments/youtube-setup :: authorization}"></div>
     </th:block>
 
     <th:block th:if="${youtube.hasClient()}">

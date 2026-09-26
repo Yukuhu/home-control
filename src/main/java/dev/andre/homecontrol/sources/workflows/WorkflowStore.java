@@ -23,7 +23,7 @@ public final class WorkflowStore {
     private static final String PREFIX = "workflow.";
     private static final int MAX_WORKFLOWS = 50;
     private static final int ID_ATTEMPTS = 128;
-    private static final int STRIPES = 64;
+    private static final int LOCK_STRIPE_COUNT = 64;
     private static final String CHANGED = "Workflow changed; reopen this item";
     private static final String INVALID = "Stored definition cannot be loaded";
 
@@ -35,7 +35,7 @@ public final class WorkflowStore {
     /** Serializes snapshot replacement and identity/capacity allocation. */
     private final ReentrantLock writes = new ReentrantLock();
     /** A bounded set of locks also covers the final dispatch callback. */
-    private final ReentrantLock[] stripes = new ReentrantLock[STRIPES];
+    private final ReentrantLock[] stripes = new ReentrantLock[LOCK_STRIPE_COUNT];
     private volatile Snapshot snapshot;
 
     public WorkflowStore(SecretStore secrets, LoginService login, WorkflowCodec codec,

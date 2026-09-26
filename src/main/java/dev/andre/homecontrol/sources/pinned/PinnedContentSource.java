@@ -15,8 +15,8 @@ import java.util.Optional;
 /** The household's pinned shortcuts as a single rail. Local; nothing is fetched over the network. */
 public class PinnedContentSource implements ContentSource {
 
-    public static final String ID = "pinned";
-    private static final RailDescriptor RAIL = new RailDescriptor(ID, "pinned", "Pinned");
+    public static final String SOURCE_ID = "pinned";
+    private static final RailDescriptor RAIL = new RailDescriptor(SOURCE_ID, "pinned", "Pinned");
 
     private final PinnedShortcuts pins;
 
@@ -26,7 +26,7 @@ public class PinnedContentSource implements ContentSource {
 
     @Override
     public String id() {
-        return ID;
+        return SOURCE_ID;
     }
 
     @Override
@@ -78,7 +78,7 @@ public class PinnedContentSource implements ContentSource {
     }
 
     static ContentItem toItem(Pin pin) {
-        return new ContentItem(pin.id(), ID, pin.kind(), pin.title(), pin.subtitle(), pin.artwork(),
+        return new ContentItem(pin.id(), SOURCE_ID, pin.kind(), pin.title(), pin.subtitle(), pin.artwork(),
                 List.of(ServiceLinks.appLink(pin.url())), null);
     }
 }

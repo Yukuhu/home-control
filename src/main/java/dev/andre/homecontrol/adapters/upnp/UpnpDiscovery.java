@@ -94,7 +94,7 @@ public class UpnpDiscovery implements AutoCloseable {
             return;
         }
         map(service.get()).ifPresent(found -> {
-            aliveListeners.forEach(listener -> listener.accept(found.attributes().get(UpnpSettings.UDN)));
+            aliveListeners.forEach(listener -> listener.accept(found.attributes().get(UpnpSettings.UDN_KEY)));
             DiscoveredDevice previous = announced.put(usn, found);
             if (!found.equals(previous)) {
                 log.info("Discovered media renderer {} at {}", found.name(), found.host());
@@ -119,12 +119,12 @@ public class UpnpDiscovery implements AutoCloseable {
         }
         String udn = description.udn() != null ? description.udn() : udnOf(service.usn());
         Map<String, String> attributes = new LinkedHashMap<>();
-        attributes.put(UpnpSettings.UDN, udn);
-        attributes.put(UpnpSettings.LOCATION, location.toString());
+        attributes.put(UpnpSettings.UDN_KEY, udn);
+        attributes.put(UpnpSettings.LOCATION_KEY, location.toString());
         String model = String.join(" ", Stream.of(description.manufacturer(), description.modelName())
                 .filter(Objects::nonNull).filter(part -> !part.isBlank()).toList());
         if (!model.isBlank()) {
-            attributes.put(UpnpSettings.MODEL, model);
+            attributes.put(UpnpSettings.MODEL_KEY, model);
         }
         String name = description.friendlyName() == null || description.friendlyName().isBlank()
                 ? "Media renderer at " + service.address() : description.friendlyName();

@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 @Component
 public class AndroidTvAdapter implements DeviceAdapter {
 
-    public static final String ID = AndroidTvSettings.ADAPTER_ID;
+    public static final String ADAPTER_ID = AndroidTvSettings.ADAPTER_ID;
 
     private final CertificateStore certificates;
     private final AndroidTvProperties properties;
@@ -46,7 +46,7 @@ public class AndroidTvAdapter implements DeviceAdapter {
 
     @Override
     public String id() {
-        return ID;
+        return ADAPTER_ID;
     }
 
     @Override
