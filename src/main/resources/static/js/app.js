@@ -19,15 +19,31 @@ document.querySelector(".chip.selected")?.closest(".chip-group")
     ?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
 
 const drawer = document.getElementById("remote-drawer");
-const desktopRemote = window.matchMedia("(min-width: 64rem)");
+const desktopRemote = window.matchMedia("(min-width: 64rem) and (hover: hover) and (pointer: fine)");
+
+function shouldDockRemote() {
+    return desktopRemote.matches && (window.visualViewport?.scale ?? 1) <= 1;
+}
+
+function syncRemoteViewport() {
+    if (!drawer) return;
+    // Zoom and the on-screen keyboard can make the visible area smaller than the layout viewport.
+    const viewport = window.visualViewport;
+    drawer.style.setProperty("--remote-vw", `${viewport?.width ?? document.documentElement.clientWidth}px`);
+    drawer.style.setProperty("--remote-vh", `${viewport?.height ?? document.documentElement.clientHeight}px`);
+    drawer.style.setProperty("--remote-vx", `${viewport?.offsetLeft ?? 0}px`);
+    drawer.style.setProperty("--remote-vy", `${viewport?.offsetTop ?? 0}px`);
+}
 
 function showDrawer() {
+    syncRemoteViewport();
     // A native modal keeps the phone remote above the page and background controls inert.
-    if (desktopRemote.matches) drawer.show();
+    const docked = shouldDockRemote();
+    if (docked) drawer.show();
     else drawer.showModal();
     // Toasts outside a modal would be hidden behind its backdrop.
     const toastElement = document.getElementById("toast");
-    if (toastElement) (desktopRemote.matches ? document.body : drawer).append(toastElement);
+    if (toastElement) (docked ? document.body : drawer).append(toastElement);
 }
 
 function setDrawer(open) {
@@ -50,15 +66,31 @@ drawer?.addEventListener("close", () => {
     // close events are queued; a breakpoint change may already have reopened the dialog.
     if (!drawer.open) setDrawer(false);
 });
-desktopRemote.addEventListener("change", () => {
+function updateRemoteLayout() {
     if (!drawer?.open) return;
+    syncRemoteViewport();
+    const modal = !shouldDockRemote();
+    if (drawer.matches(":modal") === modal) return;
     const focused = document.activeElement;
     const scrollTop = drawer.scrollTop;
     drawer.close();
     showDrawer();
     drawer.scrollTop = scrollTop;
     if (drawer.contains(focused)) focused.focus({ preventScroll: true });
-});
+}
+
+let remoteLayoutFrame;
+function scheduleRemoteLayout() {
+    if (remoteLayoutFrame) return;
+    remoteLayoutFrame = window.requestAnimationFrame(() => {
+        remoteLayoutFrame = undefined;
+        updateRemoteLayout();
+    });
+}
+desktopRemote.addEventListener("change", scheduleRemoteLayout);
+window.addEventListener("resize", scheduleRemoteLayout);
+window.visualViewport?.addEventListener("resize", scheduleRemoteLayout);
+window.visualViewport?.addEventListener("scroll", scheduleRemoteLayout);
 if (drawer && !drawer.hidden) setDrawer(true);
 document.addEventListener("click", (event) => {
     if (event.target.closest(".drawer-toggle")) setDrawer(document.getElementById("remote-drawer").hidden);

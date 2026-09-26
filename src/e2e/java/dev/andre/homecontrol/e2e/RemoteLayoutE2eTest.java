@@ -1,14 +1,19 @@
 package dev.andre.homecontrol.e2e;
 
+import com.google.gson.JsonObject;
+import com.microsoft.playwright.CDPSession;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.BoundingBox;
 import dev.andre.homecontrol.core.DeviceState;
+import org.junit.jupiter.api.Test;
 import org.assertj.core.data.Offset;
 
 import java.nio.file.Path;
+import java.util.Map;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class RemoteLayoutE2eTest extends E2eApplicationTest {
 
@@ -44,6 +49,12 @@ class RemoteLayoutE2eTest extends E2eApplicationTest {
             org.assertj.core.api.Assertions.assertThat(((Number) page.locator(".devices")
                     .evaluate("el => el.scrollLeft")).doubleValue())
                     .as("The device strip still scrolls horizontally after closing the overlay").isPositive();
+            page.setViewportSize(320, 568);
+            Locator railTiles = page.locator("#rails .tiles").first();
+            assertThat(railTiles.locator(".tile")).hasCount(2);
+            railTiles.evaluate("el => el.scrollLeft = el.scrollWidth");
+            org.assertj.core.api.Assertions.assertThat(((Number) railTiles.evaluate("el => el.scrollLeft")).doubleValue())
+                    .as("Content rails still scroll horizontally after closing the overlay").isPositive();
             assertNoHorizontalOverflow(page);
         }
     }
@@ -81,8 +92,7 @@ class RemoteLayoutE2eTest extends E2eApplicationTest {
 
             for (int[] size : new int[][] {{320, 568}, {390, 844}, {768, 1024}, {844, 390}, {1440, 900}, {390, 844}}) {
                 page.setViewportSize(size[0], size[1]);
-                page.waitForFunction("modal => document.getElementById('remote-drawer').matches(':modal') === modal",
-                        size[0] < 1024);
+                page.waitForFunction("() => document.getElementById('remote-drawer').matches(':modal')");
                 for (String mode : new String[] {"buttons", "touchpad"}) {
                     page.locator("[data-mode-switch] [data-mode=" + mode + "]").click();
                     assertInViewport(drawer, size[0], size[1]);
@@ -97,6 +107,129 @@ class RemoteLayoutE2eTest extends E2eApplicationTest {
                             .isCloseTo(top, Offset.offset(1.0));
                     assertNoHorizontalOverflow(page);
                 }
+            }
+        }
+    }
+
+    @BrowserTest
+    void wideTouchScreensKeepTheRemoteModalAndInsideThePage(String browser) {
+        try (BrowserSession session = Browsers.open(browser, baseUrl(), traceName, true)) {
+            Page page = session.page();
+            for (int width : new int[] {1080, 1280}) {
+                page.setViewportSize(width, 844);
+                page.navigate("/?device=living");
+                page.locator(".drawer-toggle").click();
+                Locator drawer = page.locator("#remote-drawer");
+                org.assertj.core.api.Assertions.assertThat(drawer.evaluate("el => el.matches(':modal')"))
+                        .as("Touch device at %spx uses an overlay, not a desktop dock", width).isEqualTo(true);
+                assertInViewport(drawer, width, 844);
+                assertNoHorizontalOverflow(page);
+                page.locator(".drawer-close").click();
+                assertThat(drawer).isHidden();
+            }
+        }
+    }
+
+    @BrowserTest
+    void finePointerDesktopStillUsesTheRightDock(String browser) {
+        try (BrowserSession session = Browsers.openDesktop(browser, baseUrl(), traceName)) {
+            Page page = session.page();
+            page.setViewportSize(1440, 900);
+            page.navigate("/?device=living");
+            page.locator(".drawer-toggle").click();
+            Locator drawer = page.locator("#remote-drawer");
+            org.assertj.core.api.Assertions.assertThat(drawer.evaluate("el => el.matches(':modal')"))
+                    .as("Fine-pointer desktop retains the right dock").isEqualTo(false);
+            BoundingBox bounds = drawer.boundingBox();
+            org.assertj.core.api.Assertions.assertThat(bounds.width).isCloseTo(400.0, Offset.offset(1.0));
+            org.assertj.core.api.Assertions.assertThat(bounds.x + bounds.width)
+                    .isCloseTo(1440.0, Offset.offset(1.0));
+            assertNoHorizontalOverflow(page);
+        }
+    }
+
+    @BrowserTest
+    void finePointerResizeKeepsTheModeAndFocusAcrossModalAndDock(String browser) {
+        try (BrowserSession session = Browsers.openDesktop(browser, baseUrl(), traceName)) {
+            Page page = session.page();
+            page.navigate("/?device=living");
+            page.locator(".drawer-toggle").click();
+            Locator drawer = page.locator("#remote-drawer");
+            org.assertj.core.api.Assertions.assertThat(drawer.evaluate("el => el.matches(':modal')")).isEqualTo(true);
+            page.locator("[data-mode-switch] [data-mode=touchpad]").click();
+            Locator close = page.locator(".drawer-close");
+            close.focus();
+
+            page.setViewportSize(1440, 900);
+            page.waitForFunction("() => !document.getElementById('remote-drawer').matches(':modal')");
+            assertInViewport(drawer, 1440, 900);
+            org.assertj.core.api.Assertions.assertThat(drawer.boundingBox().x + drawer.boundingBox().width)
+                    .isCloseTo(1440.0, Offset.offset(1.0));
+            assertThat(page.locator("[data-mode-switch] [data-mode=touchpad]")).hasAttribute("aria-selected", "true");
+            assertThat(close).isFocused();
+
+            page.setViewportSize(390, 844);
+            page.waitForFunction("() => document.getElementById('remote-drawer').matches(':modal')");
+            assertInViewport(drawer, 390, 844);
+            assertThat(page.locator("[data-mode-switch] [data-mode=touchpad]")).hasAttribute("aria-selected", "true");
+            assertThat(close).isFocused();
+            close.click();
+            assertThat(drawer).isHidden();
+            assertThat(page.locator(".drawer-toggle")).isFocused();
+            assertNoHorizontalOverflow(page);
+        }
+    }
+
+    @Test
+    void chromiumPinchZoomWhileOpenKeepsTheRemoteInsideTheVisualViewport() {
+        assumeTrue(Browsers.names().anyMatch("chromium"::equals), "Chromium is not selected for this run");
+        try (BrowserSession session = Browsers.open("chromium", baseUrl(), traceName, true)) {
+            Page page = session.page();
+            page.navigate("/?device=living&remote=open");
+            CDPSession cdp = session.context().newCDPSession(page);
+            try {
+                setPageScale(cdp, 2);
+                page.waitForFunction("() => visualViewport.scale >= 1.99");
+                assertInVisualViewport(page);
+                page.evaluate("""
+                        async () => {
+                            const { toast } = await import('/js/toast.js');
+                            toast('Zoomed remote error', { duration: 30000 });
+                        }
+                        """);
+                assertThat(page.locator("#toast")).containsText("Zoomed remote error");
+                assertElementInVisualViewport(page, "#toast");
+                assertNoHorizontalOverflow(page);
+
+                setPageScale(cdp, 1);
+                page.waitForFunction("() => visualViewport.scale <= 1.01");
+                assertInVisualViewport(page);
+                assertElementInVisualViewport(page, "#toast");
+                assertNoHorizontalOverflow(page);
+            } finally {
+                cdp.detach();
+            }
+        }
+    }
+
+    @Test
+    void chromiumPinchZoomBeforeOpeningKeepsTheRemoteInsideTheVisualViewport() {
+        assumeTrue(Browsers.names().anyMatch("chromium"::equals), "Chromium is not selected for this run");
+        try (BrowserSession session = Browsers.open("chromium", baseUrl(), traceName, true)) {
+            Page page = session.page();
+            page.navigate("/?device=living");
+            CDPSession cdp = session.context().newCDPSession(page);
+            try {
+                setPageScale(cdp, 2);
+                page.waitForFunction("() => visualViewport.scale >= 1.99");
+                page.locator(".drawer-toggle").focus();
+                page.keyboard().press("Enter");
+                org.assertj.core.api.Assertions.assertThat(page.locator("#remote-drawer")
+                        .evaluate("el => el.matches(':modal')")).isEqualTo(true);
+                assertInVisualViewport(page);
+                assertNoHorizontalOverflow(page);
+            } finally {
+                cdp.detach();
             }
         }
     }
@@ -144,6 +277,44 @@ class RemoteLayoutE2eTest extends E2eApplicationTest {
                 .isLessThanOrEqualTo(width + 1);
         org.assertj.core.api.Assertions.assertThat(bounds.y + bounds.height).as("Bottom edge of %s", element)
                 .isLessThanOrEqualTo(height + 1);
+    }
+
+    private static void setPageScale(CDPSession cdp, double scale) {
+        JsonObject parameters = new JsonObject();
+        parameters.addProperty("pageScaleFactor", scale);
+        cdp.send("Emulation.setPageScaleFactor", parameters);
+    }
+
+    private static void assertInVisualViewport(Page page) {
+        assertElementInVisualViewport(page, "#remote-drawer");
+        assertElementInVisualViewport(page, ".drawer-close");
+    }
+
+    private static void assertElementInVisualViewport(Page page, String selector) {
+        page.evaluate("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+        Map<?, ?> bounds = (Map<?, ?>) page.evaluate("""
+                selector => {
+                    const visual = window.visualViewport;
+                    const element = document.querySelector(selector).getBoundingClientRect();
+                    return {
+                        left: element.left, right: element.right, top: element.top, bottom: element.bottom,
+                        visualLeft: visual.offsetLeft, visualRight: visual.offsetLeft + visual.width,
+                        visualTop: visual.offsetTop, visualBottom: visual.offsetTop + visual.height
+                    };
+                }
+                """, selector);
+        double left = ((Number) bounds.get("visualLeft")).doubleValue();
+        double right = ((Number) bounds.get("visualRight")).doubleValue();
+        double top = ((Number) bounds.get("visualTop")).doubleValue();
+        double bottom = ((Number) bounds.get("visualBottom")).doubleValue();
+        org.assertj.core.api.Assertions.assertThat(((Number) bounds.get("left")).doubleValue())
+                .as("%s left edge must fit visual viewport: %s", selector, bounds).isGreaterThanOrEqualTo(left - 1);
+        org.assertj.core.api.Assertions.assertThat(((Number) bounds.get("right")).doubleValue())
+                .as("%s right edge must fit visual viewport: %s", selector, bounds).isLessThanOrEqualTo(right + 1);
+        org.assertj.core.api.Assertions.assertThat(((Number) bounds.get("top")).doubleValue())
+                .as("%s top edge must fit visual viewport: %s", selector, bounds).isGreaterThanOrEqualTo(top - 1);
+        org.assertj.core.api.Assertions.assertThat(((Number) bounds.get("bottom")).doubleValue())
+                .as("%s bottom edge must fit visual viewport: %s", selector, bounds).isLessThanOrEqualTo(bottom + 1);
     }
 
     private static void assertNoHorizontalOverflow(Page page) {
