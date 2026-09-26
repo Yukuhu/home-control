@@ -16,7 +16,8 @@ public class GoogleOAuthClient {
     private static final String CLIENT_ID = "client_id";
     private static final String SCOPE_PARAMETER = "scope";
     private static final String TOKEN_PATH = "/token";
-    private static final String CLIENT_SECRET = "client_secret";
+    /** OAuth form field name; the credential itself is supplied by the caller. */
+    private static final String CLIENT_SECRET_PARAMETER = "client_secret";
     private static final String GRANT_TYPE = "grant_type";
     private static final String REFRESH_TOKEN = "refresh_token";
 
@@ -103,7 +104,7 @@ public class GoogleOAuthClient {
     public TokenPoll.Granted exchangeCode(String clientId, String clientSecret, String code,
                                           URI redirectUri, String verifier) {
         YouTubeHttp.Response response = http.postForm(URI.create(base + TOKEN_PATH), Map.of(
-                CLIENT_ID, clientId, CLIENT_SECRET, clientSecret, "code", code,
+                CLIENT_ID, clientId, CLIENT_SECRET_PARAMETER, clientSecret, "code", code,
                 "redirect_uri", redirectUri.toString(), "code_verifier", verifier,
                 GRANT_TYPE, "authorization_code"), Map.of());
         if (!response.ok()) {
@@ -128,7 +129,7 @@ public class GoogleOAuthClient {
     public TokenPoll poll(String clientId, String clientSecret, String deviceCode) {
         Map<String, String> form = new LinkedHashMap<>();
         form.put(CLIENT_ID, clientId);
-        form.put(CLIENT_SECRET, clientSecret);
+        form.put(CLIENT_SECRET_PARAMETER, clientSecret);
         form.put("device_code", deviceCode);
         form.put(GRANT_TYPE, DEVICE_GRANT);
         YouTubeHttp.Response response = http.postForm(URI.create(base + TOKEN_PATH), form, Map.of());
@@ -155,7 +156,7 @@ public class GoogleOAuthClient {
     public AccessToken refresh(String clientId, String clientSecret, String refreshToken) {
         Map<String, String> form = new LinkedHashMap<>();
         form.put(CLIENT_ID, clientId);
-        form.put(CLIENT_SECRET, clientSecret);
+        form.put(CLIENT_SECRET_PARAMETER, clientSecret);
         form.put(REFRESH_TOKEN, refreshToken);
         form.put(GRANT_TYPE, REFRESH_TOKEN);
         YouTubeHttp.Response response = http.postForm(URI.create(base + TOKEN_PATH), form, Map.of());
