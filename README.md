@@ -782,9 +782,11 @@ order, so a failed build never leaves a tag pointing at an image that was never
 pushed.
 
 The arm64 image is cross-built under QEMU, so a release also waits for the
-`Smoke-test the image on arm64` job, which builds both image variants natively on
-an arm64 runner and starts them. The same check runs against a local build on any
-Linux Docker host, a Raspberry Pi included:
+`Smoke-test the image on arm64` job, which builds the image natively on an arm64
+runner and starts it. `Smoke-test the Bluetooth image on arm64` does the same for
+the `-bluetooth` variant without holding up the release, just as that variant's
+publish step never does. The same check runs against a local build on any Linux
+Docker host, a Raspberry Pi included:
 
 ```bash
 docker build -t home-control:smoke . && scripts/smoke-test-image.sh home-control:smoke
