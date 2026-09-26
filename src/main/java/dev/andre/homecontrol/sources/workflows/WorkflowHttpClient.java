@@ -176,7 +176,23 @@ public final class WorkflowHttpClient implements AutoCloseable {
         }
     }
 
-    private record FetchResponse(byte[] body, String redirectLocation) {}
+    private static final class FetchResponse {
+        private final byte[] body;
+        private final String redirectLocation;
+
+        private FetchResponse(byte[] body, String redirectLocation) {
+            this.body = body;
+            this.redirectLocation = redirectLocation;
+        }
+
+        private byte[] body() {
+            return body;
+        }
+
+        private String redirectLocation() {
+            return redirectLocation;
+        }
+    }
 
     private static void validateHeader(WorkflowDraft.Header header) {
         if (header == null || header.name() == null || !header.name().matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+")) {
