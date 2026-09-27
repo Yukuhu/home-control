@@ -11,6 +11,7 @@ import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.SpeakerGroup;
 import dev.andre.homecontrol.core.SpeakerTopology;
 import dev.andre.homecontrol.core.UnsupportedActionException;
+import dev.andre.homecontrol.testsupport.RecordingStateListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ class SonosSessionTest {
 
     private final SonosProperties properties = new SonosProperties(true, 1, 1, 1, 1, 1, 1, 2);
     private final FakeSonosHousehold household = new FakeSonosHousehold();
-    private final List<DeviceState> states = new CopyOnWriteArrayList<>();
+    private final RecordingStateListener states = new RecordingStateListener();
     private final List<SonosSession> sessions = new CopyOnWriteArrayList<>();
     private final Action.PlayMedia song = new Action.PlayMedia(URI.create("http://127.0.0.1:9/music/song.flac"),
             "audio/flac", "Bunny Song", "The Rabbits");
@@ -55,7 +56,7 @@ class SonosSessionTest {
     }
 
     private SonosSession connected(FakeSonosPlayer player) {
-        return connected(player, states::add);
+        return connected(player, states);
     }
 
     private SonosSession connected(FakeSonosPlayer player, Consumer<DeviceState> onChange) {
@@ -77,7 +78,7 @@ class SonosSessionTest {
     @Test
     void aFailingStateListenerDoesNotStopPolling() {
         SonosSession session = connected(kitchen, state -> {
-            states.add(state);
+            states.accept(state);
             throw new IllegalStateException("a subscriber failed");
         });
 
@@ -88,7 +89,7 @@ class SonosSessionTest {
     void aListenerThatFailedOnceStillReceivesLaterUpdates() {
         AtomicBoolean failed = new AtomicBoolean();
         connected(kitchen, state -> {
-            states.add(state);
+            states.accept(state);
             if (state.status() == DeviceStatus.CONNECTED && failed.compareAndSet(false, true)) {
                 throw new IllegalStateException("listener bug");
             }
@@ -97,7 +98,7 @@ class SonosSessionTest {
 
         kitchen.setVolume(35);
 
-        await().atMost(WAIT).until(() -> states.getLast().volumeLevel() == 35);
+        await().atMost(WAIT).until(() -> states.last().volumeLevel() == 35);
     }
 
     @Test
@@ -224,7 +225,7 @@ class SonosSessionTest {
     @Test
     void aStaleCoordinatorIsLookedUpAgainWhenTheSpeakerSaysItIsNotOne() {
         SonosSession session = new SonosSession(kitchen.device("sonos-" + KITCHEN), new SonosProperties(true, 1, 1, 3600, 1, 1, 1, 2),
-                SoapClient.httpClient(Duration.ofSeconds(1)), states::add, () -> { });
+                SoapClient.httpClient(Duration.ofSeconds(1)), states, () -> { });
         sessions.add(session);
         session.start();
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);

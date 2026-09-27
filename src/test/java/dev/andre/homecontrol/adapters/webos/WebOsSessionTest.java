@@ -17,6 +17,7 @@ import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
+import dev.andre.homecontrol.testsupport.RecordingStateListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,6 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,7 +47,7 @@ class WebOsSessionTest {
     private FakeWakeOnLanReceiver receiver;
     private DeviceRegistry registry;
     private WebOsSession session;
-    private final List<DeviceState> states = new CopyOnWriteArrayList<>();
+    private final RecordingStateListener states = new RecordingStateListener();
 
     @BeforeEach
     void startTv() throws IOException {
@@ -75,7 +75,7 @@ class WebOsSessionTest {
     }
 
     private WebOsSession session(Map<String, String> settings) throws IOException {
-        return session(settings, states::add);
+        return session(settings, states);
     }
 
     private WebOsSession session(Map<String, String> settings, Consumer<DeviceState> listener) throws IOException {
@@ -118,7 +118,7 @@ class WebOsSessionTest {
             assertThat(state.muted()).isFalse();
             assertThat(state.powerOn()).isTrue();
         });
-        List<DeviceStatus> statuses = states.stream().map(DeviceState::status).toList();
+        List<DeviceStatus> statuses = states.all().stream().map(DeviceState::status).toList();
         assertThat(statuses).contains(DeviceStatus.CONNECTING);
         assertThat(statuses.indexOf(DeviceStatus.CONNECTING)).isLessThan(statuses.indexOf(DeviceStatus.CONNECTED));
     }
@@ -342,8 +342,7 @@ class WebOsSessionTest {
 
         tv.dropConnections();
 
-        await().atMost(Duration.ofSeconds(5)).until(() -> states.stream()
-                .anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED));
+        states.awaitStatus(DeviceStatus.DISCONNECTED, Duration.ofSeconds(5));
         connected();
         int connections = tv.connections();
         assertThat(connections).isGreaterThan(initialConnections);
@@ -371,15 +370,14 @@ class WebOsSessionTest {
         registry.save(device);
         WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 1, 2, 1, 2, 0, 1);
         session = new WebOsSession(device, properties, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
-                learned(), new WakeOnLan(receiver.address()), states::add, () -> { });
+                learned(), new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         connected();
         int connections = tv.connections();
 
         tv.ignoreRequests(SsapUris.SYSTEM_INFO);
 
-        await().atMost(Duration.ofSeconds(6)).until(() -> states.stream()
-                .anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED));
+        states.awaitStatus(DeviceStatus.DISCONNECTED, Duration.ofSeconds(6));
         tv.answerRequests(SsapUris.SYSTEM_INFO);
         connected();
         assertThat(tv.connections()).isGreaterThan(connections);
@@ -392,7 +390,7 @@ class WebOsSessionTest {
         registry.save(device);
         WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 1, 2, 1, 2, 0, 1);
         session = new WebOsSession(device, properties, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
-                learned(), new WakeOnLan(receiver.address()), states::add, () -> { });
+                learned(), new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         connected();
         int connections = tv.connections();
@@ -415,14 +413,14 @@ class WebOsSessionTest {
         states.clear();
         tv.dropConnections();
 
-        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).until(states::isEmpty);
+        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).until(() -> states.all().isEmpty());
     }
 
     @Test
     void aFailingStateListenerDoesNotLeaveTheSessionHalfConnected() throws IOException {
         // The real listener publishes a Spring event synchronously, so any subscriber's failure lands here.
         session(Map.of("clientKey", FakeSsapServer.CLIENT_KEY), state -> {
-            states.add(state);
+            states.accept(state);
             throw new IllegalStateException("a subscriber failed");
         }).start();
         connected();

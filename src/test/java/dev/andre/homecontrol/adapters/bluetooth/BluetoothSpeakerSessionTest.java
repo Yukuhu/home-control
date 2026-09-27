@@ -16,6 +16,7 @@ import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
+import dev.andre.homecontrol.testsupport.RecordingStateListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class BluetoothSpeakerSessionTest {
     private final FakeBluezClient bluez = new FakeBluezClient();
     private final InProcessMpvLauncher launcher = new InProcessMpvLauncher();
     private final BluetoothProperties properties = BluetoothProperties.defaults().withTimings(1, 1, 5, 5, 2);
-    private final List<dev.andre.homecontrol.core.DeviceState> states = new CopyOnWriteArrayList<>();
+    private final RecordingStateListener states = new RecordingStateListener();
     private Device device;
     private BluetoothSpeakerSession session;
 
@@ -72,7 +73,7 @@ class BluetoothSpeakerSessionTest {
     }
 
     private BluetoothSpeakerSession start(BluetoothProperties props) {
-        return start(props, states::add);
+        return start(props, states);
     }
 
     private BluetoothSpeakerSession start(BluetoothProperties props,
@@ -447,7 +448,7 @@ class BluetoothSpeakerSessionTest {
 
         // The real listener publishes a Spring event synchronously, so any subscriber's failure lands here.
         start(properties, state -> {
-            states.add(state);
+            states.accept(state);
             throw new IllegalStateException("a subscriber failed");
         });
 
