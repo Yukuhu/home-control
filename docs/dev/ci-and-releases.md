@@ -8,6 +8,7 @@ What runs on every push and pull request, and how releases are made.
 
 | Job | What it does |
 | --- | --- |
+| Find out what changed | Decides with `scripts/code-changed.sh` whether a pull request changes anything besides documentation; if it does not, the jobs that build and test are left out. A push to `main` runs them all. |
 | Build the jar | Builds the one jar of the run and works out its version; every image that is tested or published is built from it. |
 | Build and test | Runs `./gradlew build` with the full test suite, checks that the frozen architecture violations are committed, and uploads the reports. |
 | Build the self-contained image | Checks that `Dockerfile` and `Dockerfile.dist` describe the same runtime, and builds `Dockerfile` without pushing it. |
@@ -18,8 +19,8 @@ What runs on every push and pull request, and how releases are made.
 | SonarCloud quality gate | Scans the results of `Build and test` and `Browser tests (Chromium)`; on pull requests it waits for the quality gate. |
 | Dependency vulnerabilities | Submits the resolved dependency graph so that Dependabot alerts cover it, and reviews the dependencies a pull request changes. The release does not wait for it. |
 | Summarise the run on the pull request | Writes one comment per pull request with the run's results, replaced on every run. |
-| Release | On a push to `main` that releases, publishes the images the smoke tests ran under the release's tags, then creates the tag and the GitHub release. It builds nothing. |
-| Release the Bluetooth image | After the release, publishes the tested `-bluetooth` images, if they passed their smoke tests. |
+| Release | On a push to `main` that releases, publishes the images the smoke tests ran under the release's tags, then creates the tag and the GitHub release, and attests where the image was built. It builds nothing. |
+| Release the Bluetooth image | After the release, publishes and attests the tested `-bluetooth` images, if they passed their smoke tests. |
 | CI passed | The one check `main` requires: it passes only if every job it needs passed or was left out on purpose. |
 
 ## CI quality gate
