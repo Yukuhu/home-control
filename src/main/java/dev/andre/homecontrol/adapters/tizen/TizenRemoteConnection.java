@@ -32,44 +32,33 @@ final class TizenRemoteConnection implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(TizenRemoteConnection.class);
     private static final Duration LATE_ANSWER = Duration.ofMillis(300);
 
-    private final BlockingQueue<String> channelEvents = new LinkedBlockingQueue<>();
-    private volatile TextWebSocket socket;
-    private volatile String issuedToken;
-    private volatile List<TizenApp> installedApps;
+    private final TextWebSocket socket;
+    private final Channel channel;
 
-    private TizenRemoteConnection() {
+    private TizenRemoteConnection(TextWebSocket socket, Channel channel) {
+        this.socket = socket;
+        this.channel = channel;
     }
 
+    /** Nothing that needs closing exists until the socket is open, so a failed open leaves nothing behind. */
     static TizenRemoteConnection open(HttpClient http, String host, TizenProperties properties, String token,
                                       Consumer<String> onClosed) throws IOException {
-        TizenRemoteConnection connection = new TizenRemoteConnection();
-        connection.socket = TextWebSocket.connect(http,
+        Channel channel = new Channel(onClosed);
+        TextWebSocket socket = TextWebSocket.connect(http,
                 TizenMessages.remoteUri(host, properties.port(), properties.clientName(), token),
-                Duration.ofSeconds(properties.connectTimeoutSeconds()),
-                new TextWebSocket.Listener() {
-                    @Override
-                    public void onText(String text) {
-                        connection.dispatch(text);
-                    }
-
-                    @Override
-                    public void onClosed(String reason) {
-                        connection.channelEvents.add("closed");
-                        onClosed.accept(reason);
-                    }
-                });
-        return connection;
+                Duration.ofSeconds(properties.connectTimeoutSeconds()), channel);
+        return new TizenRemoteConnection(socket, channel);
     }
 
     Authorization awaitAuthorization(Duration timeout) throws IOException {
         try {
-            String event = channelEvents.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            String event = channel.events.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
             if (event == null) {
                 return Authorization.NO_ANSWER;
             }
             if (event.equals("closed")) {
                 // A Deny is "unauthorized" immediately followed by a close; the close can be reported first.
-                String late = channelEvents.poll(LATE_ANSWER.toMillis(), TimeUnit.MILLISECONDS);
+                String late = channel.events.poll(LATE_ANSWER.toMillis(), TimeUnit.MILLISECONDS);
                 event = late == null ? event : late;
             }
             return switch (event) {
@@ -85,7 +74,7 @@ final class TizenRemoteConnection implements AutoCloseable {
 
     /** A token the TV issued on this connection (only after a fresh Allow). */
     Optional<String> token() {
-        return Optional.ofNullable(issuedToken);
+        return Optional.ofNullable(channel.issuedToken);
     }
 
     void key(String code) throws IOException {
@@ -107,42 +96,60 @@ final class TizenRemoteConnection implements AutoCloseable {
 
     /** Empty until the TV answered {@link #requestInstalledApps()}. */
     Optional<List<TizenApp>> installedApps() {
-        return Optional.ofNullable(installedApps);
-    }
-
-    private void dispatch(String text) {
-        JsonNode message;
-        try {
-            message = TizenMessages.JSON.readTree(text);
-        } catch (JacksonException _) {
-            log.debug("Ignoring a message from the TV that is not JSON");
-            return;
-        }
-        switch (message.path("event").asString("")) {
-            case CHANNEL_CONNECT_EVENT -> {
-                String token = message.path("data").path("token").asString("");
-                if (!token.isEmpty()) {
-                    issuedToken = token;
-                }
-                channelEvents.add(CHANNEL_CONNECT_EVENT);
-            }
-            case CHANNEL_UNAUTHORIZED_EVENT -> channelEvents.add(CHANNEL_UNAUTHORIZED_EVENT);
-            case "ed.installedApp.get" -> installedApps = TizenMessages.installedApps(message);
-            case "ms.error" -> {
-                if (log.isDebugEnabled()) {
-                    log.debug("The TV reported an error: {}", message.path("data").path("message").asString(""));
-                }
-            }
-            default -> {
-                // ed.edenTV.update, ms.voiceApp.hide, ed.apps.launch results, client (dis)connects: not needed.
-            }
-        }
+        return Optional.ofNullable(channel.installedApps);
     }
 
     @Override
     public void close() {
-        if (socket != null) {
-            socket.close();
+        socket.close();
+    }
+
+    /** What the TV sends on the channel; its callbacks run on the HTTP client's threads. */
+    private static final class Channel implements TextWebSocket.Listener {
+
+        private final BlockingQueue<String> events = new LinkedBlockingQueue<>();
+        private final Consumer<String> whenClosed;
+        private volatile String issuedToken;
+        // Immutable list replaced wholesale on each answer from the TV; the session's threads only read it.
+        @SuppressWarnings("java:S3077")
+        private volatile List<TizenApp> installedApps;
+
+        private Channel(Consumer<String> whenClosed) {
+            this.whenClosed = whenClosed;
+        }
+
+        @Override
+        public void onText(String text) {
+            JsonNode message;
+            try {
+                message = TizenMessages.JSON.readTree(text);
+            } catch (JacksonException _) {
+                log.debug("Ignoring a message from the TV that is not JSON");
+                return;
+            }
+            switch (message.path("event").asString("")) {
+                case CHANNEL_CONNECT_EVENT -> {
+                    String token = message.path("data").path("token").asString("");
+                    if (!token.isEmpty()) {
+                        issuedToken = token;
+                    }
+                    events.add(CHANNEL_CONNECT_EVENT);
+                }
+                case CHANNEL_UNAUTHORIZED_EVENT -> events.add(CHANNEL_UNAUTHORIZED_EVENT);
+                case "ed.installedApp.get" -> installedApps = TizenMessages.installedApps(message);
+                case "ms.error" -> log.atDebug()
+                        .addArgument(() -> message.path("data").path("message").asString(""))
+                        .log("The TV reported an error: {}");
+                default -> {
+                    // ed.edenTV.update, ms.voiceApp.hide, ed.apps.launch results, client (dis)connects: not needed.
+                }
+            }
+        }
+
+        @Override
+        public void onClosed(String reason) {
+            events.add("closed");
+            whenClosed.accept(reason);
         }
     }
 }
