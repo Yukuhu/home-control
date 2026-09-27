@@ -16,6 +16,7 @@ import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.CastLoads;
 import dev.andre.homecontrol.core.playback.PlayableRef;
+import dev.andre.homecontrol.testsupport.RecordingStateListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.CONNECTION;
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.MEDIA;
@@ -42,7 +42,7 @@ class CastSessionTest {
     /** heartbeat 1 s, stale 3 s, backoff 1–2 s, command 2 s, load 5 s, media poll 1 s. */
     static final CastProperties PROPERTIES = new CastProperties(true, 1, 3, 1, 2, 2, 5, 1);
 
-    private final List<DeviceState> seen = new CopyOnWriteArrayList<>();
+    private final RecordingStateListener seen = new RecordingStateListener();
     private FakeCastReceiver receiver;
     private CastSession session;
 
@@ -65,7 +65,7 @@ class CastSessionTest {
     }
 
     private CastSession start(int port) {
-        session = new CastSession(device(port), PROPERTIES, seen::add);
+        session = new CastSession(device(port), PROPERTIES, seen);
         session.start();
         return session;
     }
@@ -88,7 +88,7 @@ class CastSessionTest {
         assertThat(state.volumeLevel()).isEqualTo(25);
         assertThat(state.volumeMax()).isEqualTo(100);
         assertThat(state.muted()).isTrue();
-        assertThat(seen).extracting(DeviceState::status).startsWith(DeviceStatus.CONNECTING);
+        assertThat(seen.all()).extracting(DeviceState::status).startsWith(DeviceStatus.CONNECTING);
     }
 
     @Test
@@ -118,7 +118,7 @@ class CastSessionTest {
 
         receiver.dropConnection();
 
-        await().until(() -> seen.stream().anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED));
+        seen.awaitStatus(DeviceStatus.DISCONNECTED);
         await().until(() -> receiver.connections() == 2 && session.state().connected());
     }
 
@@ -128,8 +128,7 @@ class CastSessionTest {
         awaitStatus();
 
         receiver.goSilent();
-        await().atMost(Duration.ofSeconds(10))
-                .until(() -> seen.stream().anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED));
+        seen.awaitStatus(DeviceStatus.DISCONNECTED, Duration.ofSeconds(10));
 
         receiver.setVolume(0.9, false);
         receiver.resume();
@@ -146,7 +145,7 @@ class CastSessionTest {
         start(port);
 
         await().until(() -> session.state().status() == DeviceStatus.DISCONNECTED
-                && seen.stream().anyMatch(state -> state.status() == DeviceStatus.CONNECTING));
+                && seen.all().stream().anyMatch(state -> state.status() == DeviceStatus.CONNECTING));
 
         try (var _ = new FakeCastReceiver(port)) {
             await().atMost(Duration.ofSeconds(10)).until(() -> session.state().connected());
@@ -159,7 +158,7 @@ class CastSessionTest {
         Device tv = new Device("10-0-0-5", "Living Room TV", DeviceKind.ANDROID_TV, "192.0.2.1",
                 Map.of("androidtv", Map.of("port", "6466"),
                         "cast", Map.of("host", "127.0.0.1", "port", String.valueOf(receiver.port()))), Instant.now());
-        session = new CastSession(tv, PROPERTIES, seen::add);
+        session = new CastSession(tv, PROPERTIES, seen);
         session.start();
 
         awaitStatus();
@@ -171,11 +170,11 @@ class CastSessionTest {
         awaitStatus();
 
         session.close();
-        int published = seen.size();
+        int published = seen.all().size();
 
         // Longer than the 1–2 s reconnect backoff.
         await().during(Duration.ofMillis(2_500)).atMost(Duration.ofSeconds(4)).untilAsserted(() -> {
-            assertThat(seen).hasSize(published);
+            assertThat(seen.all()).hasSize(published);
             assertThat(receiver.connections()).isEqualTo(1);
         });
     }
@@ -460,7 +459,7 @@ class CastSessionTest {
 
         receiver.dropConnection();
 
-        await().until(() -> seen.stream().anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED
+        await().until(() -> seen.all().stream().anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED
                 && state.nowPlaying() == null));
     }
 
@@ -598,7 +597,7 @@ class CastSessionTest {
 
     @Test
     void aDisconnectedSessionIsOffline() {
-        session = new CastSession(device(receiver.port()), PROPERTIES, seen::add);
+        session = new CastSession(device(receiver.port()), PROPERTIES, seen);
 
         assertThatThrownBy(() -> session.query(MDX_STATUS)).isInstanceOf(DeviceOfflineException.class);
     }

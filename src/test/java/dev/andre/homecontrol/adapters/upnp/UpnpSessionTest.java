@@ -12,6 +12,7 @@ import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
+import dev.andre.homecontrol.testsupport.RecordingStateListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,7 @@ class UpnpSessionTest {
     private static final Duration WAIT = Duration.ofSeconds(5);
 
     private final UpnpProperties properties = new UpnpProperties(true, 1, 1, 1, 1, 1, 2);
-    private final List<DeviceState> states = new CopyOnWriteArrayList<>();
+    private final RecordingStateListener states = new RecordingStateListener();
     private final List<AutoCloseable> closeables = new CopyOnWriteArrayList<>();
     private FakeUpnpRenderer fake;
     private UpnpSession session;
@@ -62,7 +63,7 @@ class UpnpSessionTest {
     }
 
     private UpnpSession start(Device device, Function<String, Optional<URI>> locator) {
-        return start(device, locator, states::add);
+        return start(device, locator, states);
     }
 
     private UpnpSession start(Device device, Function<String, Optional<URI>> locator, Consumer<DeviceState> onChange) {
@@ -87,7 +88,7 @@ class UpnpSessionTest {
     void reportsDisconnectedFirstThenConnectedWithVolume() {
         session = start(fake.device("kitchen"), udn -> Optional.empty());
 
-        assertThat(states.getFirst().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+        assertThat(states.all().getFirst().status()).isEqualTo(DeviceStatus.DISCONNECTED);
         await().atMost(WAIT).untilAsserted(() -> {
             DeviceState state = session.state();
             assertThat(state.status()).isEqualTo(DeviceStatus.CONNECTED);
@@ -255,13 +256,13 @@ class UpnpSessionTest {
 
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().nowPlaying()).isNotNull()
                 .extracting(NowPlaying::title).isEqualTo("Carrot Waltz"));
-        assertThat(states).allSatisfy(state -> assertThat(state.toString()).doesNotContain("ApiKey"));
+        assertThat(states.all()).allSatisfy(state -> assertThat(state.toString()).doesNotContain("ApiKey"));
     }
 
     @Test
     void pollsFasterWhilePlaying() {
         session = track(new UpnpSession(fake.device("kitchen"), new UpnpProperties(true, 1, 30, 1, 1, 1, 2),
-                SoapClient.httpClient(Duration.ofSeconds(1)), udn -> Optional.empty(), states::add, () -> { }));
+                SoapClient.httpClient(Duration.ofSeconds(1)), udn -> Optional.empty(), states, () -> { }));
         session.start();
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
 
@@ -311,7 +312,7 @@ class UpnpSessionTest {
         int polls = fake.calls("GetTransportInfo").size();
         await().atMost(WAIT).until(() -> fake.calls("GetTransportInfo").size() >= polls + 2);
         assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
-        assertThat(states).noneMatch(state -> state.toString().contains("root:"));
+        assertThat(states.all()).noneMatch(state -> state.toString().contains("root:"));
     }
 
     @Test
@@ -384,20 +385,20 @@ class UpnpSessionTest {
     void aFirstReadingThatFailsLeavesTheRendererOffline() {
         fake.fail("GetTransportInfo", 501, "Action Failed", 1);
         session = track(new UpnpSession(fake.device("kitchen"), new UpnpProperties(true, 1, 1, 1, 1, 30, 60),
-                SoapClient.httpClient(Duration.ofSeconds(1)), udn -> Optional.empty(), states::add, () -> { }));
+                SoapClient.httpClient(Duration.ofSeconds(1)), udn -> Optional.empty(), states, () -> { }));
         session.start();
         await().atMost(WAIT).until(() -> fake.calls("GetTransportInfo").size() == 1);
 
         var pause = new Action.Pause();
         await().atMost(WAIT).untilAsserted(() -> assertThatThrownBy(() -> session.execute(pause))
                 .isInstanceOf(DeviceOfflineException.class));
-        assertThat(states).extracting(DeviceState::status).doesNotContain(DeviceStatus.CONNECTED);
+        assertThat(states.all()).extracting(DeviceState::status).doesNotContain(DeviceStatus.CONNECTED);
     }
 
     @Test
     void aFailingStateListenerDoesNotStopPolling() {
         session = start(fake.device("kitchen"), udn -> Optional.empty(), state -> {
-            states.add(state);
+            states.accept(state);
             throw new IllegalStateException("a subscriber failed");
         });
 
@@ -408,7 +409,7 @@ class UpnpSessionTest {
     void aListenerThatFailedOnceStillReceivesLaterUpdates() {
         AtomicBoolean failed = new AtomicBoolean();
         session = start(fake.device("kitchen"), udn -> Optional.empty(), state -> {
-            states.add(state);
+            states.accept(state);
             if (state.status() == DeviceStatus.CONNECTED && failed.compareAndSet(false, true)) {
                 throw new IllegalStateException("listener bug");
             }
@@ -417,7 +418,7 @@ class UpnpSessionTest {
 
         fake.setVolume(35);
 
-        await().atMost(WAIT).until(() -> states.getLast().volumeLevel() == 35);
+        await().atMost(WAIT).until(() -> states.last().volumeLevel() == 35);
     }
 
     @Test

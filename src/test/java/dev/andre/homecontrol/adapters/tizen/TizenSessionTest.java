@@ -16,6 +16,7 @@ import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
+import dev.andre.homecontrol.testsupport.RecordingStateListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,9 +28,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,7 +45,7 @@ class TizenSessionTest {
     private FakeWakeOnLanReceiver receiver;
     private DeviceRegistry registry;
     private TizenSession session;
-    private final List<DeviceState> states = new CopyOnWriteArrayList<>();
+    private final RecordingStateListener states = new RecordingStateListener();
 
     @BeforeEach
     void setUp() throws IOException {
@@ -78,7 +77,7 @@ class TizenSessionTest {
                 Map.of("tizen", settings), Instant.now());
         registry.save(device);
         session = new TizenSession(device, TizenRestTest.properties(tv), InsecureTls.httpClient(Duration.ofSeconds(2)),
-                registry, learned(), new WakeOnLan(receiver.address()), states::add, () -> { });
+                registry, learned(), new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         return session;
     }
@@ -302,7 +301,7 @@ class TizenSessionTest {
         session.execute(new Action.PressKey(RemoteKey.POWER));
 
         assertThat(tv.nextKey()).isEqualTo("KEY_POWER");
-        assertThat(states.getLast().powerOn()).isFalse();
+        assertThat(states.last().powerOn()).isFalse();
     }
 
     @Test
@@ -361,7 +360,7 @@ class TizenSessionTest {
                 .until(() -> tv.connections() == 1);
 
         await().atMost(Duration.ofSeconds(8)).until(() -> tv.connections() >= 2);
-        assertThat(states).noneMatch(state -> state.status() == DeviceStatus.UNPAIRED);
+        assertThat(states.all()).noneMatch(state -> state.status() == DeviceStatus.UNPAIRED);
 
         tv.setAuthorization(FakeTizenServer.Authorization.ALLOW);
         await().atMost(Duration.ofSeconds(15)).until(() -> session.state().status() == DeviceStatus.CONNECTED);
@@ -392,8 +391,7 @@ class TizenSessionTest {
 
         tv.dropConnections();
 
-        await().atMost(Duration.ofSeconds(5)).until(() -> states.stream()
-                .anyMatch(state -> state.status() == DeviceStatus.DISCONNECTED));
+        states.awaitStatus(DeviceStatus.DISCONNECTED, Duration.ofSeconds(5));
         connected();
     }
 
@@ -415,6 +413,6 @@ class TizenSessionTest {
         states.clear();
         tv.dropConnections();
 
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4)).until(states::isEmpty);
+        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4)).until(() -> states.all().isEmpty());
     }
 }
