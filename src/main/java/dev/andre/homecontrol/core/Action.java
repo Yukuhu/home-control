@@ -37,8 +37,15 @@ public sealed interface Action {
         }
     }
 
-    /** Ask the device to open a URI in whatever app claims it. Optimistic by design (spec §5.3). */
-    record OpenAppLink(URI uri) implements Action {
+    /**
+     * Ask the device to open a URI in whatever app claims it. Optimistic by design (spec §5.3).
+     * {@code media} is what the link starts playing, when the sender knows; otherwise null.
+     */
+    record OpenAppLink(URI uri, LaunchedMedia media) implements Action {
+        public OpenAppLink(URI uri) {
+            this(uri, null);
+        }
+
         /** App links can carry authenticated media URLs, including nested VLC links. */
         @Override
         public String toString() {

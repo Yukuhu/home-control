@@ -38,13 +38,18 @@ export function applyState(deviceId, state) {
     }
 }
 
-// Media reported by the device (Cast) wins over the foreground app name (Android TV).
+// Media reported or inferred by an adapter wins over the foreground app name.
 export function describePlaying(state) {
     const playing = state.nowPlaying;
     if (!playing) return state.currentApp || "Nothing playing";
+    const paused = playing.state === "PAUSED" ? " (paused)" : "";
+    // An adapter that only knows what it launched (Android TV) has no position to show.
+    if (playing.positionSeconds == null) {
+        return `${playing.title}${paused}`
+            + (playing.durationSeconds ? ` · ${formatTime(playing.durationSeconds)}` : "");
+    }
     const position = formatTime(playing.positionSeconds)
         + (playing.durationSeconds ? ` / ${formatTime(playing.durationSeconds)}` : "");
-    const paused = playing.state === "PAUSED" ? " (paused)" : "";
     return `${playing.title}${paused} · ${position}`;
 }
 

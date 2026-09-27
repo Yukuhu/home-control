@@ -381,6 +381,12 @@ A successful response means the link was sent, not that VLC confirmed playback. 
 launch compatibility still needs validation. Stream credentials are resolved only when Play is
 pressed and are not included in route previews.
 
+While VLC stays in front, the device strip shows the title and length of the item Home Control
+launched. Remote v2 reports the foreground app only, so this is inferred: there is no position,
+pausing is not visible, and playback started on the TV itself still shows as the app name. The
+title clears when another app comes to the front, the device powers off, or the item's length
+plus 30 minutes has passed.
+
 Playing a Jellyfin item on a device tries, in order:
 
 1. **The selected device player** — VLC follows the flow above. With **Jellyfin app** selected,

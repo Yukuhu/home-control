@@ -1,8 +1,12 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
+import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.LaunchedMedia;
+import dev.andre.homecontrol.core.NowPlaying;
+import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
@@ -13,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.net.ServerSocket;
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -96,6 +101,84 @@ class AndroidTvSessionTest {
                 && session.state().muted()
                 && "com.netflix.ninja".equals(session.state().currentApp())
                 && session.state().powerOn());
+    }
+
+    @Test
+    void showsTheMediaItLaunchedOnceItsAppIsInFront() throws Exception {
+        session.start();
+        await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+
+        session.execute(launchInVlc());
+        assertThat(fakeDevice.nextAppLink()).isEqualTo("vlc://http://nas.lan/stream");
+        fakeDevice.pushCurrentApp("org.videolan.vlc");
+
+        await().untilAsserted(() -> assertThat(session.state().nowPlaying())
+                .isEqualTo(new NowPlaying("Big Buck Bunny", PlaybackState.PLAYING, null, 600.0)));
+    }
+
+    @Test
+    void forgetsTheLaunchedMediaWhenAnotherAppComesToTheFront() throws Exception {
+        session.start();
+        await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+        session.execute(launchInVlc());
+        fakeDevice.pushCurrentApp("org.videolan.vlc");
+        await().until(() -> session.state().nowPlaying() != null);
+
+        fakeDevice.pushCurrentApp("com.netflix.ninja");
+
+        await().until(() -> "com.netflix.ninja".equals(session.state().currentApp()));
+        assertThat(session.state().nowPlaying()).isNull();
+    }
+
+    @Test
+    void forgetsTheLaunchedMediaWhenTheDevicePowersOff() throws Exception {
+        session.start();
+        await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+        fakeDevice.pushPower(true);
+        session.execute(launchInVlc());
+        fakeDevice.pushCurrentApp("org.videolan.vlc");
+        await().until(() -> session.state().nowPlaying() != null);
+
+        fakeDevice.pushPower(false);
+
+        await().until(() -> !session.state().powerOn());
+        assertThat(session.state().nowPlaying()).isNull();
+    }
+
+    @Test
+    void keepsTheLaunchedMediaAcrossAReconnect() throws Exception {
+        session.start();
+        await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+        session.execute(launchInVlc());
+        fakeDevice.pushCurrentApp("org.videolan.vlc");
+        await().until(() -> session.state().nowPlaying() != null);
+
+        fakeDevice.hangUp();
+        await().until(() -> fakeDevice.connections() == 2
+                && session.state().status() == DeviceStatus.CONNECTED);
+        fakeDevice.pushCurrentApp("org.videolan.vlc");
+        fakeDevice.pushVolume(7, 100, false);
+
+        await().until(() -> session.state().volumeLevel() == 7);
+        assertThat(session.state().nowPlaying()).isNotNull();
+    }
+
+    @Test
+    void anAppLinkWithoutMediaShowsNothingPlaying() throws Exception {
+        session.start();
+        await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+
+        session.execute(new Action.OpenAppLink(URI.create("https://www.netflix.com/title/80057281")));
+        assertThat(fakeDevice.nextAppLink()).isNotNull();
+        fakeDevice.pushCurrentApp("com.netflix.ninja");
+
+        await().until(() -> "com.netflix.ninja".equals(session.state().currentApp()));
+        assertThat(session.state().nowPlaying()).isNull();
+    }
+
+    private static Action.OpenAppLink launchInVlc() {
+        return new Action.OpenAppLink(URI.create("vlc://http://nas.lan/stream"),
+                new LaunchedMedia("org.videolan.vlc", "Big Buck Bunny", 600.0));
     }
 
     @Test

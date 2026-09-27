@@ -5,12 +5,14 @@ import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.LaunchedMedia;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
@@ -25,6 +27,8 @@ import java.util.concurrent.TimeoutException;
 
 /** Resolves credentials only during execution; sends the VLC playback link once. */
 public class JellyfinVlcExecutor implements RouteExecutor {
+    private static final String VLC_PACKAGE = "org.videolan.vlc";
+    private static final double TICKS_PER_SECOND = 10_000_000.0;
     private static final Logger log = LoggerFactory.getLogger(JellyfinVlcExecutor.class);
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final JellyfinSetupService setup;
@@ -52,12 +56,12 @@ public class JellyfinVlcExecutor implements RouteExecutor {
         }
         long deadline = System.nanoTime() + timeout.toNanos();
         try {
-            URI link = resolveWithinDeadline(itemId, deadline);
+            Launch launch = resolveWithinDeadline(itemId, deadline);
             wake(device, deadline);
             checkDeadline(deadline);
             log.info("Sending VLC playback link to {}", device.id());
             // The link also starts playback. Never retry it after a successful socket write.
-            devices.execute(device.id(), new Action.OpenAppLink(link));
+            devices.execute(device.id(), new Action.OpenAppLink(launch.link(), launch.media()));
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new ActionFailedException("VLC startup was interrupted");
@@ -69,8 +73,12 @@ public class JellyfinVlcExecutor implements RouteExecutor {
         }
     }
 
-    private URI resolveWithinDeadline(String itemId, long deadline) throws InterruptedException {
-        FutureTask<URI> lookup = new FutureTask<>(() -> streamLink(itemId));
+    /** The link to send, and what it plays for the device to show; {@code media} is null for a nameless item. */
+    private record Launch(URI link, LaunchedMedia media) {
+    }
+
+    private Launch resolveWithinDeadline(String itemId, long deadline) throws InterruptedException {
+        FutureTask<Launch> lookup = new FutureTask<>(() -> streamLink(itemId));
         Thread.ofVirtual().name("jellyfin-vlc-stream").start(lookup);
         try {
             return lookup.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
@@ -85,7 +93,7 @@ public class JellyfinVlcExecutor implements RouteExecutor {
         }
     }
 
-    private URI streamLink(String itemId) {
+    private Launch streamLink(String itemId) {
         String id = JellyfinClient.id(itemId);
         JellyfinSettings settings = setup.settings().orElseThrow(() -> new IllegalArgumentException("Jellyfin not configured"));
         JellyfinConnection connection = setup.connection().orElseThrow(() -> new IllegalArgumentException("Jellyfin not connected"));
@@ -111,9 +119,18 @@ public class JellyfinVlcExecutor implements RouteExecutor {
             String stream = settings.deviceServerUrl() + ("Audio".equals(type) ? "/Audio/" : "/Videos/")
                     + id + "/stream?static=true&mediaSourceId=" + encode(sourceId) + "&api_key=" + encode(connection.token());
             // VLC's MediaWrapper.manageVLCMrl removes precisely this prefix.
-            return URI.create("vlc://" + stream);
+            return new Launch(URI.create("vlc://" + stream), media(item));
         }
         throw new ActionFailedException("Jellyfin has no direct stream for VLC; use the Jellyfin app for this item");
+    }
+
+    private static LaunchedMedia media(JsonNode item) {
+        String title = JellyfinItemMapper.playingTitle(item);
+        if (title.isBlank()) {
+            return null;
+        }
+        long runtime = item.path("RunTimeTicks").asLong(0);
+        return new LaunchedMedia(VLC_PACKAGE, title, runtime > 0 ? runtime / TICKS_PER_SECOND : null);
     }
 
     private void wake(Device device, long deadline) throws InterruptedException {
