@@ -88,26 +88,7 @@ public class SubscriptionsFeed {
     }
 
     private void loadSubscriptions(Instant now) {
-        LinkedHashMap<String, String> fresh = new LinkedHashMap<>();
-        String pageToken = null;
-        for (int page = 0; page < properties.maxSubscriptionPages(); page++) {
-            Map<String, String> query = new LinkedHashMap<>();
-            query.put("part", SNIPPET);
-            query.put("mine", "true");
-            query.put(MAX_RESULTS, "50");
-            query.put("pageToken", pageToken);
-            JsonNode response = api.get(QuotaLedger.Call.SUBSCRIPTIONS_LIST, "subscriptions", query);
-            for (JsonNode item : response.path("items")) {
-                String channelId = item.path(SNIPPET).path("resourceId").path("channelId").asString("");
-                if (!channelId.isBlank()) {
-                    fresh.put(channelId, item.path(SNIPPET).path("title").asString(""));
-                }
-            }
-            pageToken = response.path("nextPageToken").asString("");
-            if (pageToken.isBlank()) {
-                break;
-            }
-        }
+        LinkedHashMap<String, String> fresh = fetchSubscriptions();
         subscriptions = fresh;
         subscriptionsFetchedAt = now;
         uploads.keySet().retainAll(fresh.keySet());
@@ -130,6 +111,31 @@ public class SubscriptionsFeed {
                 }
             }
         }
+    }
+
+    /** Every subscribed channel id → its title, in YouTube's order, up to the configured number of pages. */
+    private LinkedHashMap<String, String> fetchSubscriptions() {
+        LinkedHashMap<String, String> fresh = new LinkedHashMap<>();
+        String pageToken = null;
+        for (int page = 0; page < properties.maxSubscriptionPages(); page++) {
+            Map<String, String> query = new LinkedHashMap<>();
+            query.put("part", SNIPPET);
+            query.put("mine", "true");
+            query.put(MAX_RESULTS, "50");
+            query.put("pageToken", pageToken);
+            JsonNode response = api.get(QuotaLedger.Call.SUBSCRIPTIONS_LIST, "subscriptions", query);
+            for (JsonNode item : response.path("items")) {
+                String channelId = item.path(SNIPPET).path("resourceId").path("channelId").asString("");
+                if (!channelId.isBlank()) {
+                    fresh.put(channelId, item.path(SNIPPET).path("title").asString(""));
+                }
+            }
+            pageToken = response.path("nextPageToken").asString("");
+            if (pageToken.isBlank()) {
+                break;
+            }
+        }
+        return fresh;
     }
 
     private void pollChannels(Instant now) {

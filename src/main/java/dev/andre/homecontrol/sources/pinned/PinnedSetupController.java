@@ -58,6 +58,8 @@ public class PinnedSetupController {
         return REDIRECT;
     }
 
+    // Post/redirect/get: every handler here answers with the same redirect view, by design.
+    @SuppressWarnings("java:S3516")
     @PostMapping("/setup/sources/pinned/{id}/move")
     public String move(@PathVariable String id, @RequestParam String direction, RedirectAttributes redirect) {
         if (!"up".equals(direction) && !"down".equals(direction)) {

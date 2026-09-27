@@ -24,7 +24,7 @@ public class YouTubeSetupService {
     private static final Logger log = LoggerFactory.getLogger(YouTubeSetupService.class);
 
     private static final Pattern CLIENT_ID_PATTERN =
-            Pattern.compile("^[0-9]{6,20}-[a-z0-9]{8,64}\\.apps\\.googleusercontent\\.com$", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("^\\d{6,20}-[a-z0-9]{8,64}\\.apps\\.googleusercontent\\.com$", Pattern.CASE_INSENSITIVE);
     private static final int MAX_CLIENT_SECRET_LENGTH = 200;
     private static final Pattern PLAYLIST_ID_PATTERN = Pattern.compile("[A-Za-z0-9_-]{2,64}");
     private static final int MAX_SELECTED_PLAYLISTS = 20;
@@ -49,6 +49,8 @@ public class YouTubeSetupService {
     private final ObjectProvider<YouTubePlaylists> playlists;
     private final ObjectProvider<DeviceManager> devices;
 
+    // Eleven distinct collaborators, four resolved lazily (the account and content source beans depend on this one).
+    @SuppressWarnings("java:S107")
     public YouTubeSetupService(SecretStore secrets, LoginService login, JsonFileSourceSettings sourceSettings,
                                GoogleOAuthClient oauth, GoogleTokens tokens, YouTubeAuthorizationService authorization,
                                ObjectProvider<YouTubeAccount> account, QuotaLedger ledger,

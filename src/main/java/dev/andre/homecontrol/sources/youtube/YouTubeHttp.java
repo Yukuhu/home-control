@@ -13,7 +13,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.StringJoiner;
 
 /** Plain HTTPS to Google: no redirects, timeouts, errors that never echo credentials. */
@@ -26,7 +28,25 @@ public class YouTubeHttp {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
+    /** An HTTP answer; compared by its body's content, and printed with the body's size only. */
     public record Response(int status, String contentType, byte[] body) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Response that && status == that.status
+                    && Objects.equals(contentType, that.contentType) && Arrays.equals(body, that.body);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(status, contentType, Arrays.hashCode(body));
+        }
+
+        @Override
+        public String toString() {
+            return "Response[status=" + status + ", contentType=" + contentType + ", body="
+                    + (body == null ? "none" : body.length + " bytes") + "]";
+        }
+
         public boolean ok() {
             return status >= 200 && status < 300;
         }

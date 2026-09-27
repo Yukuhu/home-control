@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -76,13 +77,9 @@ public class JsonFilePinStore {
         for (JsonNode entry : root.path("pins")) {
             Pin pin = parsePin(entry, index);
             index++;
-            if (pin == null) {
-                continue;
+            if (pin != null && seenIds.add(pin.id())) {
+                pins.add(pin);
             }
-            if (!seenIds.add(pin.id())) {
-                continue;
-            }
-            pins.add(pin);
         }
         return pins;
     }
@@ -159,22 +156,10 @@ public class JsonFilePinStore {
             node.put("url", pin.url().toString());
             node.put("service", pin.service());
             node.put("title", pin.title());
-            if (pin.subtitle() == null) {
-                node.putNull(SUBTITLE);
-            } else {
-                node.put(SUBTITLE, pin.subtitle());
-            }
-            if (pin.artwork() == null) {
-                node.putNull(ARTWORK);
-            } else {
-                node.put(ARTWORK, pin.artwork().toString());
-            }
+            putOrNull(node, SUBTITLE, pin.subtitle());
+            putOrNull(node, ARTWORK, Objects.toString(pin.artwork(), null));
             node.put("kind", pin.kind().name());
-            if (pin.upgradeOf() == null) {
-                node.putNull(UPGRADE_OF_KEY);
-            } else {
-                node.put(UPGRADE_OF_KEY, pin.upgradeOf());
-            }
+            putOrNull(node, UPGRADE_OF_KEY, pin.upgradeOf());
             node.put("createdAt", pin.createdAt().toString());
         }
 
@@ -194,6 +179,15 @@ public class JsonFilePinStore {
                 }
             }
             throw new StorageException("Could not write pinned shortcuts to " + file, e);
+        }
+    }
+
+    /** Optional fields are always written, as JSON null when absent. */
+    private static void putOrNull(ObjectNode node, String key, String value) {
+        if (value == null) {
+            node.putNull(key);
+        } else {
+            node.put(key, value);
         }
     }
 }
