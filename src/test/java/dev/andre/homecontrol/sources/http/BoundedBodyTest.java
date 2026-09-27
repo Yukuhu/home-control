@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.http;
 
 import com.sun.net.httpserver.HttpServer;
+import dev.andre.homecontrol.testsupport.FakeHttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,13 +81,13 @@ class BoundedBodyTest {
 
     @Test
     void aBodyThatNeverFinishesFailsAtTheDeadlineAndClosesTheConnection() throws Exception {
-        try (TricklingServer trickling = new TricklingServer()) {
+        try (FakeHttpServer trickling = FakeHttpServer.start().trickle(FakeHttpServer.ANY_METHOD, "/**")) {
             HttpRequest request = HttpRequest.newBuilder(trickling.url("/feed")).timeout(Duration.ofSeconds(1)).build();
 
             assertThatThrownBy(() -> http.send(request, BoundedBody.handler(1_000_000, Duration.ofSeconds(1))))
                     .isInstanceOf(HttpTimeoutException.class);
-            assertThat(trickling.bytesSent()).isGreaterThan(1);
-            await().atMost(Duration.ofSeconds(5)).until(() -> trickling.openStreams() == 0);
+            assertThat(trickling.bytesTrickled()).isGreaterThan(1);
+            await().atMost(Duration.ofSeconds(5)).until(() -> trickling.openTrickles() == 0);
         }
     }
 }

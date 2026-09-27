@@ -17,6 +17,7 @@ import dev.andre.homecontrol.sources.tmdb.TmdbProperties;
 import dev.andre.homecontrol.sources.youtube.YouTubeException;
 import dev.andre.homecontrol.sources.youtube.YouTubeHttp;
 import dev.andre.homecontrol.sources.youtube.YouTubeProperties;
+import dev.andre.homecontrol.testsupport.FakeHttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,11 +35,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Timeout(value = 10, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 class SlowBodyDeadlineTest {
 
-    private TricklingServer server;
+    private FakeHttpServer server;
 
     @BeforeEach
     void start() throws IOException {
-        server = new TricklingServer();
+        server = FakeHttpServer.start().trickle(FakeHttpServer.ANY_METHOD, "/**");
     }
 
     @AfterEach
@@ -55,7 +56,7 @@ class SlowBodyDeadlineTest {
         assertThatThrownBy(() -> client.get(key, "/trending/movie/week", Map.of()))
                 .isInstanceOf(TmdbException.class)
                 .hasFieldOrPropertyWithValue("kind", TmdbException.Kind.UNREACHABLE);
-        assertThat(server.bytesSent()).isGreaterThan(1);
+        assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
 
     @Test
@@ -68,7 +69,7 @@ class SlowBodyDeadlineTest {
                 .isInstanceOf(TheSportsDbException.class)
                 .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.UNREACHABLE)
                 .hasMessage("Could not reach TheSportsDB");
-        assertThat(server.bytesSent()).isGreaterThan(1);
+        assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
 
     @Test
@@ -84,7 +85,7 @@ class SlowBodyDeadlineTest {
         assertThatThrownBy(() -> client.image(serverUrl, "abc", "Primary", null, 480))
                 .isInstanceOf(JellyfinException.class)
                 .hasFieldOrPropertyWithValue("kind", JellyfinException.Kind.UNREACHABLE);
-        assertThat(server.bytesSent()).isGreaterThan(1);
+        assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
 
     @Test
@@ -98,7 +99,7 @@ class SlowBodyDeadlineTest {
                 .isInstanceOf(YouTubeException.class)
                 .hasFieldOrPropertyWithValue("kind", YouTubeException.Kind.UNREACHABLE)
                 .hasMessage("Could not reach 127.0.0.1");
-        assertThat(server.bytesSent()).isGreaterThan(1);
+        assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
 
     @Test
@@ -112,6 +113,6 @@ class SlowBodyDeadlineTest {
                     .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNREACHABLE)
                     .hasMessage("Could not reach 127.0.0.1");
         }
-        assertThat(server.bytesSent()).isGreaterThan(1);
+        assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
 }
