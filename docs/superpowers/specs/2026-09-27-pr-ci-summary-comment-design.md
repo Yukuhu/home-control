@@ -2,8 +2,7 @@
 
 Date: 2026-09-27
 
-Status: Design accepted by the user in conversation on 2026-09-27; written spec
-awaiting review.
+Status: Accepted by the user on 2026-09-27.
 
 ## Purpose and agreed scope
 
@@ -76,11 +75,15 @@ pr-summary:
   runs-on: ubuntu-latest
   permissions:
     contents: read
+    actions: read
     pull-requests: write
 ```
 
+`actions: read` lets the job read this run's start time and the links to its
+jobs.
+
 `!cancelled()` makes the job run when earlier jobs failed or were skipped, but
-not when the run was cancelled. No other job gains a permission.
+not when the run was cancelled. No other job's permissions change.
 
 `release` does not list `pr-summary` in its `needs`, so the summary can never
 gate a release.
@@ -174,6 +177,9 @@ request's analysis on SonarCloud.
 | Long stack trace | Cut to 30 lines |
 | Suite job failed and produced no XML | Row reads "❌ failed before tests ran" and links to the job log |
 | Suite job succeeded and produced no XML | Row reads "✅" without counts |
+| Suite job failed although every test passed | Row shows the counts, "but the job failed" and a link to the job log |
+| A result file cannot be read, for instance because it is truncated | The other files still count; the row adds "1 result file unreadable" |
+| Failure without a message | The first line of its trace is used; without a trace, "No failure message" |
 | Non-test job failed | Row links to that job's log |
 | Job skipped | Row reads "⏭️ not run" |
 | `sonar` skipped after a suite failure | Row reads "⏭️ not run, because tests failed" |
@@ -204,11 +210,15 @@ are shown as they are.
 
 To avoid presenting an earlier analysis as this run's result, the script also
 requests `api/project_pull_requests/list` and uses the gate details only when
-the commit recorded for this pull request matches this run. Which commit
-SonarCloud records, the pull request head or the merge commit that Actions
-checks out, is to be confirmed against a real analysis during implementation;
-the script compares against whichever it is. If no match can be established,
-the details count as unavailable.
+the commit recorded for this pull request matches this run. SonarCloud records
+the pull request's head commit, not the merge commit that Actions checks out;
+this was confirmed against the analysis of pull request 105. The script
+therefore compares against `github.event.pull_request.head.sha`. If the commits
+differ, or SonarCloud has no analysis for the pull request, the details count
+as unavailable.
+
+Both endpoints answer without authentication while the project is public. The
+token is sent when present, so the script keeps working if that changes.
 
 Any HTTP error, timeout or unexpected response shape also counts as
 unavailable. The `sonar` job remains the actual gate; the comment only
@@ -234,6 +244,7 @@ scripts/pr-summary/
 | `collectSuite(directory)` | Reads every `TEST-*.xml` in a directory and sums the results; reports whether any file existed | Filesystem, `parseJUnit` |
 | `fetchGate(options, fetch)` | The two SonarCloud requests and the staleness check; returns status and failed conditions, or unavailable | An injected `fetch` |
 | `render(model)` | Model to Markdown, including truncation and escaping | Nothing |
+| `buildModel(inputs)` | Environment, suites and gate to the model | Nothing |
 | `main` | Reads the environment, calls the units, writes `summary.md` | All of the above |
 
 `render` is pure. Everything the comment shows is in the model passed to it.
