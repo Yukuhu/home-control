@@ -150,7 +150,8 @@ class WorkflowEndToEndTest {
         session = (MockHttpSession) result.getRequest().getSession(false);
         assertThat(session).isNotNull();
         assertThat(login.isAuthenticated(session)).isTrue();
-        assertThat(upstream.count("/feed")).isZero();
+        // No fetch count here: saving asks the rail cache to load the new rail in the background, so a generated
+        // workflow's first fetch races this line. The tests count fetches once the rail is ready instead.
         return result.getResponse().getRedirectedUrl().substring("/setup/workflows/".length());
     }
 
@@ -210,7 +211,7 @@ class WorkflowEndToEndTest {
         upstream.respond("/feed", 200, "{\"auth\":{\"token\":\"" + TOKEN + "\"},\"channels\":[{\"id\":\"news\",\"title\":\"News\"},{\"id\":\"music\",\"title\":\"Music\"}]}");
         String id = save("GENERATED");
         String itemId = loadedItem(id);
-        assertThat(upstream.count("/feed")).isEqualTo(1);
+        assertThat(upstream.count("/feed")).as("only the rail fetched; saving did not").isEqualTo(1);
         upstream.respond("/feed", 200, "{\"auth\":{\"token\":\"" + NEW_TOKEN + "\"},\"channels\":[{\"id\":\"music\",\"title\":\"Music\"},{\"id\":\"news\",\"title\":\"News\"}]}");
         String preview = mvc.perform(get("/devices/" + deviceId + "/route-preview")
                         .param("source", "workflows").param("item", itemId).session(session))
