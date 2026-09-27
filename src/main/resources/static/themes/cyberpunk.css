@@ -37,7 +37,13 @@
             radial-gradient(800px 520px at -200px 420px, rgba(94, 246, 255, .06), transparent 70%),
             var(--bg);
     }
-    & * { border-radius: 0; }
+    /* Declared on every element so each resolves them against its own --line and --cut. */
+    & * {
+        border-radius: 0;
+        --cp-tr: linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0);
+        --cp-br: linear-gradient(315deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0);
+        --cp-bl: linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0);
+    }
     & ::selection { background: var(--cp-yellow); color: var(--cp-ink); }
     & :focus-visible { outline: 2px solid var(--cp-cyan); outline-offset: 3px; }
     /* Clipped controls would lose an outside ring, so theirs sits inside. */
@@ -60,8 +66,8 @@
         --cut: 9px; --line: rgba(255, 95, 88, .55); --fill: rgba(255, 95, 88, .07);
         border-color: var(--line); color: var(--fg);
         background:
-            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
-            linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--cp-tr),
+            var(--cp-bl),
             var(--fill);
         background-origin: border-box;
         clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
@@ -72,8 +78,8 @@
     & :is(button.primary, .button.primary), & #sheet-play {
         --line: var(--cp-yellow); --fill: var(--cp-yellow); color: var(--cp-ink);
         background:
-            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
-            linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--cp-tr),
+            var(--cp-bl),
             var(--fill);
         background-origin: border-box;
     }
@@ -82,8 +88,8 @@
     & button.danger {
         --line: var(--cp-red); color: var(--cp-red);
         background:
-            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
-            linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--cp-tr),
+            var(--cp-bl),
             repeating-linear-gradient(-45deg, rgba(255, 95, 88, .16) 0 5px, transparent 5px 10px);
         background-origin: border-box;
     }
@@ -98,8 +104,8 @@
     & .brand { color: var(--cp-yellow); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
     & .brand-light { color: var(--cp-red); font-weight: 500; }
     & .brand-mark {
-        --cut: 8px; border-color: var(--cp-yellow); color: var(--cp-yellow);
-        background: linear-gradient(225deg, var(--cp-yellow) calc(var(--cut) * .7071 + 1px), transparent 0), rgba(252, 238, 10, .08);
+        --cut: 8px; --line: var(--cp-yellow); border-color: var(--line); color: var(--cp-yellow);
+        background: var(--cp-tr), rgba(252, 238, 10, .08);
         background-origin: border-box;
         clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
     }
@@ -126,7 +132,7 @@
         --cut: 14px; --line: rgba(255, 95, 88, .45);
         border-color: var(--line);
         background:
-            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--cp-tr),
             linear-gradient(160deg, rgba(255, 95, 88, .07), transparent 60%),
             var(--surface);
         background-origin: border-box;
@@ -135,7 +141,7 @@
     & .chip-group:has(.selected) {
         --line: var(--cp-cyan);
         background:
-            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--cp-tr),
             linear-gradient(120deg, rgba(94, 246, 255, .15), rgba(94, 246, 255, .02) 65%),
             var(--surface);
         background-origin: border-box;
@@ -165,7 +171,7 @@
     }
     & .tile .art::after {
         content: ""; position: absolute; inset: -1px; pointer-events: none;
-        background: linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0);
+        background: var(--cp-tr);
     }
     & :is(.tile:hover, .tile:focus-visible) .art { --line: var(--cp-cyan); border-color: var(--cp-cyan); }
     & :is(.tile:hover, .tile:focus-visible) .art::after { box-shadow: inset 0 0 26px rgba(94, 246, 255, .3); }
@@ -194,22 +200,22 @@
         clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
     }
     & :is(.rail-error, .error) {
-        border-color: var(--cp-red); border-left-width: 3px; color: #ffc3bf;
+        --line: var(--cp-red); border-color: var(--line); border-left-width: 3px; color: #ffc3bf;
         background:
-            linear-gradient(225deg, var(--cp-red) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--cp-tr),
             repeating-linear-gradient(-45deg, rgba(255, 95, 88, .09) 0 6px, transparent 6px 12px), #15090c;
         background-origin: border-box;
     }
     & .rail-empty {
         --line: rgba(255, 95, 88, .35); border-color: var(--line);
-        background: linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0), var(--surface);
+        background: var(--cp-tr), var(--surface);
         background-origin: border-box;
     }
     & .rail-stale { color: var(--cp-yellow); text-transform: uppercase; }
     & .rails-empty {
         --line: rgba(255, 95, 88, .45); border-color: var(--line);
         background:
-            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--cp-tr),
             radial-gradient(ellipse at top, rgba(255, 95, 88, .16), transparent 70%),
             var(--surface);
         background-origin: border-box;
@@ -235,8 +241,8 @@
         --cut: 18px; --line: rgba(255, 95, 88, .6);
         border-color: var(--line); background-color: var(--cp-panel);
         background-image:
-            linear-gradient(315deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
-            linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0);
+            var(--cp-br),
+            var(--cp-bl);
         background-origin: border-box;
         clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
     }
@@ -299,7 +305,7 @@
         --cut: 18px; --line: rgba(255, 95, 88, .4);
         border-color: var(--line);
         background:
-            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--cp-tr),
             linear-gradient(var(--cp-yellow) 0 0) 0 0 / 56px 3px no-repeat,
             linear-gradient(rgba(255, 95, 88, .05), transparent 140px),
             var(--surface);
@@ -311,7 +317,7 @@
     & .setup .setup-welcome {
         --line: var(--cp-yellow);
         background:
-            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--cp-tr),
             radial-gradient(ellipse at top right, rgba(252, 238, 10, .1), transparent 70%),
             var(--surface);
         background-origin: border-box;
@@ -341,8 +347,8 @@
         --cut: 22px; --line: rgba(255, 95, 88, .55);
         border-color: var(--line);
         background:
-            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
-            linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--cp-tr),
+            var(--cp-bl),
             linear-gradient(var(--cp-yellow) 0 0) 0 0 / 72px 3px no-repeat,
             rgba(13, 16, 23, .94);
         background-origin: border-box;
@@ -354,7 +360,7 @@
         /* The docked remote runs to the screen edge, so only its inner corner is cut. */
         & .drawer[open]:not(:modal) {
             border-radius: 0;
-            background-image: linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0);
+            background-image: var(--cp-bl);
             clip-path: polygon(0 0, 100% 0, 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
         }
     }
