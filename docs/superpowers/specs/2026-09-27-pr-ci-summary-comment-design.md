@@ -155,6 +155,8 @@ broken summary script should fail the pull request that broke it.
 
 ### Failed tests
 
+#### Unit and integration tests
+
 **AndroidTvSessionTest** › `reportsInferredPlaybackAfterLaunch`
 …message in a code block…
 <details><summary>Stack trace</summary> … </details>
@@ -172,7 +174,7 @@ request's analysis on SonarCloud.
 
 | Case | Behaviour |
 |---|---|
-| More than 10 failed tests | The first 10 are listed, followed by "and N more" linking to the run |
+| More than 10 failed tests in a suite | Failures are grouped under a sub-heading per suite. The first 10 of each suite are listed, followed by "and N more" linking to the run |
 | Long failure message | Cut to 300 characters with an ellipsis |
 | Long stack trace | Cut to 30 lines |
 | Suite job failed and produced no XML | Row reads "❌ failed before tests ran" and links to the job log |
@@ -183,7 +185,8 @@ request's analysis on SonarCloud.
 | Non-test job failed | Row links to that job's log |
 | Job skipped | Row reads "⏭️ not run" |
 | Job cancelled or timed out while the run continued | Row reads "❌ cancelled" and links to the job log |
-| `sonar` skipped after a suite failure | Row reads "⏭️ not run, because tests failed" |
+| `sonar` skipped after tests failed | Row reads "⏭️ not run, because tests failed" |
+| `sonar` skipped after a suite job failed without a failed test | Row reads "⏭️ not run, because an earlier job failed" |
 | Gate details cannot be fetched or are stale | Row shows the job's own result with "details unavailable" and a link to SonarCloud |
 | Rendered comment exceeds 60 000 characters | Stack traces are dropped, then the failure list is shortened until it fits |
 
