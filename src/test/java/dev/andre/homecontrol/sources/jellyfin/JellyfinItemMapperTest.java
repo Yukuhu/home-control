@@ -81,6 +81,23 @@ class JellyfinItemMapperTest {
     }
 
     @Test
+    void whatPlaysIsNamedWithTheSeriesOfAnEpisodeAndTheArtistsOfATrack() {
+        JsonNode episode = MAPPER.readTree("""
+                {"Type":"Episode","Name":"Pilot","SeriesName":"Severance","ParentIndexNumber":1,"IndexNumber":1}
+                """);
+        JsonNode track = MAPPER.readTree("""
+                {"Type":"Audio","Name":"Bunny Song","Artists":["The Rabbits","Hare"]}
+                """);
+        JsonNode movie = MAPPER.readTree("""
+                {"Type":"Movie","Name":"Big Buck Bunny","ProductionYear":2008}
+                """);
+
+        assertThat(JellyfinItemMapper.playingTitle(episode)).isEqualTo("Severance · S1:E1 · Pilot");
+        assertThat(JellyfinItemMapper.playingTitle(track)).isEqualTo("The Rabbits, Hare · Bunny Song");
+        assertThat(JellyfinItemMapper.playingTitle(movie)).isEqualTo("Big Buck Bunny");
+    }
+
+    @Test
     void anItemWithoutIdIsSkipped() {
         JsonNode noId = MAPPER.readTree("{\"Name\":\"Ghost\",\"Type\":\"Movie\"}");
 
