@@ -90,6 +90,19 @@ tasks.named<Test>("test") {
     // Most of the suite waits on sockets and timeouts rather than computing, so test classes run
     // in several JVMs at once. Capped at four, which is what a CI runner has.
     maxParallelForks = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
+    // The deployment tests read these files from the repository rather than the classpath. As
+    // inputs, a change to one of them alone runs the tests again instead of reusing a result.
+    inputs.files(
+        ".github/workflows/ci.yml",
+        ".github/actions/smoke-image/action.yml",
+        "Dockerfile",
+        "Dockerfile.dist",
+        "compose.yaml",
+        "compose.bluetooth.yaml",
+        "casaos/docker-compose.yml",
+        "casaos/docker-compose.bluetooth.yml",
+        "docs/bluetooth-speakers.md",
+    ).withPropertyName("deploymentFiles").withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 protobuf {

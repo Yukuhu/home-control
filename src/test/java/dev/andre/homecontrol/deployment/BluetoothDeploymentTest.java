@@ -107,31 +107,42 @@ class BluetoothDeploymentTest {
     }
 
     @Test
+    void ciSmokeTestsTheBluetoothVariantOnEveryRun() throws Exception {
+        Map<String, Object> jobs = map(load(".github/workflows/ci.yml"), "jobs");
+
+        Map<String, Object> smoke = map(jobs, "smoke-bluetooth");
+        assertThat(smoke).doesNotContainKey("if");
+        List<Object> architectures = maps(map(map(smoke, "strategy"), "matrix"), "include").stream()
+                .map(entry -> entry.get("arch")).toList();
+        assertThat(architectures).containsExactlyInAnyOrder("amd64", "arm64");
+        assertThat(stepsUsing(smoke, "./.github/actions/smoke-image")).singleElement()
+                .satisfies(step -> assertThat(map(step, "with")).containsEntry("bluetooth", true));
+
+        Map<String, Object> action = map(load(".github/actions/smoke-image/action.yml"), "runs");
+        assertThat(stepsUsing(action, "docker/build-push-action@")).hasSize(2)
+                .allSatisfy(step -> assertThat(map(step, "with"))
+                        .containsEntry("build-args", "WITH_MPV=${{ inputs.bluetooth }}"));
+    }
+
+    @Test
     void ciPublishesABluetoothVariant() throws Exception {
-        Map<String, Object> workflow = load(".github/workflows/ci.yml");
-        Map<String, Object> jobs = map(workflow, "jobs");
+        Map<String, Object> jobs = map(load(".github/workflows/ci.yml"), "jobs");
+        assertThat(stringList(map(jobs, "release"), "needs")).doesNotContain("smoke-bluetooth");
 
-        Map<String, Object> release = map(jobs, "release");
-        List<Map<String, Object>> releaseSteps = maps(release, "steps");
-        Map<String, Object> metaBluetooth = releaseSteps.stream()
-                .filter(step -> "meta-bluetooth".equals(step.get("id"))).findFirst().orElseThrow();
-        Map<String, Object> metaWith = map(metaBluetooth, "with");
-        assertThat((String) metaWith.get("flavor")).contains("suffix=-bluetooth").contains("latest=false");
+        Map<String, Object> release = map(jobs, "release-bluetooth");
+        assertThat(stringList(release, "needs")).contains("release", "smoke-bluetooth");
+        assertThat(stepsUsing(release, "actions/download-artifact@")).singleElement()
+                .satisfies(step -> assertThat(map(step, "with")).containsEntry("pattern", "digest-bluetooth-*"));
 
-        Map<String, Object> buildBluetooth = releaseSteps.stream()
-                .filter(step -> "Build and push the Bluetooth variant".equals(step.get("name"))).findFirst().orElseThrow();
-        Map<String, Object> buildWith = map(buildBluetooth, "with");
-        assertThat(buildWith)
-                .containsEntry("build-args", "WITH_MPV=true")
-                .containsEntry("platforms", "linux/amd64,linux/arm64")
-                .containsEntry("tags", "${{ steps.meta-bluetooth.outputs.tags }}");
+        List<Map<String, Object>> steps = maps(release, "steps");
+        Map<String, Object> meta = steps.stream()
+                .filter(step -> "meta".equals(step.get("id"))).findFirst().orElseThrow();
+        assertThat((String) map(meta, "with").get("flavor")).contains("suffix=-bluetooth").contains("latest=false");
 
-        Map<String, Object> image = map(jobs, "image");
-        List<Map<String, Object>> imageSteps = maps(image, "steps");
-        Map<String, Object> imageBluetooth = imageSteps.stream()
-                .filter(step -> "Build Dockerfile with mpv".equals(step.get("name"))).findFirst().orElseThrow();
-        Map<String, Object> imageWith = map(imageBluetooth, "with");
-        assertThat(imageWith).containsEntry("build-args", "WITH_MPV=true").containsEntry("push", false);
+        Map<String, Object> publish = steps.stream()
+                .filter(step -> String.valueOf(step.get("run")).startsWith("scripts/publish-images.sh ")).findFirst().orElseThrow();
+        assertThat(map(publish, "env")).containsEntry("TAGS", "${{ steps.meta.outputs.tags }}");
+        assertThat((String) publish.get("run")).endsWith(" amd64,arm64");
     }
 
     @Test
@@ -188,6 +199,11 @@ class BluetoothDeploymentTest {
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> maps(Map<String, Object> parent, String key) {
         return (List<Map<String, Object>>) parent.get(key);
+    }
+
+    private static List<Map<String, Object>> stepsUsing(Map<String, Object> job, String action) {
+        return maps(job, "steps").stream()
+                .filter(step -> String.valueOf(step.get("uses")).startsWith(action)).toList();
     }
 
     @SuppressWarnings("unchecked")
