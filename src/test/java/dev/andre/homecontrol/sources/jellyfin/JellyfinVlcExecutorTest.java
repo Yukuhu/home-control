@@ -50,6 +50,30 @@ class JellyfinVlcExecutorTest {
     }
 
     @Test
+    void tellsTheDeviceWhatItLaunchedSoItCanShowTheTitle() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree("""
+                {"Id":"%s","Type":"Episode","MediaType":"Video","Name":"Pilot","SeriesName":"Severance",
+                 "ParentIndexNumber":1,"IndexNumber":1,"RunTimeTicks":34200000000}
+                """.formatted(ID)));
+
+        executor.execute(new Route.JellyfinVlc(ID), shield);
+
+        var sent = org.mockito.ArgumentCaptor.forClass(Action.class);
+        verify(devices).execute(eq("shield"), sent.capture());
+        assertThat(((Action.OpenAppLink) sent.getValue()).media())
+                .isEqualTo(new LaunchedMedia("org.videolan.vlc", "Severance · S1:E1 · Pilot", 3420.0));
+    }
+
+    @Test
+    void launchesWithoutAHintWhenJellyfinGivesTheItemNoName() {
+        executor.execute(new Route.JellyfinVlc(ID), shield);
+
+        var sent = org.mockito.ArgumentCaptor.forClass(Action.class);
+        verify(devices).execute(eq("shield"), sent.capture());
+        assertThat(((Action.OpenAppLink) sent.getValue()).media()).isNull();
+    }
+
+    @Test
     void refusesMediaThatRequiresTranscodingOrOpeningALiveStream() {
         when(client.post(any(), anyString(), anyMap(), any())).thenReturn(json.readTree("""
                 {"MediaSources":[

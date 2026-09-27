@@ -7,6 +7,8 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.KeyPress;
+import dev.andre.homecontrol.core.NowPlaying;
+import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.RemoteKey;
 
 import java.time.Instant;
@@ -73,6 +75,22 @@ class DeviceSwitchingE2eTest extends E2eApplicationTest {
                     0, 0, false, Instant.now()));
             assertThat(page.locator("#status-living")).hasText("CONNECTED");
             assertThat(page.locator("#play-sheet [data-status-for='living']")).hasText("CONNECTED");
+        }
+    }
+
+    @BrowserTest
+    void mediaWithoutAKnownPositionShowsItsLengthOnly(String browser) {
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+            page.navigate("/?device=living");
+
+            fakeDevices.push("living", new DeviceState(DeviceStatus.CONNECTED, true, "org.videolan.vlc",
+                    0, 0, false, Instant.now(), new NowPlaying("Severance", PlaybackState.PLAYING, null, 3420.0)));
+            assertThat(page.locator("#app-living")).hasText("Severance · 57:00");
+
+            fakeDevices.push("living", new DeviceState(DeviceStatus.CONNECTED, true, "org.videolan.vlc",
+                    0, 0, false, Instant.now(), new NowPlaying("Live stream", PlaybackState.PLAYING, null, null)));
+            assertThat(page.locator("#app-living")).hasText("Live stream");
         }
     }
 }

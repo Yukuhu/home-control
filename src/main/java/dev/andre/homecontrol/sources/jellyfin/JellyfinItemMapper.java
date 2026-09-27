@@ -66,6 +66,24 @@ public final class JellyfinItemMapper {
                 progress(item, userData)));
     }
 
+    /** One line naming what plays: an episode with its series and number, a track with its artists. Blank for a nameless item. */
+    static String playingTitle(JsonNode item) {
+        String name = item.path("Name").asString("").strip();
+        String context = switch (item.path("Type").asString("")) {
+            case "Episode" -> item.path("SeriesName").asString("").strip();
+            case "Audio" -> artists(item);
+            default -> null;
+        };
+        if ("Episode".equals(item.path("Type").asString(""))) {
+            String label = episodeLabel(item, name);
+            name = label == null ? "" : label;
+        }
+        if (context == null || context.isBlank()) {
+            return name;
+        }
+        return name.isBlank() ? context : context + " · " + name;
+    }
+
     static String episodeLabel(JsonNode item, String name) {
         int season = item.path("ParentIndexNumber").asInt(-1);
         int episode = item.path("IndexNumber").asInt(-1);

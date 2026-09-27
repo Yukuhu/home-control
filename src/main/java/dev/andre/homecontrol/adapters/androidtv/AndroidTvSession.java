@@ -7,6 +7,7 @@ import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.KeyPress;
+import dev.andre.homecontrol.core.LaunchedMedia;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
@@ -21,9 +22,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -69,6 +72,10 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     private final AtomicLong generation = new AtomicLong();
     /** Accessed only on the single-threaded scheduler. */
     private int consecutiveUnpaired;
+    /** Accessed only on the single-threaded scheduler. Outlives a reconnect: the device keeps playing. */
+    private final InferredPlayback playback = new InferredPlayback();
+    /** Accessed only on the single-threaded scheduler. */
+    private ScheduledFuture<?> playbackTimer;
     private volatile boolean closed;
 
     public AndroidTvSession(Device device, ClientCertificate credential,
@@ -134,7 +141,12 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     public void execute(Action action) {
         switch (action) {
             case Action.PressKey(var key, var press) -> sendKey(key, press);
-            case Action.OpenAppLink(var uri) -> openAppLink(uri);
+            case Action.OpenAppLink(var uri, var media) -> {
+                openAppLink(uri);
+                if (media != null) {
+                    runOnScheduler(generation.get(), () -> handleLaunched(media));
+                }
+            }
             case Action.SetVolume _ -> throw new UnsupportedActionException(
                     "Android TV Remote v2 has no absolute volume; use the volume keys");
             case Action.Mute _ -> throw new UnsupportedActionException(
@@ -208,12 +220,12 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
 
             @Override
             public void onPower(boolean on) {
-                runOnScheduler(attempt, () -> update(state.withPower(on)));
+                runOnScheduler(attempt, () -> handlePower(on));
             }
 
             @Override
             public void onCurrentApp(String appPackage) {
-                runOnScheduler(attempt, () -> update(state.withCurrentApp(appPackage)));
+                runOnScheduler(attempt, () -> handleCurrentApp(appPackage));
             }
 
             @Override
@@ -298,12 +310,12 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
 
     @Override
     public void onPower(boolean on) {
-        runOnScheduler(generation.get(), () -> update(state.withPower(on)));
+        runOnScheduler(generation.get(), () -> handlePower(on));
     }
 
     @Override
     public void onCurrentApp(String appPackage) {
-        runOnScheduler(generation.get(), () -> update(state.withCurrentApp(appPackage)));
+        runOnScheduler(generation.get(), () -> handleCurrentApp(appPackage));
     }
 
     @Override
@@ -314,6 +326,43 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     @Override
     public void onDisconnected(DisconnectCause cause) {
         runOnScheduler(generation.get(), () -> handleDisconnect(cause));
+    }
+
+    private void handlePower(boolean on) {
+        if (!on) {
+            playback.poweredOff();
+        }
+        update(state.withPower(on).withNowPlaying(playback.current(Instant.now())));
+    }
+
+    private void handleCurrentApp(String appPackage) {
+        playback.appChanged(appPackage);
+        update(state.withCurrentApp(appPackage).withNowPlaying(playback.current(Instant.now())));
+    }
+
+    private void handleLaunched(LaunchedMedia media) {
+        playback.launched(media, state.currentApp(), Instant.now());
+        refreshPlayback();
+    }
+
+    /** Publishes what plays now, then comes back when that is next due to change by itself. */
+    private void refreshPlayback() {
+        Instant now = Instant.now();
+        DeviceState refreshed = state.withNowPlaying(playback.current(now));
+        if (!refreshed.sameIgnoringTime(state)) {
+            update(refreshed);
+        }
+        if (playbackTimer != null) {
+            playbackTimer.cancel(false);
+        }
+        playback.nextDeadline().ifPresent(deadline -> {
+            try {
+                playbackTimer = scheduler.schedule(this::refreshPlayback,
+                        Math.max(0, Duration.between(now, deadline).toMillis()) + 1, TimeUnit.MILLISECONDS);
+            } catch (RejectedExecutionException _) {
+                // close() shut the scheduler down; the session is going away.
+            }
+        });
     }
 
     private void handleDisconnect(DisconnectCause cause) {
