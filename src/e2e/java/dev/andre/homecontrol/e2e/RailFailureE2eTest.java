@@ -24,16 +24,20 @@ import static org.awaitility.Awaitility.await;
 class RailFailureE2eTest extends E2eApplicationTest {
 
     /**
-     * Triggers a refresh of {@code railId} and waits for a snapshot strictly newer than the one
-     * {@code refresh()} itself returned (the "still refreshing" marker, taken before the fetch it
-     * starts even begins) to reach {@code status} — comparing the version, not just the status,
-     * so this can never pass by observing a stale snapshot a previous refresh left behind.
+     * Triggers a refresh of {@code railId} and waits for the finished snapshot it produces to reach
+     * {@code status}. The version is taken before triggering: {@code refresh()} returns whatever the
+     * rail holds once the fetch is handed off, and a fetch from this instant fake source can already
+     * be done by then, so waiting for something newer than that return value could wait forever.
+     * Comparing versions, not just the status, means a stale snapshot a previous refresh left behind
+     * can never satisfy this, and skipping the "still refreshing" marker (which keeps the old status)
+     * means only the fetch's own result can.
      */
     private void refreshAndAwaitFlakyStatus(String railId, RailStatus status) {
-        long triggeredVersion = rails.refresh("e2e", railId).map(RailSnapshot::version)
+        long before = rails.snapshot("e2e", railId).map(RailSnapshot::version).orElse(-1L);
+        rails.refresh("e2e", railId)
                 .orElseThrow(() -> new IllegalStateException("No e2e/" + railId + " rail entry"));
         await().until(() -> rails.snapshot("e2e", railId)
-                .filter(s -> s.version() > triggeredVersion)
+                .filter(s -> s.version() > before && !s.refreshing())
                 .map(s -> s.status() == status)
                 .orElse(false));
     }
