@@ -17,6 +17,7 @@ export const CHECKS = [
     { key: "jar", job: "Build the jar", label: "Jar" },
     { key: "test", job: "Build and test", label: "Unit and integration tests", suite: "test" },
     { key: "e2e-chromium", job: "Browser tests (Chromium)", label: "Browser tests (Chromium)", suite: "e2e-chromium" },
+    { key: "e2e-firefox", job: "Browser tests (Firefox)", label: "Browser tests (Firefox)", suite: "e2e-firefox" },
     { key: "e2e-webkit", job: "Browser tests (WebKit)", label: "Browser tests (WebKit)", suite: "e2e-webkit" },
     { key: "sonar", job: "SonarCloud quality gate", label: "SonarCloud quality gate" },
     { key: "image", job: "Build the self-contained image", label: "Image built from source (amd64)" },
@@ -341,6 +342,7 @@ export async function main(env, fetch = globalThis.fetch) {
     const suites = {
         test: await collectSuite(env.JUNIT_TEST_DIR),
         "e2e-chromium": await collectSuite(env.JUNIT_E2E_CHROMIUM_DIR),
+        "e2e-firefox": await collectSuite(env.JUNIT_E2E_FIREFOX_DIR),
         "e2e-webkit": await collectSuite(env.JUNIT_E2E_WEBKIT_DIR),
     };
     const sonar = JSON.parse(env.NEEDS_JSON).sonar?.result;

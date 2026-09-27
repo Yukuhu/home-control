@@ -6,7 +6,7 @@
 # directly; this is for local runs only.
 #
 # Runs the Playwright browser tests inside gradle:jdk25 + browsers (no local JDK or browsers needed).
-# Usage: scripts/e2e.sh                      # Chromium and WebKit
+# Usage: scripts/e2e.sh                      # Chromium, Firefox and WebKit
 #        scripts/e2e.sh -Pe2eBrowsers=chromium --tests '*PlaySheet*'
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

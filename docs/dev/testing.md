@@ -9,7 +9,7 @@ How the test suites are built and how to run them.
 | Unit tests | Plain JUnit 5 with AssertJ, Mockito and Awaitility. Most device and source tests drive the real client against an in-process fake that speaks the real protocol over a socket. | `src/test/java`, next to the code |
 | Web slices | `@WebMvcTest` of one controller with its collaborators mocked. | `src/test/java/.../web`, and next to each content source's own controllers |
 | End to end | `@SpringBootTest` with the whole application and fake devices or services, over MockMvc or real HTTP. | classes named `*EndToEndTest` |
-| Browser tests | Playwright driving the dashboard in Chromium and WebKit. | `src/e2e/java`, see [Browser tests](#browser-tests) |
+| Browser tests | Playwright driving the dashboard in Chromium, Firefox and WebKit. | `src/e2e/java`, see [Browser tests](#browser-tests) |
 | Architecture | ArchUnit package rules. | `ArchitectureTest`, see [Architecture](architecture.md#package-rules) |
 
 When this page was written, the unit, slice, end-to-end and architecture tests numbered 2,689.
@@ -50,10 +50,10 @@ To run them:
 
 ```bash
 ./gradlew installPlaywrightBrowsers   # once; needs root or passwordless sudo, Ubuntu 22.04-26.04
-./gradlew e2eTest                     # Chromium and WebKit; -Pe2eBrowsers=chromium to narrow
+./gradlew e2eTest                     # Chromium, Firefox and WebKit; -Pe2eBrowsers=chromium to narrow
 ```
 
-Without a local JDK, `scripts/e2e.sh` builds a `gradle:jdk25`-based image with both browsers
+Without a local JDK, `scripts/e2e.sh` builds a `gradle:jdk25`-based image with all three browsers
 already installed and runs `e2eTest` inside it (a tracked copy of the same
 `.superpowers/e2e.sh` this project's agents use). Playwright traces from any run land in
 `build/e2e-artifacts/<test>-<browser>.zip`; open one at https://trace.playwright.dev.

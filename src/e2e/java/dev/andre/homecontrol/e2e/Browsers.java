@@ -23,7 +23,7 @@ public final class Browsers {
     }
 
     public static Stream<String> names() {
-        return Arrays.stream(System.getProperty("e2e.browsers", "chromium,webkit").split(","))
+        return Arrays.stream(System.getProperty("e2e.browsers", "chromium,firefox,webkit").split(","))
                 .map(String::strip).filter(name -> !name.isEmpty());
     }
 
