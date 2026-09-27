@@ -86,6 +86,9 @@ dependencies {
 // Child-JVM tests (class loading, fake mpv) start java with exactly the test runtime classpath.
 tasks.named<Test>("test") {
     systemProperty("home-control.test.runtime-classpath", sourceSets["test"].runtimeClasspath.asPath)
+    // Most of the suite waits on sockets and timeouts rather than computing, so test classes run
+    // in several JVMs at once. Capped at four, which is what a CI runner has.
+    maxParallelForks = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
 }
 
 protobuf {
