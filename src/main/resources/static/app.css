@@ -50,7 +50,6 @@ p { margin-bottom: 1rem; }
 /* Theme switch (js/theme.js); the Cyberpunk theme itself lives in themes/cyberpunk.css. */
 .theme-toggle { flex: none; gap: .5rem; padding: .5rem .85rem; background: transparent; color: var(--muted); font-size: .8rem; }
 .theme-toggle:hover { color: var(--fg); }
-.theme-toggle .control-icon { width: 18px; height: 18px; }
 main#content { max-width: 1600px; margin: 0 auto; padding: 3.25rem clamp(1.25rem, 4vw, 4rem) calc(4rem + var(--safe-bottom)); }
 .page-heading { margin-bottom: 2.6rem; }
 .page-heading > p, .page-heading > div > p:not(.eyebrow) { color: var(--muted); margin: 0; }
@@ -279,12 +278,11 @@ html:has(.drawer:modal), body:has(.drawer:modal) { overflow: hidden; }
     /* Phones: an icon-sized switch; a waiting connection status wraps below it. */
     .theme-toggle { width: 44px; padding: 0; }
     .theme-toggle-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-    .connection-status { order: 1; }
     .brand { font-size: 1rem; gap: .6rem; }
     .brand-mark { width: 32px; height: 32px; font-size: 1.5rem; }
     .header-nav { margin-left: auto; }
     .header-nav a { padding: .55rem .7rem; }
-    .connection-status { display: none; }
+    .connection-status { display: none; order: 1; }
     main#content, main.setup { padding-top: 2rem; }
     .dashboard-heading { display: block; margin-bottom: 2rem; }
     .dashboard-heading .button { display: none; }
@@ -352,6 +350,7 @@ html:has(.drawer:modal), body:has(.drawer:modal) { overflow: hidden; }
 }
 .control-icon { width: 20px; height: 20px; flex: none; }
 .drawer-toggle .control-icon { width: 14px; height: 14px; }
+.theme-toggle .control-icon { width: 18px; height: 18px; }
 .source-preferences > li { display: grid; grid-template-columns: 1fr auto; gap: .6rem 1rem; align-items: center; }
 .source-preferences > li > .badge { justify-self: end; }
 .source-preferences > li > form { margin: 0; }
