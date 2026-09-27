@@ -9,8 +9,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.URI;
 import java.net.UnknownHostException;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,7 +32,13 @@ class CalendarFetcherTest {
 
     @AfterEach
     void stop() {
+        fetcher.close();
         server.close();
+    }
+
+    /** A host name no DNS knows: the fetch can only reach the fake through the address the policy vetted. */
+    private URI unresolvable(String path) {
+        return URI.create("http://calendar.test:" + server.url("/").getPort() + path);
     }
 
     @Test
@@ -155,5 +163,32 @@ class CalendarFetcherTest {
                 .isInstanceOf(CalendarFetchException.class)
                 .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BAD_RESPONSE)
                 .hasMessage("127.0.0.1 redirected to a link Home Control does not follow");
+    }
+
+    @Test
+    void connectsToTheAddressThePolicyVetted() {
+        server.respondFixture("/cal.ics", "bundesliga.ics");
+        CalendarUrlPolicy.HostResolver loopback = host -> new InetAddress[] {InetAddress.ofLiteral("127.0.0.1")};
+
+        try (CalendarFetcher pinned = new CalendarFetcher(properties, new CalendarUrlPolicy(true, loopback))) {
+            assertThat(pinned.fetch(unresolvable("/cal.ics"))).startsWith("BEGIN:VCALENDAR");
+        }
+    }
+
+    @Test
+    void aHostThatRebindsToThisMachineAfterTheCheckIsBlocked() {
+        server.respondFixture("/cal.ics", "bundesliga.ics");
+        AtomicInteger lookups = new AtomicInteger();
+        // The first answer passes the policy; every later one points at this machine, which the policy refuses.
+        CalendarUrlPolicy.HostResolver rebinding = host -> new InetAddress[] {lookups.getAndIncrement() == 0
+                ? InetAddress.ofLiteral("192.0.2.10") : InetAddress.ofLiteral("127.0.0.1")};
+
+        try (CalendarFetcher rebound = new CalendarFetcher(properties, new CalendarUrlPolicy(false, rebinding))) {
+            URI url = unresolvable("/cal.ics");
+            assertThatThrownBy(() -> rebound.fetch(url))
+                    .isInstanceOf(CalendarFetchException.class)
+                    .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BLOCKED);
+        }
+        assertThat(server.count("/cal.ics")).isZero();
     }
 }

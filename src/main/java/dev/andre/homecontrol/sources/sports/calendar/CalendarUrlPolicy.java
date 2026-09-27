@@ -65,8 +65,12 @@ public class CalendarUrlPolicy {
         return uri;
     }
 
-    public void checkAddress(URI uri) {
-        String host = uri.getHost();
+    /**
+     * Looks the host up and returns its addresses if every one of them may be fetched from; otherwise throws.
+     * The fetcher connects to exactly these addresses, so the check and the connection cannot disagree.
+     * Accepts an IPv6 literal with or without its URI brackets.
+     */
+    public InetAddress[] addresses(String host) {
         String lookup = host.startsWith("[") && host.endsWith("]") ? host.substring(1, host.length() - 1) : host;
         InetAddress[] addresses;
         try {
@@ -81,5 +85,10 @@ public class CalendarUrlPolicy {
                         + host + ": that address belongs to this machine or its network link");
             }
         }
+        return addresses;
+    }
+
+    public void checkAddress(URI uri) {
+        addresses(uri.getHost());
     }
 }
