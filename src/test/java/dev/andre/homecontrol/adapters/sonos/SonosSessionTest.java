@@ -20,6 +20,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static dev.andre.homecontrol.adapters.sonos.SonosDiscoveryTest.KITCHEN;
@@ -81,6 +82,22 @@ class SonosSessionTest {
         });
 
         assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
+    }
+
+    @Test
+    void aListenerThatFailedOnceStillReceivesLaterUpdates() {
+        AtomicBoolean failed = new AtomicBoolean();
+        connected(kitchen, state -> {
+            states.add(state);
+            if (state.status() == DeviceStatus.CONNECTED && failed.compareAndSet(false, true)) {
+                throw new IllegalStateException("listener bug");
+            }
+        });
+        await().atMost(WAIT).until(failed::get);
+
+        kitchen.setVolume(35);
+
+        await().atMost(WAIT).until(() -> states.getLast().volumeLevel() == 35);
     }
 
     @Test

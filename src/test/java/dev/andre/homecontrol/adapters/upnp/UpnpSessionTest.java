@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -401,6 +402,22 @@ class UpnpSessionTest {
         });
 
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
+    }
+
+    @Test
+    void aListenerThatFailedOnceStillReceivesLaterUpdates() {
+        AtomicBoolean failed = new AtomicBoolean();
+        session = start(fake.device("kitchen"), udn -> Optional.empty(), state -> {
+            states.add(state);
+            if (state.status() == DeviceStatus.CONNECTED && failed.compareAndSet(false, true)) {
+                throw new IllegalStateException("listener bug");
+            }
+        });
+        await().atMost(WAIT).until(failed::get);
+
+        fake.setVolume(35);
+
+        await().atMost(WAIT).until(() -> states.getLast().volumeLevel() == 35);
     }
 
     @Test
