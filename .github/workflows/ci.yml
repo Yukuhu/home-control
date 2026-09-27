@@ -616,6 +616,9 @@ jobs:
     permissions:
       contents: write
       packages: write
+      # To have GitHub sign the attestation of the image.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -652,6 +655,7 @@ jobs:
             type=sha,format=long
 
       - name: Publish the tested images under the release's tags
+        id: publish
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
         run: scripts/publish-images.sh "$RUNNER_TEMP/digests" amd64,arm64
@@ -669,6 +673,18 @@ jobs:
           git push origin "$TAG"
           gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
+      # After the release, which it must not hold up or undo: a failure here fails the job, but
+      # the image, the tag and the release stand. Signed by GitHub and kept in the registry
+      # beside the image, so that anyone can check that this workflow built it from this repository:
+      # gh attestation verify oci://ghcr.io/yukuhu/home-control:latest --repo Yukuhu/home-control
+      - name: Attest where the image was built
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.publish.outputs.image }}
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
+
       - name: Report
         env:
           TAG: ${{ needs.jar.outputs.tag }}
@@ -685,6 +701,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # To have GitHub sign the attestation of the image.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -718,9 +737,18 @@ jobs:
             type=raw,value=latest
 
       - name: Publish the tested images under the release's tags
+        id: publish
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
         run: scripts/publish-images.sh "$RUNNER_TEMP/digests" amd64,arm64
+
+      - name: Attest where the image was built
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.publish.outputs.image }}
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
 
   ci-passed:
     name: CI passed

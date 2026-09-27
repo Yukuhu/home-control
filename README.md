@@ -824,6 +824,13 @@ which `Release the Bluetooth image` publishes after the release, without holding
 up. A variant that fails its smoke test is not published, and `latest-bluetooth`
 stays at the release before.
 
+Every published image carries an attestation, signed by GitHub, of the workflow run and the
+commit it was built from, and a list of what it contains. To check an image before running it:
+
+```bash
+gh attestation verify oci://ghcr.io/yukuhu/home-control:latest --repo Yukuhu/home-control
+```
+
 Pull requests run the same jobs without pushing anything, and the `Build the jar`
 job says in its summary which version merging would release. The same check runs
 against a local build on any Linux Docker host, a Raspberry Pi included:
