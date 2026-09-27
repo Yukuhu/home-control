@@ -33,9 +33,7 @@ public class TmdbSetupController {
         try {
             setup.connect(new TmdbSetupService.ConnectRequest(credential, loginPassword, loginPasswordConfirmation), request);
             redirect.addFlashAttribute(MESSAGE, "TMDB connected");
-        } catch (ContentSourceException e) {
-            redirect.addFlashAttribute(ERROR, e.getMessage());
-        } catch (PasswordRejectedException e) {
+        } catch (ContentSourceException | PasswordRejectedException e) {
             redirect.addFlashAttribute(ERROR, e.getMessage());
         } catch (LoginRequiredException _) {
             redirect.addFlashAttribute(ERROR, "Log in again to change TMDB");

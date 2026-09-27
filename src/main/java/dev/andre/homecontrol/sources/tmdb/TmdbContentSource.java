@@ -18,6 +18,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +45,8 @@ public class TmdbContentSource implements ContentSource {
     private final ObjectProvider<PinnedLinks> pinnedLinks;
     private final Clock clock;
 
+    // Spring constructor injection: eight distinct collaborators, no cohesive subset worth its own type.
+    @SuppressWarnings("java:S107")
     public TmdbContentSource(TmdbSetupService setup, TmdbClient client, TmdbImages images,
                              TmdbWatchProviders providers, TmdbProperties properties,
                              Supplier<SourcePreferences> preferences, ProviderMatcher matcher,
@@ -52,6 +55,8 @@ public class TmdbContentSource implements ContentSource {
     }
 
     /** Package-private: lets tests pin {@code fetchedAt}. */
+    // The injected collaborators plus the clock tests pin.
+    @SuppressWarnings("java:S107")
     TmdbContentSource(TmdbSetupService setup, TmdbClient client, TmdbImages images,
                       TmdbWatchProviders providers, TmdbProperties properties,
                       Supplier<SourcePreferences> preferences, ProviderMatcher matcher,
@@ -102,15 +107,11 @@ public class TmdbContentSource implements ContentSource {
         List<JsonNode> candidates = collectTrendingCandidates(credential, prefs.locale());
         List<ContentItem> items = new ArrayList<>();
         TmdbException firstFailure = null;
-        boolean anyAttempted = false;
         boolean anyLookupSucceeded = false;
-        for (JsonNode candidate : candidates) {
-            if (items.size() >= properties.railSize()) {
-                break;
-            }
+        for (int i = 0; i < candidates.size() && items.size() < properties.railSize(); i++) {
+            JsonNode candidate = candidates.get(i);
             TmdbMediaRef ref = TmdbMediaRef.of(candidate, null).orElseThrow();
-            anyAttempted = true;
-            List<WatchProvider> watchProviders;
+            List<WatchProvider> watchProviders = null;
             try {
                 watchProviders = providers.providers(credential, ref, prefs.region());
                 anyLookupSucceeded = true;
@@ -118,21 +119,28 @@ public class TmdbContentSource implements ContentSource {
                 if (firstFailure == null) {
                     firstFailure = e;
                 }
-                continue;
             }
-            List<String> keys = matcher.matches(watchProviders, configuredProviders);
-            if (keys.isEmpty()) {
-                continue;
+            if (watchProviders != null) {
+                trendingItem(credential, candidate, ref, matcher.matches(watchProviders, configuredProviders))
+                        .ifPresent(items::add);
             }
-            String prefix = "On " + names(keys);
-            List<PlayableRef> playables = playablesFor(ref.itemId(), keys);
-            TmdbItemMapper.toItem(candidate, null, path -> images.poster(credential, path), prefix, playables)
-                    .ifPresent(items::add);
         }
-        if (anyAttempted && !anyLookupSucceeded && firstFailure != null) {
+        // Only a failure of every lookup fails the rail; a failure means at least one lookup was attempted.
+        if (!anyLookupSucceeded && firstFailure != null) {
             throw firstFailure;
         }
         return new Rail(TRENDING, items, clock.instant());
+    }
+
+    /** The candidate as a rail item, when it streams on at least one of the household's services. */
+    private Optional<ContentItem> trendingItem(TmdbCredential credential, JsonNode candidate, TmdbMediaRef ref,
+                                               List<String> keys) {
+        if (keys.isEmpty()) {
+            return Optional.empty();
+        }
+        String prefix = "On " + names(keys);
+        List<PlayableRef> playables = playablesFor(ref.itemId(), keys);
+        return TmdbItemMapper.toItem(candidate, null, path -> images.poster(credential, path), prefix, playables);
     }
 
     @Override
@@ -230,35 +238,40 @@ public class TmdbContentSource implements ContentSource {
         List<JsonNode> candidates = new ArrayList<>();
         Set<String> seenIds = new HashSet<>();
         int page = 1;
-        while (candidates.size() < properties.trendingCandidates()) {
+        boolean lastPage = false;
+        while (!lastPage && candidates.size() < properties.trendingCandidates()) {
             LinkedHashMap<String, String> params = new LinkedHashMap<>();
             params.put(LANGUAGE, language);
             params.put("page", String.valueOf(page));
             JsonNode response = client.get(credential, "/trending/all/week", params);
-            int rawCount = 0;
-            for (JsonNode result : response.path("results")) {
-                rawCount++;
-                if (result.path("adult").asBoolean(false)) {
-                    continue;
-                }
-                Optional<TmdbMediaRef> ref = TmdbMediaRef.of(result, null);
-                if (ref.isEmpty()) {
-                    continue;
-                }
-                if (!seenIds.add(ref.get().itemId())) {
-                    continue;
-                }
-                candidates.add(result);
-                if (candidates.size() >= properties.trendingCandidates()) {
-                    break;
-                }
-            }
+            int rawCount = addCandidates(response.path("results"), candidates, seenIds);
             int totalPages = Math.max(1, response.path("total_pages").asInt(1));
-            if (rawCount == 0 || page >= totalPages) {
-                break;
-            }
+            lastPage = rawCount == 0 || page >= totalPages;
             page++;
         }
         return candidates;
+    }
+
+    /** Adds one page's new titles until the candidates are full; returns how many results it looked at. */
+    private int addCandidates(JsonNode results, List<JsonNode> candidates, Set<String> seenIds) {
+        int rawCount = 0;
+        Iterator<JsonNode> remaining = results.iterator();
+        while (remaining.hasNext() && candidates.size() < properties.trendingCandidates()) {
+            JsonNode result = remaining.next();
+            rawCount++;
+            if (isNewTitle(result, seenIds)) {
+                candidates.add(result);
+            }
+        }
+        return rawCount;
+    }
+
+    /** A movie or series (never a person, never adult) not collected yet; remembers it as seen. */
+    private static boolean isNewTitle(JsonNode result, Set<String> seenIds) {
+        if (result.path("adult").asBoolean(false)) {
+            return false;
+        }
+        Optional<TmdbMediaRef> ref = TmdbMediaRef.of(result, null);
+        return ref.isPresent() && seenIds.add(ref.get().itemId());
     }
 }
