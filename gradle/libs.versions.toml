@@ -20,6 +20,7 @@ bluez-dbus = "0.3.5"
 dbus-java = "5.2.1"
 # scripts/e2e.sh and the CI browser cache read this version.
 playwright = "1.63.0"
+archunit = "1.5.1"
 
 [libraries]
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
@@ -36,6 +37,7 @@ bluez-dbus = { module = "com.github.hypfvieh:bluez-dbus", version.ref = "bluez-d
 dbus-java-core = { module = "com.github.hypfvieh:dbus-java-core", version.ref = "dbus-java" }
 dbus-java-unixsocket = { module = "com.github.hypfvieh:dbus-java-transport-native-unixsocket", version.ref = "dbus-java" }
 playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
