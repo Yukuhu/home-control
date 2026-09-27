@@ -32,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,11 +75,15 @@ class WebOsSessionTest {
     }
 
     private WebOsSession session(Map<String, String> settings) throws IOException {
+        return session(settings, states::add);
+    }
+
+    private WebOsSession session(Map<String, String> settings, Consumer<DeviceState> listener) throws IOException {
         Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1", Map.of("webos", settings), Instant.now());
         registry.save(device);
         WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 2, 2, 1, 2, 0);
         session = new WebOsSession(device, properties, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
-                learned(), new WakeOnLan(receiver.address()), states::add, () -> { });
+                learned(), new WakeOnLan(receiver.address()), listener, () -> { });
         return session;
     }
 
@@ -411,5 +416,22 @@ class WebOsSessionTest {
         tv.dropConnections();
 
         await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).until(states::isEmpty);
+    }
+
+    @Test
+    void aFailingStateListenerDoesNotLeaveTheSessionHalfConnected() throws IOException {
+        // The real listener publishes a Spring event synchronously, so any subscriber's failure lands here.
+        session(Map.of("clientKey", FakeSsapServer.CLIENT_KEY), state -> {
+            states.add(state);
+            throw new IllegalStateException("a subscriber failed");
+        }).start();
+        connected();
+
+        // Everything connect() does after publishing CONNECTED still happened.
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            assertThat(session.state().currentApp()).isEqualTo("com.webos.app.home");
+            assertThat(session.inputs()).isNotEmpty();
+            assertThat(storedSetting("macAddress")).isEqualTo("A8:23:FE:01:02:03");
+        });
     }
 }

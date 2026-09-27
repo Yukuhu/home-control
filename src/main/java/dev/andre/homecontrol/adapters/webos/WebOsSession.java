@@ -404,7 +404,13 @@ public class WebOsSession implements DeviceHandle, InputListing {
             return;
         }
         state = next;
-        onChange.accept(next);
+        try {
+            onChange.accept(next);
+        } catch (RuntimeException e) {
+            // The listener publishes a Spring event synchronously, to subscribers this class knows nothing about.
+            // Their failure must not abort connect() after the connection is set but before its subscriptions exist.
+            log.warn("A device state listener failed for {}", device.id(), e);
+        }
     }
 
     private void onScheduler(Runnable task) {
