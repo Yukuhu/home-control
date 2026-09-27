@@ -2,6 +2,7 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.HomeControlApplication;
 import dev.andre.homecontrol.content.RailsChangedEvent;
+import dev.andre.homecontrol.testsupport.EventStreamReader;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;

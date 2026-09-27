@@ -11,6 +11,7 @@ import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.testsupport.EventStreamReader;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

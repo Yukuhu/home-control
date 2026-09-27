@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.sources.jellyfin.FakeJellyfinServer;
+import dev.andre.homecontrol.testsupport.EventStreamReader;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
