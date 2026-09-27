@@ -55,6 +55,8 @@ public class ContentController {
                 .toList();
     }
 
+    // Answers the JSON view or a plain-text reason the browser shows as is (400/404/502), each with its own status.
+    @SuppressWarnings("java:S1452")
     @GetMapping("/sources/{sourceId}/rails/{railId}")
     public ResponseEntity<?> rail(@PathVariable String sourceId, @PathVariable String railId) {
         return rails.snapshot(sourceId, railId).<ResponseEntity<?>>map(snapshot -> switch (snapshot.status()) {
@@ -66,6 +68,8 @@ public class ContentController {
         }).orElseGet(() -> unknownRail(sourceId, railId));
     }
 
+    // Answers the JSON view or a plain-text reason the browser shows as is (400/404/502), each with its own status.
+    @SuppressWarnings("java:S1452")
     @PostMapping("/sources/{sourceId}/rails/{railId}/refresh")
     public ResponseEntity<?> refresh(@PathVariable String sourceId, @PathVariable String railId) {
         return rails.refresh(sourceId, railId)
@@ -93,6 +97,8 @@ public class ContentController {
     }
 
     /** Used by the unified search box (D5): every enabled searchable source, in parallel, one deadline. */
+    // Answers the JSON view or a plain-text reason the browser shows as is (400/404/502), each with its own status.
+    @SuppressWarnings("java:S1452")
     @GetMapping(path = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> search(@RequestParam(required = false) String q, @RequestParam(defaultValue = "20") int limit) {
         return search(q, limit, null);
@@ -103,6 +109,8 @@ public class ContentController {
      * that source's own quota (e.g. a YouTube Data API search.list call). A POST, so
      * CrossOriginFilter refuses a cross-site request before it can spend anything.
      */
+    // Answers the JSON view or a plain-text reason the browser shows as is (400/404/502), each with its own status.
+    @SuppressWarnings("java:S1452")
     @PostMapping(path = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> searchSource(@RequestParam(required = false) String q, @RequestParam(defaultValue = "20") int limit,
                                           @RequestParam String source) {

@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Objects;
 
 /**
  * The AES-256 key of {@code secrets.json}. With {@code HOME_CONTROL_SECRET} set the key is
@@ -29,6 +30,23 @@ public final class SecretKeySource {
 
     /** What {@code secrets.json} records about its key. Salt and costs are set for the passphrase source only. */
     public record KeyHeader(String source, byte[] salt, int memoryKiB, int iterations, int parallelism) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof KeyHeader that && Objects.equals(source, that.source) && Arrays.equals(salt, that.salt)
+                    && memoryKiB == that.memoryKiB && iterations == that.iterations && parallelism == that.parallelism;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(source, Arrays.hashCode(salt), memoryKiB, iterations, parallelism);
+        }
+
+        /** Only the salt's length: a printed header need not carry its bytes. */
+        @Override
+        public String toString() {
+            return "KeyHeader[source=" + source + ", salt=" + (salt == null ? "none" : salt.length + " bytes")
+                    + ", memoryKiB=" + memoryKiB + ", iterations=" + iterations + ", parallelism=" + parallelism + "]";
+        }
     }
 
     record Keyed(KeyHeader header, SecretKey key) {

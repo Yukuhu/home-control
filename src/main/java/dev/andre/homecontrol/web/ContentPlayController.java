@@ -27,7 +27,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -57,61 +56,39 @@ public class ContentPlayController {
 
     @PostMapping(path = "/devices/{id}/play", params = {"source", "item"}, produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> play(@PathVariable String id, @RequestParam String source, @RequestParam String item) {
-        if (devices.device(id).isEmpty()) {
-            return text(HttpStatus.NOT_FOUND, NO_DEVICE_PREFIX + id);
-        }
-        Optional<ContentItem> content = find(source, item);
-        if (content.isEmpty()) {
-            return notFound(source);
-        }
-        return text(HttpStatus.OK, playback.play(content.get(), id).describe(content.get().kind()));
+        ContentItem content = requireItem(id, source, item);
+        return text(HttpStatus.OK, playback.play(content, id).describe(content.kind()));
     }
 
     @GetMapping(path = "/devices/{id}/route", params = {"source", "item"}, produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> route(@PathVariable String id, @RequestParam String source, @RequestParam String item) {
-        if (devices.device(id).isEmpty()) {
-            return text(HttpStatus.NOT_FOUND, NO_DEVICE_PREFIX + id);
-        }
-        Optional<ContentItem> content = find(source, item);
-        if (content.isEmpty()) {
-            return notFound(source);
-        }
-        Route route = playback.plan(content.get(), id);
+        ContentItem content = requireItem(id, source, item);
+        Route route = playback.plan(content, id);
         return route instanceof Route.Unroutable(var reason)
                 ? text(HttpStatus.UNPROCESSABLE_CONTENT, reason)
-                : text(HttpStatus.OK, route.describe(content.get().kind()));
+                : text(HttpStatus.OK, route.describe(content.kind()));
     }
 
     @GetMapping(path = "/devices/{id}/route-preview", params = {"source", "item"}, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> preview(@PathVariable String id, @RequestParam String source, @RequestParam String item) {
-        if (devices.device(id).isEmpty()) {
-            return text(HttpStatus.NOT_FOUND, NO_DEVICE_PREFIX + id);
-        }
-        Optional<ContentItem> content = find(source, item);
-        if (content.isEmpty()) {
-            return notFound(source);
-        }
+    public ResponseEntity<RoutePreviewView> preview(@PathVariable String id, @RequestParam String source,
+                                                    @RequestParam String item) {
+        ContentItem content = requireItem(id, source, item);
         PinOfferView pin = pinnedLinks.getIfAvailable() == null ? null
-                : PinOffers.offer(content.get()).map(PinOfferView::of).orElse(null);
-        return ResponseEntity.ok(RoutePreviewView.of(playback.preview(content.get(), id), pin, content.get().kind()));
+                : PinOffers.offer(content).map(PinOfferView::of).orElse(null);
+        return ResponseEntity.ok(RoutePreviewView.of(playback.preview(content, id), pin, content.kind()));
     }
 
     @PostMapping(path = "/devices/{id}/play-attempt", params = {"source", "item"}, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> attempt(@PathVariable String id, @RequestParam String source, @RequestParam String item,
-                                     @RequestParam(name = "skip", required = false) List<String> skip) {
+    public ResponseEntity<PlayResultView> attempt(@PathVariable String id, @RequestParam String source,
+                                                  @RequestParam String item,
+                                                  @RequestParam(name = "skip", required = false) List<String> skip) {
         List<String> skips = skip == null ? List.of() : skip.stream().filter(s -> !s.isBlank()).toList();
         if (skips.size() > MAX_SKIP || skips.stream().anyMatch(s -> s.length() > MAX_SKIP_LENGTH)) {
-            return text(HttpStatus.BAD_REQUEST, "Too many or too long route keys to skip");
+            throw new IllegalArgumentException("Too many or too long route keys to skip");
         }
-        if (devices.device(id).isEmpty()) {
-            return text(HttpStatus.NOT_FOUND, NO_DEVICE_PREFIX + id);
-        }
-        Optional<ContentItem> content = find(source, item);
-        if (content.isEmpty()) {
-            return notFound(source);
-        }
-        ContentKind kind = content.get().kind();
-        return switch (playback.attempt(content.get(), id, Set.copyOf(skips))) {
+        ContentItem content = requireItem(id, source, item);
+        ContentKind kind = content.kind();
+        return switch (playback.attempt(content, id, Set.copyOf(skips))) {
             case PlayAttempt.Played(var device, var route, var remaining) -> ResponseEntity.ok(new PlayResultView(true, id, device.name(),
                     RouteView.of(route, kind), RouteView.of(first(remaining), kind),
                     route.describe(kind)));
@@ -136,14 +113,24 @@ public class ContentPlayController {
         };
     }
 
-    private Optional<ContentItem> find(String source, String item) {
-        return sources.find(source).flatMap(found -> found.item(item));
+    /**
+     * The item, re-read from its source, for a device that exists. An unknown device, source or
+     * item ends the request as a 404 with a plain-text reason, through the handlers below.
+     */
+    private ContentItem requireItem(String id, String source, String item) {
+        if (devices.device(id).isEmpty()) {
+            throw new DeviceNotFoundException(NO_DEVICE_PREFIX + id);
+        }
+        return sources.find(source).flatMap(found -> found.item(item))
+                .orElseThrow(() -> new NoSuchContentException(
+                        sources.find(source).isEmpty() ? "No content source " + source : "No such item"));
     }
 
-    private ResponseEntity<String> notFound(String source) {
-        return sources.find(source).isEmpty()
-                ? text(HttpStatus.NOT_FOUND, "No content source " + source)
-                : text(HttpStatus.NOT_FOUND, "No such item");
+    /** The source or item a request names does not exist. */
+    private static final class NoSuchContentException extends RuntimeException {
+        NoSuchContentException(String message) {
+            super(message);
+        }
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -151,8 +138,8 @@ public class ContentPlayController {
         return text(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
-    @ExceptionHandler(DeviceNotFoundException.class)
-    public ResponseEntity<String> notFound(DeviceNotFoundException e) {
+    @ExceptionHandler({DeviceNotFoundException.class, NoSuchContentException.class})
+    public ResponseEntity<String> notFound(RuntimeException e) {
         return text(HttpStatus.NOT_FOUND, e.getMessage());
     }
 

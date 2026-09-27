@@ -13,6 +13,8 @@ public final class Argon2id {
         return derive(password, salt, null, null, memoryKiB, iterations, parallelism, length);
     }
 
+    // RFC 9106's own inputs (P, S, K, X, m, t, p, T), one to one, so its test vectors map onto a call.
+    @SuppressWarnings("java:S107")
     public static byte[] derive(byte[] password, byte[] salt, byte[] secret, byte[] associatedData,
                                 int memoryKiB, int iterations, int parallelism, int length) {
         Argon2Parameters.Builder builder = new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)

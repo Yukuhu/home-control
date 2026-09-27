@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.web;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ public class IconController {
     private final BiFunction<Integer, IconRenderer.Shape, byte[]> renderer;
     private final Map<String, byte[]> cache = new ConcurrentHashMap<>();
 
+    @Autowired
     public IconController() {
         this(IconRenderer::png);
     }

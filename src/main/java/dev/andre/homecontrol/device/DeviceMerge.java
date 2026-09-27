@@ -20,6 +20,8 @@ final class DeviceMerge {
     private DeviceMerge() {
     }
 
+    // DeviceManager.attach's five inputs plus the three it is made pure over (registry, clock, host match).
+    @SuppressWarnings("java:S107")
     static Device attach(List<Device> registered, String host, String name, DeviceKind kind, String adapterId,
                          Map<String, String> settings, Instant now, BiPredicate<String, String> sameHost) {
         for (Device existing : registered) {

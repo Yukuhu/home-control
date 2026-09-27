@@ -136,14 +136,15 @@ public class DeviceStateBroadcaster {
             }
             try {
                 send.to(emitter);
-            } catch (Throwable t) {
+            } catch (IOException | RuntimeException e) {
                 // Not just IOException: send throws an unchecked IllegalStateException when the
                 // emitter completed after this loop took its snapshot of the list, which happens
                 // routinely on tab close. Either way this subscriber is finished — drop it, and
-                // never let it stop the event reaching the remaining tabs.
-                log.debug("Dropping an SSE subscriber after a failed send", t);
+                // never let it stop the event reaching the remaining tabs. An Error is no such
+                // subscriber problem: it ends this task, and the executor starts a fresh thread.
+                log.debug("Dropping an SSE subscriber after a failed send", e);
                 drop(emitter);
-                completeQuietly(emitter, t);
+                completeQuietly(emitter, e);
             }
         }
     }
@@ -161,16 +162,16 @@ public class DeviceStateBroadcaster {
     private void completeQuietly(SseEmitter emitter) {
         try {
             emitter.complete();
-        } catch (Throwable _) {
+        } catch (RuntimeException _) {
             // Already gone; the emitter is off the list either way.
         }
     }
 
     /** {@code completeWithError} throws in turn on an emitter that has already completed. */
-    private void completeQuietly(SseEmitter emitter, Throwable cause) {
+    private void completeQuietly(SseEmitter emitter, Exception cause) {
         try {
             emitter.completeWithError(cause);
-        } catch (Throwable _) {
+        } catch (RuntimeException _) {
             // Already gone; the emitter is off the list either way.
         }
     }
