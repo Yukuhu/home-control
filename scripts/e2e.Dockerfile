@@ -13,8 +13,8 @@ RUN set -eux; \
     esac; \
     repo=https://repo1.maven.org/maven2/com/microsoft/playwright; \
     work=$(mktemp -d); cd "$work"; \
-    curl -fsSLo driver.jar "$repo/driver/$PLAYWRIGHT_VERSION/driver-$PLAYWRIGHT_VERSION.jar"; \
-    curl -fsSLo bundle.jar "$repo/driver-bundle/$PLAYWRIGHT_VERSION/driver-bundle-$PLAYWRIGHT_VERSION.jar"; \
+    curl --proto =https --proto-redir =https -fsSLo driver.jar "$repo/driver/$PLAYWRIGHT_VERSION/driver-$PLAYWRIGHT_VERSION.jar"; \
+    curl --proto =https --proto-redir =https -fsSLo bundle.jar "$repo/driver-bundle/$PLAYWRIGHT_VERSION/driver-bundle-$PLAYWRIGHT_VERSION.jar"; \
     unzip -q driver.jar 'driver/package/*'; \
     unzip -q bundle.jar "driver/$node_dir/node"; \
     chmod +x "driver/$node_dir/node"; \
