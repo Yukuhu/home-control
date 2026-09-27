@@ -73,7 +73,9 @@ class RemoteLayoutE2eTest extends E2eApplicationTest {
             page.setViewportSize(320, 568);
             Locator railTiles = page.locator("#rails .tiles").first();
             assertThat(railTiles.locator(".tile")).hasCount(2);
-            railTiles.evaluate("el => el.scrollLeft = el.scrollWidth");
+            // Rails scroll smoothly, so assigning scrollLeft only starts an animation that Firefox has not begun
+            // when the next line reads it. An instant scroll has landed by then in every engine.
+            railTiles.evaluate("el => el.scrollTo({ left: el.scrollWidth, behavior: 'instant' })");
             org.assertj.core.api.Assertions.assertThat(((Number) railTiles.evaluate("el => el.scrollLeft")).doubleValue())
                     .as("Content rails still scroll horizontally after closing the overlay").isPositive();
             assertNoHorizontalOverflow(page);

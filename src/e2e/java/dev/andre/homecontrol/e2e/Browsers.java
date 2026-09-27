@@ -58,8 +58,12 @@ public final class Browsers {
 
     private static BrowserSession openWithPointer(String browser, String baseUrl, String traceName,
                                                   boolean mobile, boolean touch) {
+        // Playwright does not support isMobile in Firefox. It switches on Firefox's responsive design mode, which lays
+        // out a page without a viewport meta tag, such as about:blank, 980px wide; a narrower setViewportSize then
+        // waits forever for the window to match. Touch alone already gives Firefox the coarse pointer without hover
+        // that the phone layout keys on.
         BrowserContext context = browser(browser).newContext(new Browser.NewContextOptions()
-                .setBaseURL(baseUrl).setIsMobile(mobile)
+                .setBaseURL(baseUrl).setIsMobile(mobile && !browser.equals("firefox"))
                 .setViewportSize(390, 844)
                 .setHasTouch(touch)
                 .setLocale("en-US"));
