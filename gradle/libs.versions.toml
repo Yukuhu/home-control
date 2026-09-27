@@ -1,0 +1,29 @@
+[versions]
+spring-boot = "4.1.1"
+# protobuf-java and the protoc compiler must match: generated code targets its runtime.
+protobuf = "4.36.2"
+protobuf-plugin = "0.10.0"
+sonarqube = "7.5.0.8588"
+jmdns = "3.6.3"
+bouncycastle = "1.86"
+bluez-dbus = "0.3.5"
+dbus-java = "5.2.1"
+# scripts/e2e.sh and the CI browser cache read this version.
+playwright = "1.63.0"
+
+[libraries]
+spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf" }
+jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
+bouncycastle-bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
+bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+bluez-dbus = { module = "com.github.hypfvieh:bluez-dbus", version.ref = "bluez-dbus" }
+dbus-java-core = { module = "com.github.hypfvieh:dbus-java-core", version.ref = "dbus-java" }
+dbus-java-unixsocket = { module = "com.github.hypfvieh:dbus-java-transport-native-unixsocket", version.ref = "dbus-java" }
+playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
+sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }

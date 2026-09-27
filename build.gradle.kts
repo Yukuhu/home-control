@@ -1,9 +1,9 @@
 plugins {
     java
     jacoco
-    id("org.springframework.boot") version "4.1.1"
-    id("com.google.protobuf") version "0.10.0"
-    id("org.sonarqube") version "7.5.0.8588"
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.protobuf)
+    alias(libs.plugins.sonarqube)
 }
 
 group = "dev.andre"
@@ -46,20 +46,20 @@ sonar {
 }
 
 dependencies {
-    implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
+    implementation(platform(libs.spring.boot.dependencies))
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.apache.httpcomponents.client5:httpclient5")
-    implementation("com.google.protobuf:protobuf-java:4.36.2")
-    implementation("org.jmdns:jmdns:3.6.3")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.86")
+    implementation(libs.protobuf.java)
+    implementation(libs.jmdns)
+    implementation(libs.bouncycastle.bcpkix)
     // Argon2id for the login hash and the HOME_CONTROL_SECRET key (already transitive via bcpkix; used directly now).
-    implementation("org.bouncycastle:bcprov-jdk18on:1.86")
+    implementation(libs.bouncycastle.bcprov)
     // Bluetooth speakers (optional module, off by default). Only adapters/bluetooth/bluez/DbusBluezClient imports these.
-    implementation("com.github.hypfvieh:bluez-dbus:0.3.5")
-    implementation("com.github.hypfvieh:dbus-java-core:5.2.1")
-    implementation("com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.1")
+    implementation(libs.bluez.dbus)
+    implementation(libs.dbus.java.core)
+    implementation(libs.dbus.java.unixsocket)
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-webmvc-test")
@@ -72,7 +72,7 @@ tasks.named<Test>("test") {
 }
 
 protobuf {
-    protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
+    protoc { artifact = libs.protoc.get().toString() }
 }
 
 tasks.withType<Test> {
@@ -82,7 +82,6 @@ tasks.withType<Test> {
 
 // Browser tests (Playwright for Java) live in their own source set so `build` never resolves
 // Playwright (~200 MB driver bundle) and never needs installed browsers. Run: ./gradlew e2eTest
-val playwrightVersion = "1.63.0"
 
 sourceSets {
     create("e2e") {
@@ -95,7 +94,7 @@ configurations["e2eImplementation"].extendsFrom(configurations["testImplementati
 configurations["e2eRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
 
 dependencies {
-    "e2eImplementation"("com.microsoft.playwright:playwright:$playwrightVersion") {
+    "e2eImplementation"(libs.playwright) {
         // Spring Boot's Logback is the SLF4J provider; two providers only produce warnings.
         exclude(group = "org.slf4j", module = "slf4j-simple")
     }
