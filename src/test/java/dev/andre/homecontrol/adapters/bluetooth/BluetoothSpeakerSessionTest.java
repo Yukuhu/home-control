@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.BLUEZ_NOT_RUNNING;
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.UNREACHABLE;
@@ -71,13 +72,18 @@ class BluetoothSpeakerSessionTest {
     }
 
     private BluetoothSpeakerSession start(BluetoothProperties props) {
+        return start(props, states::add);
+    }
+
+    private BluetoothSpeakerSession start(BluetoothProperties props,
+                                          Consumer<dev.andre.homecontrol.core.DeviceState> listener) {
         // Mirrors BluetoothSpeakerAdapter.connect()'s wiring, so a test can widen a timeout via withTimings(...).
         MpvPlayer player = new MpvPlayer(launcher, MpvPlayer.socketFor(runtime, device.id()),
                 Duration.ofSeconds(props.playerStartTimeoutSeconds()), Duration.ofSeconds(props.loadTimeoutSeconds()),
                 Duration.ofSeconds(props.commandTimeoutSeconds()));
         AudioDeviceResolver resolver = new AudioDeviceResolver(launcher, props.audioDeviceTemplate(),
                 Duration.ofSeconds(props.playerStartTimeoutSeconds()));
-        session = new BluetoothSpeakerSession(device, props, bluez, player, resolver, states::add);
+        session = new BluetoothSpeakerSession(device, props, bluez, player, resolver, listener);
         session.start();
         return session;
     }
@@ -433,5 +439,18 @@ class BluetoothSpeakerSessionTest {
         session.close();
 
         await().atMost(WAIT).untilAsserted(() -> assertThat(launcher.alive()).isZero());
+    }
+
+    @Test
+    void aFailingStateListenerDoesNotStopPolling() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
+
+        // The real listener publishes a Spring event synchronously, so any subscriber's failure lands here.
+        start(properties, state -> {
+            states.add(state);
+            throw new IllegalStateException("a subscriber failed");
+        });
+
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
     }
 }

@@ -74,7 +74,7 @@ public class BluetoothSpeakerSession implements DeviceHandle {
     }
 
     public void start() {
-        onChange.accept(state);
+        report(state);
         loop.execute(this::poll);
     }
 
@@ -264,7 +264,19 @@ public class BluetoothSpeakerSession implements DeviceHandle {
     private void publish(DeviceState next) {
         if (!next.sameIgnoringTime(state)) {
             state = next;
+            report(next);
+        }
+    }
+
+    /**
+     * The listener publishes a Spring event synchronously, to subscribers this class knows nothing about; their
+     * failure must not stop this session from starting or polling.
+     */
+    private void report(DeviceState next) {
+        try {
             onChange.accept(next);
+        } catch (RuntimeException e) {
+            log.warn("A device state listener failed for {}", device.id(), e);
         }
     }
 }
