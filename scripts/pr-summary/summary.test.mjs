@@ -213,6 +213,8 @@ function model(overrides = {}, results = {}) {
                 logUrl: log("image-arm64") },
             { key: "image-arm64-bluetooth", label: "Bluetooth image smoke test (arm64)",
                 result: result("image-arm64-bluetooth"), logUrl: log("image-arm64-bluetooth") },
+            { key: "dependencies", label: "Dependency vulnerabilities", result: result("dependencies"),
+                logUrl: log("dependencies") },
         ],
         ...overrides,
     };
@@ -235,6 +237,7 @@ test("a green run is the marker, the heading, the commit line and the table", ()
 | Image (amd64) | ✅ |
 | Image smoke test (arm64) | ✅ |
 | Bluetooth image smoke test (arm64) | ✅ |
+| Dependency vulnerabilities | ✅ |
 `);
 });
 
@@ -444,6 +447,7 @@ const environment = {
         test: { result: "failure", outputs: {} }, e2e: { result: "success", outputs: {} },
         sonar: { result: "skipped", outputs: {} }, image: { result: "success", outputs: {} },
         "image-arm64": { result: "success", outputs: {} }, "image-arm64-bluetooth": { result: "success", outputs: {} },
+        dependencies: { result: "success", outputs: {} },
     }),
     JOBS_JSON: JSON.stringify([
         { name: "Build and test", html_url: "https://example.test/job/1" },
@@ -463,7 +467,7 @@ test("the model is built from the needs context, the job list and the environmen
     assert.equal(built.sonarUrl, SONAR_URL);
     assert.deepEqual(built.checks.map((check) => [check.key, check.result]), [
         ["test", "failure"], ["e2e", "success"], ["sonar", "skipped"], ["image", "success"],
-        ["image-arm64", "success"], ["image-arm64-bluetooth", "success"],
+        ["image-arm64", "success"], ["image-arm64-bluetooth", "success"], ["dependencies", "success"],
     ]);
     assert.equal(built.checks[0].logUrl, "https://example.test/job/1");
     assert.equal(built.checks[1].logUrl, undefined);
@@ -478,6 +482,23 @@ test("a job missing from the needs context counts as not run, and a missing star
     assert.ok(built.checks.every((check) => check.result === "skipped"));
     assert.equal(built.durationSeconds, 0);
     assert.equal(built.runAttempt, 1);
+});
+
+test("a vulnerable dependency fails the run and links to the log of its job", () => {
+    const env = {
+        ...environment,
+        NEEDS_JSON: JSON.stringify({
+            test: { result: "success" }, e2e: { result: "success" }, sonar: { result: "success" },
+            image: { result: "success" }, "image-arm64": { result: "success" },
+            "image-arm64-bluetooth": { result: "success" }, dependencies: { result: "failure" },
+        }),
+        JOBS_JSON: JSON.stringify([{ name: "Dependency vulnerabilities", html_url: "https://example.test/job/7" }]),
+    };
+    const suites = { test: suite({ passed: 842 }), e2e: suite({ passed: 96 }) };
+    const gate = { available: true, passed: true, failedConditions: [] };
+    const comment = render(buildModel({ env, suites, gate, now: Date.parse("2026-09-27T09:08:46Z") }));
+    assert.match(comment, /^## ❌ CI failed$/m);
+    assert.match(comment, /\| Dependency vulnerabilities \| ❌ \[job log\]\(https:\/\/example\.test\/job\/7\) \|/);
 });
 
 test("main writes the comment and asks SonarCloud only when the sonar job ran", async (t) => {
