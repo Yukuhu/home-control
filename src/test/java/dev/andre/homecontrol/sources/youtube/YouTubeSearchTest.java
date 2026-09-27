@@ -16,8 +16,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -183,16 +186,20 @@ class YouTubeSearchTest {
         int callers = 8;
         ExecutorService pool = Executors.newFixedThreadPool(callers);
         CountDownLatch start = new CountDownLatch(1);
+        List<Thread> callerThreads = new CopyOnWriteArrayList<>();
         try {
             List<Future<List<YouTubeVideo>>> futures = new ArrayList<>();
             for (int i = 0; i < callers; i++) {
                 futures.add(pool.submit(() -> {
+                    callerThreads.add(Thread.currentThread());
                     start.await();
                     return blockingSearch.search("bunny", 10);
                 }));
             }
             start.countDown();
-            Thread.sleep(200); // let every caller reach search() and queue behind the one in-flight call
+            // Release only once every caller is inside search(): one in the upstream call, the rest queued behind it.
+            await().atMost(Duration.ofSeconds(5)).until(() -> callerThreads.size() == callers
+                    && callerThreads.stream().allMatch(YouTubeSearchTest::parkedInSearch));
             release.countDown();
 
             List<List<YouTubeVideo>> results = new ArrayList<>();
@@ -206,6 +213,15 @@ class YouTubeSearchTest {
         } finally {
             pool.shutdownNow();
         }
+    }
+
+    /** Blocked somewhere below {@link YouTubeSearch#search}, whether in the upstream call or waiting to share it. */
+    private static boolean parkedInSearch(Thread thread) {
+        Thread.State state = thread.getState();
+        boolean parked = state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING
+                || state == Thread.State.BLOCKED;
+        return parked && Arrays.stream(thread.getStackTrace()).anyMatch(frame ->
+                frame.getClassName().equals(YouTubeSearch.class.getName()) && frame.getMethodName().equals("search"));
     }
 
     @Test

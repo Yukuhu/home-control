@@ -97,6 +97,8 @@ class SearchServiceTest {
         };
     }
 
+    // Simulated source latency is the behaviour under test: parallel queries and the per-source timeout.
+    @SuppressWarnings("java:S2925")
     private static void sleep(long millis) {
         try {
             Thread.sleep(millis);

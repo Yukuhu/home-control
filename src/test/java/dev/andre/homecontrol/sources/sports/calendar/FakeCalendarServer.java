@@ -87,6 +87,19 @@ public final class FakeCalendarServer implements AutoCloseable {
         return requests(path).size();
     }
 
+    // A slow upstream is what the timeout tests exercise, so answering late on purpose is the point.
+    @SuppressWarnings("java:S2925")
+    private static void simulateLatency(Duration wait) {
+        if (wait.isZero()) {
+            return;
+        }
+        try {
+            Thread.sleep(wait);
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private void handle(HttpExchange exchange) throws IOException {
         try (exchange) {
             URI uri = exchange.getRequestURI();
@@ -105,14 +118,7 @@ public final class FakeCalendarServer implements AutoCloseable {
             exchange.getRequestBody().readAllBytes();
             requests.add(new Recorded(exchange.getRequestMethod(), uri.getRawPath(), query, headers));
 
-            Duration wait = globalDelay;
-            if (!wait.isZero()) {
-                try {
-                    Thread.sleep(wait);
-                } catch (InterruptedException _) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            simulateLatency(globalDelay);
 
             Canned canned = routes.get(uri.getRawPath());
             if (canned == null) {
