@@ -20,6 +20,7 @@ export const CHECKS = [
     { key: "image-arm64", job: "Smoke-test the image on arm64", label: "Image smoke test (arm64)" },
     { key: "image-arm64-bluetooth", job: "Smoke-test the Bluetooth image on arm64",
         label: "Bluetooth image smoke test (arm64)" },
+    { key: "dependencies", job: "Dependency vulnerabilities", label: "Dependency vulnerabilities" },
 ];
 
 const METRICS = {

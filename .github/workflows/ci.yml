@@ -272,12 +272,50 @@ jobs:
           ./gradlew classes testClasses sonar -x test -x jacocoTestReport \
             "-Dsonar.qualitygate.wait=$REQUIRE_SONAR_QUALITY_GATE"
 
+  dependencies:
+    name: Dependency vulnerabilities
+    # GitHub cannot read this build's dependencies from its files, so Dependabot alerts see none
+    # of them until the resolved graph is submitted. Fork pull requests get a read-only token,
+    # which cannot submit, so they are left out. Deliberately not needed by the release: a newly
+    # disclosed vulnerability must not block shipping an unrelated fix.
+    if: >-
+      github.event_name == 'push'
+      || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      # To submit the dependency graph.
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nothing here pushes, and the build below runs third-party code.
+          persist-credentials: false
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Submit the dependency graph
+        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      # Fails on a vulnerable runtime dependency that the pull request adds or changes. What is
+      # disclosed later about a dependency already on main arrives as a Dependabot alert instead.
+      - name: Review the dependencies the pull request changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          license-check: false
+          # The graph submitted above takes a moment to become available.
+          retry-on-snapshot-warnings: true
+
   pr-summary:
     name: Summarise the run on the pull request
     # One comment per pull request, replaced on every run. Runs when earlier jobs failed, which
     # is when it matters, but not when the run was cancelled. Fork pull requests get a read-only
     # token, so they are left out.
-    needs: [test, e2e, image, image-arm64, image-arm64-bluetooth, sonar]
+    needs: [test, e2e, image, image-arm64, image-arm64-bluetooth, sonar, dependencies]
     if: >-
       !cancelled()
       && github.event_name == 'pull_request'
