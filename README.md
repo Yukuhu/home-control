@@ -763,6 +763,11 @@ pull requests, so their build stays red until a separate scan path is configured
 out on purpose, so a job is enforced by adding it to that job's `needs` in
 `.github/workflows/ci.yml`, not in the repository's settings.
 
+A pull request that changes only documentation builds and tests nothing, and `CI passed`
+passes for it. Documentation is what `scripts/code-changed.sh` lists: `docs/`, the Markdown
+files at the top of the repository, the licence, and the issue and pull request templates.
+A push to `main` always runs every job.
+
 After every pull request run, CI comments the results on the pull request: the test counts
 of both suites, each failed test with its message, the quality gate with the conditions that
 failed, and the image jobs. Each run replaces the comment of the previous one, and the

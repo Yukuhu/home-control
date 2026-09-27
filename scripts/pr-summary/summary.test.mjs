@@ -281,6 +281,25 @@ test("a green run is the marker, the heading, the commit line and the table", ()
 `);
 });
 
+test("a change to the documentation alone passes without any check having run", () => {
+    const skipped = Object.fromEntries(model().checks.map((check) => [check.key, "skipped"]));
+    const comment = render(model({ gate: null, documentationOnly: true }, skipped));
+    assert.match(comment, /^## ✅ CI passed$/m);
+    assert.ok(comment.includes("\n\nOnly documentation changed, so nothing was built or tested.\n\n| Check | Result |"));
+    assert.match(comment, /\| Unit and integration tests \| ⏭️ not run \|/);
+    assert.match(comment, /\| SonarCloud quality gate \| ⏭️ not run \|/);
+});
+
+test("a failed check fails a change to the documentation like any other", () => {
+    const skipped = Object.fromEntries(model().checks.map((check) => [check.key, "skipped"]));
+    const comment = render(model({ gate: null, documentationOnly: true }, { ...skipped, jar: "failure" }));
+    assert.match(comment, /^## ❌ CI failed$/m);
+});
+
+test("checks that did not run fail a change to the code", () => {
+    assert.match(render(model({ gate: null }, { "smoke-bluetooth": "skipped" })), /^## ❌ CI failed$/m);
+});
+
 test("the marker is the first line so the comment can be found again", () => {
     assert.ok(render(model({}, { test: "failure" })).startsWith(`${MARKER}\n`));
 });
@@ -538,6 +557,11 @@ test("the model is built from the needs context, the job list and the environmen
     assert.equal(built.headSha, HEAD);
     assert.equal(built.runNumber, 413);
     assert.equal(built.runAttempt, 2);
+    assert.equal(built.documentationOnly, false);
+    assert.equal(buildModel({ env: { ...environment, CODE_CHANGED: "true" }, suites, gate: null, now: 0 })
+        .documentationOnly, false);
+    assert.equal(buildModel({ env: { ...environment, CODE_CHANGED: "false" }, suites, gate: null, now: 0 })
+        .documentationOnly, true);
     assert.equal(built.durationSeconds, 580);
     assert.equal(built.sonarUrl, SONAR_URL);
     assert.deepEqual(built.checks.map((check) => [check.key, check.result]), [

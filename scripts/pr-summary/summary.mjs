@@ -270,13 +270,16 @@ function tests(heading, kind, model, { traces, limit }) {
 }
 
 function compose(model, { traces, limit }) {
-    const passed = model.checks.every((check) => check.result === "success");
+    // Only when nothing but documentation changed are checks left out on purpose.
+    const passed = model.checks.every((check) => check.result === "success"
+        || (model.documentationOnly && check.result === "skipped"));
     const attempt = model.runAttempt > 1 ? `, attempt ${model.runAttempt}` : "";
     const lines = [
         MARKER,
         passed ? "## ✅ CI passed" : "## ❌ CI failed",
         `${code(model.headSha.slice(0, 7))} · ${link(`run #${model.runNumber}${attempt}`, model.runUrl)}`
             + ` · ${duration(model.durationSeconds)}`,
+        ...(model.documentationOnly ? ["", "Only documentation changed, so nothing was built or tested."] : []),
         "",
         "| Check | Result |",
         "|---|---|",
@@ -317,6 +320,7 @@ export function buildModel({ env, suites, gate, now }) {
         runUrl: env.RUN_URL,
         runNumber: Number(env.RUN_NUMBER),
         runAttempt: Number(env.RUN_ATTEMPT || 1),
+        documentationOnly: env.CODE_CHANGED === "false",
         durationSeconds: Number.isNaN(started) ? 0 : (now - started) / 1000,
         sonarUrl: `https://sonarcloud.io/summary/new_code?id=${encodeURIComponent(env.SONAR_PROJECT_KEY)}`
             + `&pullRequest=${encodeURIComponent(env.PR_NUMBER)}`,
