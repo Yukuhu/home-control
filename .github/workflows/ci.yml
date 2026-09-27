@@ -14,11 +14,129 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
-    name: Build and test
+  jar:
+    name: Build the jar
+    # The one jar of this run: the images that are tested and the images that are published are
+    # all built from it. It carries its version, so the version is worked out here, first.
     runs-on: ubuntu-latest
     # Every job has a limit a few times its usual duration: a build that hangs fails in minutes
     # rather than holding the run for the six hours GitHub allows.
+    timeout-minutes: 10
+    outputs:
+      # 'true' on a push to main with commits to release. Pull requests never release.
+      release: ${{ steps.plan.outputs.release }}
+      # The next three are empty unless `release` is 'true'.
+      version: ${{ steps.plan.outputs.version }}
+      majorminor: ${{ steps.plan.outputs.majorminor }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Version computation reads the whole history and every existing tag.
+          fetch-depth: 0
+          # Nothing here pushes, and the build below runs third-party code.
+          persist-credentials: false
+
+      # Conventional commits decide whether there is anything to release at all:
+      # feat -> minor, fix/perf -> patch, breaking -> minor while still pre-1.0.
+      # A push of only docs/ci/chore/test/refactor commits releases nothing.
+      # On a pull request this is a rehearsal: it says what merging would release.
+      - name: Work out the next version
+        id: version
+        uses: TriPSs/conventional-changelog-action@469f0e5e35831fbd1962706f29f65daf0a5723f2 # v6.5.0
+        with:
+          github-token: ${{ github.token }}
+          preset: conventionalcommits
+          # Compute only. The release job creates the tag and the release itself, once the
+          # image is published. This job's token could not push anyway.
+          skip-commit: true
+          skip-tag: true
+          git-push: false
+          # The checkout is the commit that is tested; pulling could move past it.
+          skip-git-pull: true
+          skip-on-empty: true
+          output-file: false
+
+      # Below 1.0 a breaking change bumps the minor; it must not promote the
+      # project to 1.0.0. Fail loudly rather than cut a release nobody intended.
+      - name: Check the pre-1.0 rule held and decide whether to release
+        id: plan
+        env:
+          SKIPPED: ${{ steps.version.outputs.skipped }}
+          NEXT: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          ON_MAIN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          # The action above wrote its token into the address of the remote. Nothing after this
+          # needs it, and the build below runs third-party code.
+          git remote set-url origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          if [[ "$SKIPPED" != false ]]; then
+            echo "No releasable commits since the last tag: nothing will be published." >> "$GITHUB_STEP_SUMMARY"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          previous=$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
+          if [[ "$previous" == v0.* && "$NEXT" != 0.* ]]; then
+            echo "::error::Refusing to promote $previous to $NEXT. This project stays pre-1.0:"
+            echo "::error::a breaking change should bump the minor. Adjust deliberately if 1.0 is intended."
+            exit 1
+          fi
+          echo "$previous -> $NEXT"
+          if [[ "$ON_MAIN" != true ]]; then
+            echo "Merging this would release $TAG (now $previous)." >> "$GITHUB_STEP_SUMMARY"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Releasing $TAG (was $previous)." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "release=true"
+            echo "version=$NEXT"
+            echo "majorminor=$(echo "$NEXT" | cut -d. -f1,2)"
+            echo "tag=$TAG"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Also validates the Gradle wrapper checksums, which is on by default.
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+
+      - name: Build the jar
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: ./gradlew bootJar ${VERSION:+"-PreleaseVersion=$VERSION"}
+
+      # Java bytecode is architecture-independent, so this one jar serves both
+      # platforms the images are built for.
+      - name: Upload the jar
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: jar
+          path: build/libs/*.jar
+          if-no-files-found: error
+
+      - name: Write the release notes
+        if: steps.plan.outputs.release == 'true'
+        env:
+          # Passed as an environment variable rather than interpolated into the
+          # script: commit messages are untrusted input, and a stray quote would
+          # otherwise break the shell or worse.
+          CHANGELOG: ${{ steps.version.outputs.clean_changelog }}
+        run: printf '%s\n' "$CHANGELOG" > "$RUNNER_TEMP/notes.md"
+
+      - name: Upload the release notes
+        if: steps.plan.outputs.release == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/notes.md
+          if-no-files-found: error
+
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -46,15 +164,6 @@ jobs:
             build/test-results/test/TEST-*.xml
           if-no-files-found: error
 
-      # Java bytecode is architecture-independent, so this one jar serves both
-      # platforms the publish job builds for.
-      - name: Upload the jar
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: jar
-          path: build/libs/*.jar
-          if-no-files-found: error
-
       - name: Upload the test report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -78,82 +187,86 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # The images CI tests and publishes are built from Dockerfile.dist. What they run is only
+      # what a build from source runs if the two files agree on everything after the build.
+      - name: Check that both Dockerfiles describe the same runtime
+        run: scripts/compare-dockerfiles.sh
+
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
-      # Proves `docker compose up --build` works from a clean checkout, and keeps
-      # this Dockerfile's runtime stage from drifting away from Dockerfile.dist.
-      # amd64 only: this job is a correctness check, not a release artifact.
+      # Proves `docker compose up --build` works from a clean checkout. amd64 only: this job
+      # is a correctness check, not a release artifact. Without a cache, which could hold
+      # nothing of use: the build stage copies the whole checkout, so every commit rebuilds it.
       - name: Build Dockerfile
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           platforms: linux/amd64
           push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
-      # The -bluetooth variant installs mpv; prove that build too (amd64 only, not pushed).
-      - name: Build Dockerfile with mpv
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: .
-          platforms: linux/amd64
-          push: false
-          build-args: WITH_MPV=true
-          cache-from: type=gha,scope=bluetooth
-          cache-to: type=gha,mode=max,scope=bluetooth
-
-  image-arm64:
-    name: Smoke-test the image on arm64
-    # The release job cross-builds the arm64 image under QEMU and never starts it. This native
-    # arm64 runner (free for public repositories) builds the self-contained Dockerfile, whose
-    # runtime stage matches Dockerfile.dist, and actually runs it, so arm64-only breakage fails
-    # here instead of on someone's Raspberry Pi.
-    runs-on: ubuntu-24.04-arm
+  smoke:
+    name: Smoke-test the image on ${{ matrix.arch }}
+    # Builds the image that is published, natively on each architecture it is published for
+    # (the arm64 runner is free for public repositories), and actually runs it, so that
+    # arm64-only breakage fails here instead of on someone's Raspberry Pi. For a release, the
+    # image that ran is the image that is published: see .github/actions/smoke-image.
+    needs: jar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
+    permissions:
+      contents: read
+      # To push the tested image by digest, which only a release does.
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-
-      # Own cache scopes: a gha scope holds one cache per writer, and amd64 must not evict these.
-      - name: Build Dockerfile
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
-          context: .
-          platforms: linux/arm64
-          load: true
-          tags: home-control:smoke
-          cache-from: type=gha,scope=arm64
-          cache-to: type=gha,mode=max,scope=arm64
+          persist-credentials: false
 
-      - name: Run the image
-        run: scripts/smoke-test-image.sh home-control:smoke
+      - uses: ./.github/actions/smoke-image
+        with:
+          arch: ${{ matrix.arch }}
+          version: ${{ needs.jar.outputs.version }}
+          token: ${{ github.token }}
 
-  image-arm64-bluetooth:
-    name: Smoke-test the Bluetooth image on arm64
+  smoke-bluetooth:
+    name: Smoke-test the Bluetooth image on ${{ matrix.arch }}
     # The same for the -bluetooth variant, as its own job so the release does not wait for it:
-    # like the variant's publish step, it must never gate the release. A failure still shows here.
-    runs-on: ubuntu-24.04-arm
+    # the variant must never gate the release. A failure still shows here, and keeps a variant
+    # that does not start from being published.
+    needs: jar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
+    permissions:
+      contents: read
+      # To push the tested image by digest, which only a release does.
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-
-      - name: Build Dockerfile with mpv
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
-          context: .
-          platforms: linux/arm64
-          load: true
-          tags: home-control:smoke-bluetooth
-          build-args: WITH_MPV=true
-          cache-from: type=gha,scope=arm64-bluetooth
-          cache-to: type=gha,mode=max,scope=arm64-bluetooth
+          persist-credentials: false
 
-      - name: Run the image with mpv
-        run: scripts/smoke-test-image.sh --bluetooth home-control:smoke-bluetooth
+      - uses: ./.github/actions/smoke-image
+        with:
+          arch: ${{ matrix.arch }}
+          bluetooth: true
+          version: ${{ needs.jar.outputs.version }}
+          token: ${{ github.token }}
 
   e2e:
     name: Browser tests (Chromium, WebKit)
@@ -324,7 +437,7 @@ jobs:
     # One comment per pull request, replaced on every run. Runs when earlier jobs failed, which
     # is when it matters, but not when the run was cancelled. Fork pull requests get a read-only
     # token, so they are left out.
-    needs: [test, e2e, image, image-arm64, image-arm64-bluetooth, sonar, dependencies]
+    needs: [jar, test, e2e, image, smoke, smoke-bluetooth, sonar, dependencies]
     if: >-
       !cancelled()
       && github.event_name == 'pull_request'
@@ -382,7 +495,7 @@ jobs:
           run="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           started_at=$(gh api "$run" --jq .run_started_at) || started_at=
           jobs=$(gh api "$run/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
-            --jq '[.jobs[] | {name, html_url}] | tojson') || jobs='[]'
+            --jq '[.jobs[] | {name, html_url, conclusion}] | tojson') || jobs='[]'
           {
             echo "started_at=$started_at"
             echo "jobs=$jobs"
@@ -438,125 +551,108 @@ jobs:
 
   release:
     name: Release
-    # Conventional commits decide whether there is anything to release at all:
-    # feat -> minor, fix/perf -> patch, breaking -> minor while still pre-1.0.
-    # A push of only docs/ci/chore/test/refactor commits releases nothing.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, image, image-arm64, e2e, sonar]
+    # Publishes the images the smoke tests ran, under the release's tags. Nothing is built here,
+    # so the only job that may write to the repository and the registry runs no build.
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.jar.outputs.release == 'true'
+    needs: [jar, test, image, smoke, e2e, sonar]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     permissions:
       contents: write
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download the digests of the tested images
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          # Version computation reads the whole history and every existing tag.
-          fetch-depth: 0
+          pattern: digest-image-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
 
-      - name: Work out the next version
-        id: version
-        uses: TriPSs/conventional-changelog-action@469f0e5e35831fbd1962706f29f65daf0a5723f2 # v6.5.0
+      - name: Download the release notes
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          preset: conventionalcommits
-          # Compute only. This job creates the tag and release itself, further
-          # down, so that the image is published in the same run.
-          skip-commit: true
-          skip-tag: true
-          skip-on-empty: true
-          output-file: false
+          name: release-notes
+          path: ${{ runner.temp }}
 
-      # Below 1.0 a breaking change bumps the minor; it must not promote the
-      # project to 1.0.0. Fail loudly rather than cut a release nobody intended.
-      - name: Check the pre-1.0 rule held
-        if: steps.version.outputs.skipped == 'false'
-        run: |
-          previous=$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
-          next="${{ steps.version.outputs.version }}"
-          if [[ "$previous" == v0.* && "$next" != 0.* ]]; then
-            echo "::error::Refusing to promote $previous to $next. This project stays pre-1.0:"
-            echo "::error::a breaking change should bump the minor. Adjust deliberately if 1.0 is intended."
-            exit 1
-          fi
-          echo "$previous -> $next"
-          echo "majorminor=$(echo "$next" | cut -d. -f1,2)" >> "$GITHUB_OUTPUT"
-        id: guard
-
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
-        if: steps.version.outputs.skipped == 'false'
-        with:
-          distribution: temurin
-          java-version: '25'
-
-      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
-        if: steps.version.outputs.skipped == 'false'
-
-      # Rebuilt here rather than reused from the test job, because the version is
-      # only known once the commits have been analysed.
-      - name: Build the release jar
-        if: steps.version.outputs.skipped == 'false'
-        run: ./gradlew bootJar -PreleaseVersion=${{ steps.version.outputs.version }}
-
-      - name: Assemble the dist build context
-        if: steps.version.outputs.skipped == 'false'
-        run: mkdir -p dist && cp Dockerfile.dist dist/Dockerfile && cp build/libs/*.jar dist/
-
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
-        if: steps.version.outputs.skipped == 'false'
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-        if: steps.version.outputs.skipped == 'false'
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        if: steps.version.outputs.skipped == 'false'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - id: meta
-        if: steps.version.outputs.skipped == 'false'
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           # metadata-action lowercases the image name, which GHCR requires.
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=${{ steps.version.outputs.version }}
-            type=raw,value=${{ steps.guard.outputs.majorminor }}
+            type=raw,value=${{ needs.jar.outputs.version }}
+            type=raw,value=${{ needs.jar.outputs.majorminor }}
             type=raw,value=latest
             type=sha,format=long
 
-      - name: Build and push
-        if: steps.version.outputs.skipped == 'false'
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: dist
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Publish the tested images under the release's tags
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: scripts/publish-images.sh "$RUNNER_TEMP/digests" amd64,arm64
 
-      # Tag and release before the multi-arch -bluetooth image below, so a slow or failed
-      # build of that optional variant never blocks or gates the release itself.
+      # Tag and release after the image, so a failure above never leaves a tag pointing at an
+      # image that was never pushed.
       - name: Tag and release
-        if: steps.version.outputs.skipped == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
-          # Passed as an environment variable rather than interpolated into the
-          # script: commit messages are untrusted input, and a stray quote would
-          # otherwise break the shell or worse.
-          CHANGELOG: ${{ steps.version.outputs.clean_changelog }}
+          TAG: ${{ needs.jar.outputs.tag }}
         run: |
-          printf '%s\n' "$CHANGELOG" > notes.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$TAG" -m "$TAG"
           git push origin "$TAG"
-          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
-      - id: meta-bluetooth
-        if: steps.version.outputs.skipped == 'false'
+      - name: Report
+        env:
+          TAG: ${{ needs.jar.outputs.tag }}
+        run: echo "Released $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  release-bluetooth:
+    name: Release the Bluetooth image
+    # Same jar, plus mpv for Bluetooth speakers (docs/bluetooth-speakers.md). Its own job, after
+    # the release is tagged: this optional variant must never gate or delay the release itself.
+    # Runs only if the release happened and the variant passed its smoke tests.
+    needs: [jar, release, smoke-bluetooth]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Download the digests of the tested images
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: digest-bluetooth-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ghcr.io/${{ github.repository }}
@@ -564,32 +660,12 @@ jobs:
             latest=false
             suffix=-bluetooth
           tags: |
-            type=raw,value=${{ steps.version.outputs.version }}
-            type=raw,value=${{ steps.guard.outputs.majorminor }}
+            type=raw,value=${{ needs.jar.outputs.version }}
+            type=raw,value=${{ needs.jar.outputs.majorminor }}
             type=raw,value=latest
 
-      # Same jar, plus mpv for Bluetooth speakers (docs/bluetooth-speakers.md). Runs after the
-      # release is tagged and pushed: this multi-arch build is slow and optional, and must never
-      # gate or delay the release itself. continue-on-error so a failure here is visible in the
-      # job summary without failing the whole workflow.
-      - name: Build and push the Bluetooth variant
-        if: steps.version.outputs.skipped == 'false'
-        continue-on-error: true
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: dist
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: WITH_MPV=true
-          tags: ${{ steps.meta-bluetooth.outputs.tags }}
-          labels: ${{ steps.meta-bluetooth.outputs.labels }}
-          cache-from: type=gha,scope=bluetooth
-          cache-to: type=gha,mode=max,scope=bluetooth
+      - name: Publish the tested images under the release's tags
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: scripts/publish-images.sh "$RUNNER_TEMP/digests" amd64,arm64
 
-      - name: Report
-        run: |
-          if [ "${{ steps.version.outputs.skipped }}" = "true" ]; then
-            echo "No releasable commits since the last tag - nothing published." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Released ${{ steps.version.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
-          fi

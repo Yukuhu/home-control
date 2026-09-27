@@ -11,15 +11,17 @@ const MAX_MESSAGE = 300;
 const MAX_TRACE_LINES = 30;
 
 // The row order of the comment. `job` is the job's display name in ci.yml, which is how the
-// GitHub API identifies it; `suite` names the JUnit results that belong to the job.
+// GitHub API identifies it; `suite` names the JUnit results that belong to the job. A job that
+// runs once per architecture is named "<job> on <architecture>" there.
 export const CHECKS = [
+    { key: "jar", job: "Build the jar", label: "Jar" },
     { key: "test", job: "Build and test", label: "Unit and integration tests", suite: "test" },
     { key: "e2e", job: "Browser tests (Chromium, WebKit)", label: "Browser tests (Chromium, WebKit)", suite: "e2e" },
     { key: "sonar", job: "SonarCloud quality gate", label: "SonarCloud quality gate" },
-    { key: "image", job: "Build the self-contained image", label: "Image (amd64)" },
-    { key: "image-arm64", job: "Smoke-test the image on arm64", label: "Image smoke test (arm64)" },
-    { key: "image-arm64-bluetooth", job: "Smoke-test the Bluetooth image on arm64",
-        label: "Bluetooth image smoke test (arm64)" },
+    { key: "image", job: "Build the self-contained image", label: "Image built from source (amd64)" },
+    { key: "smoke", job: "Smoke-test the image", label: "Image smoke test (amd64, arm64)" },
+    { key: "smoke-bluetooth", job: "Smoke-test the Bluetooth image",
+        label: "Bluetooth image smoke test (amd64, arm64)" },
     { key: "dependencies", job: "Dependency vulnerabilities", label: "Dependency vulnerabilities" },
 ];
 
@@ -299,6 +301,12 @@ export function render(model) {
     return comment;
 }
 
+// Of a job that ran once per architecture, the log worth opening is that of a run that failed.
+function logUrl(jobs, job) {
+    const runs = jobs.filter((entry) => entry.name === job || entry.name.startsWith(`${job} on `));
+    return (runs.find((entry) => entry.conclusion === "failure") ?? runs[0])?.html_url;
+}
+
 export function buildModel({ env, suites, gate, now }) {
     const needs = JSON.parse(env.NEEDS_JSON);
     const jobs = JSON.parse(env.JOBS_JSON || "[]");
@@ -316,7 +324,7 @@ export function buildModel({ env, suites, gate, now }) {
             key,
             label,
             result: needs[key]?.result ?? "skipped",
-            logUrl: jobs.find((entry) => entry.name === job)?.html_url,
+            logUrl: logUrl(jobs, job),
             ...(suite ? { suite: suites[suite] } : {}),
         })),
     };
