@@ -12,7 +12,7 @@ root.
 | --- | --- |
 | `core` | The domain model every other package builds on: devices, capabilities, actions and device states, and the adapter contract (`DeviceAdapter`, `DeviceHandle`). `core.content` holds content sources, items and rails; `core.playback` playable references, routes and the playback planner. It depends only on the JDK. |
 | `device` | `DeviceManager`: the known devices, their connections and state, merging what discovery finds, and sending commands to a device's adapters. `JsonFileDeviceRegistry` stores the paired devices in `devices.json`. |
-| `adapters` | One package per device protocol: `androidtv`, `cast`, `webos`, `tizen`, `upnp`, `sonos`, `bluetooth`. Each is a module that can be switched off, with its wire protocol in a `protocol` subpackage where it has one. `adapters.net` (TLS, WebSockets, Wake-on-LAN) and `adapters.links` (content ids in service links) are shared. |
+| `adapters` | One package per device protocol: `androidtv`, `cast`, `webos`, `tizen`, `upnp`, `sonos`, `bluetooth`. Each apart from `androidtv` is a module that can be switched off, with its wire protocol in a `protocol` subpackage where it has one. `adapters.net` (TLS, WebSockets, Wake-on-LAN) and `adapters.links` (content ids in service links) are shared. |
 | `discovery` | mDNS and SSDP discovery. |
 | `sources` | One package per content source: `jellyfin`, `youtube`, `tmdb`, `sports`, `pinned`, `workflows`. Each is a module that can be switched off. `sources.http` is shared: HTTP clients that connect only to vetted addresses and bound response bodies in size and time. |
 | `content` | The rail cache, search across sources, and source preferences. |
