@@ -33,6 +33,7 @@ public record ClientCertificate(KeyPair keyPair, X509Certificate certificate) {
             ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA")
                     .build(keyPair.getPrivate());
 
+            // BouncyCastle's certificate builder only takes java.util.Date: converted from Instant right here.
             X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(
                     new JcaX509v3CertificateBuilder(
                             subject,

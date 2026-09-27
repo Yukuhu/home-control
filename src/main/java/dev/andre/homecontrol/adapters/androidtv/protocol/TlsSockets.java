@@ -220,8 +220,8 @@ public final class TlsSockets {
         }
 
         private static void verifySelfSigned(X509Certificate certificate) throws CertificateException {
-            // Outbound Android TV connections do not invoke this client-certificate callback;
-            // test servers use it to reject malformed client identities.
+            // Outbound Android TV connections never invoke this client-certificate callback.
+            // Test servers use it to reject malformed client identities.
             try {
                 certificate.verify(certificate.getPublicKey());
             } catch (GeneralSecurityException e) {

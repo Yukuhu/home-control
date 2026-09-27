@@ -46,6 +46,8 @@ public final class MpvPlayer implements AutoCloseable {
     private final Duration startTimeout;
     private final Duration loadTimeout;
     private final Duration commandTimeout;
+    // Written only under this player's monitor (play, stop); lock-free readers use a single snapshot of it.
+    @SuppressWarnings("java:S3077")
     private volatile Running running;
 
     public MpvPlayer(MpvLauncher launcher, Path socket, Duration startTimeout, Duration loadTimeout, Duration commandTimeout) {

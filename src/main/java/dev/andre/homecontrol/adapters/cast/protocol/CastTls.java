@@ -48,6 +48,8 @@ final class CastTls {
         }
     }
 
+    // Receivers present self-signed certificates; the sender trusts any (docs/superpowers/specs/2026-09-16-cast-sender-adr.md).
+    @SuppressWarnings("java:S4830")
     private static final X509ExtendedTrustManager TRUST_RECEIVER = new X509ExtendedTrustManager() {
         @Override
         public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket) {

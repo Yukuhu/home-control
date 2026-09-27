@@ -11,8 +11,14 @@ import java.net.UnknownHostException;
 public final class SonosEndpoints {
 
     public static final int DEFAULT_PORT = 1400;
+    // Fixed by the Sonos firmware (S1 and S2 alike), not deployment configuration.
+    @SuppressWarnings("java:S1075")
     public static final String AV_TRANSPORT_PATH = "/MediaRenderer/AVTransport/Control";
+    // Fixed by the Sonos firmware (S1 and S2 alike), not deployment configuration.
+    @SuppressWarnings("java:S1075")
     public static final String RENDERING_CONTROL_PATH = "/MediaRenderer/RenderingControl/Control";
+    // Fixed by the Sonos firmware (S1 and S2 alike), not deployment configuration.
+    @SuppressWarnings("java:S1075")
     public static final String CONNECTION_MANAGER_PATH = "/MediaRenderer/ConnectionManager/Control";
     public static final String ZONE_GROUP_TOPOLOGY_PATH = "/ZoneGroupTopology/Control";
     public static final String AV_TRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1";
