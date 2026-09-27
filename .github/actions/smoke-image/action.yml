@@ -109,6 +109,9 @@ runs:
         labels: ${{ steps.meta.outputs.labels }}
         build-args: WITH_MPV=${{ inputs.bluetooth }}
         outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+        # Attached to the image, not part of it: what it was built from, and what it contains.
+        provenance: mode=max
+        sbom: true
 
     - name: Note the digest
       if: inputs.version != ''
