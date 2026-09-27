@@ -25,65 +25,87 @@ public record IcsRecurrence(Frequency frequency, int interval, Integer count, Ic
         if (rule == null || rule.isBlank()) {
             return Optional.empty();
         }
-        Frequency frequency = null;
-        int interval = 1;
-        Integer count = null;
-        IcsTime until = null;
-        Set<DayOfWeek> byDay = EnumSet.noneOf(DayOfWeek.class);
+        Parts parts = new Parts();
         for (String part : rule.strip().split(";", -1)) {
+            if (!parts.read(part)) {
+                return Optional.empty();
+            }
+        }
+        return parts.recurrence();
+    }
+
+    /** The rule parts read so far; any part outside the subset rejects the whole rule. */
+    private static final class Parts {
+
+        private Frequency frequency;
+        private int interval = 1;
+        private Integer count;
+        private IcsTime until;
+        private final Set<DayOfWeek> byDay = EnumSet.noneOf(DayOfWeek.class);
+
+        /** Reads one {@code KEY=VALUE} part; false when it is outside the supported subset. */
+        boolean read(String part) {
             int eq = part.indexOf('=');
             if (eq <= 0) {
-                return Optional.empty();
+                return false;
             }
             String key = part.substring(0, eq).strip().toUpperCase(Locale.ROOT);
             String value = part.substring(eq + 1).strip().toUpperCase(Locale.ROOT);
             try {
-                switch (key) {
-                    case "FREQ" -> {
-                        if (!value.equals("DAILY") && !value.equals("WEEKLY")) {
-                            return Optional.empty();
-                        }
-                        frequency = Frequency.valueOf(value);
-                    }
-                    case "INTERVAL" -> {
-                        interval = Integer.parseInt(value);
-                        if (interval < 1 || interval > 1000) {
-                            return Optional.empty();
-                        }
-                    }
-                    case "COUNT" -> {
-                        count = Integer.parseInt(value);
-                        if (count < 1 || count > 10_000) {
-                            return Optional.empty();
-                        }
-                    }
-                    case "UNTIL" -> until = IcsParser.parseTime(value, null);
-                    case "BYDAY" -> {
-                        for (String token : value.split(",")) {
-                            DayOfWeek day = DAYS.get(token.strip());
-                            if (day == null) {
-                                return Optional.empty();
-                            }
-                            byDay.add(day);
-                        }
-                    }
-                    case "WKST" -> {
-                        if (!DAYS.containsKey(value)) {
-                            return Optional.empty();
-                        }
-                    }
-                    default -> {
-                        return Optional.empty();
-                    }
-                }
+                return switch (key) {
+                    case "FREQ" -> frequency(value);
+                    case "INTERVAL" -> interval(value);
+                    case "COUNT" -> count(value);
+                    case "UNTIL" -> until(value);
+                    case "BYDAY" -> byDay(value);
+                    case "WKST" -> DAYS.containsKey(value);
+                    default -> false;
+                };
             } catch (NumberFormatException | IcsFormatException _) {
-                return Optional.empty();
+                return false;
             }
         }
-        if (frequency == null || (count != null && until != null)
-                || (!byDay.isEmpty() && frequency != Frequency.WEEKLY)) {
-            return Optional.empty();
+
+        private boolean frequency(String value) {
+            if (!value.equals("DAILY") && !value.equals("WEEKLY")) {
+                return false;
+            }
+            frequency = Frequency.valueOf(value);
+            return true;
         }
-        return Optional.of(new IcsRecurrence(frequency, interval, count, until, List.copyOf(byDay)));
+
+        private boolean interval(String value) {
+            interval = Integer.parseInt(value);
+            return interval >= 1 && interval <= 1000;
+        }
+
+        private boolean count(String value) {
+            count = Integer.parseInt(value);
+            return count >= 1 && count <= 10_000;
+        }
+
+        private boolean until(String value) {
+            until = IcsParser.parseTime(value, null);
+            return true;
+        }
+
+        private boolean byDay(String value) {
+            for (String token : value.split(",")) {
+                DayOfWeek day = DAYS.get(token.strip());
+                if (day == null) {
+                    return false;
+                }
+                byDay.add(day);
+            }
+            return true;
+        }
+
+        Optional<IcsRecurrence> recurrence() {
+            if (frequency == null || (count != null && until != null)
+                    || (!byDay.isEmpty() && frequency != Frequency.WEEKLY)) {
+                return Optional.empty();
+            }
+            return Optional.of(new IcsRecurrence(frequency, interval, count, until, List.copyOf(byDay)));
+        }
     }
 }

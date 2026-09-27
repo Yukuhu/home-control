@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,6 +25,7 @@ import java.util.regex.Pattern;
  */
 public final class IcsParser {
 
+    private static final String CALENDAR_COMPONENT = "VCALENDAR";
     private static final String VEVENT_COMPONENT = "VEVENT";
 
     static final int MAX_EVENTS = 5_000;
@@ -33,8 +35,9 @@ public final class IcsParser {
     private static final Pattern DATE_TIME = Pattern.compile("^(\\d{8})T(\\d{6})(Z?)$");
     private static final DateTimeFormatter TIME =
             DateTimeFormatter.ofPattern("HHmmss").withResolverStyle(ResolverStyle.STRICT);
-    private static final Pattern DURATION = Pattern.compile(
-            "^([+-])?P(?:(\\d+)W)?(?:(\\d+)D)?(?:T(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?)?$");
+    /** An RFC 5545 dur-value split at its first {@code T}: sign, weeks and days before it; H, M, S after it. */
+    private static final Pattern DURATION_DATE = Pattern.compile("^([+-])?P(?:(\\d+)W)?(?:(\\d+)D)?$");
+    private static final Pattern DURATION_TIME = Pattern.compile("^(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?$");
 
     record ContentLine(String name, Map<String, String> params, String value) {
     }
@@ -47,72 +50,14 @@ public final class IcsParser {
             throw new IcsFormatException(NOT_A_CALENDAR);
         }
         String body = text.startsWith("﻿") ? text.substring(1) : text;
-        Deque<String> stack = new ArrayDeque<>();
-        List<ContentLine> current = null;
-        List<IcsEvent> events = new ArrayList<>();
-        String name = null;
-        String zone = null;
-        int skipped = 0;
-        boolean sawCalendar = false;
+        CalendarReader reader = new CalendarReader();
         for (String raw : unfold(body)) {
-            if (raw.isBlank()) {
-                continue;
-            }
-            ContentLine line = contentLine(raw);
-            if (line == null) {
-                continue;
-            }
-            switch (line.name()) {
-                case "BEGIN" -> {
-                    String component = line.value().strip().toUpperCase(Locale.ROOT);
-                    if (stack.isEmpty()) {
-                        if (!component.equals("VCALENDAR")) {
-                            throw new IcsFormatException(NOT_A_CALENDAR);
-                        }
-                        sawCalendar = true;
-                    }
-                    stack.push(component);
-                    if (component.equals(VEVENT_COMPONENT) && stack.size() == 2) {
-                        current = new ArrayList<>();
-                    }
-                }
-                case "END" -> {
-                    if (stack.isEmpty()) {
-                        continue;
-                    }
-                    String component = stack.pop();
-                    if (component.equals(VEVENT_COMPONENT) && stack.size() == 1 && current != null) {
-                        try {
-                            events.add(event(current));
-                        } catch (IcsFormatException _) {
-                            skipped++;
-                        }
-                        current = null;
-                        if (events.size() > MAX_EVENTS) {
-                            throw new IcsFormatException("The calendar has more than " + MAX_EVENTS + " events");
-                        }
-                    }
-                }
-                default -> {
-                    if (stack.size() == 1 && "VCALENDAR".equals(stack.peek())) {
-                        if (line.name().equals("X-WR-CALNAME")) {
-                            name = unescape(line.value()).strip();
-                        } else if (line.name().equals("X-WR-TIMEZONE")) {
-                            zone = line.value().strip();
-                        }
-                    } else if (current != null && stack.size() == 2 && VEVENT_COMPONENT.equals(stack.peek())) {
-                        current.add(line);
-                    }
-                }
+            ContentLine line = raw.isBlank() ? null : contentLine(raw);
+            if (line != null) {
+                reader.accept(line);
             }
         }
-        if (!sawCalendar) {
-            throw new IcsFormatException(NOT_A_CALENDAR);
-        }
-        if (current != null) {
-            skipped++;
-        }
-        return new IcsCalendar(blankToNull(name), blankToNull(zone), events, skipped);
+        return reader.finish();
     }
 
     public static List<String> unfold(String text) {
@@ -137,20 +82,8 @@ public final class IcsParser {
     }
 
     static ContentLine contentLine(String raw) {
-        boolean quoted = false;
-        int colon = -1;
         List<Integer> semicolons = new ArrayList<>();
-        for (int i = 0; i < raw.length(); i++) {
-            char c = raw.charAt(i);
-            if (c == '"') {
-                quoted = !quoted;
-            } else if (!quoted && c == ';') {
-                semicolons.add(i);
-            } else if (!quoted && c == ':') {
-                colon = i;
-                break;
-            }
-        }
+        int colon = valueColon(raw, semicolons);
         if (colon <= 0) {
             return null;
         }
@@ -159,22 +92,45 @@ public final class IcsParser {
         if (name.isEmpty()) {
             return null;
         }
+        return new ContentLine(name, params(raw, semicolons, colon), raw.substring(colon + 1));
+    }
+
+    /** The first colon outside double quotes, or -1; collects the unquoted semicolons before it. */
+    private static int valueColon(String raw, List<Integer> semicolons) {
+        boolean quoted = false;
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c == '"') {
+                quoted = !quoted;
+            } else if (!quoted && c == ';') {
+                semicolons.add(i);
+            } else if (!quoted && c == ':') {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static Map<String, String> params(String raw, List<Integer> semicolons, int colon) {
         Map<String, String> params = new HashMap<>();
         for (int s = 0; s < semicolons.size(); s++) {
             int from = semicolons.get(s) + 1;
             int to = s + 1 < semicolons.size() ? semicolons.get(s + 1) : colon;
             String param = raw.substring(from, to);
             int eq = param.indexOf('=');
-            if (eq <= 0) {
-                continue;
+            if (eq > 0) {
+                params.putIfAbsent(param.substring(0, eq).strip().toUpperCase(Locale.ROOT),
+                        unquote(param.substring(eq + 1).strip()));
             }
-            String value = param.substring(eq + 1).strip();
-            if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
-                value = value.substring(1, value.length() - 1);
-            }
-            params.putIfAbsent(param.substring(0, eq).strip().toUpperCase(Locale.ROOT), value);
         }
-        return new ContentLine(name, Map.copyOf(params), raw.substring(colon + 1));
+        return Map.copyOf(params);
+    }
+
+    private static String unquote(String value) {
+        if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
     }
 
     private static IcsEvent event(List<ContentLine> lines) {
@@ -189,23 +145,20 @@ public final class IcsParser {
         List<IcsTime> exdates = new ArrayList<>();
         for (ContentLine line : lines) {
             String tzid = line.params().get("TZID");
+            String value = line.value();
+            // The first readable occurrence of a single-valued property wins; later ones are not parsed.
             switch (line.name()) {
-                case "UID" -> uid = uid != null ? uid : blankToNull(unescape(line.value()).strip());
-                case "SUMMARY" -> summary = summary != null ? summary : unescape(line.value()).strip();
-                case "DTSTART" -> start = start != null ? start : parseTime(line.value(), tzid);
-                case "DTEND" -> end = end != null ? end : parseTime(line.value(), tzid);
-                case "DURATION" -> duration = duration != null ? duration : parseDuration(line.value());
-                case "RRULE" -> rrule = rrule != null ? rrule : line.value().strip();
-                case "RECURRENCE-ID" -> recurrenceId = recurrenceId != null ? recurrenceId : parseTime(line.value(), tzid);
-                case "STATUS" -> status = line.value().strip().toUpperCase(Locale.ROOT);
-                case "EXDATE" -> {
-                    for (String value : line.value().split(",")) {
-                        if (!value.isBlank()) {
-                            exdates.add(parseTime(value, tzid));
-                        }
-                    }
-                }
+                case "UID" -> uid = firstOf(uid, () -> blankToNull(unescape(value).strip()));
+                case "SUMMARY" -> summary = firstOf(summary, () -> unescape(value).strip());
+                case "DTSTART" -> start = firstOf(start, () -> parseTime(value, tzid));
+                case "DTEND" -> end = firstOf(end, () -> parseTime(value, tzid));
+                case "DURATION" -> duration = firstOf(duration, () -> parseDuration(value));
+                case "RRULE" -> rrule = firstOf(rrule, value::strip);
+                case "RECURRENCE-ID" -> recurrenceId = firstOf(recurrenceId, () -> parseTime(value, tzid));
+                case "STATUS" -> status = value.strip().toUpperCase(Locale.ROOT);
+                case "EXDATE" -> addExdates(exdates, value, tzid);
                 default -> {
+                    // Not part of the subset Home Control reads.
                 }
             }
         }
@@ -213,6 +166,18 @@ public final class IcsParser {
             throw new IcsFormatException("An event has no start");
         }
         return new IcsEvent(uid, summary, start, end, duration, rrule, exdates, recurrenceId, status);
+    }
+
+    private static <T> T firstOf(T current, Supplier<T> next) {
+        return current != null ? current : next.get();
+    }
+
+    private static void addExdates(List<IcsTime> exdates, String value, String tzid) {
+        for (String date : value.split(",")) {
+            if (!date.isBlank()) {
+                exdates.add(parseTime(date, tzid));
+            }
+        }
     }
 
     public static IcsTime parseTime(String value, String tzid) {
@@ -239,13 +204,17 @@ public final class IcsParser {
         if (value == null) {
             return null;
         }
-        Matcher m = DURATION.matcher(value.strip().toUpperCase(Locale.ROOT));
-        if (!m.matches() || "-".equals(m.group(1))) {
+        String v = value.strip().toUpperCase(Locale.ROOT);
+        int t = v.indexOf('T');
+        Matcher date = DURATION_DATE.matcher(t < 0 ? v : v.substring(0, t));
+        Matcher time = DURATION_TIME.matcher(t < 0 ? "" : v.substring(t + 1));
+        if (!date.matches() || !time.matches() || "-".equals(date.group(1))) {
             return null;
         }
         try {
-            Duration duration = Duration.ofDays(7 * number(m.group(2)) + number(m.group(3)))
-                    .plusHours(number(m.group(4))).plusMinutes(number(m.group(5))).plusSeconds(number(m.group(6)));
+            Duration duration = Duration.ofDays(7 * number(date.group(2)) + number(date.group(3)))
+                    .plusHours(number(time.group(1))).plusMinutes(number(time.group(2)))
+                    .plusSeconds(number(time.group(3)));
             return duration.isZero() || duration.isNegative() ? null : duration;
         } catch (NumberFormatException | ArithmeticException _) {
             return null;
@@ -254,13 +223,16 @@ public final class IcsParser {
 
     public static String unescape(String text) {
         StringBuilder out = new StringBuilder(text.length());
-        for (int i = 0; i < text.length(); i++) {
+        int i = 0;
+        while (i < text.length()) {
             char c = text.charAt(i);
             if (c == '\\' && i + 1 < text.length()) {
-                char next = text.charAt(++i);
+                char next = text.charAt(i + 1);
                 out.append(next == 'n' || next == 'N' ? '\n' : next);
+                i += 2;
             } else {
                 out.append(c);
+                i++;
             }
         }
         return out.toString();
@@ -272,5 +244,86 @@ public final class IcsParser {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    /** Walks BEGIN/END nesting: the calendar's name and zone, and the VEVENTs directly inside the VCALENDAR. */
+    private static final class CalendarReader {
+
+        private final Deque<String> stack = new ArrayDeque<>();
+        private final List<IcsEvent> events = new ArrayList<>();
+        private List<ContentLine> current;
+        private String name;
+        private String zone;
+        private int skipped;
+        private boolean sawCalendar;
+
+        void accept(ContentLine line) {
+            switch (line.name()) {
+                case "BEGIN" -> begin(line.value().strip().toUpperCase(Locale.ROOT));
+                case "END" -> end();
+                default -> property(line);
+            }
+        }
+
+        private void begin(String component) {
+            if (stack.isEmpty()) {
+                if (!component.equals(CALENDAR_COMPONENT)) {
+                    throw new IcsFormatException(NOT_A_CALENDAR);
+                }
+                sawCalendar = true;
+            }
+            stack.push(component);
+            if (component.equals(VEVENT_COMPONENT) && stack.size() == 2) {
+                current = new ArrayList<>();
+            }
+        }
+
+        private void end() {
+            if (stack.isEmpty()) {
+                return;
+            }
+            String component = stack.pop();
+            if (component.equals(VEVENT_COMPONENT) && stack.size() == 1 && current != null) {
+                closeEvent();
+            }
+        }
+
+        private void closeEvent() {
+            try {
+                events.add(event(current));
+            } catch (IcsFormatException _) {
+                skipped++;
+            }
+            current = null;
+            if (events.size() > MAX_EVENTS) {
+                throw new IcsFormatException("The calendar has more than " + MAX_EVENTS + " events");
+            }
+        }
+
+        private void property(ContentLine line) {
+            if (stack.size() == 1 && CALENDAR_COMPONENT.equals(stack.peek())) {
+                calendarProperty(line);
+            } else if (current != null && stack.size() == 2 && VEVENT_COMPONENT.equals(stack.peek())) {
+                current.add(line);
+            }
+        }
+
+        private void calendarProperty(ContentLine line) {
+            if (line.name().equals("X-WR-CALNAME")) {
+                name = unescape(line.value()).strip();
+            } else if (line.name().equals("X-WR-TIMEZONE")) {
+                zone = line.value().strip();
+            }
+        }
+
+        IcsCalendar finish() {
+            if (!sawCalendar) {
+                throw new IcsFormatException(NOT_A_CALENDAR);
+            }
+            if (current != null) {
+                skipped++;
+            }
+            return new IcsCalendar(blankToNull(name), blankToNull(zone), events, skipped);
+        }
     }
 }
