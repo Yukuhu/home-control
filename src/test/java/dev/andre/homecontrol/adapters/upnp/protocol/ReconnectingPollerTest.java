@@ -153,19 +153,20 @@ class ReconnectingPollerTest {
     }
 
     @Test
-    void closeStopsEverything() throws InterruptedException {
+    void closeStopsEverything() {
         ScriptedLink link = new ScriptedLink();
         ReconnectingPoller poller = poller(link);
         await().atMost(Duration.ofSeconds(1)).untilAsserted(() -> assertThat(link.polls).isNotEmpty());
 
+        long closedAt = System.nanoTime();
         poller.close();
-        Thread.sleep(50);
-        int connects = link.connects.size();
-        int polls = link.polls.size();
-        Thread.sleep(500);
 
-        assertThat(link.connects).hasSize(connects);
-        assertThat(link.polls).hasSize(polls);
+        // A poll already past its closed check may still start right after; nothing may start later.
+        long lastAllowed = closedAt + Duration.ofMillis(50).toNanos();
+        await().during(Duration.ofMillis(550)).atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            assertThat(link.connects).allSatisfy(started -> assertThat(started).isLessThan(lastAllowed));
+            assertThat(link.polls).allSatisfy(started -> assertThat(started).isLessThan(lastAllowed));
+        });
         assertThat(poller.connected()).isFalse();
     }
 }

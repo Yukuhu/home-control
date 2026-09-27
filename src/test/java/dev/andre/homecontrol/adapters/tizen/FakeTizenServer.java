@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * An in-process Samsung TV: the TLS remote-control WebSocket, the REST API and DIAL (REST and DIAL
@@ -34,6 +35,8 @@ public class FakeTizenServer implements AutoCloseable {
     public static final String TOKEN = "73184052";
     public static final String YOUTUBE = "111299001912";
     public static final String NETFLIX = "3201907018807";
+    /** The well-known Prime Video id; Prime Video is not in this TV's installed-app list. */
+    public static final String PRIME_VIDEO = "3201910019365";
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final FakeWebSocketServer remote;
@@ -45,6 +48,7 @@ public class FakeTizenServer implements AutoCloseable {
     private final List<String> queries = new CopyOnWriteArrayList<>();
     private final List<FakeWebSocketServer.Connection> openConnections = new CopyOnWriteArrayList<>();
     private final Map<String, Boolean> visible = new ConcurrentHashMap<>(Map.of(YOUTUBE, false, NETFLIX, false));
+    private final AtomicInteger deviceInfoAnswers = new AtomicInteger();
     private volatile Authorization authorization = Authorization.ALLOW;
     private volatile String powerState = "on";
     private volatile boolean restAvailable = true;
@@ -80,6 +84,11 @@ public class FakeTizenServer implements AutoCloseable {
 
     public int connections() {
         return remote.connections();
+    }
+
+    /** Device-info answers the REST API has sent, each carrying the power state set at that time. */
+    public int deviceInfoAnswers() {
+        return deviceInfoAnswers.get();
     }
 
     public List<String> queries() {
@@ -170,6 +179,7 @@ public class FakeTizenServer implements AutoCloseable {
                 connection.closeNormally();
             }
             case IGNORE -> {
+                // Never answers, like a TV still showing its Allow prompt or still booting.
             }
         }
     }
@@ -194,6 +204,7 @@ public class FakeTizenServer implements AutoCloseable {
                 }
             }
             default -> {
+                // Everything else the client sends needs no answer.
             }
         }
     }
@@ -208,6 +219,7 @@ public class FakeTizenServer implements AutoCloseable {
             respond(exchange, 200, fixture("device-info.json")
                     .replace("\"PowerState\":\"on\"", "\"PowerState\":\"" + powerState + "\"")
                     + " ".repeat(deviceInfoPadding));
+            deviceInfoAnswers.incrementAndGet();
         } else if (path.startsWith("/api/v2/applications/")) {
             String appId = path.substring("/api/v2/applications/".length());
             Boolean isVisible = visible.get(appId);

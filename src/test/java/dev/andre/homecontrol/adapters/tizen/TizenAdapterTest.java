@@ -144,13 +144,14 @@ class TizenAdapterTest {
         ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", FakeWebSocketServer.closedPort(), 0, 60, 1));
         ssdp.start();
         TizenAdapter adapter = adapter(ssdp, properties(30));
-        tv.switchOff();
+        tv.setPowerState("standby");
         DeviceHandle handle = adapter.connect(device(), state -> { });
         try {
-            await().atMost(Duration.ofSeconds(5)).until(() -> tv.connections() == 0
-                    && handle.state().status() == DeviceStatus.DISCONNECTED);
-            Thread.sleep(500);
-            tv.switchOn();
+            // The first poll was told "standby" and does not connect; the next regular one is 30 s off.
+            await().atMost(Duration.ofSeconds(5)).until(() -> tv.deviceInfoAnswers() == 1);
+            assertThat(handle.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+            assertThat(tv.connections()).isZero();
+            tv.setPowerState("on");
 
             String alive = "NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: " + TizenAdapter.SEARCH_TARGET
                     + "\r\nNTS: ssdp:alive\r\nUSN: uuid:samsung::" + TizenAdapter.SEARCH_TARGET

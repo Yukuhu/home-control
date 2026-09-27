@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -104,7 +105,8 @@ public final class FakeMpv implements AutoCloseable {
         StringBuilder help = new StringBuilder("List of detected audio devices:\n  'auto' (Autoselect device)\n");
         for (String device : devices) {
             String[] parts = device.split("=", 2);
-            help.append("  '").append(parts[0]).append("' (").append(parts.length > 1 ? parts[1] : parts[0]).append(")\n");
+            // The description when one is given, else the id again.
+            help.append("  '").append(parts[0]).append("' (").append(parts[parts.length - 1]).append(")\n");
         }
         return help.toString();
     }
@@ -166,16 +168,19 @@ public final class FakeMpv implements AutoCloseable {
         try {
             server.close();
         } catch (IOException _) {
+            // Shutting down anyway; nothing more can be accepted.
         }
         for (SocketChannel client : clients) {
             try {
                 client.close();
             } catch (IOException _) {
+                // Already gone; the player sees the socket close either way.
             }
         }
         try {
             Files.deleteIfExists(socket);
         } catch (IOException _) {
+            // A leftover socket file lives in the test's temporary directory.
         }
         log.accept("{\"type\":\"exit\"}");
         quit.countDown();
@@ -202,20 +207,20 @@ public final class FakeMpv implements AutoCloseable {
         clients.remove(client);
     }
 
+    /** Ends the track once its duration has passed; ticks every 100 ms until the player quits. */
     private void clockLoop() {
-        while (!hasQuit()) {
-            boolean finished;
-            synchronized (this) {
-                finished = path != null && options.durationSeconds() > 0 && position() >= options.durationSeconds();
+        try {
+            while (!quit.await(100, TimeUnit.MILLISECONDS)) {
+                boolean finished;
+                synchronized (this) {
+                    finished = path != null && options.durationSeconds() > 0 && position() >= options.durationSeconds();
+                }
+                if (finished) {
+                    finishTrack();
+                }
             }
-            if (finished) {
-                finishTrack();
-            }
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException _) {
-                return;
-            }
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -431,20 +436,28 @@ public final class FakeMpv implements AutoCloseable {
             System.exit(Integer.parseInt(parts[0]));
         }
         if ("1".equals(env.get("FAKE_MPV_IGNORE_TERM"))) {
+            // An mpv that hangs on SIGTERM: only SIGKILL ends it.
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
-                    Thread.sleep(60_000);
+                    stall(60_000);
                 } catch (InterruptedException _) {
+                    Thread.currentThread().interrupt();
                 }
             }));
         }
-        Thread.sleep(Long.parseLong(env.getOrDefault("FAKE_MPV_START_DELAY_MS", "0")));
+        stall(Long.parseLong(env.getOrDefault("FAKE_MPV_START_DELAY_MS", "0")));
         Path socket = Path.of(value(argv, "--input-ipc-server="));
         String volume = value(argv, "--volume=");
         try (FakeMpv fake = serve(socket, options, volume == null ? 100 : Double.parseDouble(volume), log)) {
             fake.awaitQuit();
         }
         System.exit(0);
+    }
+
+    // The fake process's own timing is the behaviour under test: a slow start, or a hang on SIGTERM.
+    @SuppressWarnings("java:S2925")
+    private static void stall(long millis) throws InterruptedException {
+        Thread.sleep(millis);
     }
 
     private static String value(List<String> argv, String prefix) {
@@ -460,6 +473,7 @@ public final class FakeMpv implements AutoCloseable {
             try {
                 Files.writeString(file, line + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             } catch (IOException _) {
+                // A test that reads the log fails on the missing line; mpv itself keeps running.
             }
         }
     }

@@ -56,9 +56,7 @@ class SoapClientTest {
                         "Content-Type", String.valueOf(exchange.getRequestHeaders().getFirst("Content-Type")),
                         "Upgrade", String.valueOf(exchange.getRequestHeaders().getFirst("Upgrade")));
                 body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-                if (delayMillis > 0) {
-                    Thread.sleep(delayMillis);
-                }
+                answerSlowly(delayMillis);
                 byte[] bytes = answer.getBytes(StandardCharsets.UTF_8);
                 exchange.sendResponseHeaders(status, bytes.length == 0 ? -1 : bytes.length);
                 if (bytes.length > 0) {
@@ -71,6 +69,14 @@ class SoapClientTest {
             }
         });
         server.start();
+    }
+
+    // The delay is the behaviour under test: a renderer that answers after the client's timeout.
+    @SuppressWarnings("java:S2925")
+    private static void answerSlowly(long delayMillis) throws InterruptedException {
+        if (delayMillis > 0) {
+            Thread.sleep(delayMillis);
+        }
     }
 
     @AfterEach

@@ -92,6 +92,18 @@ class TizenSessionTest {
         await().atMost(Duration.ofSeconds(5)).until(() -> session.state().status() == status);
     }
 
+    /**
+     * Starts connected and waits until the session has the TV's installed-app list. Until the list arrives the
+     * session falls back to the well-known app ids; Prime Video is not installed on the fake TV, so its
+     * well-known id answering "visible" shows it as the current app exactly until the list has been read.
+     */
+    private void startWithInstalledApps() {
+        tv.setVisible(FakeTizenServer.PRIME_VIDEO, true);
+        start(PAIRED);
+        connected();
+        await().atMost(Duration.ofSeconds(5)).until(() -> session.state().currentApp() == null);
+    }
+
     private String stored(String key) {
         return registry.findById("samsung").orElseThrow().adapterSettings(TizenAdapter.ADAPTER_ID).get(key);
     }
@@ -163,8 +175,8 @@ class TizenSessionTest {
         start(PAIRED);
         connected();
 
-        var failingAction166 = new Action.PressKey(RemoteKey.MEDIA_NEXT);
-        assertThatThrownBy(() -> session.execute(failingAction166))
+        var nextTrack = new Action.PressKey(RemoteKey.MEDIA_NEXT);
+        assertThatThrownBy(() -> session.execute(nextTrack))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -173,17 +185,17 @@ class TizenSessionTest {
         start(PAIRED);
         connected();
 
-        var failingAction175 = new Action.SetVolume(20);
-        assertThatThrownBy(() -> session.execute(failingAction175))
+        var absoluteVolume = new Action.SetVolume(20);
+        assertThatThrownBy(() -> session.execute(absoluteVolume))
                 .isInstanceOf(UnsupportedActionException.class).hasMessageContaining("volume up, down and mute");
-        var failingAction177 = new Action.Mute(true);
-        assertThatThrownBy(() -> session.execute(failingAction177))
+        var mute = new Action.Mute(true);
+        assertThatThrownBy(() -> session.execute(mute))
                 .isInstanceOf(UnsupportedActionException.class).hasMessageContaining("volume up, down and mute");
-        var failingAction179 = new Action.SelectInput("HDMI1");
-        assertThatThrownBy(() -> session.execute(failingAction179))
+        var selectInput = new Action.SelectInput("HDMI1");
+        assertThatThrownBy(() -> session.execute(selectInput))
                 .isInstanceOf(UnsupportedActionException.class).hasMessageContaining("Source button");
-        var failingAction181 = new Action.CastLoad("CC1AD845", Map.of());
-        assertThatThrownBy(() -> session.execute(failingAction181))
+        var castLoad = new Action.CastLoad("CC1AD845", Map.of());
+        assertThatThrownBy(() -> session.execute(castLoad))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -210,9 +222,7 @@ class TizenSessionTest {
 
     @Test
     void netflixOpensTheInstalledAppWithoutTheTitle() throws Exception {
-        start(PAIRED);
-        connected();
-        Thread.sleep(500);
+        startWithInstalledApps();
 
         session.execute(new Action.OpenAppLink(URI.create("https://www.netflix.com/title/80057281")));
 
@@ -225,20 +235,18 @@ class TizenSessionTest {
         start(PAIRED);
         connected();
 
-        var failingAction223 = new Action.OpenAppLink(URI.create("https://example.org/a"));
-        assertThatThrownBy(() -> session.execute(failingAction223))
+        var webLink = new Action.OpenAppLink(URI.create("https://example.org/a"));
+        assertThatThrownBy(() -> session.execute(webLink))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessageContaining("cannot open web links");
     }
 
     @Test
-    void anAppThatIsNotInstalledIsRefused() throws Exception {
-        start(PAIRED);
-        connected();
-        Thread.sleep(500);
+    void anAppThatIsNotInstalledIsRefused() {
+        startWithInstalledApps();
 
-        var failingAction234 = new Action.OpenAppLink(URI.create("https://app.primevideo.com/detail?gti=x"));
-        assertThatThrownBy(() -> session.execute(failingAction234))
+        var primeVideo = new Action.OpenAppLink(URI.create("https://app.primevideo.com/detail?gti=x"));
+        assertThatThrownBy(() -> session.execute(primeVideo))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessageContaining("Prime Video is not installed");
     }
@@ -249,8 +257,8 @@ class TizenSessionTest {
         start(PAIRED);
         connected();
 
-        var failingAction245 = new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ"));
-        assertThatThrownBy(() -> session.execute(failingAction245))
+        var youTubeVideo = new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ"));
+        assertThatThrownBy(() -> session.execute(youTubeVideo))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("not available over DIAL");
     }
@@ -263,13 +271,14 @@ class TizenSessionTest {
     }
 
     @Test
-    void aHandEnteredMacIsNotOverwritten() throws Exception {
+    void aHandEnteredMacIsNotOverwritten() {
         start(Map.of("paired", "true", "token", FakeTizenServer.TOKEN,
                 "macAddress", "11:22:33:44:55:66", "macAddressManual", "true"));
         connected();
-        Thread.sleep(1500);
 
-        assertThat(stored("macAddress")).isEqualTo("11:22:33:44:55:66");
+        // Every poll (1 s interval) reads another MAC from the REST API.
+        await().during(Duration.ofMillis(1500)).atMost(Duration.ofSeconds(3))
+                .until(() -> "11:22:33:44:55:66".equals(stored("macAddress")));
     }
 
     @Test
@@ -317,26 +326,25 @@ class TizenSessionTest {
         start(PAIRED);
         awaitStatus(DeviceStatus.DISCONNECTED);
 
-        var failingAction312 = new Action.PressKey(RemoteKey.POWER);
-        assertThatThrownBy(() -> session.execute(failingAction312))
+        var power = new Action.PressKey(RemoteKey.POWER);
+        assertThatThrownBy(() -> session.execute(power))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("setup page");
         assertThat(receiver.received()).isZero();
     }
 
     @Test
-    void aRejectedTokenIsUnpairedAndStopsTrying() throws Exception {
+    void aRejectedTokenIsUnpairedAndStopsTrying() {
         tv.setAuthorization(FakeTizenServer.Authorization.DENY);
         start(Map.of("paired", "true", "token", "999"));
 
         awaitStatus(DeviceStatus.UNPAIRED);
-        Thread.sleep(3000);
 
-        assertThat(tv.connections()).isEqualTo(1);
+        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4)).until(() -> tv.connections() == 1);
     }
 
     @Test
-    void anUnansweredHandshakeIsTransientKeepsTheTokenAndRetriesWithBackoff() throws Exception {
+    void anUnansweredHandshakeIsTransientKeepsTheTokenAndRetriesWithBackoff() {
         tv.setAuthorization(FakeTizenServer.Authorization.IGNORE);
         long started = System.nanoTime();
         start(Map.of("paired", "true", "token", "999"));
@@ -347,8 +355,10 @@ class TizenSessionTest {
         assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
         assertThat(stored("token")).isEqualTo("999");
         assertThat(stored("paired")).isEqualTo("true");
-        Thread.sleep(Math.max(0, 3500 - Duration.ofNanos(System.nanoTime() - started).toMillis()));
-        assertThat(tv.connections()).as("no retry during the backoff").isEqualTo(1);
+        long elapsedMillis = Duration.ofNanos(System.nanoTime() - started).toMillis();
+        Duration restOfWindow = Duration.ofMillis(Math.max(0, 3500 - elapsedMillis));
+        await("no retry during the backoff").during(restOfWindow).atMost(restOfWindow.plusSeconds(1))
+                .until(() -> tv.connections() == 1);
 
         await().atMost(Duration.ofSeconds(8)).until(() -> tv.connections() >= 2);
         assertThat(states).noneMatch(state -> state.status() == DeviceStatus.UNPAIRED);
@@ -359,13 +369,12 @@ class TizenSessionTest {
     }
 
     @Test
-    void neverConnectsWithoutPairing() throws Exception {
+    void neverConnectsWithoutPairing() {
         start(Map.of());
 
         awaitStatus(DeviceStatus.UNPAIRED);
-        Thread.sleep(2000);
 
-        assertThat(tv.connections()).isZero();
+        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).until(() -> tv.connections() == 0);
     }
 
     @Test
@@ -398,15 +407,14 @@ class TizenSessionTest {
     }
 
     @Test
-    void closeStopsPolling() throws Exception {
+    void closeStopsPolling() {
         start(PAIRED);
         connected();
 
         session.close();
         states.clear();
         tv.dropConnections();
-        Thread.sleep(3000);
 
-        assertThat(states).isEmpty();
+        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4)).until(states::isEmpty);
     }
 }

@@ -148,7 +148,7 @@ class CastSessionTest {
         await().until(() -> session.state().status() == DeviceStatus.DISCONNECTED
                 && seen.stream().anyMatch(state -> state.status() == DeviceStatus.CONNECTING));
 
-        try (FakeCastReceiver late = new FakeCastReceiver(port)) {
+        try (var _ = new FakeCastReceiver(port)) {
             await().atMost(Duration.ofSeconds(10)).until(() -> session.state().connected());
         }
     }
@@ -166,27 +166,29 @@ class CastSessionTest {
     }
 
     @Test
-    void aClosedSessionPublishesNothingAndDoesNotReconnect() throws Exception {
+    void aClosedSessionPublishesNothingAndDoesNotReconnect() {
         start(receiver.port());
         awaitStatus();
 
         session.close();
         int published = seen.size();
-        Thread.sleep(2_500);
 
-        assertThat(seen).hasSize(published);
-        assertThat(receiver.connections()).isEqualTo(1);
+        // Longer than the 1–2 s reconnect backoff.
+        await().during(Duration.ofMillis(2_500)).atMost(Duration.ofSeconds(4)).untilAsserted(() -> {
+            assertThat(seen).hasSize(published);
+            assertThat(receiver.connections()).isEqualTo(1);
+        });
     }
 
     @Test
     void remoteKeysAndAppLinksAreNotCastActions() {
         start(receiver.port());
 
-        var failingAction185 = new Action.PressKey(RemoteKey.HOME);
-        assertThatThrownBy(() -> session.execute(failingAction185))
+        var homeKey = new Action.PressKey(RemoteKey.HOME);
+        assertThatThrownBy(() -> session.execute(homeKey))
                 .isInstanceOf(UnsupportedActionException.class);
-        var failingAction187 = new Action.OpenAppLink(URI.create("https://youtube.com"));
-        assertThatThrownBy(() -> session.execute(failingAction187))
+        var appLink = new Action.OpenAppLink(URI.create("https://youtube.com"));
+        assertThatThrownBy(() -> session.execute(appLink))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -246,8 +248,8 @@ class CastSessionTest {
         // Another sender replaced the app; the session still knows only the old session id.
         receiver.runApp("233637DE", "YouTube");
 
-        var failingAction247 = new Action.Stop();
-        assertThatThrownBy(() -> session.execute(failingAction247))
+        var staleStop = new Action.Stop();
+        assertThatThrownBy(() -> session.execute(staleStop))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessage("Living Room TV refused to stop Default Media Receiver (INVALID_REQUEST: INVALID_SESSION_ID)");
     }
@@ -258,8 +260,8 @@ class CastSessionTest {
         start(receiver.port());
         awaitStatus();
 
-        var failingAction258 = new Action.SetVolume(10);
-        assertThatThrownBy(() -> session.execute(failingAction258))
+        var unansweredVolume = new Action.SetVolume(10);
+        assertThatThrownBy(() -> session.execute(unansweredVolume))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("did not answer");
     }
@@ -273,8 +275,8 @@ class CastSessionTest {
         start(port);
         await().until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
 
-        var failingAction272 = new Action.SetVolume(10);
-        assertThatThrownBy(() -> session.execute(failingAction272))
+        var offlineVolume = new Action.SetVolume(10);
+        assertThatThrownBy(() -> session.execute(offlineVolume))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("not connected");
     }
@@ -286,8 +288,8 @@ class CastSessionTest {
         await().until(() -> session.state().connected() && session.state().currentApp() != null);
         receiver.runApp("233637DE", "YouTube");
 
-        var failingAction284 = new Action.Stop();
-        assertThatThrownBy(() -> session.execute(failingAction284))
+        var staleStop = new Action.Stop();
+        assertThatThrownBy(() -> session.execute(staleStop))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessage("Living Room TV refused to stop CC1AD845 (INVALID_REQUEST: INVALID_SESSION_ID)");
     }
@@ -341,8 +343,8 @@ class CastSessionTest {
         start(receiver.port());
         awaitStatus();
 
-        var preparedArg350_0 = bunny();
-        assertThatThrownBy(() -> session.execute(preparedArg350_0))
+        var refusedLaunch = bunny();
+        assertThatThrownBy(() -> session.execute(refusedLaunch))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("LAUNCH_ERROR: NOT_FOUND");
         assertThat(receiver.received(MEDIA, "LOAD")).isEmpty();
@@ -369,8 +371,8 @@ class CastSessionTest {
         start(port);
         await().until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
 
-        var preparedArg364_0 = bunny();
-        assertThatThrownBy(() -> session.execute(preparedArg364_0)).isInstanceOf(DeviceOfflineException.class);
+        var offlineLoad = bunny();
+        assertThatThrownBy(() -> session.execute(offlineLoad)).isInstanceOf(DeviceOfflineException.class);
     }
 
     @Test
@@ -495,8 +497,8 @@ class CastSessionTest {
         start(receiver.port());
         awaitStatus();
 
-        var preparedArg499_0 = playNow();
-        assertThatThrownBy(() -> session.execute(preparedArg499_0))
+        var rejectedPlayback = playNow();
+        assertThatThrownBy(() -> session.execute(rejectedPlayback))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("refused to play it (Missing one or more required params");
     }
@@ -521,8 +523,8 @@ class CastSessionTest {
         start(port);
         await().until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
 
-        var preparedArg513_0 = playNow();
-        assertThatThrownBy(() -> session.execute(preparedArg513_0))
+        var offlinePlayback = playNow();
+        assertThatThrownBy(() -> session.execute(offlinePlayback))
                 .isInstanceOf(DeviceOfflineException.class);
     }
 

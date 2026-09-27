@@ -112,9 +112,9 @@ public final class FakeBluezClient implements BluezClient {
         maybeFail("adapters");
         reads++;
         List<BluetoothAdapterInfo> result = new ArrayList<>();
-        for (AdapterRecord record : adapters) {
-            result.add(new BluetoothAdapterInfo(record.id(), record.address(), record.alias(),
-                    powered.getOrDefault(record.address(), false)));
+        for (AdapterRecord adapter : adapters) {
+            result.add(new BluetoothAdapterInfo(adapter.id(), adapter.address(), adapter.alias(),
+                    powered.getOrDefault(adapter.address(), false)));
         }
         return result;
     }
@@ -225,7 +225,7 @@ public final class FakeBluezClient implements BluezClient {
     }
 
     private void requireAdapter(String adapterAddress) throws BluezException {
-        boolean known = adapters.stream().anyMatch(record -> record.address().equalsIgnoreCase(adapterAddress));
+        boolean known = adapters.stream().anyMatch(adapter -> adapter.address().equalsIgnoreCase(adapterAddress));
         if (!known) {
             throw new BluezException(BluezFailure.NO_ADAPTER, BluezFailures.message(BluezFailure.NO_ADAPTER, adapterAddress));
         }
@@ -262,6 +262,8 @@ public final class FakeBluezClient implements BluezClient {
         }
     }
 
+    // The delay is the behaviour under test: a BlueZ operation that takes this long.
+    @SuppressWarnings("java:S2925")
     private static void sleep(Duration delay) {
         try {
             Thread.sleep(delay.toMillis());

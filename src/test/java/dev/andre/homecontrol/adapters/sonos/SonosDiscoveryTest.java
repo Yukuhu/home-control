@@ -154,17 +154,18 @@ class SonosDiscoveryTest {
     }
 
     @Test
-    void aLocationOffTheAnnouncingAddressIsNeverAsked() throws InterruptedException {
+    void aLocationOffTheAnnouncingAddressIsNeverAsked() {
         // A datagram from 127.0.0.2 naming the kitchen's address must not make us call the kitchen.
         responder.answer(SonosDiscovery.SEARCH_TARGET, living.searchResponse().replace("127.0.0.2:" + living.port(),
                 "127.0.0.3:" + kitchen.port()));
         search();
 
-        Thread.sleep(2500);
-
-        assertThat(discovery.devices()).isEmpty();
-        assertThat(kitchen.calls()).isEmpty();
-        assertThat(living.calls()).isEmpty();
+        await().atMost(Duration.ofSeconds(5)).until(() -> responder.searches() >= 1);
+        await().during(Duration.ofMillis(2500)).atMost(Duration.ofSeconds(4)).untilAsserted(() -> {
+            assertThat(discovery.devices()).isEmpty();
+            assertThat(kitchen.calls()).isEmpty();
+            assertThat(living.calls()).isEmpty();
+        });
     }
 
     @Test

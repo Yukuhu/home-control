@@ -46,7 +46,8 @@ public class FakeUpnpRenderer implements AutoCloseable {
                 "/upnp/control/RenderingControl1", "/upnp/control/ConnectionManager1", "fixtures/upnp/renderer-description.xml");
     }
 
-    public record Call(String path, String soapAction, String action, Map<String, String> arguments) {
+    /** {@code receivedNanos} is the {@link System#nanoTime()} at which the request arrived. */
+    public record Call(String path, String soapAction, String action, Map<String, String> arguments, long receivedNanos) {
         public String argument(String name) {
             return arguments.getOrDefault(name, "");
         }
@@ -284,15 +285,10 @@ public class FakeUpnpRenderer implements AutoCloseable {
         Map<String, String> arguments = new LinkedHashMap<>();
         UpnpXml.childElements(request).forEach(argument -> arguments.put(UpnpXml.localName(argument), argument.getTextContent()));
         calls.add(new Call(path, exchange.getRequestHeaders().getFirst("SOAPACTION"), action,
-                Collections.unmodifiableMap(arguments)));
+                Collections.unmodifiableMap(arguments), System.nanoTime()));
         Duration delay = answerDelay;
-        if (!delay.isZero()) {
-            try {
-                Thread.sleep(delay);
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-                return;
-            }
+        if (!delay.isZero() && !answersAfter(delay)) {
+            return;
         }
         RawAnswer raw = rawAnswers.get(action);
         if (raw != null) {
@@ -315,8 +311,24 @@ public class FakeUpnpRenderer implements AutoCloseable {
         }
     }
 
+    // The delay is the behaviour under test: a renderer that answers slowly.
+    @SuppressWarnings("java:S2925")
+    private static boolean answersAfter(Duration delay) {
+        try {
+            Thread.sleep(delay);
+            return true;
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
     /** Device behaviour. Subclasses (Sonos) intercept actions and delegate the rest here. */
     protected Map<String, String> perform(String serviceType, String action, Map<String, String> arguments) {
+        if (!serviceType.equals(serviceOf(action))) {
+            // A renderer's service knows only its own actions.
+            throw new Fault(401, "Invalid Action");
+        }
         return switch (action) {
             case "SetAVTransportURI" -> {
                 currentUri = arguments.getOrDefault("CurrentURI", "");
@@ -359,6 +371,15 @@ public class FakeUpnpRenderer implements AutoCloseable {
             }
             case "GetProtocolInfo" -> ordered("Source", "", "Sink", sink);
             default -> throw new Fault(401, "Invalid Action");
+        };
+    }
+
+    private static String serviceOf(String action) {
+        return switch (action) {
+            case "SetAVTransportURI", "Play", "Pause", "Stop", "GetTransportInfo", "GetPositionInfo" -> AV_TRANSPORT;
+            case "GetVolume", "SetVolume", "GetMute", "SetMute" -> RENDERING_CONTROL;
+            case "GetProtocolInfo" -> CONNECTION_MANAGER;
+            default -> "";
         };
     }
 
