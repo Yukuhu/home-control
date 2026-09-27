@@ -43,8 +43,11 @@ runs:
         # GHCR requires a lowercase name.
         echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
         variant=image
+        # Only the -bluetooth image runs as root, which the host's D-Bus requires of it.
+        run_as=1000:1000
         if [[ "$BLUETOOTH" == true ]]; then
           variant=bluetooth
+          run_as=0:0
           # Only the layer that installs mpv is worth caching: the base image is pulled and the
           # jar changes with every commit. One scope per variant and architecture, because a
           # scope holds the cache of one writer, and written on main alone, because a cache
@@ -55,6 +58,7 @@ runs:
           fi
         fi
         echo "variant=$variant" >> "$GITHUB_OUTPUT"
+        echo "run-as=$run_as" >> "$GITHUB_OUTPUT"
 
     # The labels are part of the image, so the image that is tested is built with the labels
     # of the one that is published.
@@ -73,7 +77,9 @@ runs:
         load: true
         tags: home-control:smoke
         labels: ${{ steps.meta.outputs.labels }}
-        build-args: WITH_MPV=${{ inputs.bluetooth }}
+        build-args: |
+          WITH_MPV=${{ inputs.bluetooth }}
+          RUN_AS=${{ steps.names.outputs.run-as }}
         cache-from: ${{ steps.names.outputs.cache-from }}
         cache-to: ${{ steps.names.outputs.cache-to }}
 
@@ -107,7 +113,9 @@ runs:
         platforms: linux/${{ inputs.arch }}
         tags: ${{ steps.names.outputs.image }}
         labels: ${{ steps.meta.outputs.labels }}
-        build-args: WITH_MPV=${{ inputs.bluetooth }}
+        build-args: |
+          WITH_MPV=${{ inputs.bluetooth }}
+          RUN_AS=${{ steps.names.outputs.run-as }}
         outputs: type=image,push-by-digest=true,name-canonical=true,push=true
         # Attached to the image, not part of it: what it was built from, and what it contains.
         provenance: mode=max

@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.security;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
+import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.SecretKeySource;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -20,8 +21,10 @@ public class SecurityConfiguration {
         return new SecureRandom();
     }
 
+    /** Takes the data directory so that it is checked before the first file in it is read. */
     @Bean
-    public SecretStore secretStore(AndroidTvProperties storage, SecurityProperties security, SecureRandom random) {
+    public SecretStore secretStore(AndroidTvProperties storage, SecurityProperties security, SecureRandom random,
+                                   DataDirectory checked) {
         SecretKeySource keys = new SecretKeySource(security.secret(), storage.dataDir().resolve("secret.key"), random);
         return new SecretStore(storage.dataDir().resolve("secrets.json"), keys, random);
     }

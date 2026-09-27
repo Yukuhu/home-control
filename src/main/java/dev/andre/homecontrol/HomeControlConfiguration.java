@@ -61,7 +61,9 @@ public class HomeControlConfiguration {
 
     @Bean
     public DataDirectory dataDirectory(AndroidTvProperties properties) {
-        return new DataDirectory(properties.dataDir());
+        DataDirectory directory = new DataDirectory(properties.dataDir());
+        directory.verifyUsable();
+        return directory;
     }
 
     @Bean

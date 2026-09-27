@@ -11,6 +11,8 @@ services:
       context: .
       args:
         WITH_MPV: "true"
+        # The host's D-Bus lets only root talk to BlueZ, so this variant runs as root.
+        RUN_AS: "0:0"
     # Or pull the published variant instead of building:
     # image: ghcr.io/yukuhu/home-control:latest-bluetooth
     environment:
