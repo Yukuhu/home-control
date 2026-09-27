@@ -163,6 +163,19 @@ class DeepLinkTestServiceTest {
     }
 
     @Test
+    void anUnexpectedFailureIsReportedWithoutItsInternals() {
+        doThrow(new IllegalStateException("Cannot invoke \"Session.send()\" because \"this.session\" is null"))
+                .when(devices).execute(eq("lg"), any());
+
+        DeepLinkTestResult failed = service.run("lg");
+
+        assertThat(failed.outcome()).isEqualTo(DeepLinkTestResult.Outcome.FAILED);
+        assertThat(failed.message())
+                .isEqualTo("The test link was not opened: an unexpected error, which the server's log describes")
+                .doesNotContain("session");
+    }
+
+    @Test
     void aDeviceWithoutAppLinksIsRejected() {
         when(devices.capabilities("lg")).thenReturn(EnumSet.of(Capability.REMOTE_KEYS));
 
