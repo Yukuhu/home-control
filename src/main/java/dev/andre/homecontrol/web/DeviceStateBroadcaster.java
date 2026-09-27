@@ -128,7 +128,7 @@ public class DeviceStateBroadcaster {
      */
     @EventListener(ContextClosedEvent.class)
     public void onContextClosed() {
-        for (SseEmitter emitter : emitters) {
+        for (SseEmitter emitter : List.copyOf(emitters)) {
             drop(emitter);
             completeQuietly(emitter);
         }
