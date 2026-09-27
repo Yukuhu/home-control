@@ -50,57 +50,76 @@ public class CalendarFetcher {
         URI current = url;
         for (int hop = 0; ; hop++) {
             policy.checkAddress(current);
-            String host = current.getHost();
-            HttpRequest request = HttpRequest.newBuilder(current)
-                    .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
-                    .header("Accept", "text/calendar, text/plain;q=0.9, */*;q=0.5")
-                    .header("User-Agent", "HomeControl")
-                    .GET().build();
-            HttpResponse<InputStream> response;
-            try {
-                response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            } catch (IOException e) {
-                throw unreachable(host, e);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw unreachable(host, e);
+            Hop answer = read(send(current), current, hop);
+            if (answer.redirect() == null) {
+                return answer.text();
             }
-            try (InputStream body = response.body()) {
-                int status = response.statusCode();
-                if (REDIRECTS.contains(status)) {
-                    String location = response.headers().firstValue("Location").orElse(null);
-                    if (location == null) {
-                        throw new CalendarFetchException(Kind.BAD_RESPONSE, host + " answered HTTP " + status);
-                    }
-                    if (hop >= properties.maxRedirects()) {
-                        throw new CalendarFetchException(Kind.BAD_RESPONSE, "The calendar link redirected too many times");
-                    }
-                    try {
-                        current = policy.parse(current.resolve(location).toString());
-                    } catch (IllegalArgumentException _) {
-                        throw new CalendarFetchException(Kind.BAD_RESPONSE,
-                                host + " redirected to a link Home Control does not follow");
-                    }
-                    continue;
-                }
-                if (status == 401 || status == 403) {
-                    throw new CalendarFetchException(Kind.UNAUTHORIZED, host + " refused access to the calendar");
-                }
-                if (status == 404 || status == 410) {
-                    throw new CalendarFetchException(Kind.NOT_FOUND, host + " has no calendar at that link");
-                }
-                if (status != 200) {
-                    throw new CalendarFetchException(Kind.BAD_RESPONSE, host + " answered HTTP " + status);
-                }
-                byte[] bytes = body.readNBytes(properties.maxBytes() + 1);
-                if (bytes.length > properties.maxBytes()) {
-                    throw new CalendarFetchException(Kind.TOO_LARGE,
-                            "The calendar is larger than " + (properties.maxBytes() / 1_048_576) + " MB");
-                }
-                return new String(bytes, charsetOf(response));
-            } catch (IOException e) {
-                throw unreachable(host, e);
+            current = answer.redirect();
+        }
+    }
+
+    /** One request's outcome: the calendar text, or the validated link it redirected to. */
+    private record Hop(String text, URI redirect) {
+    }
+
+    private HttpResponse<InputStream> send(URI target) {
+        HttpRequest request = HttpRequest.newBuilder(target)
+                .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
+                .header("Accept", "text/calendar, text/plain;q=0.9, */*;q=0.5")
+                .header("User-Agent", "HomeControl")
+                .GET().build();
+        try {
+            return client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        } catch (IOException e) {
+            throw unreachable(target.getHost(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw unreachable(target.getHost(), e);
+        }
+    }
+
+    /** Reads (and always closes) the response body. */
+    private Hop read(HttpResponse<InputStream> response, URI current, int hop) {
+        String host = current.getHost();
+        try (InputStream body = response.body()) {
+            int status = response.statusCode();
+            if (REDIRECTS.contains(status)) {
+                return new Hop(null, redirectTarget(response, current, hop));
             }
+            if (status == 401 || status == 403) {
+                throw new CalendarFetchException(Kind.UNAUTHORIZED, host + " refused access to the calendar");
+            }
+            if (status == 404 || status == 410) {
+                throw new CalendarFetchException(Kind.NOT_FOUND, host + " has no calendar at that link");
+            }
+            if (status != 200) {
+                throw new CalendarFetchException(Kind.BAD_RESPONSE, host + " answered HTTP " + status);
+            }
+            byte[] bytes = body.readNBytes(properties.maxBytes() + 1);
+            if (bytes.length > properties.maxBytes()) {
+                throw new CalendarFetchException(Kind.TOO_LARGE,
+                        "The calendar is larger than " + (properties.maxBytes() / 1_048_576) + " MB");
+            }
+            return new Hop(new String(bytes, charsetOf(response)), null);
+        } catch (IOException e) {
+            throw unreachable(host, e);
+        }
+    }
+
+    private URI redirectTarget(HttpResponse<?> response, URI current, int hop) {
+        String host = current.getHost();
+        String location = response.headers().firstValue("Location").orElse(null);
+        if (location == null) {
+            throw new CalendarFetchException(Kind.BAD_RESPONSE, host + " answered HTTP " + response.statusCode());
+        }
+        if (hop >= properties.maxRedirects()) {
+            throw new CalendarFetchException(Kind.BAD_RESPONSE, "The calendar link redirected too many times");
+        }
+        try {
+            return policy.parse(current.resolve(location).toString());
+        } catch (IllegalArgumentException _) {
+            throw new CalendarFetchException(Kind.BAD_RESPONSE,
+                    host + " redirected to a link Home Control does not follow");
         }
     }
 

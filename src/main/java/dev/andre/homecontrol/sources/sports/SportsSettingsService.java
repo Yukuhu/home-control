@@ -11,6 +11,8 @@ public class SportsSettingsService {
     private final JsonFileSportsStore store;
     private final ApplicationEventPublisher events;
     private final Object lock = new Object();
+    // Immutable record replaced wholesale, only ever written under lock; lock-free readers need visibility only.
+    @SuppressWarnings("java:S3077")
     private volatile SportsSettings cached;
 
     public SportsSettingsService(JsonFileSportsStore store, ApplicationEventPublisher events) {

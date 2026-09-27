@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 /** Maps a TheSportsDB {@code eventsday.php} element to a {@link SportsEvent}, or nothing when it does not qualify. */
 public final class TheSportsDbEventMapper {
 
-    private static final Pattern ID = Pattern.compile("^[0-9]{1,12}$");
+    private static final Pattern ID = Pattern.compile("^\\d{1,12}$");
     private static final Pattern OFFSET = Pattern.compile("[+-]\\d{2}:\\d{2}$");
     private static final int MAX_TITLE = 200;
 
@@ -54,8 +54,7 @@ public final class TheSportsDbEventMapper {
         if (CANCELLED_LIKE.contains(status)) {
             return Optional.empty();
         }
-        SportsEvent.Status mappedStatus = FINISHED_LIKE.contains(status) ? SportsEvent.Status.FINISHED
-                : LIVE_LIKE.contains(status) ? SportsEvent.Status.LIVE : SportsEvent.Status.SCHEDULED;
+        SportsEvent.Status mappedStatus = mappedStatus(status);
 
         String title = title(event);
         if (title == null) {
@@ -65,32 +64,41 @@ public final class TheSportsDbEventMapper {
         String sport = event.path("strSport").isString() ? event.path("strSport").asString() : null;
         Duration duration = durations.apply(sport);
 
-        Instant startsAt;
-        Instant endsAt;
-        LocalDate allDayDate = null;
+        return timing(event, duration, zone).map(timing -> new SportsEvent("tsdb:" + idEvent,
+                "thesportsdb:" + leagueId, title, timing.startsAt(), timing.endsAt(), timing.allDayDate(),
+                artwork(event, badge), mappedStatus));
+    }
+
+    private static SportsEvent.Status mappedStatus(String status) {
+        if (FINISHED_LIKE.contains(status)) {
+            return SportsEvent.Status.FINISHED;
+        }
+        if (LIVE_LIKE.contains(status)) {
+            return SportsEvent.Status.LIVE;
+        }
+        return SportsEvent.Status.SCHEDULED;
+    }
+
+    /** {@code allDayDate} is null for a timed event. */
+    private record Timing(Instant startsAt, Instant endsAt, LocalDate allDayDate) {
+
+        static Timing timed(Instant startsAt, Duration duration) {
+            return new Timing(startsAt, startsAt.plus(duration), null);
+        }
+    }
+
+    /** The exact timestamp, else the UTC date and time, else the whole local day; empty without any date. */
+    private static Optional<Timing> timing(JsonNode event, Duration duration, ZoneId zone) {
         Optional<Instant> parsed = timestamp(event.path("strTimestamp").isString() ? event.path("strTimestamp").asString() : null);
         if (parsed.isPresent()) {
-            startsAt = parsed.get();
-            endsAt = startsAt.plus(duration);
-        } else {
-            Optional<LocalDateTime> dateTime = dateAndTime(event);
-            if (dateTime.isPresent()) {
-                startsAt = dateTime.get().toInstant(ZoneOffset.UTC);
-                endsAt = startsAt.plus(duration);
-            } else {
-                Optional<LocalDate> date = allDayDate(event);
-                if (date.isEmpty()) {
-                    return Optional.empty();
-                }
-                allDayDate = date.get();
-                startsAt = allDayDate.atStartOfDay(zone).toInstant();
-                endsAt = allDayDate.plusDays(1).atStartOfDay(zone).toInstant();
-            }
+            return Optional.of(Timing.timed(parsed.get(), duration));
         }
-
-        URI artwork = artwork(event, badge);
-        return Optional.of(new SportsEvent("tsdb:" + idEvent, "thesportsdb:" + leagueId, title, startsAt, endsAt,
-                allDayDate, artwork, mappedStatus));
+        Optional<LocalDateTime> dateTime = dateAndTime(event);
+        if (dateTime.isPresent()) {
+            return Optional.of(Timing.timed(dateTime.get().toInstant(ZoneOffset.UTC), duration));
+        }
+        return allDayDate(event).map(date -> new Timing(date.atStartOfDay(zone).toInstant(),
+                date.plusDays(1).atStartOfDay(zone).toInstant(), date));
     }
 
     private static String title(JsonNode event) {
