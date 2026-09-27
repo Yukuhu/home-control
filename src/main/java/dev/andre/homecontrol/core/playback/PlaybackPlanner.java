@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -58,32 +59,38 @@ public class PlaybackPlanner {
     private static List<String> explain(ContentItem item, Set<Capability> capabilities) {
         Set<String> reasons = new LinkedHashSet<>();
         for (PlayableRef ref : item.playables()) {
-            switch (ref) {
-                case PlayableRef.AppLink _ -> {
-                    if (!capabilities.contains(Capability.APP_LINK)) {
-                        reasons.add("this device cannot open app links");
-                    }
-                }
-                case PlayableRef.WorkflowCast _ -> reasons.add(NOT_CAST_RECEIVER);
-                case PlayableRef.CastLoad _ -> reasons.add(NOT_CAST_RECEIVER);
-                case PlayableRef.CastMessage _ -> reasons.add(NOT_CAST_RECEIVER);
-                case PlayableRef.YouTubeLounge _ -> reasons.add(NOT_CAST_RECEIVER);
-                case PlayableRef.StreamUrl stream -> reasons.add(
-                        capabilities.contains(Capability.LOCAL_AUDIO_SINK) && !LocalAudioSinkStrategy.playable(stream)
-                                && !capabilities.contains(Capability.CAST_RECEIVER) && !capabilities.contains(Capability.MEDIA_RENDERER)
-                                ? "a Bluetooth speaker plays audio streams only"
-                                : capabilities.contains(Capability.CAST_RECEIVER) || capabilities.contains(Capability.MEDIA_RENDERER)
-                                        || capabilities.contains(Capability.LOCAL_AUDIO_SINK)
-                                        ? "the stream was not accepted" : "this device cannot play a direct stream");
-                case PlayableRef.JellyfinItem _ -> reasons.add("Jellyfin is switched off on this server");
-                case PlayableRef.JellyfinSession _ -> reasons.add("the open Jellyfin app cannot be controlled");
-                case PlayableRef.JellyfinVlc _ -> reasons.add("VLC cannot be opened on this device");
-                case PlayableRef.JellyfinApp _ -> reasons.add("the Jellyfin app cannot be started on this device");
-            }
+            reason(ref, capabilities).ifPresent(reasons::add);
         }
         if (reasons.isEmpty()) {
             reasons.add("no route to this device");
         }
         return new ArrayList<>(reasons);
+    }
+
+    /** Why one playable did not route; empty for an app link on a device that can open app links. */
+    private static Optional<String> reason(PlayableRef ref, Set<Capability> capabilities) {
+        return switch (ref) {
+            case PlayableRef.AppLink _ when capabilities.contains(Capability.APP_LINK) -> Optional.empty();
+            case PlayableRef.AppLink _ -> Optional.of("this device cannot open app links");
+            case PlayableRef.WorkflowCast _ -> Optional.of(NOT_CAST_RECEIVER);
+            case PlayableRef.CastLoad _ -> Optional.of(NOT_CAST_RECEIVER);
+            case PlayableRef.CastMessage _ -> Optional.of(NOT_CAST_RECEIVER);
+            case PlayableRef.YouTubeLounge _ -> Optional.of(NOT_CAST_RECEIVER);
+            case PlayableRef.StreamUrl stream -> Optional.of(streamReason(stream, capabilities));
+            case PlayableRef.JellyfinItem _ -> Optional.of("Jellyfin is switched off on this server");
+            case PlayableRef.JellyfinSession _ -> Optional.of("the open Jellyfin app cannot be controlled");
+            case PlayableRef.JellyfinVlc _ -> Optional.of("VLC cannot be opened on this device");
+            case PlayableRef.JellyfinApp _ -> Optional.of("the Jellyfin app cannot be started on this device");
+        };
+    }
+
+    private static String streamReason(PlayableRef.StreamUrl stream, Set<Capability> capabilities) {
+        boolean localSink = capabilities.contains(Capability.LOCAL_AUDIO_SINK);
+        boolean castOrRenderer = capabilities.contains(Capability.CAST_RECEIVER)
+                || capabilities.contains(Capability.MEDIA_RENDERER);
+        if (localSink && !LocalAudioSinkStrategy.playable(stream) && !castOrRenderer) {
+            return "a Bluetooth speaker plays audio streams only";
+        }
+        return castOrRenderer || localSink ? "the stream was not accepted" : "this device cannot play a direct stream";
     }
 }

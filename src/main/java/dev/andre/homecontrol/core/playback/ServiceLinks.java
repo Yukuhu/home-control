@@ -23,8 +23,8 @@ public final class ServiceLinks {
             YOUTUBE, "YouTube", NETFLIX, "Netflix", PRIME_VIDEO, "Prime Video", DAZN, "DAZN", "jellyfin", "Jellyfin");
 
     private static final Pattern NETFLIX_PATH = Pattern.compile(
-            "^(?:/[a-z]{2}(?:-[a-z]{2})?)?/(?:title|watch)/([0-9]{1,12})(?:/.*)?$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern NETFLIX_ID = Pattern.compile("^[0-9]{1,12}$");
+            "^(?:/[a-z]{2}(?:-[a-z]{2})?)?/(?:title|watch)/(\\d{1,12})(?:/.*)?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern NETFLIX_ID = Pattern.compile("^\\d{1,12}$");
     private static final Pattern GTI = Pattern.compile(
             "amzn1\\.dv\\.gti\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", Pattern.CASE_INSENSITIVE);
     private static final Pattern PRIME_DETAIL = Pattern.compile("/detail/([0-9A-Za-z]{10,40})(?:/|$)");

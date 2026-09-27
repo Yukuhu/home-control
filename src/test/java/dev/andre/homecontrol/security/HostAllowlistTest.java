@@ -56,4 +56,16 @@ class HostAllowlistTest {
         assertThat(odd.allows("evil.example")).isFalse();
         assertThat(odd.allows("tv.local")).isTrue();
     }
+
+    @Test
+    void aBracketedHostMustBeAnIpv6LiteralWithAValidPortIfAny() {
+        assertThat(hosts.allows("[::1]:1")).isTrue();
+        assertThat(hosts.allows("[::1]:65535")).isTrue();
+        assertThat(hosts.allows("[::1]:0")).isFalse();
+        assertThat(hosts.allows("[::1]:65536")).isFalse();
+        assertThat(hosts.allows("[::1]]")).isFalse();
+        assertThat(hosts.allows("[localhost]")).isFalse();
+        assertThat(hosts.allows("[192.168.1.10]:80")).isFalse();
+        assertThat(hosts.allows("[]")).isFalse();
+    }
 }

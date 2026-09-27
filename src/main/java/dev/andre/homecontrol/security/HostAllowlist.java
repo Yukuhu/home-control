@@ -51,46 +51,41 @@ public final class HostAllowlist {
         if (hostHeader == null) {
             return false;
         }
-        String host;
-        String port = null;
         if (hostHeader.startsWith("[")) {
-            int close = hostHeader.indexOf(']');
-            if (close < 0) {
-                return false;
-            }
-            String rest = hostHeader.substring(close + 1);
-            if (!rest.isEmpty()) {
-                if (!rest.startsWith(":")) {
-                    return false;
-                }
-                port = rest.substring(1);
-            }
-            if (port != null && !validPort(port)) {
-                return false;
-            }
-            return isIpv6(hostHeader.substring(1, close));
+            return isBracketedIpv6(hostHeader);
         }
+        String host = hostHeader;
         int colon = hostHeader.indexOf(':');
         if (colon >= 0) {
-            host = hostHeader.substring(0, colon);
-            port = hostHeader.substring(colon + 1);
-            if (!validPort(port)) {
+            if (!validPort(hostHeader.substring(colon + 1))) {
                 return false;
             }
-        } else {
-            host = hostHeader;
+            host = hostHeader.substring(0, colon);
         }
-        host = host.toLowerCase(Locale.ROOT);
+        return allowsName(host.toLowerCase(Locale.ROOT));
+    }
+
+    /** {@code [literal]} or {@code [literal]:port}: a valid IPv6 literal, and a valid port if there is one. */
+    private static boolean isBracketedIpv6(String hostHeader) {
+        int close = hostHeader.indexOf(']');
+        if (close < 0) {
+            return false;
+        }
+        String rest = hostHeader.substring(close + 1);
+        boolean portOk = rest.isEmpty() || (rest.startsWith(":") && validPort(rest.substring(1)));
+        return portOk && isIpv6(hostHeader.substring(1, close));
+    }
+
+    /** A lower-case host without its port: a valid IPv4 literal, or an allowed DNS name. */
+    private boolean allowsName(String host) {
         if (IPV4.matcher(host).matches()) {
             return isIpv4(host);
         }
         if (!isName(host)) {
             return false;
         }
-        if (host.equals("localhost") || !host.contains(".") || exactHosts.contains(host)) {
-            return true;
-        }
-        return LAN_SUFFIXES.stream().anyMatch(host::endsWith) || suffixes.stream().anyMatch(host::endsWith);
+        return host.equals("localhost") || !host.contains(".") || exactHosts.contains(host)
+                || LAN_SUFFIXES.stream().anyMatch(host::endsWith) || suffixes.stream().anyMatch(host::endsWith);
     }
 
     private static boolean validPort(String port) {

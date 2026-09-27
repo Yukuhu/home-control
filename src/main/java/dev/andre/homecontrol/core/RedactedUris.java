@@ -12,9 +12,15 @@ public final class RedactedUris {
         if (uri == null) {
             return "null";
         }
-        String where = uri.getScheme() == null || uri.getHost() == null
-                ? String.valueOf(uri.getRawPath())
-                : uri.getScheme() + "://" + uri.getHost() + (uri.getPort() >= 0 ? ":" + uri.getPort() : "") + uri.getRawPath();
-        return where + (uri.getRawQuery() == null ? "" : "?…");
+        return where(uri) + (uri.getRawQuery() == null ? "" : "?…");
+    }
+
+    /** Scheme, host, port and path; never the user info. Just the path without a scheme or host. */
+    private static String where(URI uri) {
+        if (uri.getScheme() == null || uri.getHost() == null) {
+            return String.valueOf(uri.getRawPath());
+        }
+        String port = uri.getPort() >= 0 ? ":" + uri.getPort() : "";
+        return uri.getScheme() + "://" + uri.getHost() + port + uri.getRawPath();
     }
 }
