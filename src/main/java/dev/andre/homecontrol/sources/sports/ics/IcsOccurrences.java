@@ -35,12 +35,8 @@ public final class IcsOccurrences {
     public static Result expand(IcsCalendar calendar, ZoneId fallback, Instant windowStart, Instant windowEnd,
                                 Duration defaultDuration) {
         Zones zones = new Zones(IcsZones.resolve(calendar.timeZone()).orElse(fallback));
-        Map<String, Set<Instant>> overridden = new HashMap<>();
-        for (IcsEvent event : calendar.events()) {
-            if (event.recurrenceId() != null && event.uid() != null) {
-                overridden.computeIfAbsent(event.uid(), uid -> new HashSet<>()).add(zones.instant(event.recurrenceId()));
-            }
-        }
+        Map<String, Set<Instant>> overridden = overriddenStarts(calendar, zones);
+        Window window = new Window(windowStart, windowEnd);
         List<IcsOccurrence> out = new ArrayList<>();
         int unsupported = 0;
         for (IcsEvent event : calendar.events()) {
@@ -57,10 +53,25 @@ public final class IcsOccurrences {
                 rule = parsed.orElse(null);
             }
             Set<Instant> skip = master && event.uid() != null ? overridden.getOrDefault(event.uid(), Set.of()) : Set.of();
-            new Expansion(event, rule, zones, skip, windowStart, windowEnd, defaultDuration, out).run();
+            new Expansion(event, rule, zones, skip, window, defaultDuration, out).run();
         }
         out.sort(Comparator.comparing(IcsOccurrence::startsAt).thenComparing(IcsOccurrence::summary));
         return new Result(out, unsupported, zones.unknown.size());
+    }
+
+    /** Per UID, the original starts that RECURRENCE-ID overrides replace. */
+    private static Map<String, Set<Instant>> overriddenStarts(IcsCalendar calendar, Zones zones) {
+        Map<String, Set<Instant>> overridden = new HashMap<>();
+        for (IcsEvent event : calendar.events()) {
+            if (event.recurrenceId() != null && event.uid() != null) {
+                overridden.computeIfAbsent(event.uid(), uid -> new HashSet<>()).add(zones.instant(event.recurrenceId()));
+            }
+        }
+        return overridden;
+    }
+
+    /** Occurrences are kept when they end after {@code start} and begin before {@code end}. */
+    private record Window(Instant start, Instant end) {
     }
 
     private static final class Zones {
@@ -107,8 +118,7 @@ public final class IcsOccurrences {
         private final IcsEvent event;
         private final IcsRecurrence rule;
         private final Set<Instant> overridden;
-        private final Instant windowStart;
-        private final Instant windowEnd;
+        private final Window window;
         private final List<IcsOccurrence> out;
         private final ZoneId zone;
         private final LocalDateTime first;
@@ -119,33 +129,18 @@ public final class IcsOccurrences {
         private final Set<LocalDate> exDates = new HashSet<>();
         private int produced;
 
-        Expansion(IcsEvent event, IcsRecurrence rule, Zones zones, Set<Instant> overridden, Instant windowStart,
-                  Instant windowEnd, Duration defaultDuration, List<IcsOccurrence> out) {
+        Expansion(IcsEvent event, IcsRecurrence rule, Zones zones, Set<Instant> overridden, Window window,
+                  Duration defaultDuration, List<IcsOccurrence> out) {
             this.event = event;
             this.rule = rule;
             this.overridden = overridden;
-            this.windowStart = windowStart;
-            this.windowEnd = windowEnd;
+            this.window = window;
             this.out = out;
             this.zone = zones.zoneOf(event.start());
             this.first = Zones.local(event.start());
             this.allDay = event.start() instanceof IcsTime.Date;
-            if (allDay) {
-                long d = 1;
-                if (event.end() instanceof IcsTime.Date(var endDate)) {
-                    d = ChronoUnit.DAYS.between(first.toLocalDate(), endDate);
-                } else if (event.duration() != null) {
-                    d = event.duration().toDays();
-                }
-                this.days = Math.max(1, d);
-                this.length = null;
-            } else {
-                Instant start = first.atZone(zone).toInstant();
-                Duration l = event.end() != null ? Duration.between(start, zones.instant(event.end()))
-                        : event.duration() != null ? event.duration() : defaultDuration;
-                this.length = l.isZero() || l.isNegative() ? defaultDuration : l;
-                this.days = 0;
-            }
+            this.days = allDay ? allDayLength(event, first) : 0;
+            this.length = allDay ? null : timedLength(event, first.atZone(zone).toInstant(), zones, defaultDuration);
             for (IcsTime exdate : event.exdates()) {
                 if (exdate instanceof IcsTime.Date(var dateValue)) {
                     exDates.add(dateValue);
@@ -153,6 +148,30 @@ public final class IcsOccurrences {
                     exInstants.add(zones.instant(exdate));
                 }
             }
+        }
+
+        /** Whole days an all-day event covers: up to its DTEND date, else its DURATION, and at least one. */
+        private static long allDayLength(IcsEvent event, LocalDateTime first) {
+            long d = 1;
+            if (event.end() instanceof IcsTime.Date(var endDate)) {
+                d = ChronoUnit.DAYS.between(first.toLocalDate(), endDate);
+            } else if (event.duration() != null) {
+                d = event.duration().toDays();
+            }
+            return Math.max(1, d);
+        }
+
+        /** A timed event's length: up to its DTEND, else its DURATION, else the default; never zero or negative. */
+        private static Duration timedLength(IcsEvent event, Instant start, Zones zones, Duration defaultDuration) {
+            Duration l;
+            if (event.end() != null) {
+                l = Duration.between(start, zones.instant(event.end()));
+            } else if (event.duration() != null) {
+                l = event.duration();
+            } else {
+                l = defaultDuration;
+            }
+            return l.isZero() || l.isNegative() ? defaultDuration : l;
         }
 
         void run() {
@@ -205,7 +224,7 @@ public final class IcsOccurrences {
             if (rule.until() != null && pastUntil(candidate, start)) {
                 return false;
             }
-            if (!start.isBefore(windowEnd)) {
+            if (!start.isBefore(window.end())) {
                 return false;
             }
             produced++;
@@ -227,7 +246,7 @@ public final class IcsOccurrences {
                 return;
             }
             Instant end = allDay ? occurrence.plusDays(days).atZone(zone).toInstant() : start.plus(length);
-            if (!end.isAfter(windowStart) || !start.isBefore(windowEnd)) {
+            if (!end.isAfter(window.start()) || !start.isBefore(window.end())) {
                 return;
             }
             out.add(new IcsOccurrence(event.uid(), event.summary() == null ? "" : event.summary(), start, end,
