@@ -463,7 +463,7 @@ test("reports only the failed conditions of a failed gate", async () => {
 });
 
 test("an analysis of another commit is unavailable and the gate is not requested", async () => {
-    const { fetch, requests } = sonar({ sha: "731bc9f246031fd9f91ced98cd1393cc312813b6" });
+    const { fetch, requests } = sonar({ sha: "an-older-commit" });
     assert.deepEqual(await fetchGate(gateOptions, fetch), { available: false });
     assert.equal(requests.length, 1);
 });
