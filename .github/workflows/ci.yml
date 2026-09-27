@@ -673,9 +673,10 @@ jobs:
     name: CI passed
     # The one check that main requires. It passes only if every job it needs passed, or was
     # left out on purpose, so a new job is enforced by adding it here rather than to the
-    # repository's settings. The release jobs are not checks and are not needed.
+    # repository's settings. The release jobs are not checks and are not needed. The summary
+    # is: the one step of it that may fail tests the script that writes it.
     if: always()
-    needs: [jar, test, e2e, sonar, image, smoke, smoke-bluetooth, dependencies]
+    needs: [jar, test, e2e, sonar, image, smoke, smoke-bluetooth, dependencies, pr-summary]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
