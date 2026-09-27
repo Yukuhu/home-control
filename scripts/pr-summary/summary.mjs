@@ -276,19 +276,19 @@ function compose(model, { traces, limit }) {
     const passed = model.checks.every((check) => check.result === "success"
         || (model.documentationOnly && check.result === "skipped"));
     const attempt = model.runAttempt > 1 ? `, attempt ${model.runAttempt}` : "";
+    const run = `run #${model.runNumber}${attempt}`;
     const lines = [
         MARKER,
         passed ? "## ✅ CI passed" : "## ❌ CI failed",
-        `${code(model.headSha.slice(0, 7))} · ${link(`run #${model.runNumber}${attempt}`, model.runUrl)}`
-            + ` · ${duration(model.durationSeconds)}`,
+        `${code(model.headSha.slice(0, 7))} · ${link(run, model.runUrl)} · ${duration(model.durationSeconds)}`,
         ...(model.documentationOnly ? ["", "Only documentation changed, so nothing was built or tested."] : []),
         "",
         "| Check | Result |",
         "|---|---|",
         ...model.checks.map((check) => `| ${check.label} | ${row(check, model)} |`),
     ];
-    lines.push(...tests("Failed tests", "failures", model, { traces, limit }));
-    lines.push(...tests("Passed only on a retry", "flaky", model, { traces, limit }));
+    lines.push(...tests("Failed tests", "failures", model, { traces, limit }),
+        ...tests("Passed only on a retry", "flaky", model, { traces, limit }));
     const sonar = model.checks.find((check) => check.key === "sonar");
     if (sonar?.result === "failure" && model.gate?.available && !model.gate.passed) {
         lines.push("", "### Quality gate", "", ...model.gate.failedConditions.map(condition),
@@ -300,9 +300,13 @@ function compose(model, { traces, limit }) {
 export function render(model) {
     let options = { traces: true, limit: MAX_FAILURES };
     let comment = compose(model, options);
-    if (comment.length > MAX_COMMENT) comment = compose(model, options = { ...options, traces: false });
+    if (comment.length > MAX_COMMENT) {
+        options = { ...options, traces: false };
+        comment = compose(model, options);
+    }
     while (comment.length > MAX_COMMENT && options.limit > 0) {
-        comment = compose(model, options = { ...options, limit: options.limit - 1 });
+        options = { ...options, limit: options.limit - 1 };
+        comment = compose(model, options);
     }
     return comment;
 }
