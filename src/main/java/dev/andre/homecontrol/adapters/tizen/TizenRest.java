@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.tizen;
 
+import dev.andre.homecontrol.core.Hosts;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 
@@ -48,7 +49,7 @@ final class TizenRest {
     }
 
     private Optional<JsonNode> getJson(String host, String path) {
-        String authority = host.contains(":") ? "[" + host + "]" : host;
+        String authority = Hosts.authority(host);
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://" + authority + ":" + properties.restPort() + path))
                 .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
                 .GET().build();

@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.tizen;
 
+import dev.andre.homecontrol.core.Hosts;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -27,7 +28,7 @@ final class TizenMessages {
 
     /** The TV shows {@code name} in its Allow prompt and device list; the token proves an earlier Allow. */
     static URI remoteUri(String host, int port, String clientName, String token) {
-        String authority = host.contains(":") ? "[" + host + "]" : host;
+        String authority = Hosts.authority(host);
         String name = Base64.getEncoder().encodeToString(clientName.getBytes(StandardCharsets.UTF_8));
         StringBuilder uri = new StringBuilder("wss://").append(authority).append(':').append(port)
                 .append("/api/v2/channels/samsung.remote.control?name=")

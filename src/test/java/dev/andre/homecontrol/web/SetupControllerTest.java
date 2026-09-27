@@ -97,6 +97,27 @@ class SetupControllerTest {
     }
 
     @Test
+    void anAddressThatIsNotAHostIsRefusedBeforeAnythingConnects() throws Exception {
+        for (String path : List.of("/setup/pair", "/setup/prompt-pair")) {
+            mockMvc.perform(post(path).param("adapter", "tizen").param("host", "127.0.0.1/admin?a="))
+                    .andExpect(status().isOk())
+                    .andExpect(view().name("setup"))
+                    .andExpect(model().attribute("error",
+                            "Enter the device's address as a host name or an IP address, such as 192.168.1.50"));
+        }
+
+        org.mockito.Mockito.verifyNoInteractions(pairing);
+    }
+
+    @Test
+    void spacesAroundAnAddressAreIgnored() throws Exception {
+        mockMvc.perform(post("/setup/pair").param("host", " 192.168.1.50 "))
+                .andExpect(model().attributeDoesNotExist("error"));
+
+        verify(pairing).begin("192.168.1.50", null);
+    }
+
+    @Test
     void theRightPairingCodeFinishesOnTheDashboard() throws Exception {
         given(pairing.submit("A1B2C3")).willReturn(new PairingOutcome.Paired());
 

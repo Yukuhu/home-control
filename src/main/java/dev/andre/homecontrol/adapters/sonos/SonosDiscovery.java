@@ -5,6 +5,7 @@ import dev.andre.homecontrol.adapters.sonos.protocol.SonosEndpoints;
 import dev.andre.homecontrol.adapters.sonos.protocol.ZoneGroupState;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapFault;
+import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.discovery.ssdp.DeviceFetch;
@@ -90,7 +91,7 @@ public class SonosDiscovery implements AutoCloseable {
         }
         int port = service.location().getPort();
         try {
-            String xml = soap.call(SonosEndpoints.endpoint(address, port, SonosEndpoints.ZONE_GROUP_TOPOLOGY_PATH,
+            String xml = soap.call(SonosEndpoints.endpoint(Hosts.authority(address), port, SonosEndpoints.ZONE_GROUP_TOPOLOGY_PATH,
                     SonosEndpoints.ZONE_GROUP_TOPOLOGY).controlUrl(), SonosActions.getZoneGroupState()).getOrDefault("ZoneGroupState", "");
             List<DiscoveredDevice> rooms = toDevices(ZoneGroupState.parse(xml, SonosEndpoints.isLoopback(address)));
             refreshedAt.put(household, clock.instant());

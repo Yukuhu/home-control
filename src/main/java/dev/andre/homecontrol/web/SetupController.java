@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.PromptPairing;
@@ -63,15 +64,19 @@ public class SetupController {
     @PostMapping("/setup/pair")
     public String pair(@RequestParam String host, @RequestParam(required = false) String name,
                        Model model) {
+        String address = host.trim();
+        if (!Hosts.isValid(address)) {
+            return notAHost(model);
+        }
         try {
-            pairing.begin(host, name);
+            pairing.begin(address, name);
             populateSetupModel(model, true);
         } catch (StorageException e) {
             model.addAttribute(ERROR_ATTRIBUTE, e.getMessage());
             populateSetupModel(model, false);
         } catch (IOException e) {
-            log.warn("Could not begin Android TV pairing with {}", host, e);
-            model.addAttribute(ERROR_ATTRIBUTE, "Could not connect to " + host + ": " + e.getMessage());
+            log.warn("Could not begin Android TV pairing with {}", address, e);
+            model.addAttribute(ERROR_ATTRIBUTE, "Could not connect to " + address + ": " + e.getMessage());
             populateSetupModel(model, false);
         }
         return SETUP_VIEW;
@@ -108,6 +113,10 @@ public class SetupController {
     @PostMapping("/setup/prompt-pair")
     public String promptPair(@RequestParam String adapter, @RequestParam String host,
                              @RequestParam(required = false) String name, Model model) {
+        String address = host.trim();
+        if (!Hosts.isValid(address)) {
+            return notAHost(model);
+        }
         Optional<PromptPairing> chosen = promptPairings.stream()
                 .filter(candidate -> candidate.adapterId().equals(adapter)).findFirst();
         if (chosen.isEmpty()) {
@@ -115,7 +124,7 @@ public class SetupController {
             populateSetupModel(model, false);
             return SETUP_VIEW;
         }
-        switch (chosen.get().pair(host.trim(), name)) {
+        switch (chosen.get().pair(address, name)) {
             case PromptPairingResult.Paired(var device) -> {
                 return "redirect:" + UriComponentsBuilder.fromPath("/").queryParam("device", device.id())
                         .encode().build().toUriString();
@@ -177,6 +186,14 @@ public class SetupController {
     @PostMapping("/setup/split")
     public String split(@RequestParam String id, @RequestParam String adapter, Model model) {
         return refusable(model, () -> devices.split(id, adapter));
+    }
+
+    /** Refused before anything connects: adapters build the address of a device from its host. */
+    private String notAHost(Model model) {
+        model.addAttribute(ERROR_ATTRIBUTE,
+                "Enter the device's address as a host name or an IP address, such as 192.168.1.50");
+        populateSetupModel(model, false);
+        return SETUP_VIEW;
     }
 
     /** A refusal is a sentence for the user, shown on the page; success goes back to setup. */
