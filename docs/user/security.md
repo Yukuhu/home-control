@@ -32,3 +32,13 @@ Behind an HTTPS reverse proxy, set `HOME_CONTROL_SECURE_COOKIE=true` so the logi
 marked `Secure`. If the proxy rewrites the `Host` header, also set
 `HOME_CONTROL_TRUSTED_ORIGINS` (see [Configuration](configuration.md)) to the origin your browser actually
 sees, or requests will be refused as cross-site.
+
+## Allowed hosts and origins
+
+The app only answers to host names that cannot be pointed at it by someone else's DNS
+(DNS rebinding): IP addresses, `localhost`, single-label names such as `nas`, and names
+ending in `.local`, `.lan`, `.home.arpa` or `.internal`. Any other name gets
+`421 Misdirected Request`. If you reach it under a real domain, for example through a
+reverse proxy, add that name to `HOME_CONTROL_ALLOWED_HOSTS` (or its origin to
+`HOME_CONTROL_TRUSTED_ORIGINS`). Changes (POST and other non-read requests) from another
+site's page are refused with `403`, whether or not a login exists.
