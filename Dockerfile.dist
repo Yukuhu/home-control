@@ -12,7 +12,7 @@
 #
 # That neighbour remains the path for `docker compose up --build` from a clean
 # checkout. CI builds both, so their runtime stages cannot drift apart silently.
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:25-jre@sha256:8da0490fa9a3c26867012019565948eef0ee69438f5c75ac28146967bae984b5
 # Bluetooth speakers (optional) need the mpv player, which adds about 430 MB.
 # Default builds leave it out; --build-arg WITH_MPV=true (the -bluetooth image) installs it.
 ARG WITH_MPV=false

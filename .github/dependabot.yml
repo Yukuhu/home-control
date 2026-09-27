@@ -7,6 +7,20 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Libraries that are released together and only work together arrive in one pull request.
+    groups:
+      protobuf:
+        patterns:
+          - "com.google.protobuf:*"
+      bouncycastle:
+        patterns:
+          - "org.bouncycastle:*"
+      dbus-java:
+        patterns:
+          - "com.github.hypfvieh:dbus-java-*"
+      tomcat:
+        patterns:
+          - "org.apache.tomcat.embed:*"
 
   - package-ecosystem: github-actions
     # The workflows, and the actions of this repository that they use.
@@ -16,7 +30,23 @@ updates:
     schedule:
       interval: weekly
 
+  # The base images are pinned by digest, so that a build is of known content and the image
+  # that is tested is built on the base of the one that is published. These pull requests
+  # are how a rebuilt base image, with its security fixes, reaches a release.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+
+  # The scripts CI runs: the pull request summary and the browser coverage report.
+  - package-ecosystem: npm
+    directories:
+      - /scripts/pr-summary
+      - /scripts/browser-coverage
+    schedule:
+      interval: weekly
+    groups:
+      istanbul:
+        patterns:
+          - "istanbul-*"
+          - "v8-to-istanbul"
