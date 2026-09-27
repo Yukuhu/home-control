@@ -1,11 +1,11 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.sources.http.BoundedBody;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -91,27 +91,20 @@ public class YouTubeHttp {
     }
 
     private Response send(URI uri, HttpRequest.Builder builder) {
-        HttpResponse<InputStream> response;
+        HttpResponse<byte[]> response;
         try {
-            response = http.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+            response = http.send(builder.build(), BoundedBody.handler(MAX_RESPONSE_BYTES, requestTimeout));
         } catch (IOException _) {
             throw new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Could not reach " + uri.getHost());
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Interrupted while calling " + uri.getHost());
         }
-        try (InputStream body = response.body()) {
-            if (contentLengthExceeds(response, MAX_RESPONSE_BYTES)) {
-                throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "Google sent an oversized response");
-            }
-            byte[] bytes = body.readNBytes(MAX_RESPONSE_BYTES + 1);
-            if (bytes.length > MAX_RESPONSE_BYTES) {
-                throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "Google sent an oversized response");
-            }
-            return new Response(response.statusCode(), response.headers().firstValue("Content-Type").orElse(""), bytes);
-        } catch (IOException _) {
-            throw new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Could not reach " + uri.getHost());
+        byte[] bytes = response.body();
+        if (contentLengthExceeds(response, MAX_RESPONSE_BYTES) || bytes.length > MAX_RESPONSE_BYTES) {
+            throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "Google sent an oversized response");
         }
+        return new Response(response.statusCode(), response.headers().firstValue("Content-Type").orElse(""), bytes);
     }
 
     /** Rejects an oversized body before it is streamed, when the server is honest enough to declare its length. */

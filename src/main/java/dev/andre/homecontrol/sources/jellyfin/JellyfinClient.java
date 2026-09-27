@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.sources.http.BoundedBody;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -7,7 +8,6 @@ import tools.jackson.databind.node.MissingNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -196,25 +196,21 @@ public class JellyfinClient {
                 .header("Accept", "image/*")
                 .GET()
                 .build();
-        HttpResponse<InputStream> response = exchange(serverUrl, request);
-        try (InputStream body = response.body()) {
-            if (response.statusCode() == 404) {
-                return Optional.empty();
-            }
-            String contentType = response.headers().firstValue(CONTENT_TYPE).orElse("");
-            String bareType = contentType.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
-            if (response.statusCode() != 200 || !ALLOWED_IMAGE_TYPES.contains(bareType)
-                    || contentLengthExceeds(response, MAX_IMAGE_BYTES)) {
-                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent no image");
-            }
-            byte[] bytes = body.readNBytes(MAX_IMAGE_BYTES + 1);
-            if (bytes.length > MAX_IMAGE_BYTES) {
-                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized image");
-            }
-            return Optional.of(new Image(contentType, bytes));
-        } catch (IOException e) {
-            throw unreachable(serverUrl, e.getClass().getSimpleName());
+        HttpResponse<byte[]> response = exchange(serverUrl, request, MAX_IMAGE_BYTES);
+        if (response.statusCode() == 404) {
+            return Optional.empty();
         }
+        String contentType = response.headers().firstValue(CONTENT_TYPE).orElse("");
+        String bareType = contentType.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
+        if (response.statusCode() != 200 || !ALLOWED_IMAGE_TYPES.contains(bareType)
+                || contentLengthExceeds(response, MAX_IMAGE_BYTES)) {
+            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent no image");
+        }
+        byte[] bytes = response.body();
+        if (bytes.length > MAX_IMAGE_BYTES) {
+            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized image");
+        }
+        return Optional.of(new Image(contentType, bytes));
     }
 
     private static String queryString(Map<String, String> query) {
@@ -236,28 +232,22 @@ public class JellyfinClient {
     }
 
     private JsonNode send(URI serverUrl, HttpRequest.Builder builder) {
-        HttpResponse<InputStream> response = exchange(serverUrl, builder.build());
-        try (InputStream body = response.body()) {
-            requireSuccess(serverUrl, response.statusCode());
-            // A cap, not a limit we expect to hit: a well-behaved Jellyfin answer never comes close, and a
-            // misbehaving or hostile server can't make us buffer an unbounded amount of it into heap.
-            if (contentLengthExceeds(response, MAX_JSON_BYTES)) {
-                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized response");
-            }
-            byte[] bytes = body.readNBytes(MAX_JSON_BYTES + 1);
-            if (bytes.length > MAX_JSON_BYTES) {
-                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized response");
-            }
-            return bytes.length == 0 ? MissingNode.getInstance() : parse(serverUrl, bytes);
-        } catch (IOException e) {
-            throw unreachable(serverUrl, e.getClass().getSimpleName());
+        HttpResponse<byte[]> response = exchange(serverUrl, builder.build(), MAX_JSON_BYTES);
+        requireSuccess(serverUrl, response.statusCode());
+        // A cap, not a limit we expect to hit: a well-behaved Jellyfin answer never comes close, and a
+        // misbehaving or hostile server can't make us buffer an unbounded amount of it into heap.
+        byte[] bytes = response.body();
+        if (contentLengthExceeds(response, MAX_JSON_BYTES) || bytes.length > MAX_JSON_BYTES) {
+            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized response");
         }
+        return bytes.length == 0 ? MissingNode.getInstance() : parse(serverUrl, bytes);
     }
 
-    /** Sends the request; a transport failure becomes an UNREACHABLE naming what went wrong. */
-    private HttpResponse<InputStream> exchange(URI serverUrl, HttpRequest request) {
+    /** Sends the request and reads a body of at most {@code maxBytes + 1} bytes; a transport failure becomes an UNREACHABLE naming what went wrong. */
+    private HttpResponse<byte[]> exchange(URI serverUrl, HttpRequest request, int maxBytes) {
         try {
-            return http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            return http.send(request,
+                    BoundedBody.handler(maxBytes, Duration.ofSeconds(properties.requestTimeoutSeconds())));
         } catch (HttpConnectTimeoutException _) {
             throw unreachable(serverUrl, "connection timed out");
         } catch (HttpTimeoutException _) {
