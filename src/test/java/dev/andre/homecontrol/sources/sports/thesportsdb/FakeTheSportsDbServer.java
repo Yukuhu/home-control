@@ -1,25 +1,20 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
+import dev.andre.homecontrol.testsupport.FakeHttpServer;
+import dev.andre.homecontrol.testsupport.Request;
+import dev.andre.homecontrol.testsupport.Response;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
+
+import static dev.andre.homecontrol.testsupport.FakeHttpServer.ANY_METHOD;
 
 /** In-process TheSportsDB: canned responses keyed by endpoint + query, every request recorded. Same design as FakeTmdbServer. */
 public final class FakeTheSportsDbServer implements AutoCloseable {
@@ -27,32 +22,27 @@ public final class FakeTheSportsDbServer implements AutoCloseable {
     public static final String FREE_KEY = "123";
     public static final String PERSONAL_KEY = "9876543210";
 
+    private static final String PREFIX = "/api/v1/json/";
+    private static final List<String> KEYS = List.of(FREE_KEY, PERSONAL_KEY);
+
     public record Recorded(String key, String endpoint, Map<String, String> query, Map<String, String> headers) {
         public String header(String name) {
             return headers.get(name.toLowerCase(Locale.ROOT));
         }
     }
 
-    private record Canned(int status, byte[] body) {
-    }
-
-    private final HttpServer server;
-    private final Map<String, Map<Map<String, String>, Canned>> routes = new ConcurrentHashMap<>();
-    private final Map<String, Canned> defaults = new ConcurrentHashMap<>();
-    private final List<Recorded> requests = new CopyOnWriteArrayList<>();
-    private volatile Duration globalDelay = Duration.ZERO;
+    private final FakeHttpServer server;
 
     public FakeTheSportsDbServer() throws IOException {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/", this::handle);
-        server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
-        server.start();
-        defaults.put("lookupleague.php", new Canned(200, fixtureBytes("lookupleague-unknown.json")));
-        defaults.put("eventsday.php", new Canned(200, fixtureBytes("eventsday-empty.json")));
+        server = FakeHttpServer.start().fallback(request -> KEYS.contains(keyAndEndpoint(request.path())[0])
+                ? json(404, "{}".getBytes(StandardCharsets.UTF_8))
+                : json(400, fixtureBytes("invalid-key.json")));
+        byDefault("lookupleague.php", fixtureBytes("lookupleague-unknown.json"));
+        byDefault("eventsday.php", fixtureBytes("eventsday-empty.json"));
     }
 
     public URI apiBase() {
-        return URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/api/v1/json");
+        return server.url("/api/v1/json");
     }
 
     public FakeTheSportsDbServer withStandardResponses() {
@@ -66,23 +56,23 @@ public final class FakeTheSportsDbServer implements AutoCloseable {
     }
 
     public FakeTheSportsDbServer respond(String endpoint, Map<String, String> query, int status, String fixture) {
-        routes.computeIfAbsent(endpoint, e -> new ConcurrentHashMap<>()).put(Map.copyOf(query), new Canned(status, fixtureBytes(fixture)));
-        return this;
+        return route(endpoint, query, json(status, fixtureBytes(fixture)));
     }
 
     public FakeTheSportsDbServer respondJson(String endpoint, Map<String, String> query, int status, String json) {
-        routes.computeIfAbsent(endpoint, e -> new ConcurrentHashMap<>())
-                .put(Map.copyOf(query), new Canned(status, json == null ? new byte[0] : json.getBytes(StandardCharsets.UTF_8)));
-        return this;
+        return route(endpoint, query, json(status, json == null ? new byte[0] : json.getBytes(StandardCharsets.UTF_8)));
     }
 
     public FakeTheSportsDbServer delay(Duration duration) {
-        this.globalDelay = duration;
+        server.delay(duration);
         return this;
     }
 
     public List<Recorded> requests(String endpoint) {
-        return requests.stream().filter(r -> r.endpoint().equals(endpoint)).toList();
+        return server.requests().stream()
+                .map(FakeTheSportsDbServer::recorded)
+                .filter(recorded -> recorded.endpoint().equals(endpoint))
+                .toList();
     }
 
     public int count(String endpoint) {
@@ -97,6 +87,38 @@ public final class FakeTheSportsDbServer implements AutoCloseable {
         return matching.getLast();
     }
 
+    private FakeTheSportsDbServer route(String endpoint, Map<String, String> query, Response response) {
+        Map<String, String> expected = Map.copyOf(query);
+        for (String key : KEYS) {
+            server.respond(ANY_METHOD, PREFIX + key + "/" + endpoint, request -> request.query().equals(expected), response);
+        }
+        return this;
+    }
+
+    private void byDefault(String endpoint, byte[] body) {
+        for (String key : KEYS) {
+            server.respond(ANY_METHOD, PREFIX + key + "/" + endpoint, json(200, body));
+        }
+    }
+
+    private static Response json(int status, byte[] body) {
+        return Response.of(status, Response.JSON, body);
+    }
+
+    /** {key, endpoint} of a path under /api/v1/json/; empty strings for anything else. */
+    private static String[] keyAndEndpoint(String path) {
+        String remainder = path.startsWith(PREFIX) ? path.substring(PREFIX.length()) : "";
+        int slash = remainder.indexOf('/');
+        return slash < 0
+                ? new String[]{remainder, ""}
+                : new String[]{remainder.substring(0, slash), remainder.substring(slash + 1)};
+    }
+
+    private static Recorded recorded(Request request) {
+        String[] keyAndEndpoint = keyAndEndpoint(request.path());
+        return new Recorded(keyAndEndpoint[0], keyAndEndpoint[1], request.query(), request.headers());
+    }
+
     private static byte[] fixtureBytes(String name) {
         try (InputStream in = FakeTheSportsDbServer.class.getResourceAsStream("/fixtures/thesportsdb/" + name)) {
             if (in == null) {
@@ -108,78 +130,8 @@ public final class FakeTheSportsDbServer implements AutoCloseable {
         }
     }
 
-    // A slow upstream is what the timeout tests exercise, so answering late on purpose is the point.
-    @SuppressWarnings("java:S2925")
-    private static void simulateLatency(Duration wait) {
-        if (wait.isZero()) {
-            return;
-        }
-        try {
-            Thread.sleep(wait);
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private void handle(HttpExchange exchange) throws IOException {
-        try (exchange) {
-            URI uri = exchange.getRequestURI();
-            String path = uri.getRawPath();
-            String prefix = "/api/v1/json/";
-            String remainder = path.startsWith(prefix) ? path.substring(prefix.length()) : "";
-            int slash = remainder.indexOf('/');
-            String key = slash < 0 ? remainder : remainder.substring(0, slash);
-            String endpoint = slash < 0 ? "" : remainder.substring(slash + 1);
-
-            Map<String, String> query = new LinkedHashMap<>();
-            if (uri.getRawQuery() != null) {
-                for (String pair : uri.getRawQuery().split("&")) {
-                    int eq = pair.indexOf('=');
-                    String name = URLDecoder.decode(eq < 0 ? pair : pair.substring(0, eq), StandardCharsets.UTF_8);
-                    String value = eq < 0 ? "" : URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8);
-                    query.put(name, value);
-                }
-            }
-            Map<String, String> headers = new TreeMap<>();
-            exchange.getRequestHeaders().forEach((name, values) ->
-                    headers.put(name.toLowerCase(Locale.ROOT), String.join(",", values)));
-            exchange.getRequestBody().readAllBytes();
-            requests.add(new Recorded(key, endpoint, query, headers));
-
-            simulateLatency(globalDelay);
-
-            if (!FREE_KEY.equals(key) && !PERSONAL_KEY.equals(key)) {
-                respond(exchange, 400, fixtureBytes("invalid-key.json"));
-                return;
-            }
-
-            Map<Map<String, String>, Canned> byQuery = routes.get(endpoint);
-            Canned canned = byQuery == null ? null : byQuery.get(query);
-            if (canned == null) {
-                canned = defaults.get(endpoint);
-            }
-            if (canned == null) {
-                respond(exchange, 404, "{}".getBytes(StandardCharsets.UTF_8));
-                return;
-            }
-            respond(exchange, canned.status(), canned.body());
-        }
-    }
-
-    private static void respond(HttpExchange exchange, int status, byte[] body) throws IOException {
-        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
-        if (body.length == 0) {
-            exchange.sendResponseHeaders(status, -1);
-            return;
-        }
-        exchange.sendResponseHeaders(status, body.length);
-        try (OutputStream out = exchange.getResponseBody()) {
-            out.write(body);
-        }
-    }
-
     @Override
     public void close() {
-        server.stop(0);
+        server.close();
     }
 }
