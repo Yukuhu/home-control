@@ -69,9 +69,11 @@ the architecture the [concept](2026-09-16-home-control-center-concept.md) descri
 4. **Security headers depend on a password.** `LoginGateFilter` returns before setting `X-Frame-Options`,
    `X-Content-Type-Options` and `Referrer-Policy` when no login is required (`security/LoginGateFilter.java:43-49`).
    There is no Content-Security-Policy anywhere.
-5. **Possible rail stall (unconfirmed).** The java.net.http clients read bodies through `ofInputStream`, and
-   `HttpRequest.timeout` stops applying once headers arrive. A server that sends its body slowly could hold one of
-   the four `RailCache` fetch permits (`content/RailCache.java:243`) indefinitely.
+5. **Rail stall.** The java.net.http clients read bodies through `ofInputStream`, and `HttpRequest.timeout` stops
+   applying once headers arrive; HttpClient 5's response timeout bounds each read, not the whole body. A server that
+   sends its body slowly can hold one of the four `RailCache` fetch permits (`content/RailCache.java:243`)
+   indefinitely. A probe on JDK 25.0.4 confirmed it while planning Phase 0: with a 1-second request timeout, a body
+   sent one byte per 100 ms held `send` for the full 10 seconds.
 
 ### Structural themes
 
@@ -108,8 +110,8 @@ Five independent S-sized pull requests, each starting from a failing test.
 | 0.1 | `CalendarFetcher` connects to the addresses it checked. The DNS-pinning code is extracted from `WorkflowHttpClient` into a small reusable helper that 2C builds on. |
 | 0.2 | `WebOsSession` catches and logs listener exceptions at publish time and can no longer be left half-connected. The same guard is applied wherever a session publishes before finishing its connect sequence. |
 | 0.3 | Security headers are sent on every response, set in `CrossOriginFilter`, together with `frame-ancestors 'none'`. The full CSP waits for 2E, which removes the inline scripts. |
-| 0.4 | A test reproduces the slow-body stall against a fake server. If it does, a minimal fix applies one deadline to the whole exchange, including the body. If it does not, the item is closed with the test kept. |
-| 0.5 | The test configuration becomes `application-test.yaml` holding only overrides, activated for all tests; a test binds the main `application.yaml`; the path-parsing workaround in `BluetoothModuleSwitchTest` goes. |
+| 0.4 | A test reproduces the slow-body stall against a fake server for every source client, and one deadline then covers the whole exchange, including the body: a bounded body handler for the JDK clients, and a cancel at the deadline for the calendar client. |
+| 0.5 | The test configuration moves to `src/test/resources/config/application.yaml` and holds only overrides; Spring Boot loads it on top of the main `application.yaml` for every test, IDE runs included, with no profile to activate. A test binds the main file; the path-parsing workaround in `BluetoothModuleSwitchTest` goes. |
 
 ## Phase 1: Guardrails
 
