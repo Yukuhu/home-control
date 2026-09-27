@@ -8,13 +8,13 @@ import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.content.ContentChangedEvent;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
+import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,15 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RailCacheTest {
-
-    /** Mutable clock for due-time tests. */
-    static final class TestClock extends Clock {
-        Instant now = Instant.parse("2026-09-16T09:00:00Z");
-        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
-        @Override public Clock withZone(ZoneId zone) { return this; }
-        @Override public Instant instant() { return now; }
-        void advance(Duration d) { now = now.plus(d); }
-    }
 
     /** Runs tasks only when told to, so "in flight" is observable. */
     static final class ManualExecutor extends AbstractExecutorService {
@@ -135,7 +126,7 @@ class RailCacheTest {
         }
     }
 
-    final TestClock clock = new TestClock();
+    final MutableClock clock = new MutableClock(Instant.parse("2026-09-16T09:00:00Z"), ZoneOffset.UTC);
     final StubSource source = new StubSource(clock);
     final ManualExecutor executor = new ManualExecutor();
     final List<Object> events = new CopyOnWriteArrayList<>();
@@ -184,7 +175,7 @@ class RailCacheTest {
 
         assertThat(a().status()).isEqualTo(RailStatus.READY);
         assertThat(a().items()).hasSize(1);
-        assertThat(a().fetchedAt()).isEqualTo(clock.now);
+        assertThat(a().fetchedAt()).isEqualTo(clock.instant());
         assertThat(events).filteredOn(RailsChangedEvent.class::isInstance).hasSize(1);
         assertThat(events).filteredOn(RailUpdatedEvent.class::isInstance)
                 .extracting(e -> ((RailUpdatedEvent) e).snapshot().status())

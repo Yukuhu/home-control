@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.discovery.ssdp;
 
 import com.sun.net.httpserver.HttpServer;
+import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,10 +15,8 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
@@ -313,36 +312,5 @@ class SsdpDiscoveryTest {
         }
         assertThat(protocols).first().isEqualTo("HTTP/1.1");
         assertThat(upgrades).first().isEqualTo("null");
-    }
-
-    /** A {@link Clock} whose {@code instant()} can be moved forward by the test. */
-    private static final class MutableClock extends Clock {
-
-        private volatile Instant instant;
-        private final ZoneId zone;
-
-        MutableClock(Instant instant, ZoneId zone) {
-            this.instant = instant;
-            this.zone = zone;
-        }
-
-        void advance(Duration amount) {
-            instant = instant.plus(amount);
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return zone;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return new MutableClock(instant, zone);
-        }
-
-        @Override
-        public Instant instant() {
-            return instant;
-        }
     }
 }
