@@ -94,7 +94,7 @@ public class TmdbClient {
     }
 
     private URI uri(TmdbCredential credential, String path, Map<String, String> query) {
-        String base = properties.apiBaseUrl().toString().replaceAll("/+$", "");
+        String base = withoutTrailingSlashes(properties.apiBaseUrl().toString());
         StringJoiner parameters = new StringJoiner("&");
         query.forEach((name, value) -> parameters.add(encode(name) + "=" + encode(value)));
         if (credential.kind() == TmdbCredential.Kind.API_KEY) {
@@ -105,6 +105,14 @@ public class TmdbClient {
 
     private String unreachable() {
         return "Could not reach TMDB at " + properties.apiBaseUrl().getHost();
+    }
+
+    private static String withoutTrailingSlashes(String value) {
+        int end = value.length();
+        while (end > 0 && value.charAt(end - 1) == '/') {
+            end--;
+        }
+        return value.substring(0, end);
     }
 
     private static String encode(String value) {

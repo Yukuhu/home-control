@@ -11,7 +11,7 @@ public record TmdbMediaRef(Type type, long id) {
     public enum Type { MOVIE, TV }
     private static final String MOVIE_VALUE = "movie";
 
-    private static final Pattern ITEM_ID = Pattern.compile("^(movie|tv)-([1-9][0-9]{0,9})$");
+    private static final Pattern ITEM_ID = Pattern.compile("^(movie|tv)-([1-9]\\d{0,9})$");
 
     public String itemId() {
         return (type == Type.MOVIE ? MOVIE_VALUE : "tv") + "-" + id;

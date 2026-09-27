@@ -37,21 +37,26 @@ public final class TmdbItemMapper {
         if (title == null) {
             return Optional.empty();
         }
-        String dateField = movie ? "release_date" : "first_air_date";
-        String date = result.path(dateField).asString("");
-        String year = YEAR.matcher(date).lookingAt() ? date.substring(0, 4) : null;
-        String subtitle;
-        if (subtitlePrefix != null) {
-            subtitle = year != null ? subtitlePrefix + " · " + year : subtitlePrefix;
-        } else {
-            String kindWord = movie ? "Movie" : "Series";
-            subtitle = year != null ? kindWord + " · " + year : kindWord;
-        }
+        String subtitle = subtitle(result, movie, subtitlePrefix);
         String posterPath = result.path("poster_path").isString() ? result.path("poster_path").asString() : null;
         URI artwork = posterPath == null ? null : posters.apply(posterPath);
         ContentKind kind = movie ? ContentKind.MOVIE : ContentKind.VIDEO;
         return Optional.of(new ContentItem(mediaRef.itemId(), TmdbSettings.SOURCE_ID, kind, title, subtitle,
                 artwork, playables, null));
+    }
+
+    /** The caller's prefix (else "Movie" or "Series"), followed by the release year when TMDB has one. */
+    private static String subtitle(JsonNode result, boolean movie, String subtitlePrefix) {
+        String dateField = movie ? "release_date" : "first_air_date";
+        String date = result.path(dateField).asString("");
+        String year = YEAR.matcher(date).lookingAt() ? date.substring(0, 4) : null;
+        String lead;
+        if (subtitlePrefix != null) {
+            lead = subtitlePrefix;
+        } else {
+            lead = movie ? "Movie" : "Series";
+        }
+        return year != null ? lead + " · " + year : lead;
     }
 
     private static String firstNonBlank(JsonNode primary, JsonNode fallback) {

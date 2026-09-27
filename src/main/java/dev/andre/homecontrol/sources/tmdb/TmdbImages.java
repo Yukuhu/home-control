@@ -28,17 +28,21 @@ public class TmdbImages {
     private final TmdbClient client;
     private final TmdbProperties properties;
     private final Clock clock;
-    private volatile Base override;
+    private final Base override;
+    // Immutable record replaced wholesale, never computed from the old value: threads that call poster() at
+    // once (rail refresh, search, item requests) at worst both refresh it, and the last complete Base wins.
+    @SuppressWarnings("java:S3077")
     private volatile Base cached;
 
     public TmdbImages(TmdbClient client, TmdbProperties properties, Clock clock) {
         this.client = client;
         this.properties = properties;
         this.clock = clock;
-        if (properties.imageBaseUrl() != null) {
-            String base = properties.imageBaseUrl().toString();
-            this.override = new Base(base.endsWith("/") ? base : base + "/", PREFERRED_SIZE, Instant.MAX);
-        }
+        this.override = properties.imageBaseUrl() == null ? null : fixedBase(properties.imageBaseUrl().toString());
+    }
+
+    private static Base fixedBase(String base) {
+        return new Base(base.endsWith("/") ? base : base + "/", PREFERRED_SIZE, Instant.MAX);
     }
 
     public URI poster(TmdbCredential credential, String posterPath) {
