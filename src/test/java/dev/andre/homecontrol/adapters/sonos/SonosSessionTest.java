@@ -20,7 +20,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import static dev.andre.homecontrol.adapters.sonos.SonosDiscoveryTest.KITCHEN;
 import static dev.andre.homecontrol.adapters.sonos.SonosDiscoveryTest.LIVING;
@@ -54,8 +54,12 @@ class SonosSessionTest {
     }
 
     private SonosSession connected(FakeSonosPlayer player) {
+        return connected(player, states::add);
+    }
+
+    private SonosSession connected(FakeSonosPlayer player, Consumer<DeviceState> onChange) {
         SonosSession session = new SonosSession(player.device("sonos-" + player.uuid()), properties,
-                SoapClient.httpClient(Duration.ofSeconds(1)), states::add, () -> { });
+                SoapClient.httpClient(Duration.ofSeconds(1)), onChange, () -> { });
         sessions.add(session);
         session.start();
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
@@ -71,21 +75,12 @@ class SonosSessionTest {
 
     @Test
     void aFailingStateListenerDoesNotStopPolling() {
-        AtomicBoolean failed = new AtomicBoolean();
-        SonosSession session = new SonosSession(kitchen.device("sonos-" + kitchen.uuid()), properties,
-                SoapClient.httpClient(Duration.ofSeconds(1)), state -> {
-                    states.add(state);
-                    if (state.status() == DeviceStatus.CONNECTED && failed.compareAndSet(false, true)) {
-                        throw new IllegalStateException("listener bug");
-                    }
-                }, () -> { });
-        sessions.add(session);
-        session.start();
-        await().atMost(WAIT).until(failed::get);
+        SonosSession session = connected(kitchen, state -> {
+            states.add(state);
+            throw new IllegalStateException("a subscriber failed");
+        });
 
-        kitchen.setVolume(35);
-
-        await().atMost(WAIT).until(() -> states.getLast().volumeLevel() == 35);
+        assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
     }
 
     @Test

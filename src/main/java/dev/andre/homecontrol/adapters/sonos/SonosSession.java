@@ -108,7 +108,11 @@ public class SonosSession implements DeviceHandle, GroupListing {
     }
 
     public void start() {
-        onChange.accept(state);
+        try {
+            onChange.accept(state);
+        } catch (RuntimeException e) {
+            log.warn("A device state listener failed for {}", device.id(), e);
+        }
         poller.start();
     }
 
