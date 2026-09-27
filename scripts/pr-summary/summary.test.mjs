@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { MARKER, collectSuite, fetchGate, parseJUnit, render } from "./summary.mjs";
+import { MARKER, buildModel, collectSuite, fetchGate, main, parseJUnit, render } from "./summary.mjs";
 
 const fixtures = fileURLToPath(new URL("./fixtures/", import.meta.url));
 const fixture = (name) => readFile(path.join(fixtures, name), "utf8");
@@ -397,4 +397,71 @@ test("hostile test output cannot leave its code spans and blocks", async () => {
     assert.ok(!outside.includes("@"));
     assert.ok(!outside.includes("<script"));
     assert.equal(outside.match(/<\/details>/g).length, 1);
+});
+
+// ---- buildModel and main
+
+const environment = {
+    NEEDS_JSON: JSON.stringify({
+        test: { result: "failure", outputs: {} }, e2e: { result: "success", outputs: {} },
+        sonar: { result: "skipped", outputs: {} }, image: { result: "success", outputs: {} },
+        "image-arm64": { result: "success", outputs: {} }, "image-arm64-bluetooth": { result: "success", outputs: {} },
+    }),
+    JOBS_JSON: JSON.stringify([
+        { name: "Build and test", html_url: "https://example.test/job/1" },
+        { name: "Smoke-test the Bluetooth image on arm64", html_url: "https://example.test/job/6" },
+    ]),
+    HEAD_SHA: HEAD, PR_NUMBER: "105", RUN_URL, RUN_NUMBER: "413", RUN_ATTEMPT: "2",
+    RUN_STARTED_AT: "2026-09-27T08:59:06Z", SONAR_PROJECT_KEY: "Yukuhu_home-control",
+};
+
+test("the model is built from the needs context, the job list and the environment", () => {
+    const suites = { test: suite({ failed: 1 }), e2e: suite({ passed: 96 }) };
+    const built = buildModel({ env: environment, suites, gate: null, now: Date.parse("2026-09-27T09:08:46Z") });
+    assert.equal(built.headSha, HEAD);
+    assert.equal(built.runNumber, 413);
+    assert.equal(built.runAttempt, 2);
+    assert.equal(built.durationSeconds, 580);
+    assert.equal(built.sonarUrl, SONAR_URL);
+    assert.deepEqual(built.checks.map((check) => [check.key, check.result]), [
+        ["test", "failure"], ["e2e", "success"], ["sonar", "skipped"], ["image", "success"],
+        ["image-arm64", "success"], ["image-arm64-bluetooth", "success"],
+    ]);
+    assert.equal(built.checks[0].logUrl, "https://example.test/job/1");
+    assert.equal(built.checks[1].logUrl, undefined);
+    assert.equal(built.checks[5].logUrl, "https://example.test/job/6");
+    assert.equal(built.checks[0].suite, suites.test);
+    assert.equal(built.checks[2].suite, undefined);
+});
+
+test("a job missing from the needs context counts as not run, and a missing start time as zero", () => {
+    const env = { ...environment, NEEDS_JSON: "{}", JOBS_JSON: "", RUN_STARTED_AT: "", RUN_ATTEMPT: "" };
+    const built = buildModel({ env, suites: { test: noResults, e2e: noResults }, gate: null, now: 0 });
+    assert.ok(built.checks.every((check) => check.result === "skipped"));
+    assert.equal(built.durationSeconds, 0);
+    assert.equal(built.runAttempt, 1);
+});
+
+test("main writes the comment and asks SonarCloud only when the sonar job ran", async (t) => {
+    const root = await directory(t, "failed.xml");
+    const env = { ...environment, JUNIT_TEST_DIR: root, JUNIT_E2E_DIR: path.join(root, "absent"),
+        SUMMARY_FILE: path.join(root, "summary.md"), SONAR_TOKEN: "secret" };
+    let requests = 0;
+    const fetch = async (url) => {
+        requests++;
+        return { ok: true, status: 200, json: async () => (url.includes("list")
+            ? { pullRequests: [{ key: "105", commit: { sha: HEAD } }] }
+            : { projectStatus: { status: "OK", conditions: [] } }) };
+    };
+    await main(env, fetch);
+    assert.equal(requests, 0);
+    const skipped = await readFile(env.SUMMARY_FILE, "utf8");
+    assert.match(skipped, /\| Unit and integration tests \| ❌ 3 failed, 1 passed \|/);
+    assert.match(skipped, /\| Browser tests \(Chromium, WebKit\) \| ✅ \|/);
+    assert.match(skipped, /⏭️ not run, because tests failed/);
+
+    const needs = { ...JSON.parse(env.NEEDS_JSON), test: { result: "success" }, sonar: { result: "success" } };
+    await main({ ...env, NEEDS_JSON: JSON.stringify(needs), JUNIT_TEST_DIR: path.join(root, "absent") }, fetch);
+    assert.equal(requests, 2);
+    assert.match(await readFile(env.SUMMARY_FILE, "utf8"), /^## ✅ CI passed$/m);
 });

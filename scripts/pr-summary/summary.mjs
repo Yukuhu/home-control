@@ -1,5 +1,6 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 
 export const MARKER = "<!-- home-control-ci-summary -->";
@@ -8,6 +9,18 @@ const MAX_COMMENT = 60000;
 const MAX_FAILURES = 10;
 const MAX_MESSAGE = 300;
 const MAX_TRACE_LINES = 30;
+
+// The row order of the comment. `job` is the job's display name in ci.yml, which is how the
+// GitHub API identifies it; `suite` names the JUnit results that belong to the job.
+export const CHECKS = [
+    { key: "test", job: "Build and test", label: "Unit and integration tests", suite: "test" },
+    { key: "e2e", job: "Browser tests (Chromium, WebKit)", label: "Browser tests (Chromium, WebKit)", suite: "e2e" },
+    { key: "sonar", job: "SonarCloud quality gate", label: "SonarCloud quality gate" },
+    { key: "image", job: "Build the self-contained image", label: "Image (amd64)" },
+    { key: "image-arm64", job: "Smoke-test the image on arm64", label: "Image smoke test (arm64)" },
+    { key: "image-arm64-bluetooth", job: "Smoke-test the Bluetooth image on arm64",
+        label: "Bluetooth image smoke test (arm64)" },
+];
 
 const METRICS = {
     new_coverage: "Coverage on new code",
@@ -256,4 +269,41 @@ export function render(model) {
         comment = compose(model, options = { ...options, limit: options.limit - 1 });
     }
     return comment;
+}
+
+export function buildModel({ env, suites, gate, now }) {
+    const needs = JSON.parse(env.NEEDS_JSON);
+    const jobs = JSON.parse(env.JOBS_JSON || "[]");
+    const started = Date.parse(env.RUN_STARTED_AT);
+    return {
+        headSha: env.HEAD_SHA,
+        runUrl: env.RUN_URL,
+        runNumber: Number(env.RUN_NUMBER),
+        runAttempt: Number(env.RUN_ATTEMPT || 1),
+        durationSeconds: Number.isNaN(started) ? 0 : (now - started) / 1000,
+        sonarUrl: `https://sonarcloud.io/summary/new_code?id=${encodeURIComponent(env.SONAR_PROJECT_KEY)}`
+            + `&pullRequest=${encodeURIComponent(env.PR_NUMBER)}`,
+        gate,
+        checks: CHECKS.map(({ key, job, label, suite }) => ({
+            key,
+            label,
+            result: needs[key]?.result ?? "skipped",
+            logUrl: jobs.find((entry) => entry.name === job)?.html_url,
+            ...(suite ? { suite: suites[suite] } : {}),
+        })),
+    };
+}
+
+export async function main(env, fetch = globalThis.fetch) {
+    const suites = { test: await collectSuite(env.JUNIT_TEST_DIR), e2e: await collectSuite(env.JUNIT_E2E_DIR) };
+    const sonar = JSON.parse(env.NEEDS_JSON).sonar?.result;
+    const gate = sonar === "success" || sonar === "failure"
+        ? await fetchGate({ projectKey: env.SONAR_PROJECT_KEY, pullRequest: env.PR_NUMBER,
+            headSha: env.HEAD_SHA, token: env.SONAR_TOKEN }, fetch)
+        : null;
+    await writeFile(env.SUMMARY_FILE, render(buildModel({ env, suites, gate, now: Date.now() })));
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+    await main(process.env);
 }
