@@ -59,6 +59,15 @@ jobs:
           name: test-report
           path: build/reports/tests/test
 
+      # Uploaded even when tests fail, which is when the pull request summary needs them most.
+      - name: Upload the test results for the pull request summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: junit-test
+          path: build/test-results/test/TEST-*.xml
+          if-no-files-found: ignore
+
   image:
     name: Build the self-contained image
     runs-on: ubuntu-latest
@@ -197,6 +206,14 @@ jobs:
             build/e2e-artifacts
           if-no-files-found: ignore
 
+      - name: Upload the test results for the pull request summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: junit-e2e
+          path: build/test-results/e2eTest/TEST-*.xml
+          if-no-files-found: ignore
+
   sonar:
     name: SonarCloud quality gate
     needs: [test, e2e]
@@ -234,6 +251,107 @@ jobs:
           fi
           ./gradlew classes testClasses sonar -x test -x jacocoTestReport \
             "-Dsonar.qualitygate.wait=$REQUIRE_SONAR_QUALITY_GATE"
+
+  pr-summary:
+    name: Summarise the run on the pull request
+    # One comment per pull request, replaced on every run. Runs when earlier jobs failed, which
+    # is when it matters, but not when the run was cancelled. Fork pull requests get a read-only
+    # token, so they are left out.
+    needs: [test, e2e, image, image-arm64, image-arm64-bluetooth, sonar]
+    if: >-
+      !cancelled()
+      && github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # To read this run's start time and the links to its jobs.
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: scripts/pr-summary/package-lock.json
+
+      # Either artifact is missing when its job failed before running any test.
+      - name: Download the unit and integration results
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: junit-test
+          path: junit/test
+
+      - name: Download the browser test results
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: junit-e2e
+          path: junit/e2e
+
+      # The only step here that may fail the job: a broken summary script should fail the
+      # pull request that broke it. Everything after it reports problems as warnings.
+      - name: Test the summary script
+        working-directory: scripts/pr-summary
+        run: |
+          npm ci --ignore-scripts
+          npm test
+
+      - name: Write the summary
+        id: summary
+        continue-on-error: true
+        working-directory: scripts/pr-summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Passed as environment variables rather than interpolated into the script.
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: Yukuhu_home-control
+          JUNIT_TEST_DIR: ${{ github.workspace }}/junit/test
+          JUNIT_E2E_DIR: ${{ github.workspace }}/junit/e2e
+          SUMMARY_FILE: ${{ runner.temp }}/summary.md
+        run: |
+          run="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          # Without these the summary only loses its duration and its links to job logs.
+          RUN_STARTED_AT=$(gh api "$run" --jq .run_started_at) || RUN_STARTED_AT=
+          JOBS_JSON=$(gh api "$run/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
+            --jq '[.jobs[] | {name, html_url}]') || JOBS_JSON='[]'
+          export RUN_STARTED_AT JOBS_JSON
+          if ! npm run --silent summary; then
+            echo "::warning::The pull request summary could not be written."
+            exit 1
+          fi
+
+      # Delete before posting: if posting fails, the pull request has no summary rather than
+      # two. Only this workflow's own comments are deleted, so pasting the marker into a
+      # comment does not get that comment removed.
+      - name: Replace the comment on the pull request
+        if: steps.summary.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SUMMARY_FILE: ${{ runner.temp }}/summary.md
+        run: |
+          set -euo pipefail
+          trap 'echo "::warning::The pull request summary could not be posted."' ERR
+          comments="repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments"
+          gh api --paginate "$comments?per_page=100" --jq '.[]
+            | select(.user.login == "github-actions[bot]")
+            | select(.body | startswith("<!-- home-control-ci-summary -->"))
+            | .id' > "$RUNNER_TEMP/previous-summaries"
+          while read -r id; do
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/issues/comments/$id"
+          done < "$RUNNER_TEMP/previous-summaries"
+          gh api --method POST "$comments" -F "body=@$SUMMARY_FILE" --silent
 
   release:
     name: Release
