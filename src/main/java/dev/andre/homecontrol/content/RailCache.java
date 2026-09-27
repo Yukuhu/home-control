@@ -47,6 +47,8 @@ public class RailCache implements SmartLifecycle {
 
     /** Guarded by {@code this}; iteration order is display order. */
     private Map<String, Entry> entries = new LinkedHashMap<>();
+    // Assigned once in start() and only read (never read-modify-written) in stop(); the executor is thread-safe.
+    @SuppressWarnings("java:S3077")
     private volatile ScheduledExecutorService ticker;
     private volatile boolean running;
 

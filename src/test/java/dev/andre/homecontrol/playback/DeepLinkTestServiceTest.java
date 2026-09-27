@@ -194,4 +194,16 @@ class DeepLinkTestServiceTest {
         running.join();
         assertThat(first.get().outcome()).isEqualTo(DeepLinkTestResult.Outcome.NO_CHANGE);
     }
+
+    @Test
+    void aLiveDeviceWithoutAReportedAppDoesNotClaimOneEither() {
+        when(devices.state("lg")).thenReturn(HOME.withCurrentApp(null));
+
+        DeepLinkTestResult result = service.run("lg");
+
+        assertThat(result.outcome()).isEqualTo(DeepLinkTestResult.Outcome.NO_CHANGE);
+        assertThat(result.message()).isEqualTo("The app in front did not change within 1 seconds. If that already"
+                + " was YouTube, go to the Home screen and test again; otherwise the YouTube app may be missing or"
+                + " LG TV ignored the link; check the screen.");
+    }
 }

@@ -84,18 +84,24 @@ public class DeepLinkTestService {
                 return new DeepLinkTestResult(APP_CHANGED, before, after.get(), device.name() + " switched from "
                         + (before == null ? "no reported app" : before) + " to " + after.get() + how + CHECK_THE_SCREEN);
             }
-            String message = reporting == ForegroundAppReporting.POLLED
-                    ? "No other known app reported itself in front within " + seconds + " seconds"
-                    + (before == null ? "" : " (still " + before + "; if that was YouTube, go to the Home screen and test again)")
-                    + ". This device is polled and its app status may be unavailable on this model; check the screen."
-                    : "The app in front did not change within " + seconds + " seconds"
-                    + (before == null ? "" : " (still " + before + ")")
-                    + ". If that already was YouTube, go to the Home screen and test again; otherwise the YouTube app"
-                    + " may be missing or " + device.name() + " ignored the link; check the screen.";
-            return new DeepLinkTestResult(NO_CHANGE, before, before, message);
+            return new DeepLinkTestResult(NO_CHANGE, before, before, noChange(reporting, seconds, before, device.name()));
         } finally {
             watching.remove(deviceId, queue);
         }
+    }
+
+    /** Why the app in front seemed not to change, worded for how the device reports it. */
+    private static String noChange(ForegroundAppReporting reporting, long seconds, String before, String deviceName) {
+        if (reporting == ForegroundAppReporting.POLLED) {
+            String still = before == null
+                    ? "" : " (still " + before + "; if that was YouTube, go to the Home screen and test again)";
+            return "No other known app reported itself in front within " + seconds + " seconds" + still
+                    + ". This device is polled and its app status may be unavailable on this model; check the screen.";
+        }
+        String still = before == null ? "" : " (still " + before + ")";
+        return "The app in front did not change within " + seconds + " seconds" + still
+                + ". If that already was YouTube, go to the Home screen and test again; otherwise the YouTube app"
+                + " may be missing or " + deviceName + " ignored the link; check the screen.";
     }
 
     private Optional<String> awaitAnotherApp(BlockingQueue<DeviceState> queue, String before) {
