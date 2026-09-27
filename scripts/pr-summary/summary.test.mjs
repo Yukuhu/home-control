@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { collectSuite, parseJUnit } from "./summary.mjs";
+import { collectSuite, fetchGate, parseJUnit } from "./summary.mjs";
 
 const fixtures = fileURLToPath(new URL("./fixtures/", import.meta.url));
 const fixture = (name) => readFile(path.join(fixtures, name), "utf8");
@@ -111,4 +111,70 @@ test("a truncated result file is counted as unreadable and the others still coun
     assert.equal(result.found, true);
     assert.equal(result.unreadable, 1);
     assert.equal(result.passed, 2);
+});
+
+// ---- fetchGate
+
+const HEAD = "1277414c04bec9054494becf05affdd7db790d53";
+const gateOptions = { projectKey: "Yukuhu_home-control", pullRequest: "105", headSha: HEAD, token: "secret" };
+
+function sonar({ sha = HEAD, status = "OK", conditions = [], listStatus = 200, gateStatus = 200 } = {}) {
+    const requests = [];
+    const fetch = async (url, options) => {
+        requests.push({ url, options });
+        const list = url.includes("project_pull_requests/list");
+        const body = list
+            ? { pullRequests: [{ key: "104", commit: { sha: "other" } }, { key: "105", commit: { sha } }] }
+            : { projectStatus: { status, conditions } };
+        const code = list ? listStatus : gateStatus;
+        return { ok: code === 200, status: code, json: async () => body };
+    };
+    return { fetch, requests };
+}
+
+test("reports a passed gate and authenticates with the token", async () => {
+    const { fetch, requests } = sonar();
+    assert.deepEqual(await fetchGate(gateOptions, fetch), { available: true, passed: true, failedConditions: [] });
+    assert.equal(requests[0].url, "https://sonarcloud.io/api/project_pull_requests/list?project=Yukuhu_home-control");
+    assert.equal(requests[1].url,
+        "https://sonarcloud.io/api/qualitygates/project_status?projectKey=Yukuhu_home-control&pullRequest=105");
+    assert.equal(requests[0].options.headers.Authorization, "Bearer secret");
+});
+
+test("sends no authorisation header without a token", async () => {
+    const { fetch, requests } = sonar();
+    await fetchGate({ ...gateOptions, token: "" }, fetch);
+    assert.deepEqual(requests[0].options.headers, {});
+});
+
+test("reports only the failed conditions of a failed gate", async () => {
+    const { fetch } = sonar({ status: "ERROR", conditions: [
+        { status: "OK", metricKey: "new_security_rating", comparator: "GT", errorThreshold: "1", actualValue: "1" },
+        { status: "ERROR", metricKey: "new_coverage", comparator: "LT", periodIndex: 1, errorThreshold: "80", actualValue: "71.2" },
+    ] });
+    assert.deepEqual(await fetchGate(gateOptions, fetch), { available: true, passed: false, failedConditions: [
+        { metricKey: "new_coverage", comparator: "LT", actualValue: "71.2", errorThreshold: "80" },
+    ] });
+});
+
+test("an analysis of another commit is unavailable and the gate is not requested", async () => {
+    const { fetch, requests } = sonar({ sha: "731bc9f246031fd9f91ced98cd1393cc312813b6" });
+    assert.deepEqual(await fetchGate(gateOptions, fetch), { available: false });
+    assert.equal(requests.length, 1);
+});
+
+test("a pull request SonarCloud has never analysed is unavailable", async () => {
+    const { fetch } = sonar();
+    assert.deepEqual(await fetchGate({ ...gateOptions, pullRequest: "999" }, fetch), { available: false });
+});
+
+test("HTTP errors, timeouts, unexpected shapes and unknown statuses are unavailable", async () => {
+    assert.deepEqual(await fetchGate(gateOptions, sonar({ listStatus: 401 }).fetch), { available: false });
+    assert.deepEqual(await fetchGate(gateOptions, sonar({ gateStatus: 500 }).fetch), { available: false });
+    assert.deepEqual(await fetchGate(gateOptions, sonar({ status: "NONE" }).fetch), { available: false });
+    assert.deepEqual(await fetchGate(gateOptions,
+        async () => ({ ok: true, status: 200, json: async () => ({ unexpected: true }) })), { available: false });
+    const never = (url, { signal }) => new Promise((resolve, reject) =>
+        signal.addEventListener("abort", () => reject(signal.reason)));
+    assert.deepEqual(await fetchGate({ ...gateOptions, timeoutMs: 20 }, never), { available: false });
 });

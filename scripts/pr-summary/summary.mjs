@@ -68,3 +68,36 @@ export async function collectSuite(directory) {
     }
     return result;
 }
+
+const UNAVAILABLE = { available: false };
+
+export async function fetchGate({ projectKey, pullRequest, headSha, token, timeoutMs = 10000 }, fetch = globalThis.fetch) {
+    const get = async (pathAndQuery) => {
+        const response = await fetch(`https://sonarcloud.io/api/${pathAndQuery}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            signal: AbortSignal.timeout(timeoutMs),
+        });
+        if (!response.ok) throw new Error(`SonarCloud answered ${response.status}`);
+        return response.json();
+    };
+    try {
+        const project = encodeURIComponent(projectKey);
+        const key = encodeURIComponent(pullRequest);
+        const list = await get(`project_pull_requests/list?project=${project}`);
+        const analysed = list.pullRequests.find((entry) => entry.key === String(pullRequest));
+        // SonarCloud records the pull request's head commit, not the merge commit Actions checks out.
+        if (analysed?.commit?.sha !== headSha) return UNAVAILABLE;
+        const { projectStatus } = await get(`qualitygates/project_status?projectKey=${project}&pullRequest=${key}`);
+        if (projectStatus.status !== "OK" && projectStatus.status !== "ERROR") return UNAVAILABLE;
+        return {
+            available: true,
+            passed: projectStatus.status === "OK",
+            failedConditions: projectStatus.conditions
+                .filter((condition) => condition.status === "ERROR")
+                .map(({ metricKey, comparator, actualValue, errorThreshold }) =>
+                    ({ metricKey, comparator, actualValue, errorThreshold })),
+        };
+    } catch {
+        return UNAVAILABLE;
+    }
+}
