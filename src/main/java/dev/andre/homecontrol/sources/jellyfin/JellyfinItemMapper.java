@@ -35,12 +35,7 @@ public final class JellyfinItemMapper {
         if (id.isBlank() || item.path("IsFolder").asBoolean(false)) {
             return Optional.empty();
         }
-        ContentKind kind = switch (item.path("Type").asString("")) {
-            case "Movie" -> ContentKind.MOVIE;
-            case "Episode" -> ContentKind.EPISODE;
-            case "Audio" -> ContentKind.TRACK;
-            default -> ContentKind.VIDEO;
-        };
+        ContentKind kind = kind(item);
         String name = item.path("Name").asString("");
         String title;
         String subtitle;
@@ -68,13 +63,14 @@ public final class JellyfinItemMapper {
 
     /** One line naming what plays: an episode with its series and number, a track with its artists. Blank for a nameless item. */
     static String playingTitle(JsonNode item) {
+        ContentKind kind = kind(item);
         String name = item.path("Name").asString("").strip();
-        String context = switch (item.path("Type").asString("")) {
-            case "Episode" -> item.path("SeriesName").asString("").strip();
-            case "Audio" -> artists(item);
+        String context = switch (kind) {
+            case EPISODE -> item.path("SeriesName").asString("").strip();
+            case TRACK -> artists(item);
             default -> null;
         };
-        if ("Episode".equals(item.path("Type").asString(""))) {
+        if (kind == ContentKind.EPISODE) {
             String label = episodeLabel(item, name);
             name = label == null ? "" : label;
         }
@@ -82,6 +78,15 @@ public final class JellyfinItemMapper {
             return name;
         }
         return name.isBlank() ? context : context + " · " + name;
+    }
+
+    private static ContentKind kind(JsonNode item) {
+        return switch (item.path("Type").asString("")) {
+            case "Movie" -> ContentKind.MOVIE;
+            case "Episode" -> ContentKind.EPISODE;
+            case "Audio" -> ContentKind.TRACK;
+            default -> ContentKind.VIDEO;
+        };
     }
 
     static String episodeLabel(JsonNode item, String name) {
