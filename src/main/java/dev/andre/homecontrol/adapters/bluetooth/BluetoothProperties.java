@@ -13,7 +13,7 @@ import java.util.Optional;
 
 /**
  * {@code home-control.bluetooth.*}. Off by default: the module needs the host's D-Bus socket,
- * BlueZ, a Bluetooth adapter, an audio server and mpv (see docs/bluetooth-speakers.md). A bad
+ * BlueZ, a Bluetooth adapter, an audio server and mpv (see docs/user/bluetooth-speakers.md). A bad
  * value fails startup instead of surfacing later as a busy loop or a silent no-op, as with the
  * other adapter modules' {@code *Properties}.
  */

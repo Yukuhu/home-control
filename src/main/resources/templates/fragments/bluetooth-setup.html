@@ -15,7 +15,7 @@
         </li>
     </ul>
     <p class="hint" th:unless="${bluetooth.hostReady()}">
-        Fix the items marked above on the host; docs/bluetooth-speakers.md in the repository lists every step.
+        Fix the items marked above on the host; docs/user/bluetooth-speakers.md in the repository lists every step.
     </p>
     <form method="post" th:action="@{/setup/bluetooth/check}">
         <button type="submit">Check again</button>

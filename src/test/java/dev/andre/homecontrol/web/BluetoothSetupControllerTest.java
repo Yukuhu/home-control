@@ -93,7 +93,7 @@ class BluetoothSetupControllerTest {
                 .andExpect(content().string(containsString("data-check=\"bluez\"")))
                 .andExpect(content().string(containsString("action=\"/setup/bluetooth/scan\"")))
                 .andExpect(content().string(containsString("Scanning takes about 10 seconds")))
-                .andExpect(content().string(containsString("docs/bluetooth-speakers.md")));
+                .andExpect(content().string(containsString("docs/user/bluetooth-speakers.md")));
     }
 
     @Test

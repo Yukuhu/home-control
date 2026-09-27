@@ -1,4 +1,4 @@
-# Variant with Bluetooth speakers. Install this OR docker-compose.yml, not both (same app id). Host requirements: docs/bluetooth-speakers.md in the repository.
+# Variant with Bluetooth speakers. Install this OR docker-compose.yml, not both (same app id). Host requirements: docs/user/bluetooth-speakers.md in the repository.
 name: shield-remote
 
 services:

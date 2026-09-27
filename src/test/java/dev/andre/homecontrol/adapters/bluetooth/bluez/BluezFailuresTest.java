@@ -51,11 +51,11 @@ class BluezFailuresTest {
     @org.junit.jupiter.api.Test
     void messagesNameTheFix() {
         assertThat(BluezFailures.message(NO_MACHINE_ID, "x"))
-                .contains("/etc/machine-id:/etc/machine-id:ro").contains("docs/bluetooth-speakers.md");
+                .contains("/etc/machine-id:/etc/machine-id:ro").contains("docs/user/bluetooth-speakers.md");
         assertThat(BluezFailures.message(BLUEZ_NOT_RUNNING, "x")).contains("systemctl enable --now bluetooth");
         assertThat(BluezFailures.message(NO_ADAPTER, "x")).contains("rfkill unblock bluetooth");
         assertThat(BluezFailures.message(ADAPTER_OFF, "x")).contains("rfkill unblock bluetooth");
-        assertThat(BluezFailures.message(NO_AUDIO_PROFILE, "x")).contains("PipeWire").contains("docs/bluetooth-speakers.md");
+        assertThat(BluezFailures.message(NO_AUDIO_PROFILE, "x")).contains("PipeWire").contains("docs/user/bluetooth-speakers.md");
         assertThat(BluezFailures.message(ACCESS_DENIED, "x")).contains("apparmor:unconfined");
         assertThat(BluezFailures.message(PAIRING_REJECTED, "x")).contains("pairing mode");
         assertThat(BluezFailures.message(UNREACHABLE, "x")).contains("Switch it on");

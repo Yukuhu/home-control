@@ -8,7 +8,7 @@ import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.*;
 /** Turns D-Bus/BlueZ errors into a failure kind and a sentence that names the fix. */
 public final class BluezFailures {
 
-    private static final String DOCS = "see docs/bluetooth-speakers.md";
+    private static final String DOCS = "see docs/user/bluetooth-speakers.md";
 
     private BluezFailures() {
     }

@@ -88,7 +88,7 @@ home-control:
     reconnect-max-delay-seconds: 60
   bluetooth:
     # Bluetooth speakers through the host's BlueZ and a server-side mpv player.
-    # Needs host plumbing and the -bluetooth image: see docs/bluetooth-speakers.md.
+    # Needs host plumbing and the -bluetooth image: see docs/user/bluetooth-speakers.md.
     enabled: false
     dbus-address: unix:path=/run/dbus/system_bus_socket
     # Blank = first powered adapter; otherwise an adapter MAC or id such as hci0.

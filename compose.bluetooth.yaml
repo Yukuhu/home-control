@@ -3,7 +3,7 @@
 #   docker compose -f compose.yaml -f compose.bluetooth.yaml up -d --build
 #
 # Host requirements (BlueZ, an adapter, PipeWire or PulseAudio for the audio user):
-# docs/bluetooth-speakers.md. HOST_AUDIO_UID is the uid whose PipeWire/PulseAudio
+# docs/user/bluetooth-speakers.md. HOST_AUDIO_UID is the uid whose PipeWire/PulseAudio
 # plays the audio (1000 is the first user on Raspberry Pi OS and Ubuntu).
 services:
   shield-remote:
