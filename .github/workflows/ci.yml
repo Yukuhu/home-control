@@ -476,12 +476,50 @@ jobs:
           # The graph submitted above takes a moment to become available.
           retry-on-snapshot-warnings: true
 
+  codeql:
+    name: Scan the code (${{ matrix.language }})
+    # CodeQL looks for security flaws in the application, in the scripts and in this workflow,
+    # and reports them as code scanning alerts. The job fails if a scan cannot run, not if it
+    # finds something: what a pull request adds shows on the pull request. Fork pull requests
+    # get a read-only token, which cannot upload results, so they are left out.
+    needs: changes
+    if: >-
+      needs.changes.outputs.code == 'true'
+      && (github.event_name == 'push'
+      || github.event.pull_request.head.repo.full_name == github.repository)
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, java-kotlin, javascript-typescript]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # To upload the results.
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # Java is read from its source, without a build. CodeQL still fetches the dependencies, to
+      # know the types the code uses, but keeps none of them: kept, they took half a gigabyte
+      # of the cache for every scan.
+      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: /language:${{ matrix.language }}
+
   pr-summary:
     name: Summarise the run on the pull request
     # One comment per pull request, replaced on every run. Runs when earlier jobs failed, which
     # is when it matters, but not when the run was cancelled. Fork pull requests get a read-only
     # token, so they are left out.
-    needs: [changes, jar, test, e2e-chromium, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies]
+    needs: [changes, jar, test, e2e-chromium, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies, codeql]
     if: >-
       !cancelled()
       && github.event_name == 'pull_request'
@@ -768,6 +806,7 @@ jobs:
       - smoke
       - smoke-bluetooth
       - dependencies
+      - codeql
       - pr-summary
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -778,7 +817,7 @@ jobs:
         run: |
           jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS_JSON"
           # A job is skipped when a job it needs failed, which fails this one anyway, or when
-          # its own condition leaves it out, as for the dependencies of a fork's pull request
+          # its own condition leaves it out, as for the dependencies and the scan of a fork's pull request
           # and for everything when only documentation changed.
           failed=$(jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key]
             | join(", ")' <<< "$NEEDS_JSON")

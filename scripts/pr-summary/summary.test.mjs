@@ -253,6 +253,7 @@ function model(overrides = {}, results = {}) {
                 result: result("smoke-bluetooth"), logUrl: log("smoke-bluetooth") },
             { key: "dependencies", label: "Dependency vulnerabilities", result: result("dependencies"),
                 logUrl: log("dependencies") },
+            { key: "codeql", label: "Code scan (CodeQL)", result: result("codeql"), logUrl: log("codeql") },
         ],
         ...overrides,
     };
@@ -278,6 +279,7 @@ test("a green run is the marker, the heading, the commit line and the table", ()
 | Image smoke test (amd64, arm64) | ✅ |
 | Bluetooth image smoke test (amd64, arm64) | ✅ |
 | Dependency vulnerabilities | ✅ |
+| Code scan (CodeQL) | ✅ |
 `);
 });
 
@@ -537,7 +539,7 @@ const environment = {
         sonar: { result: "skipped", outputs: {} }, image: { result: "success", outputs: {} },
         jar: { result: "success", outputs: {} },
         smoke: { result: "success", outputs: {} }, "smoke-bluetooth": { result: "success", outputs: {} },
-        dependencies: { result: "success", outputs: {} },
+        dependencies: { result: "success", outputs: {} }, codeql: { result: "success", outputs: {} },
     }),
     JOBS_JSON: JSON.stringify([
         { name: "Build and test", html_url: "https://example.test/job/1", conclusion: "failure" },
@@ -545,6 +547,8 @@ const environment = {
         { name: "Smoke-test the Bluetooth image on arm64", html_url: "https://example.test/job/6", conclusion: "failure" },
         { name: "Smoke-test the image on amd64", html_url: "https://example.test/job/7", conclusion: "success" },
         { name: "Smoke-test the image on arm64", html_url: "https://example.test/job/8", conclusion: "success" },
+        { name: "Scan the code (actions)", html_url: "https://example.test/job/9", conclusion: "success" },
+        { name: "Scan the code (java-kotlin)", html_url: "https://example.test/job/10", conclusion: "failure" },
     ]),
     HEAD_SHA: HEAD, PR_NUMBER: "105", RUN_URL, RUN_NUMBER: "413", RUN_ATTEMPT: "2",
     RUN_STARTED_AT: "2026-09-27T08:59:06Z", SONAR_PROJECT_KEY: "Yukuhu_home-control",
@@ -567,7 +571,7 @@ test("the model is built from the needs context, the job list and the environmen
     assert.deepEqual(built.checks.map((check) => [check.key, check.result]), [
         ["jar", "success"], ["test", "failure"], ["e2e-chromium", "success"], ["e2e-webkit", "success"],
         ["sonar", "skipped"], ["image", "success"],
-        ["smoke", "success"], ["smoke-bluetooth", "success"], ["dependencies", "success"],
+        ["smoke", "success"], ["smoke-bluetooth", "success"], ["dependencies", "success"], ["codeql", "success"],
     ]);
     const check = (key) => built.checks.find((entry) => entry.key === key);
     assert.equal(check("test").logUrl, "https://example.test/job/1");
@@ -584,6 +588,7 @@ test("a job that runs once per architecture links to the log of the one that fai
     assert.equal(check("smoke-bluetooth").logUrl, "https://example.test/job/6");
     // Without a failure the first one serves, and the Bluetooth jobs are never mistaken for these.
     assert.equal(check("smoke").logUrl, "https://example.test/job/7");
+    assert.equal(check("codeql").logUrl, "https://example.test/job/10");
 });
 
 test("a job list without conclusions still yields log links", () => {
@@ -610,6 +615,7 @@ test("a vulnerable dependency fails the run and links to the log of its job", ()
             "e2e-webkit": { result: "success" }, sonar: { result: "success" },
             jar: { result: "success" }, image: { result: "success" }, smoke: { result: "success" },
             "smoke-bluetooth": { result: "success" }, dependencies: { result: "failure" },
+            codeql: { result: "success" },
         }),
         JOBS_JSON: JSON.stringify([{ name: "Dependency vulnerabilities", html_url: "https://example.test/job/7" }]),
     };

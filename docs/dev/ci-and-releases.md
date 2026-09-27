@@ -18,6 +18,7 @@ What runs on every push and pull request, and how releases are made.
 | Browser tests (WebKit) | Runs the Playwright tests in WebKit. |
 | SonarCloud quality gate | Scans the results of `Build and test` and `Browser tests (Chromium)`; on pull requests it waits for the quality gate. |
 | Dependency vulnerabilities | Submits the resolved dependency graph so that Dependabot alerts cover it, and reviews the dependencies a pull request changes. The release does not wait for it. |
+| Scan the code (…) | Runs CodeQL on the application, the scripts and the workflow, one job for each language, and reports what it finds as code scanning alerts. It fails if a scan cannot run, not if it finds something. The release does not wait for it. |
 | Summarise the run on the pull request | Writes one comment per pull request with the run's results, replaced on every run. |
 | Release | On a push to `main` that releases, publishes the images the smoke tests ran under the release's tags, then creates the tag and the GitHub release, and attests where the image was built. It builds nothing. |
 | Release the Bluetooth image | After the release, publishes and attests the tested `-bluetooth` images, if they passed their smoke tests. |
@@ -37,6 +38,10 @@ pull requests, so their build stays red until a separate scan path is configured
 `main` requires one check, `CI passed`. It passes only if every other job passed or was left
 out on purpose, so a job is enforced by adding it to that job's `needs` in
 `.github/workflows/ci.yml`, not in the repository's settings.
+
+The `Scan the code` jobs read Java from its source, without a build. On a pull request a
+scan reports only what it finds in the lines that changed; the alerts are under the
+repository's Security tab.
 
 A pull request that changes only documentation builds and tests nothing, and `CI passed`
 passes for it. Documentation is what `scripts/code-changed.sh` lists: `docs/`, the Markdown
