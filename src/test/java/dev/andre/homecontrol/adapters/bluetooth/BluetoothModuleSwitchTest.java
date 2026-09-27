@@ -8,12 +8,8 @@ import dev.andre.homecontrol.adapters.bluetooth.player.ProcessMpvLauncher;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.yaml.snakeyaml.Yaml;
 
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -70,12 +66,6 @@ class BluetoothModuleSwitchTest {
     }
 
     @Test
-    void applicationYamlKeepsItOff() throws Exception {
-        assertThat(bluetoothEnabled("src/main/resources/application.yaml")).isFalse();
-        assertThat(bluetoothEnabled("src/test/resources/application.yaml")).isFalse();
-    }
-
-    @Test
     void anInvalidScanSecondsFailsStartup() {
         runner.withPropertyValues("home-control.bluetooth.enabled=true", "home-control.bluetooth.scan-seconds=0")
                 .run(context -> assertThat(context).hasFailed());
@@ -113,14 +103,4 @@ class BluetoothModuleSwitchTest {
                 .isEmpty();
     }
 
-    @SuppressWarnings("unchecked")
-    private static boolean bluetoothEnabled(String path) throws Exception {
-        Map<String, Object> yaml;
-        try (InputStream input = Files.newInputStream(Path.of(path))) {
-            yaml = new Yaml().load(input);
-        }
-        Map<String, Object> homeControl = (Map<String, Object>) yaml.get("home-control");
-        Map<String, Object> bluetooth = (Map<String, Object>) homeControl.get("bluetooth");
-        return (boolean) bluetooth.get("enabled");
-    }
 }

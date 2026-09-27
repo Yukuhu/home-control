@@ -1,0 +1,44 @@
+package dev.andre.homecontrol;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.core.env.Environment;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** Tests load the production application.yaml, with only src/test/resources/config/application.yaml on top. */
+class ApplicationYamlTest {
+
+    private final ApplicationContextRunner runner = new ApplicationContextRunner()
+            .withInitializer(new ConfigDataApplicationContextInitializer());
+
+    @Test
+    void theProductionFileIsBound() {
+        runner.run(context -> {
+            Environment environment = context.getEnvironment();
+            // Set only in src/main/resources/application.yaml.
+            assertThat(environment.getProperty("home-control.webos.port")).isEqualTo("3000");
+            assertThat(environment.getProperty("home-control.deep-link-test.youtube-url"))
+                    .isEqualTo("https://www.youtube.com/watch?v=aqz-KE-bpKQ");
+        });
+    }
+
+    @Test
+    void bluetoothStaysOffInTheProductionFile() {
+        runner.run(context -> assertThat(context.getEnvironment().getProperty("home-control.bluetooth.enabled"))
+                .isEqualTo("false"));
+    }
+
+    @Test
+    void theTestOverridesWin() {
+        runner.run(context -> {
+            Environment environment = context.getEnvironment();
+            assertThat(environment.getProperty("shield.data-dir")).isEqualTo("build/test-data");
+            assertThat(environment.getProperty("shield.discovery-enabled")).isEqualTo("false");
+            assertThat(environment.getProperty("home-control.ssdp.enabled")).isEqualTo("false");
+            assertThat(environment.getProperty("home-control.content.rails.scheduler-enabled")).isEqualTo("false");
+            assertThat(environment.getProperty("home-control.tmdb.api-base-url")).isEqualTo("http://127.0.0.1:9/3");
+        });
+    }
+}

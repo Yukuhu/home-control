@@ -1,0 +1,33 @@
+# Test overrides only. Spring Boot loads src/main/resources/application.yaml as in production and this file
+# (classpath:/config/ wins over classpath:/) on top of it, so tests bind the real configuration and change only
+# what a test run must not do: discover the LAN, reach real upstream APIs, wait out production timeouts, or
+# refresh rails on a schedule.
+shield:
+  data-dir: build/test-data
+  discovery-enabled: false
+
+home-control:
+  ssdp:
+    enabled: false
+  tmdb:
+    api-base-url: http://127.0.0.1:9/3
+    connect-timeout-seconds: 1
+    request-timeout-seconds: 2
+  sports:
+    calendar:
+      connect-timeout-seconds: 1
+      request-timeout-seconds: 2
+    thesportsdb:
+      api-base-url: http://127.0.0.1:9/api/v1/json
+      connect-timeout-seconds: 1
+      request-timeout-seconds: 2
+  youtube:
+    oauth-base-url: http://127.0.0.1:9
+    api-base-url: http://127.0.0.1:9
+    lounge-base-url: http://127.0.0.1:9
+    thumbnail-base-url: http://127.0.0.1:9
+  content:
+    rails:
+      scheduler-enabled: false
+    search:
+      timeout: 2s
