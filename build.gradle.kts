@@ -1,3 +1,13 @@
+// Raises commons-lang3 on the build classpath above the version the Spring Boot plugin drags in;
+// gradle/libs.versions.toml says why. A plugin's transitive dependencies can only be constrained here.
+buildscript {
+    dependencies {
+        constraints {
+            classpath(libs.commons.lang3)
+        }
+    }
+}
+
 plugins {
     java
     jacoco
