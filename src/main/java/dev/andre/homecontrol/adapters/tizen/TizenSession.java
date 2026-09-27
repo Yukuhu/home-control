@@ -119,7 +119,7 @@ public class TizenSession implements DeviceHandle {
     public void execute(Action action) {
         switch (action) {
             case Action.PressKey(var key, var press) -> pressKey(key, press);
-            case Action.OpenAppLink(var uri, var _) -> openAppLink(uri);
+            case Action.OpenAppLink(var uri, _) -> openAppLink(uri);
             case Action.SelectInput _ -> throw new UnsupportedActionException(
                     device.name() + " does not list its inputs; use the Source button of the TV remote");
             case Action.SetVolume _ -> throw volumeKeysOnly();
