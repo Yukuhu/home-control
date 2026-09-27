@@ -36,6 +36,8 @@ public class YouTubeContentSource implements ContentSource {
     private final YouTubeProperties properties;
     private final Clock clock;
 
+    // Nine distinct collaborators (feeds, API, search, quota, clock...); bundling them would only hide them from Spring.
+    @SuppressWarnings("java:S107")
     public YouTubeContentSource(YouTubeSetupService setup, SubscriptionsFeed feed, YouTubeApiClient api,
                                 YouTubePlaylists playlists, YouTubeSearch search, QuotaLedger ledger, KnownVideos known,
                                 YouTubeProperties properties, Clock clock) {

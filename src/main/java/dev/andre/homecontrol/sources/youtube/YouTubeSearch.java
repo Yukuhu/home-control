@@ -21,7 +21,7 @@ public class YouTubeSearch {
 
     private static final int MAX_RESULTS = 25;
     private static final int CACHE_ENTRIES = 50;
-    private static final Pattern ENTITY = Pattern.compile("&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|amp|lt|gt|quot|apos|#39);");
+    private static final Pattern ENTITY = Pattern.compile("&(#\\d{1,7}|#[xX][0-9a-fA-F]{1,6}|amp|lt|gt|quot|apos|#39);");
 
     private record Cached(List<YouTubeVideo> videos, Instant at) {
     }

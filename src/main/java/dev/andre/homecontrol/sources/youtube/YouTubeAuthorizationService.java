@@ -214,9 +214,8 @@ public class YouTubeAuthorizationService implements AutoCloseable {
                     return finish(State.FAILED, "Google refused the authorization (" + error
                             + (description.isBlank() ? "" : ": " + description) + ")");
                 }
-                case GoogleOAuthClient.TokenPoll.Granted(var accessToken, var refreshToken) -> {
-                    storeGrant(accessToken, refreshToken);
-                }
+                case GoogleOAuthClient.TokenPoll.Granted(var accessToken, var refreshToken) ->
+                        storeGrant(accessToken, refreshToken);
             }
         }
         return false;

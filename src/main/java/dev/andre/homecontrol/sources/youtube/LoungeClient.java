@@ -3,9 +3,12 @@ package dev.andre.homecontrol.sources.youtube;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.MissingNode;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -117,47 +120,14 @@ public class LoungeClient {
         String sid = "";
         String gsessionId = "";
         long lastEventId = -1;
-        int depth = 0;
-        int start = -1;
-        boolean inString = false;
-        boolean escaped = false;
-        for (int i = 0; i < body.length(); i++) {
-            char c = body.charAt(i);
-            if (inString) {
-                if (escaped) {
-                    escaped = false;
-                } else if (c == '\\') {
-                    escaped = true;
-                } else if (c == '"') {
-                    inString = false;
-                }
-                continue;
-            }
-            if (c == '"' && depth > 0) {
-                inString = true;
-            } else if (c == '[') {
-                if (depth++ == 0) {
-                    start = i;
-                }
-            } else if (c == ']' && depth > 0 && --depth == 0) {
-                JsonNode events;
-                try {
-                    events = MAPPER.readTree(body.substring(start, i + 1));
-                } catch (JacksonException _) {
-                    continue;
-                }
-                for (JsonNode event : events) {
-                    if (!event.isArray()) {
-                        continue;
-                    }
-                    lastEventId = Math.max(lastEventId, event.path(0).asLong(-1));
-                    JsonNode payload = event.path(1);
-                    switch (payload.path(0).asString("")) {
-                        case "c" -> sid = payload.path(1).asString("");
-                        case "S" -> gsessionId = payload.path(1).asString("");
-                        default -> {
-                        }
-                    }
+        for (JsonNode event : events(body)) {
+            lastEventId = Math.max(lastEventId, event.path(0).asLong(-1));
+            JsonNode payload = event.path(1);
+            switch (payload.path(0).asString("")) {
+                case "c" -> sid = payload.path(1).asString("");
+                case "S" -> gsessionId = payload.path(1).asString("");
+                default -> {
+                    // Every other event says nothing about the session.
                 }
             }
         }
@@ -165,6 +135,63 @@ public class LoungeClient {
             throw new LoungeException("bind", "YouTube's answer had no session");
         }
         return new LoungeSession(sid, gsessionId, Math.max(lastEventId, 0));
+    }
+
+    /** The array-shaped events of every top-level array that parses, in order; anything else is skipped. */
+    private static List<JsonNode> events(String body) {
+        List<JsonNode> events = new ArrayList<>();
+        for (String chunk : topLevelArrays(body)) {
+            for (JsonNode event : parseOrMissing(chunk)) {
+                if (event.isArray()) {
+                    events.add(event);
+                }
+            }
+        }
+        return events;
+    }
+
+    /** Each outermost {@code [...]} of the body, by bracket depth; brackets inside a string within one do not count. */
+    private static List<String> topLevelArrays(String body) {
+        List<String> arrays = new ArrayList<>();
+        int depth = 0;
+        int start = -1;
+        int i = 0;
+        while (i < body.length()) {
+            char c = body.charAt(i);
+            if (c == '"' && depth > 0) {
+                i = closingQuote(body, i + 1);
+            } else if (c == '[') {
+                if (depth == 0) {
+                    start = i;
+                }
+                depth++;
+            } else if (c == ']' && depth > 0) {
+                depth--;
+                if (depth == 0) {
+                    arrays.add(body.substring(start, i + 1));
+                }
+            }
+            i++;
+        }
+        return arrays;
+    }
+
+    /** Where the string that starts at {@code from} ends: its closing quote, or past the body's end. */
+    private static int closingQuote(String body, int from) {
+        int i = from;
+        while (i < body.length() && body.charAt(i) != '"') {
+            i += body.charAt(i) == '\\' ? 2 : 1;
+        }
+        return i;
+    }
+
+    /** A chunk that is not valid JSON reads as a missing node, which has no events. */
+    private static JsonNode parseOrMissing(String chunk) {
+        try {
+            return MAPPER.readTree(chunk);
+        } catch (JacksonException _) {
+            return MissingNode.getInstance();
+        }
     }
 
     private YouTubeHttp.Response post(String step, URI uri, Map<String, String> form) {

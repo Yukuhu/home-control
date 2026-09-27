@@ -7,6 +7,8 @@ import java.net.URI;
 
 /** Uses the same browser-facing origin for starting sign-in and receiving its session cookie. */
 final class YouTubeOAuthCallback {
+    // This app's own route: the @GetMapping value (a compile-time constant) and the redirect target it serves.
+    @SuppressWarnings("java:S1075")
     static final String PATH = "/setup/sources/youtube/callback";
 
     private YouTubeOAuthCallback() { }

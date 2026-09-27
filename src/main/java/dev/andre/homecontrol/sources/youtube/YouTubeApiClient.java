@@ -55,22 +55,7 @@ public class YouTubeApiClient {
         JsonNode error = errorBody(response);
         String reason = error.path("errors").path(0).path("reason").asString("");
         if (status == 403) {
-            if (reason.equals("quotaExceeded") || reason.equals("dailyLimitExceeded")) {
-                ledger.markExhausted();
-                return ledger.exhaustedException();
-            }
-            String message = error.path("message").asString("");
-            if (reason.equals("accessNotConfigured") || ("PERMISSION_DENIED".equals(error.path("status").asString(""))
-                    && (message.contains("has not been used") || message.contains("is disabled")))) {
-                return new YouTubeException(YouTubeException.Kind.FORBIDDEN, "The YouTube Data API v3 is not enabled"
-                        + " in your Google Cloud project. Enable it, wait a few minutes and try again.", reason);
-            }
-            if (reason.equals("insufficientPermissions")) {
-                return new YouTubeException(YouTubeException.Kind.FORBIDDEN,
-                        "The saved authorization does not include read access to YouTube; reconnect YouTube.", reason);
-            }
-            return new YouTubeException(YouTubeException.Kind.FORBIDDEN,
-                    "YouTube refused the request (" + (reason.isBlank() ? "HTTP 403" : reason) + ")", reason);
+            return forbidden(error, reason);
         }
         if (status == 404) {
             return new YouTubeException(YouTubeException.Kind.NOT_FOUND,
@@ -80,6 +65,26 @@ public class YouTubeApiClient {
             return new YouTubeException(YouTubeException.Kind.SERVER_ERROR, "YouTube is having problems (HTTP " + status + ")");
         }
         return new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "YouTube answered HTTP " + status, reason);
+    }
+
+    /** A 403: the day's quota is spent, the API is off in the Cloud project, the grant is too narrow, or else a plain refusal. */
+    private YouTubeException forbidden(JsonNode error, String reason) {
+        if (reason.equals("quotaExceeded") || reason.equals("dailyLimitExceeded")) {
+            ledger.markExhausted();
+            return ledger.exhaustedException();
+        }
+        String message = error.path("message").asString("");
+        if (reason.equals("accessNotConfigured") || ("PERMISSION_DENIED".equals(error.path("status").asString(""))
+                && (message.contains("has not been used") || message.contains("is disabled")))) {
+            return new YouTubeException(YouTubeException.Kind.FORBIDDEN, "The YouTube Data API v3 is not enabled"
+                    + " in your Google Cloud project. Enable it, wait a few minutes and try again.", reason);
+        }
+        if (reason.equals("insufficientPermissions")) {
+            return new YouTubeException(YouTubeException.Kind.FORBIDDEN,
+                    "The saved authorization does not include read access to YouTube; reconnect YouTube.", reason);
+        }
+        return new YouTubeException(YouTubeException.Kind.FORBIDDEN,
+                "YouTube refused the request (" + (reason.isBlank() ? "HTTP 403" : reason) + ")", reason);
     }
 
     private static JsonNode errorBody(YouTubeHttp.Response response) {
