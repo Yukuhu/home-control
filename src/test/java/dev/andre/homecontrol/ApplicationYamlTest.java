@@ -1,9 +1,15 @@
 package dev.andre.homecontrol;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.io.ClassPathResource;
+
+import java.io.IOException;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,9 +31,13 @@ class ApplicationYamlTest {
     }
 
     @Test
-    void bluetoothStaysOffInTheProductionFile() {
-        runner.run(context -> assertThat(context.getEnvironment().getProperty("home-control.bluetooth.enabled"))
-                .isEqualTo("false"));
+    void bluetoothStaysOffInTheProductionFile() throws IOException {
+        // Reads the production file directly, unmerged: an override added to the test file must not make
+        // this pass vacuously, and exporting HOME_CONTROL_BLUETOOTH_ENABLED must not make it fail.
+        List<PropertySource<?>> sources = new YamlPropertySourceLoader()
+                .load("application.yaml", new ClassPathResource("application.yaml"));
+        assertThat(sources).hasSize(1);
+        assertThat(sources.getFirst().getProperty("home-control.bluetooth.enabled")).isEqualTo(false);
     }
 
     @Test
@@ -39,6 +49,7 @@ class ApplicationYamlTest {
             assertThat(environment.getProperty("home-control.ssdp.enabled")).isEqualTo("false");
             assertThat(environment.getProperty("home-control.content.rails.scheduler-enabled")).isEqualTo("false");
             assertThat(environment.getProperty("home-control.tmdb.api-base-url")).isEqualTo("http://127.0.0.1:9/3");
+            assertThat(environment.getProperty("home-control.security.secret")).isEqualTo("");
         });
     }
 }
