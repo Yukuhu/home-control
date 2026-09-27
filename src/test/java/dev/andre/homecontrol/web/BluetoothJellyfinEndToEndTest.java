@@ -145,17 +145,18 @@ class BluetoothJellyfinEndToEndTest {
 
     private void listenToEvents(Duration window) throws Exception {
         HttpClient stream = HttpClient.newBuilder().cookieHandler(cookies).build();
-        List<String> lines = new CopyOnWriteArrayList<>();
+        EventStreamReader events;
         try {
-            HttpResponse<Stream<String>> events = stream.send(get("/events").header("Accept", "text/event-stream").build(),
+            HttpResponse<Stream<String>> response = stream.send(get("/events").header("Accept", "text/event-stream").build(),
                     HttpResponse.BodyHandlers.ofLines());
-            assertThat(events.statusCode()).isEqualTo(200);
-            Thread reader = Thread.ofVirtual().start(() -> events.body().forEach(lines::add));
-            reader.join(window);
+            assertThat(response.statusCode()).isEqualTo(200);
+            events = new EventStreamReader(response);
+            assertThat(events.awaitEnd(window)).as("the event stream stays open").isFalse();
         } finally {
             stream.shutdownNow();
         }
-        browserBodies.add(String.join("\n", lines));
+        assertThat(events.awaitEnd(Duration.ofSeconds(5))).as("the event stream ends after shutdown").isTrue();
+        browserBodies.add(String.join("\n", events.lines()));
     }
 
     private List<List<String>> ipcCommands() throws IOException {

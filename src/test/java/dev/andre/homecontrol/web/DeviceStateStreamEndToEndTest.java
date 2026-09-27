@@ -21,7 +21,6 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,6 +55,7 @@ class DeviceStateStreamEndToEndTest {
     @Test
     void streamsAnInboundVolumeMessageOutAsAnSseEvent() throws Exception {
         HttpClient http = HttpClient.newHttpClient();
+        EventStreamReader events = null;
         try (FakeRemoteServer fakeA = new FakeRemoteServer(); FakeRemoteServer fakeB = new FakeRemoteServer()) {
             certificates.loadOrCreate("shield-a");
             certificates.loadOrCreate("shield-b");
@@ -66,7 +66,6 @@ class DeviceStateStreamEndToEndTest {
             await().until(() -> sessions.state("shield-a").status() == DeviceStatus.CONNECTED);
             await().until(() -> sessions.state("shield-b").status() == DeviceStatus.CONNECTED);
 
-            List<String> lines = new CopyOnWriteArrayList<>();
             HttpResponse<Stream<String>> response = http.send(
                     HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/events"))
                             .header("Accept", "text/event-stream")
@@ -74,7 +73,8 @@ class DeviceStateStreamEndToEndTest {
                             .build(),
                     HttpResponse.BodyHandlers.ofLines());
             assertThat(response.statusCode()).isEqualTo(200);
-            Thread.ofVirtual().name("sse-e2e-reader").start(() -> response.body().forEach(lines::add));
+            events = new EventStreamReader(response);
+            List<String> lines = events.lines();
 
             // Each device's snapshot must show up somewhere in the stream, but not necessarily
             // as the very first lines: a broadcast from either fake device's own connect can
@@ -93,6 +93,9 @@ class DeviceStateStreamEndToEndTest {
             // shutdownNow, not close: an SSE stream never ends by itself, and close() would
             // block waiting for this one to.
             http.shutdownNow();
+            if (events != null) {
+                events.awaitEnd(Duration.ofSeconds(5));
+            }
             sessions.forget("shield-a");
             sessions.forget("shield-b");
         }

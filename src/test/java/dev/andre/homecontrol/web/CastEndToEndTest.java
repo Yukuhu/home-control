@@ -30,7 +30,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Stream;
 
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.MEDIA;
@@ -165,9 +164,9 @@ class CastEndToEndTest {
     void theEventStreamCarriesNowPlayingWithTheDeviceId() throws Exception {
         try (FakeCastReceiver receiver = new FakeCastReceiver()) {
             devices.adopt(castDevice("cast-e2e-sse", receiver.port()));
+            EventStreamReader events = null;
             try {
                 awaitReceiverStatus("cast-e2e-sse");
-                List<String> lines = new CopyOnWriteArrayList<>();
                 HttpResponse<Stream<String>> response = http.send(
                         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/events"))
                                 .header("Accept", "text/event-stream")
@@ -175,7 +174,8 @@ class CastEndToEndTest {
                                 .build(),
                         HttpResponse.BodyHandlers.ofLines());
                 assertThat(response.statusCode()).isEqualTo(200);
-                Thread.ofVirtual().name("cast-sse-reader").start(() -> response.body().forEach(lines::add));
+                events = new EventStreamReader(response);
+                List<String> lines = events.lines();
                 await().until(() -> lines.stream().anyMatch(line -> line.contains("\"deviceId\":\"cast-e2e-sse\"")));
 
                 receiver.runApp(FakeCastReceiver.DEFAULT_MEDIA_RECEIVER, "Default Media Receiver");
@@ -188,6 +188,9 @@ class CastEndToEndTest {
                 // shutdownNow, not close: an SSE stream never ends by itself, and close() would
                 // block waiting for this one to (mirrors DeviceStateStreamEndToEndTest).
                 http.shutdownNow();
+                if (events != null) {
+                    events.awaitEnd(Duration.ofSeconds(5));
+                }
                 devices.forget("cast-e2e-sse");
             }
         }
