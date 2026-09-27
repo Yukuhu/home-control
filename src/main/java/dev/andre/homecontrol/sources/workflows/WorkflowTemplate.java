@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 
 /** One validated media URL template, tokenized once for expansion and safe preview. */
 public final class WorkflowTemplate {
-    private static final Pattern VARIABLE = Pattern.compile("\\{([A-Za-z][A-Za-z0-9_]{0,31})\\}");
+    private static final Pattern VARIABLE = Pattern.compile("\\{([A-Za-z]\\w{0,31})\\}");
     private static final int MAX_URL = 8_192;
     private final String template;
     private final List<Token> tokens;
@@ -100,24 +100,25 @@ public final class WorkflowTemplate {
         String literal = token.text();
         boolean masked = false;
         for (int i = 0; i < literal.length(); i++) {
-            int position = token.start() + i;
             char c = literal.charAt(i);
-            if (position < pathStart || (pathStart < 0 && (queryStart < 0 || position < queryStart))) {
+            if (shownInPreview(c, token.start() + i)) {
                 out.append(c);
                 masked = false;
-            } else if (queryStart < 0 || position < queryStart) {
-                if (c == '/') { out.append(c); masked = false; }
-                else if (!masked) { out.append("•••"); masked = true; }
-            } else {
-                int fieldStart = Math.max(template.lastIndexOf('&', position), queryStart);
-                int equals = template.indexOf('=', fieldStart + 1);
-                boolean delimiter = c == '?' || c == '&' || (c == '=' && position == equals);
-                if (delimiter) { out.append(c); masked = false; continue; }
-                boolean queryName = equals < 0 || position < equals;
-                if (queryName) { out.append(c); masked = false; }
-                else if (!masked) { out.append("•••"); masked = true; }
+            } else if (!masked) {
+                out.append("•••");
+                masked = true;
             }
         }
+    }
+
+    /** Scheme, authority, path separators, query delimiters and query names show; path and query values do not. */
+    private boolean shownInPreview(char c, int position) {
+        if (position < pathStart || (pathStart < 0 && (queryStart < 0 || position < queryStart))) return true;
+        if (queryStart < 0 || position < queryStart) return c == '/';
+        int fieldStart = Math.max(template.lastIndexOf('&', position), queryStart);
+        int equals = template.indexOf('=', fieldStart + 1);
+        boolean delimiter = c == '?' || c == '&' || (c == '=' && position == equals);
+        return delimiter || equals < 0 || position < equals;
     }
 
     static String encodeComponent(String value) {

@@ -36,6 +36,8 @@ public final class WorkflowStore {
     private final ReentrantLock writes = new ReentrantLock();
     /** A bounded set of locks also covers the final dispatch callback. */
     private final ReentrantLock[] stripes = new ReentrantLock[LOCK_STRIPE_COUNT];
+    // Immutable snapshot replaced wholesale under writes; readers only need visibility, never a read-modify-write.
+    @SuppressWarnings("java:S3077")
     private volatile Snapshot snapshot;
 
     public WorkflowStore(SecretStore secrets, LoginService login, WorkflowCodec codec,

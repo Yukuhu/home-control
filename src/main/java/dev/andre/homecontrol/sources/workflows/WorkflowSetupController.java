@@ -11,6 +11,7 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.DirectFieldBindingResult;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ExtendedServletRequestDataBinder;
@@ -36,8 +37,8 @@ public final class WorkflowSetupController {
             "includeSubtitlePointer", "includeArtworkPointer", "urlMode", "url", "templateMode", "template", "mimeType",
             "headersMode", "expectedRevision", "loginPassword", "loginPasswordConfirmation");
     private static final Set<String> CHECKBOXES = Set.of(ENABLED, "includeSubtitlePointer", "includeArtworkPointer");
-    private static final Pattern VARIABLE = Pattern.compile("variables\\[(0|[1-9][0-9]?)\\]\\.(name|scope|pointer|sensitive)");
-    private static final Pattern HEADER = Pattern.compile("headers\\[(0|[1-9][0-9]?)\\]\\.(name|value)");
+    private static final Pattern VARIABLE = Pattern.compile("variables\\[(0|[1-9]\\d?)\\]\\.(name|scope|pointer|sensitive)");
+    private static final Pattern HEADER = Pattern.compile("headers\\[(0|[1-9]\\d?)\\]\\.(name|value)");
     public record ErrorView(String target, String message) {}
     private final WorkflowStore store;
     private final LoginService login;
@@ -258,15 +259,7 @@ public final class WorkflowSetupController {
     private String editor(String id, WorkflowForm form, BindingResult original, Model model) {
         form.clearSecrets();
         var safe = new DirectFieldBindingResult(form, WORKFLOW_FORM);
-        List<ErrorView> errors = new ArrayList<>();
-        if (original != null) for (var error : original.getAllErrors()) {
-            String field = error instanceof FieldError f && safeField(f.getField()) ? ((FieldError) error).getField() : null;
-            String message = (error instanceof FieldError f && f.isBindingFailure()) ? "Choose a valid value for this field." : error.getDefaultMessage();
-            // Never retain rejected values, formatter arguments, causes, or user-selected message codes.
-            if (field == null) safe.reject(INVALID, message);
-            else safe.addError(new FieldError(WORKFLOW_FORM, field, null, false, new String[]{INVALID}, null, message));
-            errors.add(new ErrorView(field == null ? "workflow-form" : fieldId(field), message));
-        }
+        List<ErrorView> errors = original == null ? List.of() : copySafely(original, safe);
         model.addAttribute(WORKFLOW_FORM, form);
         model.addAttribute(BindingResult.MODEL_KEY_PREFIX + WORKFLOW_FORM, safe);
         model.addAttribute("workflowId", id);
@@ -274,10 +267,37 @@ public final class WorkflowSetupController {
         model.addAttribute("errors", List.copyOf(errors));
         return VIEW;
     }
+
+    /** Never retains rejected values, formatter arguments, causes, or user-selected message codes. */
+    private static List<ErrorView> copySafely(BindingResult original, BindingResult safe) {
+        List<ErrorView> errors = new ArrayList<>();
+        for (var error : original.getAllErrors()) {
+            String field = error instanceof FieldError f && safeField(f.getField()) ? f.getField() : null;
+            String message = safeMessage(error);
+            if (field == null) safe.reject(INVALID, message);
+            else safe.addError(new FieldError(WORKFLOW_FORM, field, null, false, new String[]{INVALID}, null, message));
+            errors.add(new ErrorView(field == null ? "workflow-form" : fieldId(field), message));
+        }
+        return errors;
+    }
+
+    private static String safeMessage(ObjectError error) {
+        if (error instanceof FieldError f && f.isBindingFailure()) return "Choose a valid value for this field.";
+        String message = error.getDefaultMessage();
+        return message == null ? "Check the form and try again." : message;
+    }
+
     /** Domain diagnostics choose a field only; their text/arguments are never copied to the view. */
     private static String validationField(WorkflowException failure, WorkflowForm form) {
         if (failure.stage() == WorkflowException.Stage.BUILD) return "templateMode";
         String detail = failure.getMessage();
+        String field = scalarField(detail);
+        if (field == null) field = variableField(detail, form);
+        if (field == null && detail.contains("header")) field = "headersMode";
+        return field;
+    }
+
+    private static String scalarField(String detail) {
         if (detail.contains("fetch URL")) return "url";
         if (detail.contains("media type")) return "mimeType";
         if (detail.contains("artwork URL")) return "artwork";
@@ -290,6 +310,10 @@ public final class WorkflowSetupController {
         if (detail.contains("entry title pointer")) return "titlePointer";
         if (detail.contains("entry subtitle pointer")) return "subtitlePointer";
         if (detail.contains("entry artwork pointer")) return "artworkPointer";
+        return null;
+    }
+
+    private static String variableField(String detail, WorkflowForm form) {
         for (int i = 0; i < form.variables.size(); i++) {
             var row = form.variables.get(i);
             if (row.name == null || !row.name.matches("[A-Za-z]\\w{0,31}")) return VARIABLE_PREFIX + i + "].name";
@@ -297,7 +321,6 @@ public final class WorkflowSetupController {
             if (detail.equals("Workflow: invalid mapping scope: " + row.name)) return VARIABLE_PREFIX + i + "].scope";
             if (detail.equals("Workflow: duplicate mapping name: " + row.name)) return VARIABLE_PREFIX + i + "].name";
         }
-        if (detail.contains("header")) return "headersMode";
         return null;
     }
 

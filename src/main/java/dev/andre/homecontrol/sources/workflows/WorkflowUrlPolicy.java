@@ -66,7 +66,8 @@ public final class WorkflowUrlPolicy {
     }
 
     private static int port(URI uri) {
-        return uri.getPort() >= 0 ? uri.getPort() : "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
+        if (uri.getPort() >= 0) return uri.getPort();
+        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
     }
 
     private static WorkflowException invalidUrl() {
