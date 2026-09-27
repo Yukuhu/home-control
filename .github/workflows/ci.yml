@@ -669,3 +669,26 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
         run: scripts/publish-images.sh "$RUNNER_TEMP/digests" amd64,arm64
 
+  ci-passed:
+    name: CI passed
+    # The one check that main requires. It passes only if every job it needs passed, or was
+    # left out on purpose, so a new job is enforced by adding it here rather than to the
+    # repository's settings. The release jobs are not checks and are not needed.
+    if: always()
+    needs: [jar, test, e2e, sonar, image, smoke, smoke-bluetooth, dependencies]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the result of every job
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS_JSON"
+          # A job is skipped when a job it needs failed, which fails this one anyway, or when
+          # its own condition leaves it out, as for the dependencies of a fork's pull request.
+          failed=$(jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key]
+            | join(", ")' <<< "$NEEDS_JSON")
+          if [[ -n "$failed" ]]; then
+            echo "::error::Not passed: $failed"
+            exit 1
+          fi

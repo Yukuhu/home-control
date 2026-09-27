@@ -752,10 +752,14 @@ restore that file as `devices.json`, and start the older image.
 
 The `SonarCloud quality gate` job scans the results of the `Build and test` and
 `Browser tests` jobs with SonarCloud. On pull requests, it waits for the quality gate, so a
-failed scan, failed gate, or missing `SONAR_TOKEN` makes the required check red. Main-branch
+failed scan, failed gate, or missing `SONAR_TOKEN` fails the job. Main-branch
 scans update the analysis baseline without waiting for the gate. Keep `SONAR_TOKEN` in both
 the GitHub Actions and Dependabot secret stores. GitHub does not provide that secret to fork
 pull requests, so their build stays red until a separate scan path is configured.
+
+`main` requires one check, `CI passed`. It passes only if every other job passed or was left
+out on purpose, so a job is enforced by adding it to that job's `needs` in
+`.github/workflows/ci.yml`, not in the repository's settings.
 
 After every pull request run, CI comments the results on the pull request: the test counts
 of both suites, each failed test with its message, the quality gate with the conditions that
