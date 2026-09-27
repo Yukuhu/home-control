@@ -7,6 +7,8 @@
 <title>Home Control · Workflow</title>
 <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" th:href="@{/app.css}">
+<link rel="stylesheet" th:href="@{/themes/cyberpunk.css}">
+<script th:src="@{/js/theme.js}"></script>
 <script type="module" th:src="@{/js/workflows.js}">
 </script>
 </head>
@@ -18,6 +20,7 @@
         <a th:href="@{/}">Home</a>
         <a th:href="@{/setup}" aria-current="page">Setup</a>
     </nav>
+    <button th:replace="~{fragments/theme-toggle :: toggle}"></button>
 </header>
 <main id="main-content" class="setup workflow-editor">
 <div class="page-heading">

@@ -72,6 +72,26 @@ class LoginGatingE2eTest extends E2eApplicationTest {
     }
 
     @BrowserTest
+    void theLoginPageKeepsTheChosenThemeWithoutASession(String browser) {
+        try (BrowserSession session = open(browser)) {
+            session.context().addInitScript("localStorage.setItem('homecontrol.theme.v1', 'cyberpunk')");
+            Page page = session.page();
+            page.navigate("/?device=living");
+            assertThat(page).hasURL(Pattern.compile(".*/login.*"));
+            assertThat(page.locator("html")).hasAttribute("data-theme", "cyberpunk");
+            assertThat(page.locator("body")).hasCSS("background-color", "rgb(7, 8, 13)");
+            org.assertj.core.api.Assertions.assertThat(page.evaluate("""
+                    async () => {
+                        await document.fonts.ready;
+                        return document.fonts.check('500 16px Rajdhani') && document.fonts.check('700 16px Rajdhani');
+                    }
+                    """)).as("The theme's fonts load before logging in").isEqualTo(true);
+            page.screenshot(new Page.ScreenshotOptions().setPath(java.nio.file.Path.of(
+                    System.getProperty("e2e.artifacts", "build/e2e-artifacts"), "ui-cyberpunk-login-" + browser + ".png")));
+        }
+    }
+
+    @BrowserTest
     void pwaFilesStayReachableWithoutASession(String browser) {
         try (BrowserSession session = open(browser)) {
             APIRequestContext api = session.context().request();

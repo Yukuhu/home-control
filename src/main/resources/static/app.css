@@ -47,6 +47,10 @@ p { margin-bottom: 1rem; }
 .connection-status { margin-left: auto; color: var(--muted); font-size: .75rem; white-space: nowrap; }
 .connection-status::before { content: ''; display: inline-block; height: 6px; width: 6px; border-radius: 50%; background: #d2b87c; margin-right: .5rem; }
 .connection-status.connected::before { background: var(--accent); box-shadow: 0 0 0 4px #b7e6a009; }
+/* Theme switch (js/theme.js); the Cyberpunk theme itself lives in themes/cyberpunk.css. */
+.theme-toggle { flex: none; gap: .5rem; padding: .5rem .85rem; background: transparent; color: var(--muted); font-size: .8rem; }
+.theme-toggle:hover { color: var(--fg); }
+.theme-toggle .control-icon { width: 18px; height: 18px; }
 main#content { max-width: 1600px; margin: 0 auto; padding: 3.25rem clamp(1.25rem, 4vw, 4rem) calc(4rem + var(--safe-bottom)); }
 .page-heading { margin-bottom: 2.6rem; }
 .page-heading > p, .page-heading > div > p:not(.eyebrow) { color: var(--muted); margin: 0; }
@@ -266,8 +270,16 @@ html:has(.drawer:modal), body:has(.drawer:modal) { overflow: hidden; }
     .drawer[data-mode=touchpad] .remote-body { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1rem; align-items: start; }
     .drawer[data-mode=touchpad] .touchpad { height: 55dvh; }
 }
+@media (min-width: 48rem) {
+    .connection-status + .theme-toggle { margin-left: -1.25rem; }
+    .header-nav + .theme-toggle { margin-left: auto; }
+}
 @media (max-width: 47.999rem) {
     .app-header { min-height: 74px; gap: 1rem; padding-inline: 1.25rem; }
+    /* Phones: an icon-sized switch; a waiting connection status wraps below it. */
+    .theme-toggle { width: 44px; padding: 0; }
+    .theme-toggle-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .connection-status { order: 1; }
     .brand { font-size: 1rem; gap: .6rem; }
     .brand-mark { width: 32px; height: 32px; font-size: 1.5rem; }
     .header-nav { margin-left: auto; }
@@ -356,6 +368,10 @@ html:has(.drawer:modal), body:has(.drawer:modal) { overflow: hidden; }
     .source-preferences > li > form:last-child { justify-content: flex-start; }
     .source-preferences form > label { flex: 0 1 auto; }
     .rail-preferences > li > span { flex-basis: 100%; }
+}
+/* Narrow phones: the house mark alone links home, leaving room for the nav and the theme switch. */
+@media (max-width: 26.999rem) {
+    .app-header .brand > span:last-child { display: none; }
 }
 @media (max-width: 22rem) {
     .app-header { gap: .6rem; padding-inline: .9rem; }

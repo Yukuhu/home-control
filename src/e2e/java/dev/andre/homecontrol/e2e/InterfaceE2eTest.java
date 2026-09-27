@@ -220,17 +220,24 @@ class InterfaceE2eTest extends E2eApplicationTest {
 
     @BrowserTest
     void dashboardRemoteAndSetupFitANarrowPhone(String browser) {
-        verifyLayouts(browser, 320, 740);
+        verifyLayouts(browser, 320, 740, "default");
     }
 
     @BrowserTest
     void dashboardRemoteAndSetupFitAPhone(String browser) {
-        verifyLayouts(browser, 390, 844);
+        verifyLayouts(browser, 390, 844, "default");
     }
 
     @BrowserTest
     void dashboardRemoteAndSetupFitADesktop(String browser) {
-        verifyLayouts(browser, 1440, 1000);
+        verifyLayouts(browser, 1440, 1000, "default");
+    }
+
+    @BrowserTest
+    void theCyberpunkThemeFitsANarrowPhoneAPhoneAndADesktop(String browser) {
+        verifyLayouts(browser, 320, 740, "cyberpunk");
+        verifyLayouts(browser, 390, 844, "cyberpunk");
+        verifyLayouts(browser, 1440, 1000, "cyberpunk");
     }
 
     @BrowserTest
@@ -262,11 +269,14 @@ class InterfaceE2eTest extends E2eApplicationTest {
         }
     }
 
-    private void verifyLayouts(String browser, int width, int height) {
+    private void verifyLayouts(String browser, int width, int height, String theme) {
         try (BrowserSession session = open(browser)) {
+            session.context().addInitScript("localStorage.setItem('homecontrol.theme.v1', '" + theme + "')");
             Page page = session.page();
             page.setViewportSize(width, height);
             page.navigate("/?device=living");
+            assertThat(page.locator("html")).hasAttribute("data-theme", theme);
+            String prefix = theme.equals("default") ? "" : theme + "-";
             Locator tile = page.locator("button.tile[data-item='clip-1']");
             assertThat(tile).isVisible();
             BoundingBox tileBounds = tile.boundingBox();
@@ -277,20 +287,22 @@ class InterfaceE2eTest extends E2eApplicationTest {
             assertNoPageOverflow(page);
             assertInsideViewport(page.locator("#search-q"), width);
             assertInsideViewport(page.locator(".drawer-toggle"), width);
-            screenshot(page, browser, width, "dashboard");
+            assertInsideViewport(page.locator(".theme-toggle"), width);
+            screenshot(page, browser, width, prefix + "dashboard");
 
             page.locator(".drawer-toggle").click();
             assertThat(page.locator("#remote-drawer")).isVisible();
             assertNoPageOverflow(page);
             assertInsideViewport(page.locator("#remote-drawer"), width);
-            screenshot(page, browser, width, "drawer");
+            screenshot(page, browser, width, prefix + "drawer");
 
             page.navigate("/setup");
             assertNoPageOverflow(page);
             for (Locator field : visibleFields(page).all()) {
                 assertInsideViewport(field, width);
             }
-            screenshot(page, browser, width, "setup");
+            assertInsideViewport(page.locator(".theme-toggle"), width);
+            screenshot(page, browser, width, prefix + "setup");
         }
     }
 
@@ -336,7 +348,7 @@ class InterfaceE2eTest extends E2eApplicationTest {
                 "ui-" + view + "-" + width + "-" + browser + ".png");
         page.screenshot(new Page.ScreenshotOptions().setPath(path).setFullPage(true)
                 .setAnimations(ScreenshotAnimations.DISABLED));
-        if (view.equals("setup") || view.equals("first-run")) {
+        if (view.endsWith("setup") || view.equals("first-run")) {
             page.screenshot(new Page.ScreenshotOptions().setPath(path.resolveSibling(
                     "ui-" + view + "-" + width + "-" + browser + "-viewport.png"))
                     .setAnimations(ScreenshotAnimations.DISABLED));

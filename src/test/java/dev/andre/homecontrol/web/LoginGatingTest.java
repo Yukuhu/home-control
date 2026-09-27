@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -240,6 +241,23 @@ class LoginGatingTest {
 
         mockMvc.perform(get("/sw.js")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/js/touchpad.js")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void theLoginPageCanShowTheChosenThemeBeforeLoggingIn() throws Exception {
+        storeAFirstSecret();
+
+        mockMvc.perform(get("/login")).andExpect(status().isOk())
+                .andExpect(content().string(allOf(containsString("href=\"/themes/cyberpunk.css\""),
+                        containsString("src=\"/js/theme.js\""))));
+        for (String path : new String[] {"/themes/cyberpunk.css", "/js/theme.js",
+                "/themes/fonts/rajdhani-500.woff2", "/themes/fonts/rajdhani-700.woff2"}) {
+            mockMvc.perform(get(path)).andExpect(status().isOk());
+        }
+
+        mockMvc.perform(get("/themes/fonts/OFL.txt")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(URI.create("/themes/..;/setup"))).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(URI.create("/js/theme.js;x"))).andExpect(status().isUnauthorized());
     }
 
     /**

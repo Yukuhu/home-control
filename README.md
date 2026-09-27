@@ -105,6 +105,12 @@ installed app's own icon need HTTPS, typically through a reverse proxy.
 The **Setup** page groups devices, content connections, dashboard preferences, and app
 installation with section navigation. Forms stack on smaller screens and have visible labels.
 
+The **Cyberpunk** button in the header switches every page between the default look and a
+Cyberpunk theme inspired by the Cyberpunk 2077 game UI — neon red lines, cyan highlights and
+chamfered corners. It switches instantly without reloading, is remembered per browser, and
+other open tabs follow along. On phones the button is a chip icon, and on narrow ones the
+header shows only the house mark beside the navigation.
+
 Keyboard shortcuts on a desktop browser work when no button or form field is focused: arrow keys and Enter drive the D-pad,
 Backspace is Back, Space is Play/Pause, `h` is Home and `m` toggles mute, aimed at whichever
 device is selected.
@@ -794,7 +800,9 @@ docker build -t home-control:smoke . && scripts/smoke-test-image.sh home-control
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The Cyberpunk theme bundles the Rajdhani font by the Indian Type
+Foundry under the SIL Open Font License 1.1 (see
+[`OFL.txt`](src/main/resources/static/themes/fonts/OFL.txt)).
 
 ## Security
 
