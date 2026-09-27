@@ -49,7 +49,7 @@ public final class IcsParser {
         if (text == null) {
             throw new IcsFormatException(NOT_A_CALENDAR);
         }
-        String body = text.startsWith("﻿") ? text.substring(1) : text;
+        String body = text.startsWith("\uFEFF") ? text.substring(1) : text;
         CalendarReader reader = new CalendarReader();
         for (String raw : unfold(body)) {
             ContentLine line = raw.isBlank() ? null : contentLine(raw);
@@ -133,6 +133,9 @@ public final class IcsParser {
         return value;
     }
 
+    // Reads one VEVENT with the value helpers below; moving it into CalendarReader would drag them all along and
+    // turn the nesting walker into the whole parser.
+    @SuppressWarnings("java:S3398")
     private static IcsEvent event(List<ContentLine> lines) {
         String uid = null;
         String summary = null;
