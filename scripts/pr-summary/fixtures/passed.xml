@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.andre.homecontrol.adapters.androidtv.MdnsDiscoveryTest" tests="3" skipped="1" failures="0" errors="0" timestamp="2026-09-27T08:48:37.038Z" hostname="runner" time="0.412">
+  <properties/>
+  <testcase name="findsADeviceOnTheLocalNetwork()" classname="dev.andre.homecontrol.adapters.androidtv.MdnsDiscoveryTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="usesTheAndroidTvRemoteServiceType()" classname="dev.andre.homecontrol.adapters.androidtv.MdnsDiscoveryTest" time="0.004"/>
+  <testcase name="mediaWithoutAKnownPositionShowsItsLengthOnly(String) [&quot;chromium&quot;]" classname="dev.andre.homecontrol.adapters.androidtv.MdnsDiscoveryTest" time="1.175"/>
+  <system-out><![CDATA[10:55:18.000 [Test worker] INFO <not a tag> & not an entity]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

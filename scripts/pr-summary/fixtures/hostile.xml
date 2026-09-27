@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="x.HostileTest" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-09-27T08:48:37.038Z" hostname="runner" time="0.1">
+  <testcase name="a`b``c() @Yukuhu" classname="x.&lt;img src=x&gt;HostileTest" time="0.1">
+    <failure message="```&#10;&lt;/details&gt; @Yukuhu **bold** &lt;script&gt;alert(1)&lt;/script&gt;" type="T">first
+````
+&lt;/details&gt; @Yukuhu [link](https://example.com)
+</failure>
+  </testcase>
+</testsuite>

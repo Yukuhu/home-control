@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="x.CrashedTest" tests="2" skipped="0" failures="0" errors="0">
+  <testcase name="a()" classname="x.CrashedTest" time="0.1"/>
+  <testcase name="b()" classname="x.Cras

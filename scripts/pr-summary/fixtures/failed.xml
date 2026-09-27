@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.andre.homecontrol.adapters.androidtv.AndroidTvSessionTest" tests="4" skipped="0" failures="2" errors="1" timestamp="2026-09-27T08:48:37.038Z" hostname="runner" time="1.457">
+  <properties/>
+  <testcase name="executesAKeyPressOnceConnected()" classname="dev.andre.homecontrol.adapters.androidtv.AndroidTvSessionTest" time="0.391"/>
+  <testcase name="reportsInferredPlaybackAfterLaunch()" classname="dev.andre.homecontrol.adapters.androidtv.AndroidTvSessionTest" time="0.021">
+    <failure message="org.opentest4j.AssertionFailedError: expected: &lt;PLAYING&gt; but was: &lt;IDLE&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: expected: &lt;PLAYING&gt; but was: &lt;IDLE&gt;
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at dev.andre.homecontrol.adapters.androidtv.AndroidTvSessionTest.reportsInferredPlaybackAfterLaunch(AndroidTvSessionTest.java:88)
+</failure>
+  </testcase>
+  <testcase name="reconnectsAfterATimeout()" classname="dev.andre.homecontrol.adapters.androidtv.AndroidTvSessionTest" time="0.2">
+    <error message="java.lang.IllegalStateException: socket closed" type="java.lang.IllegalStateException">java.lang.IllegalStateException: socket closed
+	at dev.andre.homecontrol.adapters.androidtv.AndroidTvSession.send(AndroidTvSession.java:140)
+</error>
+  </testcase>
+  <testcase name="failsWithoutSayingWhy()" classname="dev.andre.homecontrol.adapters.androidtv.AndroidTvSessionTest" time="0.1">
+    <failure/>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
