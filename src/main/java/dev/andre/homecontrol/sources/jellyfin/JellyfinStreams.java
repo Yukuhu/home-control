@@ -75,22 +75,26 @@ public class JellyfinStreams {
         Map<String, String> types = audio ? AUDIO_TYPES : VIDEO_TYPES;
         String itemId = JellyfinClient.id(item.path("Id").asString(""));
         for (JsonNode source : info.path("MediaSources")) {
-            String mediaSourceId = source.path("Id").asString("");
-            if (!source.path("SupportsDirectPlay").asBoolean(false) || mediaSourceId.isBlank()) {
-                continue;
+            Optional<String> container = directContainer(source, types);
+            if (container.isPresent()) {
+                String mediaSourceId = source.path("Id").asString("");
+                String url = deviceServerUrl + (audio ? "/Audio/" : "/Videos/") + itemId + "/stream." + container.get()
+                        + "?static=true&mediaSourceId=" + encode(mediaSourceId) + "&ApiKey=" + encode(token);
+                return Optional.of(new PlayableRef.StreamUrl(URI.create(url), types.get(container.get())));
             }
-            Optional<String> container = Arrays.stream(source.path("Container").asString("").split(","))
-                    .map(part -> part.strip().toLowerCase(Locale.ROOT))
-                    .filter(types::containsKey)
-                    .findFirst();
-            if (container.isEmpty()) {
-                continue;
-            }
-            String url = deviceServerUrl + (audio ? "/Audio/" : "/Videos/") + itemId + "/stream." + container.get()
-                    + "?static=true&mediaSourceId=" + encode(mediaSourceId) + "&ApiKey=" + encode(token);
-            return Optional.of(new PlayableRef.StreamUrl(URI.create(url), types.get(container.get())));
         }
         return Optional.empty();
+    }
+
+    /** The first container of {@code types} a source can be played in as is; empty when it cannot be direct-played. */
+    private static Optional<String> directContainer(JsonNode source, Map<String, String> types) {
+        if (!source.path("SupportsDirectPlay").asBoolean(false) || source.path("Id").asString("").isBlank()) {
+            return Optional.empty();
+        }
+        return Arrays.stream(source.path("Container").asString("").split(","))
+                .map(part -> part.strip().toLowerCase(Locale.ROOT))
+                .filter(types::containsKey)
+                .findFirst();
     }
 
     private static void directPlay(ArrayNode profiles, String container, String type, String videoCodec, String audioCodec) {
