@@ -86,8 +86,8 @@ class DeviceManagerExecuteTest {
         androidtv.handles.get("shield").failure = new DeviceOfflineException("Shield must be paired again");
         cast.handles.get("shield").failure = new UnsupportedActionException("not this one");
 
-        var failingAction89 = new Action.SetVolume(5);
-        assertThatThrownBy(() -> manager.execute("shield", failingAction89))
+        var setVolume = new Action.SetVolume(5);
+        assertThatThrownBy(() -> manager.execute("shield", setVolume))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("paired again");
     }
@@ -97,8 +97,8 @@ class DeviceManagerExecuteTest {
         androidtv.handles.get("shield").failure = new UnsupportedActionException("first reason");
         cast.handles.get("shield").failure = new UnsupportedActionException("last reason");
 
-        var failingAction99 = new Action.SetVolume(5);
-        assertThatThrownBy(() -> manager.execute("shield", failingAction99))
+        var setVolume = new Action.SetVolume(5);
+        assertThatThrownBy(() -> manager.execute("shield", setVolume))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("last reason");
     }
@@ -107,8 +107,8 @@ class DeviceManagerExecuteTest {
     void aRefusalByTheDeviceIsFinal() {
         androidtv.handles.get("shield").failure = new ActionFailedException("Shield refused");
 
-        var failingAction108 = new Action.SetVolume(5);
-        assertThatThrownBy(() -> manager.execute("shield", failingAction108))
+        var setVolume = new Action.SetVolume(5);
+        assertThatThrownBy(() -> manager.execute("shield", setVolume))
                 .isInstanceOf(ActionFailedException.class);
         assertThat(cast.handles.get("shield").executed).isEmpty();
     }
@@ -135,12 +135,12 @@ class DeviceManagerExecuteTest {
         manager = new DeviceManager(registry, List.of(broken, cast), event -> { });
         manager.start();
 
-        var failingAction135 = new Action.SetVolume(5);
-        assertThatThrownBy(() -> manager.execute("shield", failingAction135))
+        var setVolume = new Action.SetVolume(5);
+        assertThatThrownBy(() -> manager.execute("shield", setVolume))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("Shield is not connected");
-        var failingAction138 = new Action.OpenAppLink(URI.create("https://a.example"));
-        assertThatThrownBy(() -> manager.execute("shield", failingAction138))
+        var openLink = new Action.OpenAppLink(URI.create("https://a.example"));
+        assertThatThrownBy(() -> manager.execute("shield", openLink))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -164,8 +164,8 @@ class DeviceManagerExecuteTest {
 
             // Only when nobody could stop is the failure reported.
             upnp.handles.get("tv").failure = new DeviceOfflineException("gone");
-            var failingAction162 = new Action.Stop();
-            assertThatThrownBy(() -> both.execute("tv", failingAction162)).isInstanceOf(ActionFailedException.class);
+            var stop = new Action.Stop();
+            assertThatThrownBy(() -> both.execute("tv", stop)).isInstanceOf(ActionFailedException.class);
         } finally {
             both.close();
         }
@@ -200,8 +200,8 @@ class DeviceManagerExecuteTest {
                     new Action.Pause(), new Action.Resume(), new Action.Stop(),
                     new Action.SetVolume(20), new Action.Mute(true));
 
-            var failingAction197 = new Action.PressKey(RemoteKey.HOME);
-            assertThatThrownBy(() -> speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", failingAction197))
+            var pressHome = new Action.PressKey(RemoteKey.HOME);
+            assertThatThrownBy(() -> speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", pressHome))
                     .isInstanceOf(UnsupportedActionException.class);
         } finally {
             speakers.close();
@@ -220,8 +220,8 @@ class DeviceManagerExecuteTest {
             speakers.execute("speaker", new Action.Stop());
 
             assertThat(upnp.handles.get("speaker").executed).containsExactly(new Action.Stop());
-            var failingAction216 = new Action.PressKey(RemoteKey.HOME);
-            assertThatThrownBy(() -> speakers.execute("speaker", failingAction216))
+            var pressHome = new Action.PressKey(RemoteKey.HOME);
+            assertThatThrownBy(() -> speakers.execute("speaker", pressHome))
                     .isInstanceOf(UnsupportedActionException.class);
         } finally {
             speakers.close();
