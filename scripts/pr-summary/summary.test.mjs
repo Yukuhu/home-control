@@ -535,7 +535,7 @@ test("hostile test output cannot leave its code spans and blocks", async () => {
 const environment = {
     NEEDS_JSON: JSON.stringify({
         test: { result: "failure", outputs: {} }, "e2e-chromium": { result: "success", outputs: {} },
-        "e2e-webkit": { result: "success", outputs: {} },
+        "e2e-firefox": { result: "success", outputs: {} }, "e2e-webkit": { result: "success", outputs: {} },
         sonar: { result: "skipped", outputs: {} }, image: { result: "success", outputs: {} },
         jar: { result: "success", outputs: {} },
         smoke: { result: "success", outputs: {} }, "smoke-bluetooth": { result: "success", outputs: {} },
@@ -556,7 +556,7 @@ const environment = {
 
 test("the model is built from the needs context, the job list and the environment", () => {
     const suites = { test: suite({ failed: 1 }), "e2e-chromium": suite({ passed: 59 }),
-        "e2e-webkit": suite({ passed: 59 }) };
+        "e2e-firefox": suite({ passed: 57 }), "e2e-webkit": suite({ passed: 59 }) };
     const built = buildModel({ env: environment, suites, gate: null, now: Date.parse("2026-09-27T09:08:46Z") });
     assert.equal(built.headSha, HEAD);
     assert.equal(built.runNumber, 413);
@@ -569,14 +569,15 @@ test("the model is built from the needs context, the job list and the environmen
     assert.equal(built.durationSeconds, 580);
     assert.equal(built.sonarUrl, SONAR_URL);
     assert.deepEqual(built.checks.map((check) => [check.key, check.result]), [
-        ["jar", "success"], ["test", "failure"], ["e2e-chromium", "success"], ["e2e-webkit", "success"],
-        ["sonar", "skipped"], ["image", "success"],
+        ["jar", "success"], ["test", "failure"], ["e2e-chromium", "success"], ["e2e-firefox", "success"],
+        ["e2e-webkit", "success"], ["sonar", "skipped"], ["image", "success"],
         ["smoke", "success"], ["smoke-bluetooth", "success"], ["dependencies", "success"], ["codeql", "success"],
     ]);
     const check = (key) => built.checks.find((entry) => entry.key === key);
     assert.equal(check("test").logUrl, "https://example.test/job/1");
     assert.equal(check("e2e-chromium").logUrl, undefined);
     assert.equal(check("test").suite, suites.test);
+    assert.equal(check("e2e-firefox").suite, suites["e2e-firefox"]);
     assert.equal(check("e2e-webkit").suite, suites["e2e-webkit"]);
     assert.equal(check("sonar").suite, undefined);
 });
@@ -629,9 +630,11 @@ test("a vulnerable dependency fails the run and links to the log of its job", ()
 
 test("main writes the comment and asks SonarCloud only when the sonar job ran", async (t) => {
     const root = await directory(t, "failed.xml");
+    const firefox = await directory(t, "passed.xml");
     const webkit = await directory(t, "passed.xml");
     const env = { ...environment, JUNIT_TEST_DIR: root, JUNIT_E2E_CHROMIUM_DIR: path.join(root, "absent"),
-        JUNIT_E2E_WEBKIT_DIR: webkit, SUMMARY_FILE: path.join(root, "summary.md"), SONAR_TOKEN: "secret" };
+        JUNIT_E2E_FIREFOX_DIR: firefox, JUNIT_E2E_WEBKIT_DIR: webkit, SUMMARY_FILE: path.join(root, "summary.md"),
+        SONAR_TOKEN: "secret" };
     let requests = 0;
     const fetch = async (url) => {
         requests++;
@@ -644,6 +647,7 @@ test("main writes the comment and asks SonarCloud only when the sonar job ran", 
     const skipped = await readFile(env.SUMMARY_FILE, "utf8");
     assert.match(skipped, /\| Unit and integration tests \| ❌ 3 failed, 1 passed \|/);
     assert.match(skipped, /\| Browser tests \(Chromium\) \| ✅ \|/);
+    assert.match(skipped, /\| Browser tests \(Firefox\) \| ✅ 2 passed, 1 skipped \|/);
     assert.match(skipped, /\| Browser tests \(WebKit\) \| ✅ 2 passed, 1 skipped \|/);
     assert.match(skipped, /⏭️ not run, because tests failed/);
 

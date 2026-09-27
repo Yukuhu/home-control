@@ -147,7 +147,7 @@ val e2eTest by tasks.registering(Test::class) {
     shouldRunAfter(tasks.test)
     // Fail fast with a clear error instead of downloading browsers in the middle of a test run.
     environment("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1")
-    systemProperty("e2e.browsers", (findProperty("e2eBrowsers") as String?) ?: "chromium,webkit")
+    systemProperty("e2e.browsers", (findProperty("e2eBrowsers") as String?) ?: "chromium,firefox,webkit")
     systemProperty("e2e.artifacts", layout.buildDirectory.dir("e2e-artifacts").get().asFile.absolutePath)
     val browserCoverage = providers.gradleProperty("e2eCoverage").map(String::toBoolean).orElse(false)
     val browserCoverageDirectory = layout.buildDirectory.dir("coverage/browser-raw")
@@ -173,10 +173,10 @@ val e2eTest by tasks.registering(Test::class) {
 }
 
 val installPlaywrightBrowsers by tasks.registering(JavaExec::class) {
-    description = "Installs Playwright's Chromium and WebKit plus their OS packages (needs root or passwordless sudo)." +
+    description = "Installs Playwright's Chromium, Firefox and WebKit plus their OS packages (needs root or passwordless sudo)." +
         " -Pe2eBrowsers=chromium installs one of them."
     group = "verification"
     classpath = configurations["e2eRuntimeClasspath"]
     mainClass = "com.microsoft.playwright.CLI"
-    args(listOf("install", "--with-deps") + ((findProperty("e2eBrowsers") as String?) ?: "chromium,webkit").split(","))
+    args(listOf("install", "--with-deps") + ((findProperty("e2eBrowsers") as String?) ?: "chromium,firefox,webkit").split(","))
 }

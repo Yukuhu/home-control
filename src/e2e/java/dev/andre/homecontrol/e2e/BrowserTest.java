@@ -8,7 +8,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Runs the test once per browser named in -De2e.browsers (default chromium,webkit). */
+/** Runs the test once per browser named in -De2e.browsers (default chromium,firefox,webkit). */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @ParameterizedTest(name = "{displayName} [{0}]")

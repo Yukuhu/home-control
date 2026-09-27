@@ -15,6 +15,7 @@ What runs on every push and pull request, and how releases are made.
 | Smoke-test the image on amd64, arm64 | Builds the image that is published, natively on each architecture, and starts it; for a release, it pushes that image by digest. |
 | Smoke-test the Bluetooth image on amd64, arm64 | The same for the `-bluetooth` variant, in its own job so that it never gates the release. |
 | Browser tests (Chromium) | Runs the Playwright tests in Chromium, records their JavaScript coverage for SonarCloud, and tests the pull request summary script. |
+| Browser tests (Firefox) | Runs the Playwright tests in Firefox. |
 | Browser tests (WebKit) | Runs the Playwright tests in WebKit. |
 | SonarCloud quality gate | Scans the results of `Build and test` and `Browser tests (Chromium)`; on pull requests it waits for the quality gate. |
 | Dependency vulnerabilities | Submits the resolved dependency graph so that Dependabot alerts cover it, and reviews the dependencies a pull request changes. The release does not wait for it. |

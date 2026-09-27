@@ -326,7 +326,7 @@ jobs:
           version: ${{ needs.jar.outputs.version }}
           token: ${{ github.token }}
 
-  # The browser tests run in one job for each browser, so that each takes half the time and the
+  # The browser tests run in one job for each browser, so that the browsers run side by side and the
   # SonarCloud scan waits only for Chromium, the one browser that can say which JavaScript ran.
   e2e-chromium:
     name: Browser tests (Chromium)
@@ -377,6 +377,19 @@ jobs:
           path: build/reports/pr-summary/lcov.info
           if-no-files-found: error
 
+  e2e-firefox:
+    name: Browser tests (Firefox)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: ./.github/actions/browser-tests
+        with:
+          browser: firefox
+
   e2e-webkit:
     name: Browser tests (WebKit)
     needs: changes
@@ -392,7 +405,7 @@ jobs:
 
   sonar:
     name: SonarCloud quality gate
-    # Not the WebKit tests: they add nothing to the scan, and the release waits for them itself.
+    # Not the Firefox or WebKit tests: they add nothing to the scan, and the release waits for them itself.
     needs: [test, e2e-chromium]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -519,7 +532,7 @@ jobs:
     # One comment per pull request, replaced on every run. Runs when earlier jobs failed, which
     # is when it matters, but not when the run was cancelled. Fork pull requests get a read-only
     # token, so they are left out.
-    needs: [changes, jar, test, e2e-chromium, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies, codeql]
+    needs: [changes, jar, test, e2e-chromium, e2e-firefox, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies, codeql]
     if: >-
       !cancelled()
       && github.event_name == 'pull_request'
@@ -557,6 +570,13 @@ jobs:
         with:
           name: junit-e2e-chromium
           path: junit/e2e-chromium
+
+      - name: Download the Firefox test results
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: junit-e2e-firefox
+          path: junit/e2e-firefox
 
       - name: Download the WebKit test results
         continue-on-error: true
@@ -609,6 +629,7 @@ jobs:
           SONAR_PROJECT_KEY: Yukuhu_home-control
           JUNIT_TEST_DIR: ${{ github.workspace }}/junit/test
           JUNIT_E2E_CHROMIUM_DIR: ${{ github.workspace }}/junit/e2e-chromium
+          JUNIT_E2E_FIREFOX_DIR: ${{ github.workspace }}/junit/e2e-firefox
           JUNIT_E2E_WEBKIT_DIR: ${{ github.workspace }}/junit/e2e-webkit
           SUMMARY_FILE: ${{ runner.temp }}/summary.md
         run: |
@@ -648,7 +669,7 @@ jobs:
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && needs.jar.outputs.release == 'true'
-    needs: [jar, test, image, smoke, e2e-chromium, e2e-webkit, sonar]
+    needs: [jar, test, image, smoke, e2e-chromium, e2e-firefox, e2e-webkit, sonar]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -800,6 +821,7 @@ jobs:
       - jar
       - test
       - e2e-chromium
+      - e2e-firefox
       - e2e-webkit
       - sonar
       - image

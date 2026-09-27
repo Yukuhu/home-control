@@ -1,5 +1,5 @@
 # Tracked copy of .superpowers/e2e.Dockerfile (.superpowers/ is gitignored agent scratch space).
-# Gradle + JDK 25 plus Playwright's Chromium and WebKit with their OS packages, for scripts/e2e.sh.
+# Gradle + JDK 25 plus Playwright's Chromium, Firefox and WebKit with their OS packages, for scripts/e2e.sh.
 # Browsers live in /ms-playwright so any uid can use them.
 FROM gradle:jdk25
 ARG PLAYWRIGHT_VERSION
@@ -20,6 +20,6 @@ RUN set -eux; \
     unzip -q bundle.jar "driver/$node_dir/node"; \
     chmod +x "driver/$node_dir/node"; \
     apt-get update; \
-    (cd driver/package && "../$node_dir/node" cli.js install --with-deps chromium webkit); \
+    (cd driver/package && "../$node_dir/node" cli.js install --with-deps chromium firefox webkit); \
     chmod -R a+rX /ms-playwright; \
     cd /; rm -rf "$work" /var/lib/apt/lists/*

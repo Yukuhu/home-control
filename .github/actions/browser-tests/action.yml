@@ -3,7 +3,7 @@ description: Runs the Playwright browser tests in one browser and uploads their 
 
 inputs:
   browser:
-    description: The browser to test in, chromium or webkit.
+    description: The browser to test in, chromium, firefox or webkit.
     required: true
   coverage:
     description: Whether to record which JavaScript ran. Only Chromium can.
