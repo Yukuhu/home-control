@@ -692,7 +692,7 @@ jobs:
 
   release-bluetooth:
     name: Release the Bluetooth image
-    # Same jar, plus mpv for Bluetooth speakers (docs/bluetooth-speakers.md). Its own job, after
+    # Same jar, plus mpv for Bluetooth speakers (docs/user/bluetooth-speakers.md). Its own job, after
     # the release is tagged: this optional variant must never gate or delay the release itself.
     # Runs only if the release happened and the variant passed its smoke tests.
     needs: [jar, release, smoke-bluetooth]

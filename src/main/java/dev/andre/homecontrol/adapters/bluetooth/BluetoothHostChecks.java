@@ -158,7 +158,7 @@ public class BluetoothHostChecks {
             }
             StringBuilder detail = new StringBuilder("No PipeWire or PulseAudio server is reachable from the container. "
                     + "Mount the audio user's /run/user/<uid>/pulse to /run/pulse and set "
-                    + "PULSE_SERVER=unix:/run/pulse/native (see docs/bluetooth-speakers.md).");
+                    + "PULSE_SERVER=unix:/run/pulse/native (see docs/user/bluetooth-speakers.md).");
             String pulseServer = environment.apply("PULSE_SERVER");
             if (pulseServer != null) {
                 detail.append(" PULSE_SERVER is ").append(pulseServer).append(", but nothing answers there.");

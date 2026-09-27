@@ -165,7 +165,7 @@ class BluetoothDeploymentTest {
 
     @Test
     void hostDocumentationCoversTheChecklist() throws Exception {
-        String text = Files.readString(Path.of("docs/bluetooth-speakers.md"));
+        String text = Files.readString(Path.of("docs/user/bluetooth-speakers.md"));
         assertThat(text).contains("/run/dbus:/run/dbus:ro")
                 .contains("/etc/machine-id:/etc/machine-id:ro")
                 .contains("systemctl enable --now bluetooth")
@@ -183,7 +183,7 @@ class BluetoothDeploymentTest {
 
     @Test
     void hostDocumentationCoversEveryFailureMode() throws Exception {
-        String text = Files.readString(Path.of("docs/bluetooth-speakers.md"));
+        String text = Files.readString(Path.of("docs/user/bluetooth-speakers.md"));
         assertThat(text).contains("## Failure modes")
                 .contains("No D-Bus system socket")
                 .contains("The container has no D-Bus machine id")

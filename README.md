@@ -284,7 +284,7 @@ speaker); the speaker's hardware volume is not changed, only mpv's own; music st
 the speaker disconnects, so it never continues on the host's own audio output; one stream per
 speaker (no simultaneous playback on the same speaker).
 
-See `docs/bluetooth-speakers.md` for the full host checklist and every failure mode's fix.
+See `docs/user/bluetooth-speakers.md` for the full host checklist and every failure mode's fix.
 
 ## Discovery does not work
 

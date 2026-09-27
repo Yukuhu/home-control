@@ -38,7 +38,7 @@ public class BluetoothSpeakerSession implements DeviceHandle {
     private static final Logger log = LoggerFactory.getLogger(BluetoothSpeakerSession.class);
 
     public static final String MPV_MISSING = "mpv is not installed in this container. Use the image tag latest-bluetooth, "
-            + "or build the image with WITH_MPV=true (see docs/bluetooth-speakers.md).";
+            + "or build the image with WITH_MPV=true (see docs/user/bluetooth-speakers.md).";
 
     private final Device device;
     private final BluetoothSettings settings;
