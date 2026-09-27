@@ -58,7 +58,11 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     private final ScheduledExecutorService scheduler;
     private final ConnectionOpener opener;
 
+    // Self-synchronized connection written only on the scheduler thread; request threads and close() just read it.
+    @SuppressWarnings("java:S3077")
     private volatile RemoteConnection connection;
+    // Immutable snapshot; every read-modify-write runs on the scheduler thread, request threads only read it.
+    @SuppressWarnings("java:S3077")
     private volatile DeviceState state = DeviceState.initial();
     private volatile Duration backoff;
     /** Tags reader callbacks so an old connection cannot update a newer attempt. */
@@ -179,7 +183,6 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
                 // so one of the two sides always sees the other.
                 opened.close();
                 connection = null;
-                return;
             }
             // TLS only proves transport setup. The reader reports Remote v2 readiness
             // after the device's configure/active exchange, on this same scheduler.
@@ -343,8 +346,8 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
                 }
             });
         } catch (RejectedExecutionException _) {
-            // close() shut the scheduler down between the check above and this handoff;
-            // the session is going away, so there is nothing left to update.
+            // The scheduler was shut down by close between the check above and this handoff.
+            // The session is going away, so there is nothing left to update.
         }
     }
 

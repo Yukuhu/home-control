@@ -50,6 +50,8 @@ public class BluetoothSpeakerSession implements DeviceHandle {
     private final ScheduledExecutorService loop;
     private final Object commands = new Object();
 
+    // Immutable snapshot written only by publish() on the loop thread; request threads only read it.
+    @SuppressWarnings("java:S3077")
     private volatile DeviceState state = DeviceState.initial();
     private volatile int volume;
     private volatile boolean muted;

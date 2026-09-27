@@ -39,6 +39,8 @@ public final class InsecureTls {
         }
     }
 
+    // Only Tizen (wss 8002) and webOS (wss 3001) TVs: self-signed LAN certificates, none of them pinned.
+    @SuppressWarnings("java:S4830")
     private static final class AcceptAny extends X509ExtendedTrustManager {
         @Override
         public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket) {

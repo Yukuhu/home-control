@@ -44,6 +44,8 @@ final class SsapConnection implements AutoCloseable {
     private final Map<String, Consumer<JsonNode>> subscriptions = new ConcurrentHashMap<>();
     private final BlockingQueue<JsonNode> registration = new LinkedBlockingQueue<>();
     private final AtomicInteger ids = new AtomicInteger();
+    // Assigned only inside open(), before the connection is returned; TextWebSocket synchronizes itself.
+    @SuppressWarnings("java:S3077")
     private volatile TextWebSocket socket;
     private volatile String closedReason;
     private TextWebSocket pointer; // guarded by this

@@ -40,6 +40,8 @@ public class BluetoothPairingService {
     private final BluetoothProperties properties;
     private final Clock clock;
 
+    // Immutable record replaced wholesale by scan(); concurrent scans just race to publish a complete result.
+    @SuppressWarnings("java:S3077")
     private volatile BluetoothScan lastScan = BluetoothScan.NONE;
 
     public BluetoothPairingService(BluezClient bluez, DeviceManager devices, BluetoothProperties properties) {
