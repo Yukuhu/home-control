@@ -1,24 +1,21 @@
 package dev.andre.homecontrol.sources.youtube;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
+import dev.andre.homecontrol.testsupport.FakeHttpServer;
+import dev.andre.homecontrol.testsupport.Request;
+import dev.andre.homecontrol.testsupport.Response;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 
 /** Google OAuth, YouTube Data API v3, Lounge and thumbnails in one in-process fake. */
@@ -41,22 +38,15 @@ public final class FakeGoogleServer implements AutoCloseable {
         }
     }
 
-    private record Rule(String method, String path, Predicate<Recorded> when, Deque<Canned> answers) {
-    }
-
-    private final HttpServer server;
-    private final List<Rule> rules = new CopyOnWriteArrayList<>();
-    private final List<Recorded> requests = new CopyOnWriteArrayList<>();
+    private final FakeHttpServer server;
 
     public FakeGoogleServer() throws IOException {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/", this::handle);
-        server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
-        server.start();
+        server = FakeHttpServer.start().fallback(Response.of(404, "application/json; charset=UTF-8",
+                "{\"error\":{\"code\":404,\"message\":\"no fake route\",\"errors\":[]}}"));
     }
 
     public URI base() {
-        return URI.create("http://127.0.0.1:" + server.getAddress().getPort());
+        return server.url();
     }
 
     public YouTubeProperties properties() {
@@ -86,16 +76,18 @@ public final class FakeGoogleServer implements AutoCloseable {
     }
 
     public FakeGoogleServer respondWhen(String method, String path, Predicate<Recorded> when, Canned... answers) {
-        rules.addFirst(new Rule(method, path, when, new ArrayDeque<>(List.of(answers))));
+        server.respond(method, path, request -> when.test(recorded(request)), Arrays.stream(answers)
+                .map(answer -> Response.of(answer.status(), answer.contentType(), answer.body()))
+                .toArray(Response[]::new));
         return this;
     }
 
     public List<Recorded> requests() {
-        return List.copyOf(requests);
+        return server.requests().stream().map(FakeGoogleServer::recorded).toList();
     }
 
     public List<Recorded> requests(String path) {
-        return requests.stream().filter(r -> r.path().equals(path)).toList();
+        return requests().stream().filter(r -> r.path().equals(path)).toList();
     }
 
     public int count(String path) {
@@ -151,34 +143,7 @@ public final class FakeGoogleServer implements AutoCloseable {
         return respondWhen("GET", "/thumbs/vi/aqz-KE-bpKQ/mqdefault.jpg", r -> true, new Canned(200, "image/jpeg", jpeg));
     }
 
-    private void handle(HttpExchange exchange) throws IOException {
-        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        Map<String, String> headers = new LinkedHashMap<>();
-        exchange.getRequestHeaders().forEach((k, v) -> headers.put(k.toLowerCase(Locale.ROOT), String.join(",", v)));
-        String contentType = headers.getOrDefault("content-type", "");
-        Recorded recorded = new Recorded(exchange.getRequestMethod(), exchange.getRequestURI().getPath(),
-                decode(exchange.getRequestURI().getRawQuery()),
-                contentType.startsWith("application/x-www-form-urlencoded") ? decode(body) : Map.of(),
-                headers, body, exchange.getRequestURI().getRawQuery());
-        requests.add(recorded);
-        Canned answer = rules.stream()
-                .filter(rule -> rule.method().equals(recorded.method()) && rule.path().equals(recorded.path())
-                        && rule.when().test(recorded))
-                .findFirst()
-                .map(rule -> {
-                    synchronized (rule.answers()) {
-                        return rule.answers().size() > 1 ? rule.answers().pollFirst() : rule.answers().peekFirst();
-                    }
-                })
-                .orElse(Canned.json(404, "{\"error\":{\"code\":404,\"message\":\"no fake route\",\"errors\":[]}}"));
-        exchange.getResponseHeaders().add("Content-Type", answer.contentType());
-        exchange.sendResponseHeaders(answer.status(), answer.body().length == 0 ? -1 : answer.body().length);
-        if (answer.body().length > 0) {
-            exchange.getResponseBody().write(answer.body());
-        }
-        exchange.close();
-    }
-
+    /** The Google APIs join a repeated name's values with commas, so this decode does too (unlike Request.decode). */
     static Map<String, String> decode(String raw) {
         Map<String, String> values = new LinkedHashMap<>();
         if (raw == null || raw.isEmpty()) {
@@ -193,8 +158,15 @@ public final class FakeGoogleServer implements AutoCloseable {
         return values;
     }
 
+    private static Recorded recorded(Request request) {
+        String contentType = request.headers().getOrDefault("content-type", "");
+        return new Recorded(request.method(), request.uri().getPath(), decode(request.uri().getRawQuery()),
+                contentType.startsWith("application/x-www-form-urlencoded") ? decode(request.body()) : Map.of(),
+                request.headers(), request.body(), request.uri().getRawQuery());
+    }
+
     @Override
     public void close() {
-        server.stop(0);
+        server.close();
     }
 }
