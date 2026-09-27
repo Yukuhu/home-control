@@ -21,6 +21,8 @@ import java.nio.charset.UnsupportedCharsetException;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,6 +30,7 @@ import java.util.regex.Pattern;
  * Fetches a calendar over HTTP(S), following only validated redirects. Never trusts the caller's URL:
  * {@link CalendarUrlPolicy} vets every hop, and the connection goes to exactly the addresses it vetted, so a
  * host cannot pass the check with one address and be connected to at another.
+ * One deadline per request covers the headers and the whole body.
  */
 public class CalendarFetcher implements AutoCloseable {
 
@@ -80,6 +83,9 @@ public class CalendarFetcher implements AutoCloseable {
                 .build());
         request.setHeader("Accept", "text/calendar, text/plain;q=0.9, */*;q=0.5");
         request.setHeader("User-Agent", "HomeControl");
+        // The response timeout bounds each read, not the whole body: a server that trickles its calendar would
+        // hold the refresh. Cancelling at the deadline closes the connection mid-read.
+        CompletableFuture.delayedExecutor(properties.requestTimeoutSeconds(), TimeUnit.SECONDS).execute(request::cancel);
         CloseableHttpResponse response = null;
         try {
             response = CloseableHttpResponse.adapt(http.executeOpen(null, request, null));
