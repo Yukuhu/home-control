@@ -182,6 +182,7 @@ request's analysis on SonarCloud.
 | Failure without a message | The first line of its trace is used; without a trace, "No failure message" |
 | Non-test job failed | Row links to that job's log |
 | Job skipped | Row reads "⏭️ not run" |
+| Job cancelled or timed out while the run continued | Row reads "❌ cancelled" and links to the job log |
 | `sonar` skipped after a suite failure | Row reads "⏭️ not run, because tests failed" |
 | Gate details cannot be fetched or are stale | Row shows the job's own result with "details unavailable" and a link to SonarCloud |
 | Rendered comment exceeds 60 000 characters | Stack traces are dropped, then the failure list is shortened until it fits |

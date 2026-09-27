@@ -306,12 +306,19 @@ test("a skipped sonar job without a failed suite is simply not run", () => {
     assert.match(comment, /\| SonarCloud quality gate \| ⏭️ not run \|/);
 });
 
-test("failed and skipped jobs without tests link to their log or say not run", () => {
+test("failed, cancelled and skipped jobs without tests link to their log or say not run", () => {
     const comment = render(model({}, { "image-arm64": "failure", "image-arm64-bluetooth": "skipped", image: "cancelled" }));
     assert.match(comment, /^## ❌ CI failed$/m);
     assert.match(comment, /\| Image smoke test \(arm64\) \| ❌ \[job log\]\([^)]*\/job\/image-arm64\) \|/);
     assert.match(comment, /\| Bluetooth image smoke test \(arm64\) \| ⏭️ not run \|/);
-    assert.match(comment, /\| Image \(amd64\) \| ⏭️ not run \|/);
+    assert.match(comment, /\| Image \(amd64\) \| ❌ cancelled · \[job log\]\([^)]*\/job\/image\) \|/);
+});
+
+test("a cancelled suite job and a cancelled sonar job both read cancelled with a log link", () => {
+    const comment = render(model({ gate: null }, { test: "cancelled", sonar: "cancelled" }));
+    assert.match(comment, /^## ❌ CI failed$/m);
+    assert.match(comment, /\| Unit and integration tests \| ❌ cancelled · \[job log\]\([^)]*\/job\/test\) \|/);
+    assert.match(comment, /\| SonarCloud quality gate \| ❌ cancelled · \[job log\]\([^)]*\/job\/sonar\) \|/);
 });
 
 test("a missing log link degrades to plain text", () => {

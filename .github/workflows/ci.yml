@@ -270,6 +270,9 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nothing here pushes, and the steps below run third-party code.
+          persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -300,12 +303,28 @@ jobs:
           npm ci --ignore-scripts
           npm test
 
+      # Kept apart from the step below, so that the script and its dependency never see the
+      # token. Without these values the summary only loses its duration and its job log links.
+      - name: Read the run's start time and jobs
+        id: run
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          started_at=$(gh api "$run" --jq .run_started_at) || started_at=
+          jobs=$(gh api "$run/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
+            --jq '[.jobs[] | {name, html_url}] | tojson') || jobs='[]'
+          {
+            echo "started_at=$started_at"
+            echo "jobs=$jobs"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Write the summary
         id: summary
         continue-on-error: true
         working-directory: scripts/pr-summary
         env:
-          GH_TOKEN: ${{ github.token }}
           # Passed as environment variables rather than interpolated into the script.
           NEEDS_JSON: ${{ toJSON(needs) }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -313,18 +332,14 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_NUMBER: ${{ github.run_number }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUN_STARTED_AT: ${{ steps.run.outputs.started_at }}
+          JOBS_JSON: ${{ steps.run.outputs.jobs }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: Yukuhu_home-control
           JUNIT_TEST_DIR: ${{ github.workspace }}/junit/test
           JUNIT_E2E_DIR: ${{ github.workspace }}/junit/e2e
           SUMMARY_FILE: ${{ runner.temp }}/summary.md
         run: |
-          run="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          # Without these the summary only loses its duration and its links to job logs.
-          RUN_STARTED_AT=$(gh api "$run" --jq .run_started_at) || RUN_STARTED_AT=
-          JOBS_JSON=$(gh api "$run/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
-            --jq '[.jobs[] | {name, html_url}]') || JOBS_JSON='[]'
-          export RUN_STARTED_AT JOBS_JSON
           if ! npm run --silent summary; then
             echo "::warning::The pull request summary could not be written."
             exit 1

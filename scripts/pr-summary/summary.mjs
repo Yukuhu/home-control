@@ -101,7 +101,10 @@ export async function collectSuite(directory) {
 
 const UNAVAILABLE = { available: false };
 
-export async function fetchGate({ projectKey, pullRequest, headSha, token, timeoutMs = 10000 }, fetch = globalThis.fetch) {
+export async function fetchGate(
+    { projectKey, pullRequest, headSha, token, timeoutMs = 10000 },
+    fetch = globalThis.fetch,
+) {
     const get = async (pathAndQuery) => {
         const response = await fetch(`https://sonarcloud.io/api/${pathAndQuery}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -157,7 +160,9 @@ function counts(suite) {
     if (suite.failed > 0) parts.push(`${suite.failed} failed`);
     parts.push(`${suite.passed} passed`);
     if (suite.skipped > 0) parts.push(`${suite.skipped} skipped`);
-    if (suite.unreadable > 0) parts.push(`${suite.unreadable} result ${suite.unreadable === 1 ? "file" : "files"} unreadable`);
+    if (suite.unreadable > 0) {
+        parts.push(`${suite.unreadable} result ${suite.unreadable === 1 ? "file" : "files"} unreadable`);
+    }
     return parts.join(", ");
 }
 
@@ -191,6 +196,9 @@ function sonarRow(check, model) {
 }
 
 function row(check, model) {
+    // A job cancelled or timed out while the run continued must still surface as a failure;
+    // only `skipped` (the run never reached it) keeps the "not run" rendering below.
+    if (check.result === "cancelled") return `❌ cancelled · ${link("job log", check.logUrl)}`;
     if (check.key === "sonar") return sonarRow(check, model);
     if (check.suite) return suiteRow(check);
     if (check.result === "success") return "✅";
