@@ -69,11 +69,20 @@ public class SonosSession implements DeviceHandle, GroupListing {
     private final Clock clock;
     private final ReconnectingPoller poller;
 
+    // Immutable, replaced wholesale by each topology read (poll loop or a grouping command); never modified in place.
+    @SuppressWarnings("java:S3077")
     private volatile ZoneGroupState topology;
     private volatile Instant topologyReadAt = Instant.EPOCH;
+    // Immutable, written by the poll loop on connect; command threads only read it.
+    @SuppressWarnings("java:S3077")
     private volatile ProtocolInfo sink = ProtocolInfo.UNKNOWN;
-    private volatile TransportInfo transport = TransportInfo.NONE;
+    /** Poll loop only: chooses the next poll delay. */
+    private TransportInfo transport = TransportInfo.NONE;
+    // Immutable record written by the command thread that played it; the poll loop only reads it.
+    @SuppressWarnings("java:S3077")
     private volatile PlayedItem lastPlayed;
+    // Immutable snapshot written only by Link.publish on the poll loop; request threads only read it.
+    @SuppressWarnings("java:S3077")
     private volatile DeviceState state = DeviceState.initial();
     /** True from a completed connect until a disconnect or close; commands and topology need it. */
     private volatile boolean live;
@@ -245,18 +254,6 @@ public class SonosSession implements DeviceHandle, GroupListing {
         return new UnsupportedActionException(device.name() + " is a Sonos speaker and " + what);
     }
 
-    private synchronized void publish(DeviceState next) {
-        DeviceState previous = state;
-        state = next;
-        if (!next.sameIgnoringTime(previous)) {
-            try {
-                onChange.accept(next);
-            } catch (RuntimeException e) {
-                log.warn("A device state listener failed for {}", device.id(), e);
-            }
-        }
-    }
-
     @Override
     public void close() {
         live = false;
@@ -264,7 +261,20 @@ public class SonosSession implements DeviceHandle, GroupListing {
         onClosed.run();
     }
 
+    /** Every callback runs on the poll loop's thread. */
     private final class Link implements ReconnectingPoller.Link {
+
+        private void publish(DeviceState next) {
+            DeviceState previous = state;
+            state = next;
+            if (!next.sameIgnoringTime(previous)) {
+                try {
+                    onChange.accept(next);
+                } catch (RuntimeException e) {
+                    log.warn("A device state listener failed for {}", device.id(), e);
+                }
+            }
+        }
 
         private void readState() throws IOException, SoapFault {
             ServiceEndpoint coordinator = coordinatorAvTransport();
@@ -287,7 +297,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
         }
 
         @Override
-        public void connect() throws Exception {
+        public void connect() throws IOException, SoapFault {
             readTopology();
             try {
                 sink = commands.sink(own(SonosEndpoints.CONNECTION_MANAGER_PATH, SonosEndpoints.CONNECTION_MANAGER));
@@ -299,7 +309,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
         }
 
         @Override
-        public void poll() throws Exception {
+        public void poll() throws IOException, SoapFault {
             if (Duration.between(topologyReadAt, clock.instant()).toSeconds() >= properties.topologyIntervalSeconds()) {
                 try {
                     readTopology();

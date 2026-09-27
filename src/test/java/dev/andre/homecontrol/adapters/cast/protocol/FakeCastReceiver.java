@@ -119,6 +119,12 @@ public class FakeCastReceiver implements AutoCloseable {
         media = new Media(1, "http://media.invalid/" + title, "video/mp4", title, 596.5, playerState, currentTime);
     }
 
+    /** Back to the idle screen without closing the app's virtual connection first, as some receivers do. */
+    public void showBackdrop() {
+        app = backdrop();
+        media = null;
+    }
+
     public void setMediaState(String playerState, double currentTime) {
         media = media.with(playerState, currentTime);
     }

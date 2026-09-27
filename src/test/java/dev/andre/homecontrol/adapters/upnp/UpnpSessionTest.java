@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -331,6 +332,79 @@ class UpnpSessionTest {
 
         fake.overrideDescription(null);
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
+    }
+
+    private static String description() throws IOException {
+        return Files.readString(Path.of("src/test/resources/fixtures/upnp/renderer-description.xml"));
+    }
+
+    @Test
+    void aServiceWithAMalformedTypeIsLeftOut() throws Exception {
+        fake.overrideDescription(description().replace(
+                "<serviceType>urn:schemas-upnp-org:service:RenderingControl:1</serviceType>",
+                "<serviceType>urn:schemas-upnp-org:service:RenderingControl:1#x</serviceType>"));
+        startConnected();
+
+        var setVolume = new Action.SetVolume(30);
+        assertThatThrownBy(() -> session.execute(setVolume))
+                .isInstanceOf(UnsupportedActionException.class)
+                .hasMessageContaining("has no volume control");
+    }
+
+    @Test
+    void anScpdOffTheDescriptionsHostKeepsTheDefaultVolumeRange() throws Exception {
+        fake.setVolumeMax(50);
+        fake.setVolume(25);
+        fake.overrideDescription(description().replace("<SCPDURL>/scpd/RenderingControl1.xml</SCPDURL>",
+                "<SCPDURL>http://192.0.2.1:1/scpd/RenderingControl1.xml</SCPDURL>"));
+        startConnected();
+
+        assertThat(session.state().volumeLevel()).isEqualTo(25);
+        assertThat(fake.requestedPaths()).doesNotContain("/scpd/RenderingControl1.xml");
+    }
+
+    @Test
+    void anScpdThatCannotBeReadKeepsTheDefaultVolumeRange() throws Exception {
+        fake.setVolumeMax(50);
+        fake.setVolume(25);
+        fake.overrideDescription(description().replace("<SCPDURL>/scpd/RenderingControl1.xml</SCPDURL>",
+                "<SCPDURL>/scpd/missing.xml</SCPDURL>"));
+        startConnected();
+
+        assertThat(session.state().volumeLevel()).isEqualTo(25);
+        assertThat(fake.requestedPaths()).contains("/scpd/missing.xml");
+    }
+
+    @Test
+    void aFirstReadingThatFailsLeavesTheRendererOffline() {
+        fake.fail("GetTransportInfo", 501, "Action Failed", 1);
+        session = track(new UpnpSession(fake.device("kitchen"), new UpnpProperties(true, 1, 1, 1, 1, 30, 60),
+                SoapClient.httpClient(Duration.ofSeconds(1)), udn -> Optional.empty(), states::add, () -> { }));
+        session.start();
+        await().atMost(WAIT).until(() -> fake.calls("GetTransportInfo").size() == 1);
+
+        var pause = new Action.Pause();
+        await().atMost(WAIT).untilAsserted(() -> assertThatThrownBy(() -> session.execute(pause))
+                .isInstanceOf(DeviceOfflineException.class));
+        assertThat(states).extracting(DeviceState::status).doesNotContain(DeviceStatus.CONNECTED);
+    }
+
+    @Test
+    void aFailingStateListenerDoesNotStopPolling() {
+        AtomicBoolean failed = new AtomicBoolean();
+        session = track(new UpnpSession(fake.device("kitchen"), properties, SoapClient.httpClient(Duration.ofSeconds(1)),
+                udn -> Optional.empty(), state -> {
+                    states.add(state);
+                    if (state.status() == DeviceStatus.CONNECTED && failed.compareAndSet(false, true)) {
+                        throw new IllegalStateException("listener bug");
+                    }
+                }, () -> { }));
+        session.start();
+        await().atMost(WAIT).until(failed::get);
+
+        fake.setVolume(35);
+
+        await().atMost(WAIT).until(() -> states.getLast().volumeLevel() == 35);
     }
 
     @Test

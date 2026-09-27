@@ -412,6 +412,21 @@ class CastSessionTest {
     }
 
     @Test
+    void theIdleScreenComingToTheFrontClearsNowPlaying() throws Exception {
+        start(receiver.port());
+        awaitStatus();
+        receiver.runApp(FakeCastReceiver.DEFAULT_MEDIA_RECEIVER, "Default Media Receiver");
+        receiver.startMedia("Song", "PLAYING", 12.0);
+        receiver.pushReceiverStatus();
+        awaitFollowing("Song");
+
+        receiver.showBackdrop();
+        receiver.pushReceiverStatus();
+
+        await().until(() -> session.state().nowPlaying() == null && session.state().currentApp() == null);
+    }
+
+    @Test
     void pollsThePositionWhilePlaying() throws Exception {
         start(receiver.port());
         awaitStatus();

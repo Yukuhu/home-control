@@ -62,15 +62,21 @@ public class CastSession implements DeviceHandle {
     private final Consumer<DeviceState> onChange;
     private final ScheduledExecutorService scheduler;
 
+    // Self-synchronized connection written only on the scheduler thread; command threads and close() just read it.
+    @SuppressWarnings("java:S3077")
     private volatile CastConnection connection;
     /** Incremented per connection attempt; callbacks from older connections are ignored. */
     private final AtomicLong generation = new AtomicLong();
+    // Immutable snapshot; every read-modify-write runs on the scheduler thread, command threads only read it.
+    @SuppressWarnings("java:S3077")
     private volatile DeviceState state = DeviceState.initial();
+    // Immutable record replaced wholesale on the scheduler thread; command threads only read it.
+    @SuppressWarnings("java:S3077")
     private volatile ReceiverStatus receiver;
     /** Transport of the foreground app whose media channel we follow, or null. */
     private volatile String mediaTransportId;
-    /** The last media status, so partial statuses (without {@code media}) keep their title. */
-    private volatile MediaStatus lastMedia;
+    /** The last media status, so partial statuses (without {@code media}) keep their title. Scheduler thread only. */
+    private MediaStatus lastMedia;
     private volatile Duration backoff;
     private volatile boolean closed;
 
@@ -350,51 +356,6 @@ public class CastSession implements DeviceHandle {
         }
     }
 
-    private void onReceiverStatus(ReceiverStatus status) {
-        receiver = status;
-        Optional<ReceiverStatus.ReceiverApp> foreground = status.foregroundApp();
-        update(state.withPower(!status.standBy())
-                .withCurrentApp(foreground.map(ReceiverStatus.ReceiverApp::displayName).orElse(null))
-                .withVolume(status.volumePercent(), 100, status.muted()));
-        followMedia(foreground.filter(app -> app.speaks(MEDIA)).map(ReceiverStatus.ReceiverApp::transportId).orElse(null));
-    }
-
-    /** Subscribes to the media channel of whatever app is in front — including casts started from a phone. */
-    private void followMedia(String transportId) {
-        if (Objects.equals(transportId, mediaTransportId)) {
-            return;
-        }
-        mediaTransportId = transportId;
-        lastMedia = null;
-        if (transportId == null) {
-            update(state.withNowPlaying(null));
-            return;
-        }
-        CastConnection current = connection;
-        if (current == null) {
-            return;
-        }
-        try {
-            current.connect(transportId);
-            sendMediaGetStatus(current, transportId);
-        } catch (IOException e) {
-            log.debug("Could not follow media on {}: {}", device.id(), e.getMessage()); // the reader reports the drop
-        }
-    }
-
-    private void onMediaStatus(List<MediaStatus> statuses) {
-        if (statuses.isEmpty()) {
-            lastMedia = null;
-            update(state.withNowPlaying(null));
-            return;
-        }
-        MediaStatus latest = statuses.getFirst().fillFrom(lastMedia);
-        lastMedia = latest;
-        PlaybackState playback = latest.playbackState();
-        update(state.withNowPlaying(playback == PlaybackState.IDLE ? null
-                : new NowPlaying(latest.displayTitle(), playback, latest.currentTime(), latest.duration())));
-    }
-
     /** Receivers only push on changes; ask while playing so the position moves. */
     private void pollMediaPosition() {
         try {
@@ -476,6 +437,51 @@ public class CastSession implements DeviceHandle {
                 lastMedia = null;
                 update(state.withNowPlaying(null));
             }
+        }
+
+        private void onReceiverStatus(ReceiverStatus status) {
+            receiver = status;
+            Optional<ReceiverStatus.ReceiverApp> foreground = status.foregroundApp();
+            update(state.withPower(!status.standBy())
+                    .withCurrentApp(foreground.map(ReceiverStatus.ReceiverApp::displayName).orElse(null))
+                    .withVolume(status.volumePercent(), 100, status.muted()));
+            followMedia(foreground.filter(app -> app.speaks(MEDIA)).map(ReceiverStatus.ReceiverApp::transportId).orElse(null));
+        }
+
+        /** Subscribes to the media channel of whatever app is in front — including casts started from a phone. */
+        private void followMedia(String transportId) {
+            if (Objects.equals(transportId, mediaTransportId)) {
+                return;
+            }
+            mediaTransportId = transportId;
+            lastMedia = null;
+            if (transportId == null) {
+                update(state.withNowPlaying(null));
+                return;
+            }
+            CastConnection current = connection;
+            if (current == null) {
+                return;
+            }
+            try {
+                current.connect(transportId);
+                sendMediaGetStatus(current, transportId);
+            } catch (IOException e) {
+                log.debug("Could not follow media on {}: {}", device.id(), e.getMessage()); // the reader reports the drop
+            }
+        }
+
+        private void onMediaStatus(List<MediaStatus> statuses) {
+            if (statuses.isEmpty()) {
+                lastMedia = null;
+                update(state.withNowPlaying(null));
+                return;
+            }
+            MediaStatus latest = statuses.getFirst().fillFrom(lastMedia);
+            lastMedia = latest;
+            PlaybackState playback = latest.playbackState();
+            update(state.withNowPlaying(playback == PlaybackState.IDLE ? null
+                    : new NowPlaying(latest.displayTitle(), playback, latest.currentTime(), latest.duration())));
         }
 
         private void handleDisconnect(CastDisconnectCause cause) {
