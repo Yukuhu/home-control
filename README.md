@@ -762,7 +762,8 @@ of both suites, each failed test with its message, the quality gate with the con
 failed, and the image jobs. Each run replaces the comment of the previous one, and the
 comment names the commit it belongs to. Pull requests from forks get no comment. The comment
 is written by `scripts/pr-summary`; run its tests with `npm ci && npm test` in that
-directory.
+directory. CI runs them with coverage, which SonarCloud counts like the coverage of the
+dashboard's JavaScript.
 
 ## Browser tests
 

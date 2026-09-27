@@ -41,7 +41,8 @@ sonar {
         property("sonar.projectKey", "Yukuhu_home-control")
         property("sonar.organization", "yukuhu")
         property("sonar.gradle.scanAll", "true")
-        property("sonar.javascript.lcov.reportPaths", "build/reports/browser-coverage/lcov.info")
+        property("sonar.javascript.lcov.reportPaths",
+            "build/reports/browser-coverage/lcov.info,build/reports/pr-summary/lcov.info")
     }
 }
 
