@@ -65,13 +65,18 @@ public class TizenSession implements DeviceHandle {
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean nextPlayPauseIsPlay = new AtomicBoolean();
 
-    private volatile TizenRemoteConnection connection;
+    /** Set by the scheduler thread; taken out (and closed) by whoever drops it, which close() does from any thread. */
+    private final AtomicReference<TizenRemoteConnection> connection = new AtomicReference<>();
+    // Immutable snapshot; every read-modify-write runs inside the synchronized update(), readers only read it.
+    @SuppressWarnings("java:S3077")
     private volatile DeviceState state = DeviceState.initial();
     private volatile boolean closed;
     private volatile boolean stopped;
     private Duration handshakeBackoff;  // scheduler thread only; null while no handshake went unanswered
     private long connectNotBefore;      // scheduler thread only; System.nanoTime()
 
+    // Package-private, built only by TizenAdapter: eight distinct collaborator types, nothing to group.
+    @SuppressWarnings("java:S107")
     TizenSession(Device device, TizenProperties properties, HttpClient http, DeviceRegistry registry,
                  LearnedSettings learned, WakeOnLan wakeOnLan, Consumer<DeviceState> onChange, Runnable onClose) {
         this.device = device;
@@ -190,7 +195,7 @@ public class TizenSession implements DeviceHandle {
     }
 
     private void togglePower() {
-        if (connection != null && state.powerOn()) {
+        if (connection.get() != null && state.powerOn()) {
             sendKey("KEY_POWER");
             update(s -> s.withPower(false));
             return;
@@ -224,7 +229,7 @@ public class TizenSession implements DeviceHandle {
                 update(s -> s.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
                 return;
             }
-            if (connection == null && (handshakeBackingOff() || !connect())) {
+            if (connection.get() == null && (handshakeBackingOff() || !connect())) {
                 return;
             }
             String app = visibleKnownApp();
@@ -257,11 +262,10 @@ public class TizenSession implements DeviceHandle {
             if (answer == TizenRemoteConnection.Authorization.CONNECTED) {
                 handshakeBackoff = null;
                 connectNotBefore = 0;
-                connection = opened;
+                connection.set(opened);
                 if (closed) {
-                    // close() ran while waiting for the TV and saw no connection to close.
-                    connection = null;
-                    opened.close();
+                    // close() ran while waiting for the TV and may have missed this connection.
+                    closeIfCurrent(opened);
                     return false;
                 }
                 opened.token().filter(token -> !token.equals(settings.token()))
@@ -285,9 +289,9 @@ public class TizenSession implements DeviceHandle {
             return false;
         } catch (IOException e) {
             if (opened != null) {
+                connection.compareAndSet(opened, null);
                 opened.close();
             }
-            connection = null;
             log.debug("{} is not reachable: {}", device.name(), e.getMessage());
             update(s -> s.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
             return false;
@@ -306,7 +310,7 @@ public class TizenSession implements DeviceHandle {
     }
 
     private String visibleKnownApp() {
-        TizenRemoteConnection current = connection;
+        TizenRemoteConnection current = connection.get();
         if (current == null) {
             return null;
         }
@@ -328,24 +332,31 @@ public class TizenSession implements DeviceHandle {
     }
 
     private void lost(TizenRemoteConnection which, String reason) {
-        if (which == null || which != connection) {
+        if (which == null || !closeIfCurrent(which)) {
             return;
         }
-        dropConnection();
         log.info("Lost the connection to {} ({})", device.name(), reason);
         update(s -> s.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
     }
 
     private void dropConnection() {
-        TizenRemoteConnection current = connection;
-        connection = null;
+        TizenRemoteConnection current = connection.getAndSet(null);
         if (current != null) {
             current.close();
         }
     }
 
+    /** Drops {@code which} only if it is still the connection, so it is closed exactly once. */
+    private boolean closeIfCurrent(TizenRemoteConnection which) {
+        if (!connection.compareAndSet(which, null)) {
+            return false;
+        }
+        which.close();
+        return true;
+    }
+
     private TizenRemoteConnection requireConnected() {
-        TizenRemoteConnection current = connection;
+        TizenRemoteConnection current = connection.get();
         if (current != null) {
             return current;
         }

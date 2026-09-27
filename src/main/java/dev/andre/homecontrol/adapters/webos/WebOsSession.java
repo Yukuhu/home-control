@@ -65,13 +65,20 @@ public class WebOsSession implements DeviceHandle, InputListing {
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean nextPlayPauseIsPlay = new AtomicBoolean();
 
-    private volatile SsapConnection connection;
+    /** Set by the scheduler thread; taken out (and closed) by whoever drops it, which close() does from any thread. */
+    private final AtomicReference<SsapConnection> connection = new AtomicReference<>();
+    // Immutable snapshot; every read-modify-write runs inside the synchronized update(), readers only read it.
+    @SuppressWarnings("java:S3077")
     private volatile DeviceState state = DeviceState.initial();
+    // Immutable list replaced wholesale on the scheduler thread; request threads only read it.
+    @SuppressWarnings("java:S3077")
     private volatile List<TvInput> inputs = List.of();
     private volatile boolean closed;
     private Duration backoff;                   // scheduler thread only
     private ScheduledFuture<?> pendingConnect;  // scheduler thread only
 
+    // Package-private, built only by WebOsAdapter: eight distinct collaborator types, nothing to group.
+    @SuppressWarnings("java:S107")
     WebOsSession(Device device, WebOsProperties properties, HttpClient http, DeviceRegistry registry,
                  LearnedSettings learned, WakeOnLan wakeOnLan, Consumer<DeviceState> onChange, Runnable onClose) {
         this.device = device;
@@ -105,7 +112,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
      * {@link #connect} or {@link #lost}.
      */
     private void checkLiveness() {
-        SsapConnection current = connection;
+        SsapConnection current = connection.get();
         if (current == null || closed) {
             return;
         }
@@ -130,7 +137,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
     /** SSDP heard the TV announce itself: skip whatever is left of the backoff. */
     void reconnectNow() {
         onScheduler(() -> {
-            if (connection == null && state.status() != DeviceStatus.UNPAIRED) {
+            if (connection.get() == null && state.status() != DeviceStatus.UNPAIRED) {
                 backoff = initialBackoff();
                 connect();
             }
@@ -221,7 +228,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
     }
 
     private void togglePower() {
-        SsapConnection current = connection;
+        SsapConnection current = connection.get();
         if (current != null && state.powerOn()) {
             try {
                 current.fire(SsapUris.TURN_OFF, SsapMessages.empty());
@@ -250,7 +257,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
 
     private void connect() {
         cancelPendingConnect();
-        if (closed || connection != null) {
+        if (closed || connection.get() != null) {
             return;
         }
         String clientKey = WebOsSettings.of(current()).clientKey();
@@ -266,11 +273,12 @@ public class WebOsSession implements DeviceHandle, InputListing {
                     reason -> onScheduler(() -> lost(attempt.get(), reason)));
             attempt.set(opened);
             String key = opened.register(clientKey, Duration.ofSeconds(properties.requestTimeoutSeconds()));
-            connection = opened;
+            connection.set(opened);
             if (closed) {
-                // close() ran while registering and saw no connection to close.
-                connection = null;
-                opened.close();
+                // close() ran while registering and may have missed this connection.
+                if (connection.compareAndSet(opened, null)) {
+                    opened.close();
+                }
                 return;
             }
             backoff = initialBackoff();
@@ -340,10 +348,9 @@ public class WebOsSession implements DeviceHandle, InputListing {
     }
 
     private void lost(SsapConnection which, String reason) {
-        if (which == null || which != connection) {
+        if (which == null || !connection.compareAndSet(which, null)) {
             return;
         }
-        connection = null;
         which.close();
         inputs = List.of();
         log.info("Lost the connection to {} ({}); reconnecting", device.name(), reason);
@@ -372,7 +379,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
     }
 
     private SsapConnection requireConnected() {
-        SsapConnection current = connection;
+        SsapConnection current = connection.get();
         if (current != null) {
             return current;
         }
@@ -429,9 +436,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
     public void close() {
         closed = true;
         scheduler.shutdownNow();
-        SsapConnection current = connection;
-        connection = null;
-        closeQuietly(current);
+        closeQuietly(connection.getAndSet(null));
         onClose.run();
     }
 }
