@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -117,6 +118,20 @@ public class DeviceStateBroadcaster {
     public void onRailsChanged(RailsChangedEvent event) {
         Map<String, Object> body = Map.of("rails", event.keys());
         enqueue(emitter -> sendNamed(emitter, "rails", body));
+    }
+
+    /**
+     * Ends every stream as the application starts closing, before the web server's graceful shutdown. A stream never
+     * ends by itself, and graceful shutdown waits for every request in flight, so an open tab, or a closed one whose
+     * disconnect no failed send has revealed yet, would otherwise hold shutdown for the whole 30 s phase timeout.
+     * Browsers reconnect on their own once the application is back.
+     */
+    @EventListener(ContextClosedEvent.class)
+    public void onContextClosed() {
+        for (SseEmitter emitter : emitters) {
+            drop(emitter);
+            completeQuietly(emitter);
+        }
     }
 
     private void enqueue(Send send) {
