@@ -28,8 +28,8 @@ class WorkflowTemplateTest {
     @Test void rejectsDotSegmentsAfterExpansion() {
         var template = new WorkflowTemplate("https://media.example/{A}/play", Set.of("A"));
         for (String value : new String[]{".", ".."}) {
-            var preparedArg31_0 = Map.of("A", new WorkflowJson.Value(value, false));
-            assertThatThrownBy(() -> template.expand(preparedArg31_0))
+            var dotSegment = Map.of("A", new WorkflowJson.Value(value, false));
+            assertThatThrownBy(() -> template.expand(dotSegment))
                     .isInstanceOf(WorkflowException.class);
         }
     }
@@ -37,8 +37,8 @@ class WorkflowTemplateTest {
     @Test void unresolvedVariablesAndOversizedExpansionFail() {
         var template = new WorkflowTemplate("https://media.example/{A}", Set.of("A"));
         assertThatThrownBy(() -> template.expand(Map.of())).isInstanceOf(WorkflowException.class);
-        var preparedArg39_0 = Map.of("A", new WorkflowJson.Value("x".repeat(8200), false));
-        assertThatThrownBy(() -> template.expand(preparedArg39_0))
+        var oversized = Map.of("A", new WorkflowJson.Value("x".repeat(8200), false));
+        assertThatThrownBy(() -> template.expand(oversized))
                 .isInstanceOf(WorkflowException.class);
     }
 
@@ -56,14 +56,13 @@ class WorkflowTemplateTest {
     }
 
     @Test void invalidPlaceholdersAndQueryKeysFailAtConstruction() {
+        var variables = Set.of("A");
         for (String bad : new String[]{"https://media.example/?{A}&id=1", "https://media.example/?{A}=x",
                 "https://{A}/play", "https://media.example/{A", "https://media.example/a}"}) {
-            var preparedArg59_1 = Set.of("A");
-            assertThatThrownBy(() -> new WorkflowTemplate(bad, preparedArg59_1))
+            assertThatThrownBy(() -> new WorkflowTemplate(bad, variables))
                     .isInstanceOf(WorkflowException.class);
         }
-        var preparedArg62_1 = Set.of("A");
-        assertThatThrownBy(() -> new WorkflowTemplate("https://media.example/?id={B}", preparedArg62_1))
+        assertThatThrownBy(() -> new WorkflowTemplate("https://media.example/?id={B}", variables))
                 .isInstanceOf(WorkflowException.class);
     }
 }

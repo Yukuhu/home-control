@@ -74,31 +74,19 @@ class AppLinksTest {
         assertThat(item.kind()).isEqualTo(ContentKind.VIDEO);
     }
 
-    @Test
-    void aFileNameWithALiteralPlusKeepsItInsteadOfTurningItIntoASpace() {
-        String url = "https://media.example.org/films/Big+Buck+Bunny.mp4";
-
+    @ParameterizedTest
+    @CsvSource({
+            // a literal plus stays a plus instead of turning into a space
+            "https://media.example.org/films/Big+Buck+Bunny.mp4, Big+Buck+Bunny.mp4",
+            // literal non-ASCII characters are kept instead of turning into mojibake
+            "https://media.example.org/films/Bücherei.mp4, Bücherei.mp4",
+            // a percent-encoded non-ASCII name decodes as UTF-8
+            "https://media.example.org/films/%C3%BCber.mp4, über.mp4"
+    })
+    void theTitleIsTheDecodedFileName(String url, String title) {
         ContentItem item = AppLinks.fromUrl(url);
 
-        assertThat(item.title()).isEqualTo("Big+Buck+Bunny.mp4");
-    }
-
-    @Test
-    void aLiteralNonAsciiFileNameKeepsItsCharactersInsteadOfMojibake() {
-        String url = "https://media.example.org/films/Bücherei.mp4";
-
-        ContentItem item = AppLinks.fromUrl(url);
-
-        assertThat(item.title()).isEqualTo("Bücherei.mp4");
-    }
-
-    @Test
-    void aPercentEncodedNonAsciiFileNameDecodesAsUtf8() {
-        String url = "https://media.example.org/films/%C3%BCber.mp4";
-
-        ContentItem item = AppLinks.fromUrl(url);
-
-        assertThat(item.title()).isEqualTo("über.mp4");
+        assertThat(item.title()).isEqualTo(title);
     }
 
     @Test

@@ -23,8 +23,9 @@ class BluetoothDeploymentTest {
         assertThat(map(build, "args")).containsEntry("WITH_MPV", "true");
 
         Map<String, Object> environment = map(service, "environment");
-        assertThat(environment).containsEntry("HOME_CONTROL_BLUETOOTH_ENABLED", "true");
-        assertThat(environment).containsEntry("PULSE_SERVER", "unix:/run/pulse/native");
+        assertThat(environment)
+                .containsEntry("HOME_CONTROL_BLUETOOTH_ENABLED", "true")
+                .containsEntry("PULSE_SERVER", "unix:/run/pulse/native");
 
         List<String> volumes = stringList(service, "volumes");
         assertThat(volumes).containsExactlyInAnyOrder(
@@ -46,13 +47,15 @@ class BluetoothDeploymentTest {
         Map<String, Object> manifest = load("casaos/docker-compose.bluetooth.yml");
         Map<String, Object> service = map(map(manifest, "services"), "shield-remote");
 
-        assertThat(service).containsEntry("image", "ghcr.io/yukuhu/home-control:latest-bluetooth");
-        assertThat(service).containsEntry("network_mode", "host");
-        assertThat(service).containsEntry("restart", "unless-stopped");
+        assertThat(service)
+                .containsEntry("image", "ghcr.io/yukuhu/home-control:latest-bluetooth")
+                .containsEntry("network_mode", "host")
+                .containsEntry("restart", "unless-stopped");
 
         Map<String, Object> environment = map(service, "environment");
-        assertThat(environment).containsEntry("HOME_CONTROL_BLUETOOTH_ENABLED", "true");
-        assertThat(environment).containsEntry("PULSE_SERVER", "unix:/run/pulse/native");
+        assertThat(environment)
+                .containsEntry("HOME_CONTROL_BLUETOOTH_ENABLED", "true")
+                .containsEntry("PULSE_SERVER", "unix:/run/pulse/native");
 
         List<Map<String, Object>> volumes = maps(service, "volumes");
         assertThat(volumes).hasSize(4);
@@ -73,9 +76,10 @@ class BluetoothDeploymentTest {
         assertThat(containers).containsExactlyInAnyOrder("/data", "/run/dbus", "/etc/machine-id", "/run/pulse");
 
         Map<String, Object> metadata = map(manifest, "x-casaos");
-        assertThat(metadata).containsEntry("id", "dev.andre.shield-remote");
-        assertThat(metadata).containsEntry("main", "shield-remote");
-        assertThat(metadata).containsEntry("architectures", List.of("amd64", "arm64"));
+        assertThat(metadata)
+                .containsEntry("id", "dev.andre.shield-remote")
+                .containsEntry("main", "shield-remote")
+                .containsEntry("architectures", List.of("amd64", "arm64"));
     }
 
     @Test
@@ -117,17 +121,17 @@ class BluetoothDeploymentTest {
         Map<String, Object> buildBluetooth = releaseSteps.stream()
                 .filter(step -> "Build and push the Bluetooth variant".equals(step.get("name"))).findFirst().orElseThrow();
         Map<String, Object> buildWith = map(buildBluetooth, "with");
-        assertThat(buildWith).containsEntry("build-args", "WITH_MPV=true");
-        assertThat(buildWith).containsEntry("platforms", "linux/amd64,linux/arm64");
-        assertThat(buildWith).containsEntry("tags", "${{ steps.meta-bluetooth.outputs.tags }}");
+        assertThat(buildWith)
+                .containsEntry("build-args", "WITH_MPV=true")
+                .containsEntry("platforms", "linux/amd64,linux/arm64")
+                .containsEntry("tags", "${{ steps.meta-bluetooth.outputs.tags }}");
 
         Map<String, Object> image = map(jobs, "image");
         List<Map<String, Object>> imageSteps = maps(image, "steps");
         Map<String, Object> imageBluetooth = imageSteps.stream()
                 .filter(step -> "Build Dockerfile with mpv".equals(step.get("name"))).findFirst().orElseThrow();
         Map<String, Object> imageWith = map(imageBluetooth, "with");
-        assertThat(imageWith).containsEntry("build-args", "WITH_MPV=true");
-        assertThat(imageWith).containsEntry("push", false);
+        assertThat(imageWith).containsEntry("build-args", "WITH_MPV=true").containsEntry("push", false);
     }
 
     @Test

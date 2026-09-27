@@ -14,13 +14,13 @@ class CastLoadsTest {
         Map<String, Object> load = CastLoads.defaultMediaReceiver(
                 new PlayableRef.StreamUrl(URI.create("http://nas.local/films/bunny.mp4"), "video/mp4"), "Big Buck Bunny");
 
-        assertThat(load).containsEntry("autoplay", true).containsEntry("currentTime", 0);
-        assertThat(load).containsEntry("media", Map.of(
-                "contentId", "http://nas.local/films/bunny.mp4",
-                "contentUrl", "http://nas.local/films/bunny.mp4",
-                "contentType", "video/mp4",
-                "streamType", "BUFFERED",
-                "metadata", Map.of("metadataType", 0, "title", "Big Buck Bunny")));
+        assertThat(load).containsEntry("autoplay", true).containsEntry("currentTime", 0)
+                .containsEntry("media", Map.of(
+                        "contentId", "http://nas.local/films/bunny.mp4",
+                        "contentUrl", "http://nas.local/films/bunny.mp4",
+                        "contentType", "video/mp4",
+                        "streamType", "BUFFERED",
+                        "metadata", Map.of("metadataType", 0, "title", "Big Buck Bunny")));
     }
 
     @Test
@@ -30,8 +30,8 @@ class CastLoadsTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> media = (Map<String, Object>) load.get("media");
-        assertThat(media).containsEntry("contentType", "video/mp4");
-        assertThat(media).containsEntry("metadata", Map.of("metadataType", 0));
+        assertThat(media).containsEntry("contentType", "video/mp4")
+                .containsEntry("metadata", Map.of("metadataType", 0));
         assertThat(CastLoads.DEFAULT_MEDIA_RECEIVER).isEqualTo("CC1AD845");
     }
 }

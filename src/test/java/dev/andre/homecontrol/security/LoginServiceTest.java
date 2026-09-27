@@ -72,12 +72,11 @@ class LoginServiceTest {
     void theFirstSecretNeedsAValidNewPassword() {
         MockHttpServletRequest request = new MockHttpServletRequest();
 
-        var preparedArg54_0 = Map.of("jellyfin.token", "t");
-        assertThatThrownBy(() -> login.storeSecrets(preparedArg54_0, "short", "short", request))
+        var secrets = Map.of("jellyfin.token", "t");
+        assertThatThrownBy(() -> login.storeSecrets(secrets, "short", "short", request))
                 .isInstanceOf(PasswordRejectedException.class)
                 .hasMessage("The login password needs at least 10 characters");
-        var preparedArg57_0 = Map.of("jellyfin.token", "t");
-        assertThatThrownBy(() -> login.storeSecrets(preparedArg57_0, "long enough 1", "long enough 2", request))
+        assertThatThrownBy(() -> login.storeSecrets(secrets, "long enough 1", "long enough 2", request))
                 .isInstanceOf(PasswordRejectedException.class)
                 .hasMessage("The two passwords do not match");
         assertThat(store.hasSecrets()).isFalse();
@@ -97,9 +96,9 @@ class LoginServiceTest {
     void laterSecretsNeedAnAuthenticatedRequest() {
         MockHttpServletRequest request = firstSecretStored();
 
-        var preparedArg77_0 = Map.of("other.token", "u");
-        var preparedArg77_3 = new MockHttpServletRequest();
-        assertThatThrownBy(() -> login.storeSecrets(preparedArg77_0, null, null, preparedArg77_3))
+        var otherSecret = Map.of("other.token", "u");
+        var anonymous = new MockHttpServletRequest();
+        assertThatThrownBy(() -> login.storeSecrets(otherSecret, null, null, anonymous))
                 .isInstanceOf(LoginRequiredException.class)
                 .hasMessage("Log in first");
         assertThat(store.secret("other.token")).isEmpty();
@@ -172,8 +171,8 @@ class LoginServiceTest {
     void aNewPasswordIsCheckedBeforeTheCurrentOneSoOnlyWrongGuessesAreWrongPasswords() {
         firstSecretStored();
 
-        var preparedArg150_3 = new MockHttpServletRequest();
-        assertThatThrownBy(() -> login.changePassword("not the password", "short", "short", preparedArg150_3))
+        var anonymous = new MockHttpServletRequest();
+        assertThatThrownBy(() -> login.changePassword("not the password", "short", "short", anonymous))
                 .isInstanceOf(PasswordRejectedException.class)
                 .isNotInstanceOf(WrongPasswordException.class)
                 .hasMessage("The login password needs at least 10 characters");

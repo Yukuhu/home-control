@@ -132,8 +132,8 @@ class PinnedShortcutsTest {
 
     @Test
     void rejectsAnOverlongTitle() {
-        var preparedArg135_1 = "a".repeat(121);
-        assertThatThrownBy(() -> shortcuts.add("https://example.org/x", preparedArg135_1))
+        var overlongTitle = "a".repeat(121);
+        assertThatThrownBy(() -> shortcuts.add("https://example.org/x", overlongTitle))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Keep the title under 120 characters");
         assertThat(store.load()).isEmpty();
@@ -179,8 +179,8 @@ class PinnedShortcutsTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("No pinned link p-000000000000");
         assertThatThrownBy(() -> shortcuts.remove("p-000000000000"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("No pinned link p-000000000000");
-        var preparedArg181_0 = b.id();
-        assertThatThrownBy(() -> shortcuts.rename(preparedArg181_0, " "))
+        var pinnedId = b.id();
+        assertThatThrownBy(() -> shortcuts.rename(pinnedId, " "))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("Enter a title");
     }
 

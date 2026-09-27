@@ -14,6 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TheSportsDbClientTest {
 
@@ -154,17 +155,14 @@ class TheSportsDbClientTest {
     @Test
     void neverLeaksTheKey() {
         server.delay(Duration.ofSeconds(3));
-        try {
-            client.lookupLeague(FakeTheSportsDbServer.PERSONAL_KEY, "4331");
-            org.junit.jupiter.api.Assertions.fail("expected a TheSportsDbException");
-        } catch (TheSportsDbException e) {
-            assertThat(e.getMessage()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
-            assertThat(e.toString()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
-            assertThat(e.getCause()).isNull();
-            for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
-                assertThat(cause.getMessage()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
-                assertThat(cause.toString()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
-            }
+        TheSportsDbException e = assertThrows(TheSportsDbException.class,
+                () -> client.lookupLeague(FakeTheSportsDbServer.PERSONAL_KEY, "4331"));
+        assertThat(e.getMessage()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
+        assertThat(e.toString()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
+        assertThat(e.getCause()).isNull();
+        for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+            assertThat(cause.getMessage()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
+            assertThat(cause.toString()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
         }
     }
 

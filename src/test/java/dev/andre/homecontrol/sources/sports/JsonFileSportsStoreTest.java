@@ -93,8 +93,8 @@ class JsonFileSportsStoreTest {
     void malformedFilesAreNamedErrors(String content) throws IOException {
         Files.writeString(file(), content);
 
-        var preparedReceiver96 = new JsonFileSportsStore(file());
-        assertThatThrownBy(() -> preparedReceiver96.load())
+        var store = new JsonFileSportsStore(file());
+        assertThatThrownBy(store::load)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file().toString())
                 .hasMessageContaining("fix or delete it");

@@ -21,16 +21,18 @@ class CasaOsManifestTest {
         }
 
         Map<String, Object> service = map(map(manifest, "services"), "shield-remote");
-        assertThat(service).containsEntry("image", "ghcr.io/yukuhu/home-control:latest");
-        assertThat(service).containsEntry("network_mode", "host");
-        assertThat(service).containsEntry("restart", "unless-stopped");
-        assertThat(service).doesNotContainKeys("ports", "environment");
+        assertThat(service)
+                .containsEntry("image", "ghcr.io/yukuhu/home-control:latest")
+                .containsEntry("network_mode", "host")
+                .containsEntry("restart", "unless-stopped")
+                .doesNotContainKeys("ports", "environment");
 
         List<Map<String, Object>> volumes = maps(service, "volumes");
         assertThat(volumes).singleElement().satisfies(volume -> {
-            assertThat(volume).containsEntry("type", "bind");
-            assertThat(volume).containsEntry("source", "/DATA/AppData/$AppID/data");
-            assertThat(volume).containsEntry("target", "/data");
+            assertThat(volume)
+                    .containsEntry("type", "bind")
+                    .containsEntry("source", "/DATA/AppData/$AppID/data")
+                    .containsEntry("target", "/data");
         });
 
         Map<String, Object> serviceMetadata = map(service, "x-casaos");
@@ -40,13 +42,14 @@ class CasaOsManifestTest {
                 assertThat(volume).containsEntry("container", "/data"));
 
         Map<String, Object> metadata = map(manifest, "x-casaos");
-        assertThat(metadata).containsEntry("id", "dev.andre.shield-remote");
-        assertThat(metadata).containsEntry("main", "shield-remote");
-        assertThat(metadata).containsEntry("index", "/");
-        assertThat(metadata).containsEntry("port_map", "8080");
-        assertThat(metadata).containsEntry("scheme", "http");
-        assertThat(metadata).containsEntry("category", "Home");
-        assertThat(metadata).containsEntry("architectures", List.of("amd64", "arm64"));
+        assertThat(metadata)
+                .containsEntry("id", "dev.andre.shield-remote")
+                .containsEntry("main", "shield-remote")
+                .containsEntry("index", "/")
+                .containsEntry("port_map", "8080")
+                .containsEntry("scheme", "http")
+                .containsEntry("category", "Home")
+                .containsEntry("architectures", List.of("amd64", "arm64"));
     }
 
     @SuppressWarnings("unchecked")

@@ -188,8 +188,8 @@ class PlaybackServiceTest {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.noneOf(Capability.class));
 
-        var preparedArg191_0 = AppLinks.fromUrl("https://example.org/a");
-        assertThatThrownBy(() -> defaultService.play(preparedArg191_0, "shield"))
+        var link = AppLinks.fromUrl("https://example.org/a");
+        assertThatThrownBy(() -> defaultService.play(link, "shield"))
                 .isInstanceOf(UnroutableException.class)
                 .hasMessageContaining("Shield")
                 .hasMessageContaining("cannot open app links");
@@ -200,8 +200,8 @@ class PlaybackServiceTest {
     void anUnknownDeviceIsNotFound() {
         given(devices.device("ghost")).willReturn(Optional.empty());
 
-        var preparedArg202_0 = AppLinks.fromUrl("https://example.org/a");
-        assertThatThrownBy(() -> defaultService.play(preparedArg202_0, "ghost"))
+        var link = AppLinks.fromUrl("https://example.org/a");
+        assertThatThrownBy(() -> defaultService.play(link, "ghost"))
                 .isInstanceOf(DeviceNotFoundException.class);
     }
 

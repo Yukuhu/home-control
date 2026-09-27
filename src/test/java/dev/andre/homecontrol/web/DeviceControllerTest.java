@@ -223,7 +223,7 @@ class DeviceControllerTest {
     }
 
     @Test
-    void anUnrelatedIllegalArgumentIsNotReportedAsABadLink() throws Exception {
+    void anUnrelatedIllegalArgumentIsNotReportedAsABadLink() {
         given(playback.play(any(), eq("shield"))).willThrow(new IllegalArgumentException("programming error"));
 
         // Unhandled, so MockMvc rethrows it instead of rendering a 400 "bad link".
@@ -340,7 +340,7 @@ class DeviceControllerTest {
     }
 
     @Test
-    void anIllegalArgumentFromTheDeviceIsNotReportedAsABadVolume() throws Exception {
+    void anIllegalArgumentFromTheDeviceIsNotReportedAsABadVolume() {
         willThrow(new IllegalArgumentException("programming error")).given(devices).execute(eq("shield"), any());
 
         assertThatThrownBy(() -> mockMvc.perform(post("/devices/shield/volume").param("level", "10")))

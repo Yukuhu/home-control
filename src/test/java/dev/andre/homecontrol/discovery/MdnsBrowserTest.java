@@ -116,6 +116,7 @@ class MdnsBrowserTest {
 
             @Override
             public void removed(String serviceType, String name) {
+                // this listener only exists to throw from resolved()
             }
         });
         browser.browse("t", listener(seen));

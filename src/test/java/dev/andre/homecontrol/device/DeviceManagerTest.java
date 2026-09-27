@@ -402,7 +402,7 @@ class DeviceManagerTest {
     @Test
     void whatAHandleLearnsIsStoredUnderItsAdapterWithoutReconnecting() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-        try (DeviceManager manager = wakingManager(registry)) {
+        try (DeviceManager _ = wakingManager(registry)) {
             StubAdapter.StubHandle before = waking.handles.get("tv");
 
             waking.learned.get("tv").store(Map.of("macAddress", "A8:23:FE:01:02:03", "clientKey", "k2"));
@@ -498,10 +498,12 @@ class DeviceManagerTest {
 
         @Override
         public void execute(Action action) {
+            // these tests only read what the handle knows; actions are never sent
         }
 
         @Override
         public void close() {
+            // holds no connection or thread to release
         }
     }
 
@@ -573,10 +575,12 @@ class DeviceManagerTest {
 
         @Override
         public void execute(Action action) {
+            // these tests only read what the handle knows; actions are never sent
         }
 
         @Override
         public void close() {
+            // holds no connection or thread to release
         }
     }
 
@@ -631,6 +635,7 @@ class DeviceManagerTest {
 
         @Override
         public void execute(Action action) {
+            // only closing is observed; actions are irrelevant here
         }
 
         @Override

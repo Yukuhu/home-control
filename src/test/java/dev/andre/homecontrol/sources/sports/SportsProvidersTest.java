@@ -44,8 +44,8 @@ class SportsProvidersTest {
 
     @Test
     void refusesUnknownKeys() {
-        var preparedArg47_1 = Map.of("thesportsdb:9999", "dazn");
-        assertThatThrownBy(() -> SportsProviders.apply(SETTINGS, preparedArg47_1))
+        var unknownCompetition = Map.of("thesportsdb:9999", "dazn");
+        assertThatThrownBy(() -> SportsProviders.apply(SETTINGS, unknownCompetition))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("Unknown competition");
         assertThatThrownBy(() -> SportsProviders.apply(SETTINGS, Map.of("calendar:c-ffffffffffff", "dazn")))
                 .hasMessage("Unknown competition");

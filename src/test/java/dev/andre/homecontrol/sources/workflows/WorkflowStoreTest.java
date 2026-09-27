@@ -77,21 +77,15 @@ class WorkflowStoreTest {
     @Test void editsRequireAuthenticationAndRejectStaleRevisionsWithoutEvents() {
         WorkflowDefinition saved = first();
         int eventCount = events.size();
-        var preparedArg80_0 = saved.id();
-        var preparedArg80_1 = saved.revision();
-        var preparedArg80_2 = draft();
-        var preparedArg80_3 = new MockHttpServletRequest();
-        assertThatThrownBy(() -> workflows.update(preparedArg80_0, preparedArg80_1, preparedArg80_2, preparedArg80_3))
+        String id = saved.id();
+        long revision = saved.revision();
+        WorkflowDraft edit = draft();
+        var anonymous = new MockHttpServletRequest();
+        assertThatThrownBy(() -> workflows.update(id, revision, edit, anonymous))
                 .isInstanceOf(LoginRequiredException.class);
-        var preparedArg82_0 = saved.id();
-        var preparedArg82_1 = saved.revision();
-        var preparedArg82_3 = new MockHttpServletRequest();
-        assertThatThrownBy(() -> workflows.setEnabled(preparedArg82_0, preparedArg82_1, false, preparedArg82_3))
+        assertThatThrownBy(() -> workflows.setEnabled(id, revision, false, anonymous))
                 .isInstanceOf(LoginRequiredException.class);
-        var preparedArg84_0 = saved.id();
-        var preparedArg84_1 = saved.revision();
-        var preparedArg84_2 = new MockHttpServletRequest();
-        assertThatThrownBy(() -> workflows.remove(preparedArg84_0, preparedArg84_1, preparedArg84_2))
+        assertThatThrownBy(() -> workflows.remove(id, revision, anonymous))
                 .isInstanceOf(LoginRequiredException.class);
 
         WorkflowDefinition edited = workflows.update(saved.id(), saved.revision(), draft(), request);
@@ -151,12 +145,11 @@ class WorkflowStoreTest {
         login.storeSecrets(Map.of(key, "{corrupt-payload", "jellyfin.token", "keep-me"), PASSWORD, PASSWORD, request);
         workflows = new WorkflowStore(secrets, login, new WorkflowCodec(), events::add, new SecureRandom());
         assertThat(workflows.problems()).containsKey("damaged-record");
-        var preparedArg144_0 = draft();
-        var preparedArg144_3 = new MockHttpServletRequest();
-        assertThatThrownBy(() -> workflows.create(preparedArg144_0, null, null, preparedArg144_3))
+        WorkflowDraft replacement = draft();
+        var anonymous = new MockHttpServletRequest();
+        assertThatThrownBy(() -> workflows.create(replacement, null, null, anonymous))
                 .isInstanceOf(LoginRequiredException.class);
-        var preparedArg146_1 = new MockHttpServletRequest();
-        assertThatThrownBy(() -> workflows.removeInvalid("damaged-record", preparedArg146_1))
+        assertThatThrownBy(() -> workflows.removeInvalid("damaged-record", anonymous))
                 .isInstanceOf(LoginRequiredException.class);
         assertThat(secrets.secret(key)).contains("{corrupt-payload");
         assertThatThrownBy(() -> workflows.removeInvalid("not-displayed", request)).hasMessageContaining("Unknown workflow");
@@ -206,7 +199,10 @@ class WorkflowStoreTest {
         WorkflowDraft invalid = new WorkflowDraft(draft().name(), true, draft().mode(), draft().kind(),
                 draft().fetch(), draft().listing(), draft().tile(), draft().variables(),
                 new WorkflowDraft.Cast("https://media.example/too-bad/{Missing}", "video/mp4"));
-        assertThatThrownBy(() -> workflows.update(saved.id(), saved.revision(), invalid, request));
+        String id = saved.id();
+        long revision = saved.revision();
+        assertThatThrownBy(() -> workflows.update(id, revision, invalid, request))
+                .isInstanceOf(WorkflowException.class).hasMessageContaining("unknown media URL placeholder: Missing");
         assertThat(workflows.find(saved.id())).contains(saved);
         assertThat(events).hasSize(eventCount);
     }

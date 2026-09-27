@@ -224,6 +224,7 @@ class SourcesSetupControllerTest {
         handlerMapping.getHandlerMethods().forEach((info, method) -> {
             if (method.getBeanType().equals(SourcesSetupController.class)) {
                 assertThat(info.getPatternValues())
+                        .isNotEmpty()
                         .allSatisfy(pattern -> assertThat(pattern).startsWith("/setup/sources/"));
             }
         });

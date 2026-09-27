@@ -57,8 +57,8 @@ class DeviceDescriptionsTest {
                 + "<root><device><friendlyName>&x;</friendlyName></device></root>")
                 .getBytes(StandardCharsets.UTF_8);
 
-        var preparedArg60_1 = URI.create("http://10.0.0.1/d.xml");
-        assertThatThrownBy(() -> DeviceDescriptions.parse(xml, preparedArg60_1))
+        var location = URI.create("http://10.0.0.1/d.xml");
+        assertThatThrownBy(() -> DeviceDescriptions.parse(xml, location))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

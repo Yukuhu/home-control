@@ -45,7 +45,7 @@ class RailCacheTest {
         final List<Runnable> queued = new ArrayList<>();
         @Override public void execute(Runnable command) { queued.add(command); }
         void runAll() { List<Runnable> now = new ArrayList<>(queued); queued.clear(); now.forEach(Runnable::run); }
-        @Override public void shutdown() { }
+        @Override public void shutdown() { /* nothing runs in the background, so there is nothing to stop */ }
         @Override public List<Runnable> shutdownNow() { return List.of(); }
         @Override public boolean isShutdown() { return false; }
         @Override public boolean isTerminated() { return false; }

@@ -79,8 +79,8 @@ class JellyfinSetupServiceTest {
     void theLoginPasswordIsCheckedBeforeContactingJellyfin() {
         MockHttpServletRequest request = new MockHttpServletRequest();
 
-        var preparedArg82_0 = passwordRequest("short", "short");
-        assertThatThrownBy(() -> setup.connect(preparedArg82_0, request))
+        var weakPassword = passwordRequest("short", "short");
+        assertThatThrownBy(() -> setup.connect(weakPassword, request))
                 .isInstanceOf(PasswordRejectedException.class);
 
         assertThat(fake.requests()).isEmpty();
@@ -140,8 +140,8 @@ class JellyfinSetupServiceTest {
         setup.save(connected.withSessionLink("shield", "jf-dev").withPlayer("shield", JellyfinSettings.Player.VLC));
 
         MockHttpServletRequest unauthenticated = new MockHttpServletRequest();
-        var preparedArg142_0 = passwordRequest(null, null);
-        assertThatThrownBy(() -> setup.connect(preparedArg142_0, unauthenticated))
+        var reconnect = passwordRequest(null, null);
+        assertThatThrownBy(() -> setup.connect(reconnect, unauthenticated))
                 .isInstanceOf(LoginRequiredException.class);
 
         JellyfinSettings again = setup.connect(passwordRequest(null, null), first);
