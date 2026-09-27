@@ -159,6 +159,8 @@ class YouTubeEndToEndTest {
         return MAPPER.readTree(response.body());
     }
 
+    // One journey (connect, browse, search, play on Shield and Cast, disconnect); each step builds on the last.
+    @SuppressWarnings("java:S5961")
     @Test
     void youtubeFromConnectToCast(CapturedOutput output) throws Exception {
         try (FakeRemoteServer shieldRemote = new FakeRemoteServer();

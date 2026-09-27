@@ -152,19 +152,25 @@ class SportsEndToEndTest {
     /** The rail tile fragment's {@code data-*} attributes, one map per tile, in document order. */
     private static List<Map<String, String>> tiles(String html) {
         List<Map<String, String>> tiles = new ArrayList<>();
-        Matcher tileTag = Pattern.compile("<button[^>]*class=\"tile\"[^>]*>").matcher(html);
+        // Whole <button ...> tags first (linear, no backtracking), then keep the tile buttons.
+        Matcher buttonTag = Pattern.compile("<button[^>]*+>").matcher(html);
         Pattern attr = Pattern.compile("(data-[a-z-]+)=\"([^\"]*)\"");
-        while (tileTag.find()) {
-            Map<String, String> attrs = new LinkedHashMap<>();
-            Matcher a = attr.matcher(tileTag.group());
-            while (a.find()) {
-                attrs.put(a.group(1), a.group(2));
+        while (buttonTag.find()) {
+            String tag = buttonTag.group();
+            if (tag.contains("class=\"tile\"")) {
+                Map<String, String> attrs = new LinkedHashMap<>();
+                Matcher a = attr.matcher(tag);
+                while (a.find()) {
+                    attrs.put(a.group(1), a.group(2));
+                }
+                tiles.add(attrs);
             }
-            tiles.add(attrs);
         }
         return tiles;
     }
 
+    // One journey (add a calendar, map it to DAZN, open, paste a link, remove); each step builds on the last.
+    @SuppressWarnings("java:S5961")
     @Test
     @Order(1)
     void mappedEventsOpenDaznAndPastedLinksOpenTheEvent() throws Exception {

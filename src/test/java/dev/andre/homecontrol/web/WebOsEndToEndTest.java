@@ -140,6 +140,8 @@ class WebOsEndToEndTest {
         await().atMost(Duration.ofSeconds(10)).until(() -> devices.state(ID).status() == status);
     }
 
+    // One journey (discover, pair, control, wake, forget); each step needs the state the previous one left behind.
+    @SuppressWarnings("java:S5961")
     @Test
     void discoversPairsControlsWakesAndTestsALgTv() throws Exception {
         // 1. Discovered through SSDP and offered for prompt pairing.

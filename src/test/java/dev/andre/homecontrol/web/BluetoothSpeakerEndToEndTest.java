@@ -148,6 +148,8 @@ class BluetoothSpeakerEndToEndTest {
         });
     }
 
+    // One journey (pair, play, control, forget); each step needs the state the previous one left behind.
+    @SuppressWarnings("java:S5961")
     @Test
     void pairsPlaysControlsAndForgetsASpeaker() throws Exception {
         // 1.
