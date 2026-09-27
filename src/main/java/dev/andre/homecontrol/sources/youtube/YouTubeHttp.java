@@ -32,8 +32,8 @@ public class YouTubeHttp {
     public record Response(int status, String contentType, byte[] body) {
         @Override
         public boolean equals(Object other) {
-            return other instanceof Response that && status == that.status
-                    && Objects.equals(contentType, that.contentType) && Arrays.equals(body, that.body);
+            return other instanceof Response(var otherStatus, var otherContentType, var otherBody)
+                    && status == otherStatus && Objects.equals(contentType, otherContentType) && Arrays.equals(body, otherBody);
         }
 
         @Override

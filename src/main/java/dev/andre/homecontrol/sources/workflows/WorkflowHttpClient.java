@@ -181,8 +181,8 @@ public final class WorkflowHttpClient implements AutoCloseable {
     /** A response body, or where a redirect points; compared and printed by the body's content, not its identity. */
     record FetchResponse(byte[] body, String redirectLocation) {
         @Override public boolean equals(Object other) {
-            return other instanceof FetchResponse that && Arrays.equals(body, that.body)
-                    && Objects.equals(redirectLocation, that.redirectLocation);
+            return other instanceof FetchResponse(var otherBody, var otherRedirectLocation)
+                    && Arrays.equals(body, otherBody) && Objects.equals(redirectLocation, otherRedirectLocation);
         }
 
         @Override public int hashCode() {

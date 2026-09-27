@@ -32,8 +32,10 @@ public final class SecretKeySource {
     public record KeyHeader(String source, byte[] salt, int memoryKiB, int iterations, int parallelism) {
         @Override
         public boolean equals(Object other) {
-            return other instanceof KeyHeader that && Objects.equals(source, that.source) && Arrays.equals(salt, that.salt)
-                    && memoryKiB == that.memoryKiB && iterations == that.iterations && parallelism == that.parallelism;
+            return other instanceof KeyHeader(var otherSource, var otherSalt, var otherMemoryKiB, var otherIterations,
+                    var otherParallelism)
+                    && Objects.equals(source, otherSource) && Arrays.equals(salt, otherSalt)
+                    && memoryKiB == otherMemoryKiB && iterations == otherIterations && parallelism == otherParallelism;
         }
 
         @Override

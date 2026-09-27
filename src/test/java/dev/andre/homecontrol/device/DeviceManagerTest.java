@@ -401,7 +401,7 @@ class DeviceManagerTest {
     @Test
     void whatAHandleLearnsIsStoredUnderItsAdapterWithoutReconnecting() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-        try (DeviceManager _ = wakingManager(registry)) {
+        try (var _ = wakingManager(registry)) {
             StubAdapter.StubHandle before = waking.handles.get("tv");
 
             waking.learned.get("tv").store(Map.of("macAddress", "A8:23:FE:01:02:03", "clientKey", "k2"));

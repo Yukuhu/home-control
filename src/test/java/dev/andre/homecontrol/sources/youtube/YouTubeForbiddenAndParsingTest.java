@@ -14,7 +14,6 @@ import java.time.Instant;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -112,8 +111,8 @@ class YouTubeForbiddenAndParsingTest {
                 .isNotEqualTo(new YouTubeHttp.Response(201, "application/json", new byte[] {1, 2}))
                 .isNotEqualTo(new YouTubeHttp.Response(200, "text/plain", new byte[] {1, 2}))
                 .isNotEqualTo(new YouTubeHttp.Response(200, "application/json", new byte[] {1, 3}))
-                .isNotEqualTo("application/json");
-        assertThat(response).hasToString("Response[status=200, contentType=application/json, body=2 bytes]");
+                .isNotEqualTo("application/json")
+                .hasToString("Response[status=200, contentType=application/json, body=2 bytes]");
         assertThat(new YouTubeHttp.Response(204, null, null)).hasToString("Response[status=204, contentType=null, body=none]");
     }
 }
