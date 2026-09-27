@@ -9,7 +9,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -150,7 +149,7 @@ class JellyfinFixtureContractTest {
     }
 
     @Test
-    void playbackInfoFixturesDecideDirectPlay() throws IOException {
+    void playbackInfoFixturesDecideDirectPlay() {
         URI deviceServerUrl = URI.create("http://192.168.1.20:8096");
         JsonNode videoItem = MAPPER.readTree("""
                 {"Id":"3f2a9c1e7b6d4e5f8a9b0c1d2e3f4a5b","MediaType":"Video"}

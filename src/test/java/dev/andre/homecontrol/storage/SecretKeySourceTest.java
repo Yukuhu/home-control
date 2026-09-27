@@ -61,8 +61,8 @@ class SecretKeySourceTest {
     void aKeyFileOfTheWrongLengthIsRefused() throws Exception {
         Files.writeString(dir.resolve("secret.key"), Base64.getEncoder().encodeToString(new byte[16]) + "\n");
 
-        var preparedReceiver64 = source(null);
-        assertThatThrownBy(() -> preparedReceiver64.forWriting(null))
+        var keySource = source(null);
+        assertThatThrownBy(() -> keySource.forWriting(null))
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining("secret.key");
     }
@@ -71,8 +71,8 @@ class SecretKeySourceTest {
     void aKeyFileThatIsNotBase64IsRefusedWithoutQuotingIt() throws Exception {
         Files.writeString(dir.resolve("secret.key"), "pasted-by-mistake: hunter2 %%%\n");
 
-        var preparedReceiver = source(null);
-        assertThatThrownBy(() -> preparedReceiver.forWriting(null))
+        var keySource = source(null);
+        assertThatThrownBy(() -> keySource.forWriting(null))
                 .isInstanceOf(StorageException.class)
                 .hasMessage("Could not read " + dir.resolve("secret.key") + "; it must hold 32 base64-encoded bytes")
                 .hasNoCause();
@@ -82,8 +82,8 @@ class SecretKeySourceTest {
     void anUnknownKeySourceIsNamed() {
         var header = new SecretKeySource.KeyHeader("vault", null, 0, 0, 0);
 
-        var preparedReceiver = source("correct horse battery staple");
-        assertThatThrownBy(() -> preparedReceiver.keyFor(header))
+        var keySource = source("correct horse battery staple");
+        assertThatThrownBy(() -> keySource.keyFor(header))
                 .isInstanceOf(StorageException.class)
                 .hasMessage("secrets.json names an unknown key source");
     }

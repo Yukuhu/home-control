@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -65,7 +64,7 @@ class SubscriptionsFeedTest {
     }
 
     private static List<String> ids(List<YouTubeVideo> videos) {
-        return videos.stream().map(YouTubeVideo::id).collect(Collectors.toList());
+        return videos.stream().map(YouTubeVideo::id).toList();
     }
 
     @Test

@@ -83,8 +83,8 @@ class JsonFileDeviceRegistryTest {
         Path file = dir.resolve("devices.json");
         java.nio.file.Files.writeString(file, "{not-json");
 
-        var preparedReceiver86 = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(() -> preparedReceiver86.findAll())
+        var registry = new JsonFileDeviceRegistry(file);
+        assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("permissions");
@@ -95,8 +95,8 @@ class JsonFileDeviceRegistryTest {
         Path file = dir.resolve("devices.json");
         java.nio.file.Files.writeString(file, "null");
 
-        var preparedReceiver97 = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(() -> preparedReceiver97.findAll())
+        var registry = new JsonFileDeviceRegistry(file);
+        assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("integrity");
@@ -115,8 +115,8 @@ class JsonFileDeviceRegistryTest {
                 }]
                 """);
 
-        var preparedReceiver116 = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(() -> preparedReceiver116.findAll())
+        var registry = new JsonFileDeviceRegistry(file);
+        assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("integrity");
@@ -202,8 +202,8 @@ class JsonFileDeviceRegistryTest {
         Files.writeString(file, "[{\"id\":\"x\",\"name\":\"X\",\"host\":\"10.0.0.9\",\"port\":99999,"
                 + "\"certificateFingerprint\":null,\"lastSeen\":\"2026-08-29T18:00:00Z\"}]");
 
-        var preparedReceiver202 = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(() -> preparedReceiver202.findAll())
+        var registry = new JsonFileDeviceRegistry(file);
+        assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("integrity");
@@ -215,8 +215,8 @@ class JsonFileDeviceRegistryTest {
         Files.writeString(file, "[{\"id\":\"x\",\"name\":\"X\",\"host\":\"10.0.0.9\",\"port\":\"not-a-number\","
                 + "\"certificateFingerprint\":null,\"lastSeen\":\"2026-08-29T18:00:00Z\"}]");
 
-        var preparedReceiver214 = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(() -> preparedReceiver214.findAll())
+        var registry = new JsonFileDeviceRegistry(file);
+        assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("integrity");
@@ -228,8 +228,8 @@ class JsonFileDeviceRegistryTest {
         Files.writeString(file, "[{\"id\":\"x\",\"name\":\"X\",\"host\":\"10.0.0.9\","
                 + "\"certificateFingerprint\":null,\"lastSeen\":\"2026-08-29T18:00:00Z\"}]");
 
-        var preparedReceiver226 = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(() -> preparedReceiver226.findAll())
+        var registry = new JsonFileDeviceRegistry(file);
+        assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("integrity");
@@ -249,8 +249,8 @@ class JsonFileDeviceRegistryTest {
                 }]
                 """);
 
-        var preparedReceiver246 = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(() -> preparedReceiver246.findAll())
+        var registry = new JsonFileDeviceRegistry(file);
+        assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("integrity");
@@ -270,8 +270,8 @@ class JsonFileDeviceRegistryTest {
                 }]
                 """);
 
-        var preparedReceiver266 = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(() -> preparedReceiver266.findAll())
+        var registry = new JsonFileDeviceRegistry(file);
+        assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("integrity");

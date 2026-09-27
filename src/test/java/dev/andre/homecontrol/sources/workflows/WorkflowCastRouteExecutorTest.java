@@ -49,8 +49,8 @@ class WorkflowCastRouteExecutorTest {
         @SuppressWarnings("unchecked") var payload = (Map<String, Object>) cast.load().get("media");
         assertThat(payload).containsEntry("contentUrl", "https://media.example/play?token=fresh-secret")
                 .containsEntry("contentId", "https://media.example/play?token=fresh-secret")
-                .containsEntry("contentType", "audio/aac");
-        assertThat(payload).containsEntry("metadata", Map.of("metadataType", 0, "title", "News"));
+                .containsEntry("contentType", "audio/aac")
+                .containsEntry("metadata", Map.of("metadataType", 0, "title", "News"));
         verify(runner).resolve(fixture.definition, "single");
     }
 
@@ -126,8 +126,8 @@ class WorkflowCastRouteExecutorTest {
         fixture.store.update(ID, 1, fixture.definition.draft(), fixture.request);
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(ActionFailedException.class);
         fixture.store.setEnabled(ID, 2, false, fixture.request);
-        var preparedArg129_0 = new Route.WorkflowCast(ID, 3, "single");
-        assertThatThrownBy(() -> executor.execute(preparedArg129_0, tv)).isInstanceOf(ActionFailedException.class);
+        var disabledRoute = new Route.WorkflowCast(ID, 3, "single");
+        assertThatThrownBy(() -> executor.execute(disabledRoute, tv)).isInstanceOf(ActionFailedException.class);
         fixture.store.remove(ID, 3, fixture.request);
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(ActionFailedException.class);
         verifyNoInteractions(runner);

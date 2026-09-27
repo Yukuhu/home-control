@@ -81,9 +81,8 @@ class LoginGatingTest {
                 .andExpect(status().isNotFound());
         mockMvc.perform(post("/devices/nope/key/HOME")).andExpect(status().isNotFound());
         mockMvc.perform(get("/login")).andExpect(redirectedUrl("/"));
-        try (var files = Files.list(dataDir)) {
-            assertThat(files.map(p -> p.getFileName().toString())).doesNotContain("secrets.json", "secret.key");
-        }
+        assertThat(dataDir.resolve("secrets.json")).doesNotExist();
+        assertThat(dataDir.resolve("secret.key")).doesNotExist();
     }
 
     @Test

@@ -34,10 +34,10 @@ class PlayableRefTest {
 
     @Test
     void aStreamUrlWithoutSchemeOrQueryPrintsItsPath() {
-        assertThat(new PlayableRef.StreamUrl(URI.create("/media/song.flac"), "audio/flac").toString())
-                .isEqualTo("StreamUrl[url=/media/song.flac, mimeType=audio/flac]");
-        assertThat(new PlayableRef.StreamUrl(URI.create("https://cdn.example.com/a.mp4"), null).toString())
-                .isEqualTo("StreamUrl[url=https://cdn.example.com/a.mp4, mimeType=null]");
+        assertThat(new PlayableRef.StreamUrl(URI.create("/media/song.flac"), "audio/flac"))
+                .hasToString("StreamUrl[url=/media/song.flac, mimeType=audio/flac]");
+        assertThat(new PlayableRef.StreamUrl(URI.create("https://cdn.example.com/a.mp4"), null))
+                .hasToString("StreamUrl[url=https://cdn.example.com/a.mp4, mimeType=null]");
     }
 
     @Test
@@ -58,7 +58,8 @@ class PlayableRefTest {
         payload.put("channel", "sports");
 
         assertThat(message.message()).containsExactly(Map.entry("channel", "news"));
-        assertThatThrownBy(() -> message.message().put("x", "y")).isInstanceOf(UnsupportedOperationException.class);
+        Map<String, Object> kept = message.message();
+        assertThatThrownBy(() -> kept.put("x", "y")).isInstanceOf(UnsupportedOperationException.class);
         assertThat(new PlayableRef.CastMessage("ABCD1234", "urn:x-cast:com.example.play", null, "Example").message())
                 .isEmpty();
     }

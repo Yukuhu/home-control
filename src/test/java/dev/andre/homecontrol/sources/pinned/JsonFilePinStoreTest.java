@@ -101,8 +101,8 @@ class JsonFilePinStoreTest {
         Path file = dir.resolve("pinned.json");
         Files.writeString(file, content);
 
-        var preparedReceiver104 = new JsonFilePinStore(file);
-        assertThatThrownBy(() -> preparedReceiver104.load())
+        var store = new JsonFilePinStore(file);
+        assertThatThrownBy(store::load)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("fix or delete it");

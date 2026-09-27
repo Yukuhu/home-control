@@ -31,8 +31,8 @@ class DataDirectoryTest {
         Path blocked = dir.resolve("not-a-directory");
         Files.writeString(blocked, "occupied");
 
-        var preparedReceiver34 = new DataDirectory(blocked);
-        assertThatThrownBy(() -> preparedReceiver34.verifyWritable())
+        var dataDirectory = new DataDirectory(blocked);
+        assertThatThrownBy(dataDirectory::verifyWritable)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(blocked.toString())
                 .hasMessageContaining("bind-mounted")

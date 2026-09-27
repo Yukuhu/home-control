@@ -19,6 +19,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -62,6 +64,11 @@ class LoginControllerTest {
 
     private String submit(String password) {
         return controller.submit(password, "/devices", request, response, model);
+    }
+
+    /** Typed as {@code Map<String, Object>} so AssertJ can compare entries; Spring hands out {@code Map<String, ?>}. */
+    private static Map<String, Object> flash(RedirectAttributesModelMap redirect) {
+        return new HashMap<>(redirect.getFlashAttributes());
     }
 
     @Test
@@ -159,8 +166,8 @@ class LoginControllerTest {
         assertThat(controller.changePassword("old", "new", "new", request, redirect)).isEqualTo("redirect:/setup");
 
         verify(login).changePassword("old", "new", "new", request);
-        assertThat(redirect.getFlashAttributes().get("loginMessage"))
-                .isEqualTo("Password changed. Other browsers need to log in again.");
+        assertThat(flash(redirect))
+                .containsEntry("loginMessage", "Password changed. Other browsers need to log in again.");
         assertThat(limiter.blockedFor(ADDRESS)).isEmpty();
     }
 
@@ -172,10 +179,10 @@ class LoginControllerTest {
 
         controller.changePassword("guess", "new", "new", request, first);
 
-        assertThat(first.getFlashAttributes().get("loginError")).isEqualTo("The current password is wrong");
+        assertThat(flash(first)).containsEntry("loginError", "The current password is wrong");
         RedirectAttributesModelMap second = new RedirectAttributesModelMap();
         assertThat(controller.changePassword("guess", "new", "new", request, second)).isEqualTo("redirect:/setup");
-        assertThat(second.getFlashAttributes().get("loginError")).isEqualTo("Too many attempts. Try again in 15 minutes.");
+        assertThat(flash(second)).containsEntry("loginError", "Too many attempts. Try again in 15 minutes.");
         verify(login, times(1)).changePassword(any(), any(), any(), any());
     }
 
@@ -190,9 +197,9 @@ class LoginControllerTest {
         RedirectAttributesModelMap busy = new RedirectAttributesModelMap();
         controller.changePassword("old", "new", "new", request, busy);
 
-        assertThat(rejected.getFlashAttributes().get("loginError")).isEqualTo("The two passwords do not match");
-        assertThat(busy.getFlashAttributes().get("loginError"))
-                .isEqualTo("The server is busy checking other logins; try again in a moment");
+        assertThat(flash(rejected)).containsEntry("loginError", "The two passwords do not match");
+        assertThat(flash(busy))
+                .containsEntry("loginError", "The server is busy checking other logins; try again in a moment");
         assertThat(limiter.blockedFor(ADDRESS)).isEmpty();
     }
 

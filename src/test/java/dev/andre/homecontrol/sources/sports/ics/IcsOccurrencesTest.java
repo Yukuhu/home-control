@@ -94,10 +94,17 @@ class IcsOccurrencesTest {
 
     @Test
     void wallClockSurvivesDst() {
-        IcsCalendar calendar = IcsParser.parse(
-                "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nUID:x\n"
-                        + "DTSTART;TZID=Europe/Berlin:20261017T153000\nDTEND;TZID=Europe/Berlin:20261017T173000\n"
-                        + "RRULE:FREQ=WEEKLY;COUNT=3\nEND:VEVENT\nEND:VCALENDAR\n");
+        IcsCalendar calendar = IcsParser.parse("""
+                BEGIN:VCALENDAR
+                VERSION:2.0
+                BEGIN:VEVENT
+                UID:x
+                DTSTART;TZID=Europe/Berlin:20261017T153000
+                DTEND;TZID=Europe/Berlin:20261017T173000
+                RRULE:FREQ=WEEKLY;COUNT=3
+                END:VEVENT
+                END:VCALENDAR
+                """);
 
         IcsOccurrences.Result result = IcsOccurrences.expand(calendar, BERLIN,
                 Instant.parse("2026-10-01T00:00:00Z"), Instant.parse("2026-11-15T00:00:00Z"), DEFAULT_DURATION);
@@ -124,9 +131,17 @@ class IcsOccurrencesTest {
 
     @Test
     void intervalAndUntil() {
-        IcsCalendar calendar = IcsParser.parse(
-                "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nUID:x\nDTSTART:20260901T100000Z\nDTEND:20260901T110000Z\n"
-                        + "RRULE:FREQ=DAILY;INTERVAL=3;UNTIL=20260910T100000Z\nEND:VEVENT\nEND:VCALENDAR\n");
+        IcsCalendar calendar = IcsParser.parse("""
+                BEGIN:VCALENDAR
+                VERSION:2.0
+                BEGIN:VEVENT
+                UID:x
+                DTSTART:20260901T100000Z
+                DTEND:20260901T110000Z
+                RRULE:FREQ=DAILY;INTERVAL=3;UNTIL=20260910T100000Z
+                END:VEVENT
+                END:VCALENDAR
+                """);
 
         IcsOccurrences.Result result = IcsOccurrences.expand(calendar, BERLIN,
                 Instant.parse("2026-08-01T00:00:00Z"), Instant.parse("2026-10-01T00:00:00Z"), DEFAULT_DURATION);
@@ -138,9 +153,18 @@ class IcsOccurrencesTest {
 
     @Test
     void dateExdateOnAllDaySeries() {
-        IcsCalendar calendar = IcsParser.parse(
-                "BEGIN:VCALENDAR\nVERSION:2.0\nX-WR-TIMEZONE:Europe/Berlin\nBEGIN:VEVENT\nUID:x\n"
-                        + "DTSTART;VALUE=DATE:20260917\nRRULE:FREQ=DAILY;COUNT=3\nEXDATE;VALUE=DATE:20260918\nEND:VEVENT\nEND:VCALENDAR\n");
+        IcsCalendar calendar = IcsParser.parse("""
+                BEGIN:VCALENDAR
+                VERSION:2.0
+                X-WR-TIMEZONE:Europe/Berlin
+                BEGIN:VEVENT
+                UID:x
+                DTSTART;VALUE=DATE:20260917
+                RRULE:FREQ=DAILY;COUNT=3
+                EXDATE;VALUE=DATE:20260918
+                END:VEVENT
+                END:VCALENDAR
+                """);
 
         IcsOccurrences.Result result = IcsOccurrences.expand(calendar, BERLIN,
                 Instant.parse("2026-09-01T00:00:00Z"), Instant.parse("2026-10-01T00:00:00Z"), DEFAULT_DURATION);
@@ -151,9 +175,17 @@ class IcsOccurrencesTest {
 
     @Test
     void runawayRulesStop() {
-        IcsCalendar calendar = IcsParser.parse(
-                "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nUID:x\nDTSTART:18000101T100000Z\nDTEND:18000101T110000Z\n"
-                        + "RRULE:FREQ=DAILY\nEND:VEVENT\nEND:VCALENDAR\n");
+        IcsCalendar calendar = IcsParser.parse("""
+                BEGIN:VCALENDAR
+                VERSION:2.0
+                BEGIN:VEVENT
+                UID:x
+                DTSTART:18000101T100000Z
+                DTEND:18000101T110000Z
+                RRULE:FREQ=DAILY
+                END:VEVENT
+                END:VCALENDAR
+                """);
 
         IcsOccurrences.Result result = IcsOccurrences.expand(calendar, BERLIN,
                 Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-12-31T00:00:00Z"), DEFAULT_DURATION);

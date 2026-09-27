@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Optional;
 import java.util.Random;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
@@ -38,8 +37,16 @@ class SsdpMessageTest {
 
     @Test
     void parsesNotifyAliveAndByeBye() {
-        String alive = "NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\n"
-                + "USN: uuid:a::urn:x:1\r\nCACHE-CONTROL: max-age = 120\r\nLOCATION: http://10.0.0.2/d.xml\r\n\r\n";
+        String alive = """
+                NOTIFY * HTTP/1.1\r
+                HOST: 239.255.255.250:1900\r
+                NT: urn:x:1\r
+                NTS: ssdp:alive\r
+                USN: uuid:a::urn:x:1\r
+                CACHE-CONTROL: max-age = 120\r
+                LOCATION: http://10.0.0.2/d.xml\r
+                \r
+                """;
         SsdpMessage aliveMessage = SsdpMessage.parse(alive.getBytes(US_ASCII), alive.length()).orElseThrow();
         assertThat(aliveMessage.kind()).isEqualTo(SsdpMessage.Kind.NOTIFY);
         assertThat(aliveMessage.type()).contains("urn:x:1");
@@ -53,8 +60,16 @@ class SsdpMessageTest {
 
     @Test
     void acceptsBareLineFeeds() {
-        String alive = "NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\n"
-                + "USN: uuid:a::urn:x:1\r\nCACHE-CONTROL: max-age = 120\r\nLOCATION: http://10.0.0.2/d.xml\r\n\r\n";
+        String alive = """
+                NOTIFY * HTTP/1.1\r
+                HOST: 239.255.255.250:1900\r
+                NT: urn:x:1\r
+                NTS: ssdp:alive\r
+                USN: uuid:a::urn:x:1\r
+                CACHE-CONTROL: max-age = 120\r
+                LOCATION: http://10.0.0.2/d.xml\r
+                \r
+                """;
         String lfOnly = alive.replace("\r\n", "\n");
 
         SsdpMessage viaCrLf = SsdpMessage.parse(alive.getBytes(US_ASCII), alive.length()).orElseThrow();
@@ -68,8 +83,15 @@ class SsdpMessageTest {
 
     @Test
     void aMissingMaxAgeDefaultsToThirtyMinutes() {
-        String noMaxAge = "NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\n"
-                + "USN: uuid:a::urn:x:1\r\nLOCATION: http://10.0.0.2/d.xml\r\n\r\n";
+        String noMaxAge = """
+                NOTIFY * HTTP/1.1\r
+                HOST: 239.255.255.250:1900\r
+                NT: urn:x:1\r
+                NTS: ssdp:alive\r
+                USN: uuid:a::urn:x:1\r
+                LOCATION: http://10.0.0.2/d.xml\r
+                \r
+                """;
 
         SsdpMessage message = SsdpMessage.parse(noMaxAge.getBytes(US_ASCII), noMaxAge.length()).orElseThrow();
 
@@ -92,13 +114,15 @@ class SsdpMessageTest {
     void buildsAnMSearchRequest() {
         byte[] request = SsdpMessage.search("urn:x:1", "239.255.255.250:1900", 2, "Linux/1 UPnP/1.1 HomeControl/1");
 
-        assertThat(new String(request, US_ASCII)).isEqualTo("M-SEARCH * HTTP/1.1\r\n"
-                + "HOST: 239.255.255.250:1900\r\n"
-                + "MAN: \"ssdp:discover\"\r\n"
-                + "MX: 2\r\n"
-                + "ST: urn:x:1\r\n"
-                + "USER-AGENT: Linux/1 UPnP/1.1 HomeControl/1\r\n"
-                + "\r\n");
+        assertThat(new String(request, US_ASCII)).isEqualTo("""
+                M-SEARCH * HTTP/1.1\r
+                HOST: 239.255.255.250:1900\r
+                MAN: "ssdp:discover"\r
+                MX: 2\r
+                ST: urn:x:1\r
+                USER-AGENT: Linux/1 UPnP/1.1 HomeControl/1\r
+                \r
+                """);
 
         SsdpMessage parsed = SsdpMessage.parse(request, request.length).orElseThrow();
         assertThat(parsed.kind()).isEqualTo(SsdpMessage.Kind.SEARCH_REQUEST);

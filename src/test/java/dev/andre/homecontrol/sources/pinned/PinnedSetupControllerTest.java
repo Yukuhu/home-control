@@ -22,7 +22,6 @@ import java.util.Optional;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -104,7 +103,7 @@ class PinnedSetupControllerTest {
 
         mockMvc.perform(post("/setup/sources/pinned/p-aaaaaaaaaaaa/move").param("direction", "sideways"))
                 .andExpect(flash().attribute("pinnedError", "Choose up or down"));
-        verify(pins, never()).move(eq("p-aaaaaaaaaaaa"), eq(true));
+        verify(pins, never()).move("p-aaaaaaaaaaaa", true);
 
         given(pins.find("p-aaaaaaaaaaaa")).willReturn(Optional.of(pin("p-aaaaaaaaaaaa", "New title")));
         mockMvc.perform(post("/setup/sources/pinned/p-aaaaaaaaaaaa/remove"))

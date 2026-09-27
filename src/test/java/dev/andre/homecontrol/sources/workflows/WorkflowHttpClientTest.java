@@ -52,8 +52,8 @@ class WorkflowHttpClientTest {
     @Test void aCrossOriginRedirectDoesNotForwardAuthorization() throws Exception {
         try (var first = new FakeWorkflowServer(); var other = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(3))) {
             first.redirect("/feed", 302, other.url("/stolen").toString());
-            var preparedArg55_0 = request(first.url("/feed"));
-            assertThatThrownBy(() -> client.fetch(preparedArg55_0))
+            var feedRequest = request(first.url("/feed"));
+            assertThatThrownBy(() -> client.fetch(feedRequest))
                     .isInstanceOf(WorkflowException.class).hasMessageContaining("Fetch JSON").hasMessageNotContaining("secret-marker");
             assertThat(other.count("/stolen")).isZero();
         }
@@ -75,8 +75,8 @@ class WorkflowHttpClientTest {
         try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(3))) {
             for (int i = 0; i < 4; i++) server.redirect("/" + i, 302, "/" + (i + 1));
             server.respond("/4", 200, "{}");
-            var preparedArg77_0 = request(server.url("/0"));
-            assertThatThrownBy(() -> client.fetch(preparedArg77_0)).isInstanceOf(WorkflowException.class).hasMessageContaining("redirect");
+            var redirectChainRequest = request(server.url("/0"));
+            assertThatThrownBy(() -> client.fetch(redirectChainRequest)).isInstanceOf(WorkflowException.class).hasMessageContaining("redirect");
             assertThat(server.count("/4")).isZero();
         }
     }
@@ -85,8 +85,8 @@ class WorkflowHttpClientTest {
     void rejectsMalformedOrUnsafeRedirects(String location) throws Exception {
         try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(3))) {
             server.redirect("/a", 302, location);
-            var preparedArg86_0 = request(server.url("/a"));
-            assertThatThrownBy(() -> client.fetch(preparedArg86_0)).isInstanceOf(WorkflowException.class).hasMessageNotContaining("secret-marker");
+            var unsafeRedirectRequest = request(server.url("/a"));
+            assertThatThrownBy(() -> client.fetch(unsafeRedirectRequest)).isInstanceOf(WorkflowException.class).hasMessageNotContaining("secret-marker");
         }
     }
 
@@ -95,9 +95,9 @@ class WorkflowHttpClientTest {
         try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(3))) {
             server.respond("/bad", status, "secret-marker");
             server.respond("/ok", 200, "{}");
+            var failingRequest = request(server.url("/bad"));
             for (int i = 0; i < 6; i++) {
-                var preparedArg96_0 = request(server.url("/bad"));
-                assertThatThrownBy(() -> client.fetch(preparedArg96_0)).isInstanceOf(WorkflowException.class).hasMessageNotContaining("secret-marker").hasCause(null);
+                assertThatThrownBy(() -> client.fetch(failingRequest)).isInstanceOf(WorkflowException.class).hasMessageNotContaining("secret-marker").hasCause(null);
                 assertThat(client.fetch(request(server.url("/ok")))).asString().isEqualTo("{}");
             }
         }
@@ -109,10 +109,10 @@ class WorkflowHttpClientTest {
             server.respond("/big", 200, " ".repeat(2_097_153));
             server.route("/compressed", e -> { e.getResponseHeaders().set("Content-Encoding", "gzip"); e.sendResponseHeaders(200, 0); e.getResponseBody().write("secret-marker".getBytes()); });
             assertThat(client.fetch(request(server.url("/exact")))).hasSize(2_097_152);
-            var preparedArg108_0 = request(server.url("/big"));
-            assertThatThrownBy(() -> client.fetch(preparedArg108_0)).isInstanceOf(WorkflowException.class).hasMessageContaining("large");
-            var preparedArg109_0 = request(server.url("/compressed"));
-            assertThatThrownBy(() -> client.fetch(preparedArg109_0)).isInstanceOf(WorkflowException.class).hasMessageContaining("compression");
+            var oversizedRequest = request(server.url("/big"));
+            assertThatThrownBy(() -> client.fetch(oversizedRequest)).isInstanceOf(WorkflowException.class).hasMessageContaining("large");
+            var compressedRequest = request(server.url("/compressed"));
+            assertThatThrownBy(() -> client.fetch(compressedRequest)).isInstanceOf(WorkflowException.class).hasMessageContaining("compression");
         }
     }
 
@@ -139,8 +139,8 @@ class WorkflowHttpClientTest {
             for (int i = 0; i < 4; i++) futures.add(callers.submit(() -> client.fetch(request(server.url("/slow")))));
             try {
                 assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
-                var preparedArg136_0 = request(server.url("/fifth"));
-                assertThatThrownBy(() -> client.fetch(preparedArg136_0)).isInstanceOf(WorkflowException.class).hasMessageContaining("busy");
+                var fifthRequest = request(server.url("/fifth"));
+                assertThatThrownBy(() -> client.fetch(fifthRequest)).isInstanceOf(WorkflowException.class).hasMessageContaining("busy");
                 assertThat(server.count("/fifth")).isZero();
             } finally { release.countDown(); }
             for (var future : futures) assertThat(future.get(3, TimeUnit.SECONDS)).asString().isEqualTo("{}");
@@ -191,10 +191,10 @@ class WorkflowHttpClientTest {
             try {
                 assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
                 for (var result : results) assertThat(result.get(3, TimeUnit.SECONDS)).isInstanceOf(WorkflowException.class);
-                var preparedArg187_0 = named(server.url("/media"));
-                assertThatThrownBy(() -> client.checkMedia(preparedArg187_0)).isInstanceOf(WorkflowException.class).hasMessageContaining("busy");
-                var preparedArg188_0 = request(server.url("/fifth"));
-                assertThatThrownBy(() -> client.fetch(preparedArg188_0)).isInstanceOf(WorkflowException.class).hasMessageContaining("busy");
+                var mediaUrl = named(server.url("/media"));
+                assertThatThrownBy(() -> client.checkMedia(mediaUrl)).isInstanceOf(WorkflowException.class).hasMessageContaining("busy");
+                var fifthRequest = request(server.url("/fifth"));
+                assertThatThrownBy(() -> client.fetch(fifthRequest)).isInstanceOf(WorkflowException.class).hasMessageContaining("busy");
             } finally { release.countDown(); }
             assertThat(resolved.await(3, TimeUnit.SECONDS)).isTrue();
             server.respond("/ok", 200, "{}");
@@ -207,16 +207,16 @@ class WorkflowHttpClientTest {
         try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(3))) {
             client.checkMedia(named(server.url("/media")));
             assertThat(server.count("/media")).isZero();
-            var preparedArg201_0 = URI.create("http://169.254.1.1/media");
-            assertThatThrownBy(() -> client.checkMedia(preparedArg201_0)).isInstanceOf(WorkflowException.class).hasMessageContaining("Build media URL");
+            var linkLocalMediaUrl = URI.create("http://169.254.1.1/media");
+            assertThatThrownBy(() -> client.checkMedia(linkLocalMediaUrl)).isInstanceOf(WorkflowException.class).hasMessageContaining("Build media URL");
         }
     }
 
     @Test void rejectsUntrustedTlsEvenThroughInjectedDns() throws Exception {
         try (var server = FakeWorkflowServer.untrustedHttps(); var client = client(Duration.ofSeconds(3))) {
             server.respond("/feed", 200, "{}");
-            var preparedArg208_0 = request(named(server.url("/feed")));
-            assertThatThrownBy(() -> client.fetch(preparedArg208_0)).isInstanceOf(WorkflowException.class).hasCause(null);
+            var untrustedRequest = request(named(server.url("/feed")));
+            assertThatThrownBy(() -> client.fetch(untrustedRequest)).isInstanceOf(WorkflowException.class).hasCause(null);
             assertThat(server.count("/feed")).isZero();
         }
     }
@@ -228,8 +228,8 @@ class WorkflowHttpClientTest {
                 new InetAddress[]{InetAddress.ofLiteral(calls.incrementAndGet() == 1 ? "127.0.0.1" : "169.254.1.1")})) {
             server.redirect("/feed", 302, "/next");
             server.respond("/next", 200, "{}");
-            var preparedArg220_0 = request(named(server.url("/feed")));
-            assertThatThrownBy(() -> client.fetch(preparedArg220_0)).isInstanceOf(WorkflowException.class);
+            var feedRequest = request(named(server.url("/feed")));
+            assertThatThrownBy(() -> client.fetch(feedRequest)).isInstanceOf(WorkflowException.class);
             assertThat(server.count("/feed")).isOne();
             assertThat(server.count("/next")).isZero();
             assertThat(calls).hasValue(2);
@@ -239,8 +239,8 @@ class WorkflowHttpClientTest {
     @Test void mixedDnsAnswersPreventAnyConnection() throws Exception {
         try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(3), host ->
                 new InetAddress[]{InetAddress.ofLiteral("127.0.0.1"), InetAddress.ofLiteral("169.254.1.1")})) {
-            var preparedArg230_0 = request(named(server.url("/feed")));
-            assertThatThrownBy(() -> client.fetch(preparedArg230_0)).isInstanceOf(WorkflowException.class);
+            var feedRequest = request(named(server.url("/feed")));
+            assertThatThrownBy(() -> client.fetch(feedRequest)).isInstanceOf(WorkflowException.class);
             assertThat(server.count("/feed")).isZero();
         }
     }
@@ -249,8 +249,8 @@ class WorkflowHttpClientTest {
         try (var server = new FakeWorkflowServer(); var client = new WorkflowHttpClient(
                 new WorkflowProperties(true, false, Duration.ofSeconds(1), Duration.ofSeconds(2), 4, 2_097_152, 3),
                 new WorkflowUrlPolicy(false, host -> new InetAddress[]{InetAddress.ofLiteral("192.168.1.1")}))) {
-            var preparedArg239_0 = request(server.url("/feed"));
-            assertThatThrownBy(() -> client.fetch(preparedArg239_0)).isInstanceOf(WorkflowException.class);
+            var feedRequest = request(server.url("/feed"));
+            assertThatThrownBy(() -> client.fetch(feedRequest)).isInstanceOf(WorkflowException.class);
             assertThat(server.count("/feed")).isZero();
         }
     }
@@ -324,10 +324,10 @@ class WorkflowHttpClientTest {
             assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
             client.close();
             assertThat(result.get(2, TimeUnit.SECONDS)).isInstanceOf(WorkflowException.class);
-            var preparedArg312_0 = request(server.url("/next"));
-            assertThatThrownBy(() -> client.fetch(preparedArg312_0)).isInstanceOf(WorkflowException.class).hasMessageContaining("closed");
-            var preparedArg313_0 = server.url("/next");
-            assertThatThrownBy(() -> client.checkMedia(preparedArg313_0)).isInstanceOf(WorkflowException.class).hasMessageContaining("closed");
+            var nextRequest = request(server.url("/next"));
+            assertThatThrownBy(() -> client.fetch(nextRequest)).isInstanceOf(WorkflowException.class).hasMessageContaining("closed");
+            var nextMediaUrl = server.url("/next");
+            assertThatThrownBy(() -> client.checkMedia(nextMediaUrl)).isInstanceOf(WorkflowException.class).hasMessageContaining("closed");
         } finally { release.countDown(); }
     }
 
