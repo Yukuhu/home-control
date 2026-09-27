@@ -134,17 +134,23 @@ public class DeviceStateBroadcaster {
                 completeQuietly(emitter);
                 continue;
             }
+            boolean delivered = false;
             try {
                 send.to(emitter);
+                delivered = true;
             } catch (IOException | RuntimeException e) {
                 // Not just IOException: send throws an unchecked IllegalStateException when the
                 // emitter completed after this loop took its snapshot of the list, which happens
                 // routinely on tab close. Either way this subscriber is finished — drop it, and
-                // never let it stop the event reaching the remaining tabs. An Error is no such
-                // subscriber problem: it ends this task, and the executor starts a fresh thread.
+                // never let it stop the event reaching the remaining tabs.
                 log.debug("Dropping an SSE subscriber after a failed send", e);
-                drop(emitter);
                 completeQuietly(emitter, e);
+            } finally {
+                // An Error still ends this task (the executor starts a fresh thread), but the subscriber
+                // that raised it is dropped too, so it cannot cut off the tabs after it on every event.
+                if (!delivered) {
+                    drop(emitter);
+                }
             }
         }
     }
