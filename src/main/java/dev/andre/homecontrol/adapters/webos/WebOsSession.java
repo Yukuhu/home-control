@@ -158,7 +158,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
     public void execute(Action action) {
         switch (action) {
             case Action.PressKey(var key, var press) -> pressKey(key, press);
-            case Action.OpenAppLink(var uri, var _) -> {
+            case Action.OpenAppLink(var uri, _) -> {
                 WebOsLaunch launch = WebOsLaunches.forUri(uri);
                 call(launch.ssapUri(), launch.payload(), "open " + uri);
             }
