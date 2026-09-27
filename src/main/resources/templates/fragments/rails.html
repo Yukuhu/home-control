@@ -1,7 +1,3 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="en">
-<body>
-
 <section id="rails" th:fragment="rails" aria-label="Content">
     <div class="rails-empty" th:if="${!hasSources or #lists.isEmpty(rails)}">
         <div class="empty-art" aria-hidden="true"><span>♫</span><span>▷</span><span>▤</span></div>
@@ -76,6 +72,3 @@
     <span class="title" th:text="${item.title()}">Title</span>
     <span class="subtitle" th:if="${item.subtitle() != null}" th:text="${item.subtitle()}">S1:E1</span>
 </button>
-
-</body>
-</html>
