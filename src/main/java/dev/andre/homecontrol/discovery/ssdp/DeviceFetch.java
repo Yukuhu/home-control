@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
 public final class DeviceFetch {
 
     /** A device description or SCPD is small XML; anything past this is refused rather than read into memory. */
-    public static final long MAX_DESCRIPTION_BYTES = 64 * 1024;
+    public static final long MAX_DESCRIPTION_BYTES = 64L * 1024;
     public static final String USER_AGENT = "Linux/1 UPnP/1.1 HomeControl/1";
     private static final Pattern IPV4_LITERAL = Pattern.compile(
             "^(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(\\.(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$");

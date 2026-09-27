@@ -45,6 +45,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -68,12 +70,11 @@ public class DeviceManager implements AutoCloseable {
     /** device id → (adapter id → handle), in the device's adapter order. */
     private final Map<String, Map<String, DeviceHandle>> handles = new ConcurrentHashMap<>();
     /**
-     * device id → (adapter id → last state that adapter reported), in the device's adapter
-     * order. Each connect installs a fresh map, so a handle of a closed generation that
-     * reports late finds its map replaced and is ignored. Written under {@link #lock} (the map
-     * itself) and under the inner map's own monitor (its entries).
+     * device id → the states its adapters last reported. Each connect installs a fresh
+     * {@link Generation}, so a handle of a closed generation that reports late finds it replaced
+     * and is ignored. Written under {@link #lock}; each generation guards its own entries.
      */
-    private final Map<String, Map<String, DeviceState>> reported = new ConcurrentHashMap<>();
+    private final Map<String, Generation> reported = new ConcurrentHashMap<>();
     /**
      * Guards every write to {@link #handles} and {@link #reported} (via {@link #tryConnect},
      * {@link #closeHandles}, {@link #adopt}, {@link #forget}, {@link #addDiscovered},
@@ -119,13 +120,8 @@ public class DeviceManager implements AutoCloseable {
 
     /** The composed state of the device's adapters; an unknown or handle-less device reads as DISCONNECTED. */
     public DeviceState state(String id) {
-        Map<String, DeviceState> states = reported.get(id);
-        if (states == null) {
-            return DeviceState.initial();
-        }
-        synchronized (states) {
-            return DeviceStates.compose(List.copyOf(states.values()));
-        }
+        Generation generation = reported.get(id);
+        return generation == null ? DeviceState.initial() : generation.composed();
     }
 
     public Map<String, DeviceState> states() {
@@ -162,38 +158,13 @@ public class DeviceManager implements AutoCloseable {
             stopEverywhere(device, deviceHandles, action);
             return;
         }
-        DeviceOfflineException firstOffline = null;
-        UnsupportedActionException lastUnsupported = null;
+        FallThrough failures = new FallThrough(device);
         for (String adapterId : device.adapters().keySet()) {
-            DeviceAdapter adapter = adapters.get(adapterId);
-            if (adapter == null || !action.acceptedBy(adapter.capabilities(device))) {
-                continue;
-            }
-            DeviceHandle handle = deviceHandles.get(adapterId);
-            if (handle == null) {
-                if (firstOffline == null) {
-                    firstOffline = new DeviceOfflineException(device.name() + NOT_CONNECTED_SUFFIX);
-                }
-                continue;
-            }
-            try {
-                handle.execute(action);
+            if (accepts(device, adapterId, action::acceptedBy) && failures.sent(deviceHandles.get(adapterId), action)) {
                 return;
-            } catch (DeviceOfflineException e) {
-                if (firstOffline == null) {
-                    firstOffline = e;
-                }
-            } catch (UnsupportedActionException e) {
-                lastUnsupported = e;
             }
         }
-        if (firstOffline != null) {
-            throw firstOffline;
-        }
-        if (lastUnsupported != null) {
-            throw lastUnsupported;
-        }
-        throw new UnsupportedActionException(device.name() + " cannot perform " + action);
+        throw failures.reason(() -> new UnsupportedActionException(device.name() + " cannot perform " + action));
     }
 
     /**
@@ -202,53 +173,15 @@ public class DeviceManager implements AutoCloseable {
      * refusal wins, then the first offline reason, then the last unsupported one.
      */
     private void stopEverywhere(Device device, Map<String, DeviceHandle> deviceHandles, Action stop) {
+        FallThrough failures = new FallThrough(device);
         boolean stopped = false;
-        boolean accepted = false;
-        ActionFailedException firstRefusal = null;
-        DeviceOfflineException firstOffline = null;
-        UnsupportedActionException lastUnsupported = null;
         for (String adapterId : device.adapters().keySet()) {
-            DeviceAdapter adapter = adapters.get(adapterId);
-            if (adapter == null || !stop.acceptedBy(adapter.capabilities(device))) {
-                continue;
-            }
-            accepted = true;
-            DeviceHandle handle = deviceHandles.get(adapterId);
-            if (handle == null) {
-                if (firstOffline == null) {
-                    firstOffline = new DeviceOfflineException(device.name() + NOT_CONNECTED_SUFFIX);
-                }
-                continue;
-            }
-            try {
-                handle.execute(stop);
+            if (accepts(device, adapterId, stop::acceptedBy) && failures.stopped(deviceHandles.get(adapterId), stop)) {
                 stopped = true;
-            } catch (ActionFailedException e) {
-                if (firstRefusal == null) {
-                    firstRefusal = e;
-                }
-            } catch (DeviceOfflineException e) {
-                if (firstOffline == null) {
-                    firstOffline = e;
-                }
-            } catch (UnsupportedActionException e) {
-                lastUnsupported = e;
             }
         }
-        if (stopped) {
-            return;
-        }
-        if (firstRefusal != null) {
-            throw firstRefusal;
-        }
-        if (firstOffline != null) {
-            throw firstOffline;
-        }
-        if (lastUnsupported != null) {
-            throw lastUnsupported;
-        }
-        if (!accepted) {
-            throw new UnsupportedActionException(device.name() + " cannot perform " + stop);
+        if (!stopped) {
+            throw failures.reason(() -> new UnsupportedActionException(device.name() + " cannot perform " + stop));
         }
     }
 
@@ -261,37 +194,105 @@ public class DeviceManager implements AutoCloseable {
         Device device = registry.findById(id)
                 .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
         Map<String, DeviceHandle> deviceHandles = handles.getOrDefault(id, Map.of());
-        DeviceOfflineException firstOffline = null;
-        UnsupportedActionException lastUnsupported = null;
+        FallThrough failures = new FallThrough(device);
         for (String adapterId : device.adapters().keySet()) {
-            DeviceAdapter adapter = adapters.get(adapterId);
-            if (adapter == null || !adapter.capabilities(device).contains(Capability.CAST_RECEIVER)) {
-                continue;
-            }
             DeviceHandle handle = deviceHandles.get(adapterId);
-            if (handle == null) {
-                if (firstOffline == null) {
-                    firstOffline = new DeviceOfflineException(device.name() + NOT_CONNECTED_SUFFIX);
+            if (accepts(device, adapterId, capabilities -> capabilities.contains(Capability.CAST_RECEIVER))
+                    && failures.reachable(handle)) {
+                try {
+                    return handle.query(query);
+                } catch (DeviceOfflineException e) {
+                    failures.offline(e);
+                } catch (UnsupportedActionException e) {
+                    failures.unsupported(e);
                 }
-                continue;
+            }
+        }
+        throw failures.reason(() -> new UnsupportedActionException(device.name() + " is not a Cast receiver"));
+    }
+
+    /** True when the adapter is switched on and declares what {@code accepts} asks for on this device. */
+    private boolean accepts(Device device, String adapterId, Predicate<Set<Capability>> accepts) {
+        DeviceAdapter adapter = adapters.get(adapterId);
+        return adapter != null && accepts.test(adapter.capabilities(device));
+    }
+
+    /**
+     * Why none of a device's adapters could send, collected while falling through them in order:
+     * the first refusal (only stop falls through one) wins, then the first offline reason — an
+     * adapter without a live handle counts as offline — then the last unsupported one.
+     */
+    private static final class FallThrough {
+
+        private final Device device;
+        private ActionFailedException firstRefusal;
+        private DeviceOfflineException firstOffline;
+        private UnsupportedActionException lastUnsupported;
+
+        FallThrough(Device device) {
+            this.device = device;
+        }
+
+        /** False, with the device kept as offline, when the adapter has no live handle. */
+        boolean reachable(DeviceHandle handle) {
+            if (handle == null) {
+                offline(new DeviceOfflineException(device.name() + NOT_CONNECTED_SUFFIX));
+                return false;
+            }
+            return true;
+        }
+
+        /** Sends through the handle; false, with the reason kept, when it could not. A refusal propagates. */
+        boolean sent(DeviceHandle handle, Action action) {
+            if (!reachable(handle)) {
+                return false;
             }
             try {
-                return handle.query(query);
+                handle.execute(action);
+                return true;
             } catch (DeviceOfflineException e) {
-                if (firstOffline == null) {
-                    firstOffline = e;
-                }
+                offline(e);
             } catch (UnsupportedActionException e) {
-                lastUnsupported = e;
+                unsupported(e);
+            }
+            return false;
+        }
+
+        /** Like {@link #sent}, but a refusal is kept too, so the other adapters still get the stop. */
+        boolean stopped(DeviceHandle handle, Action stop) {
+            try {
+                return sent(handle, stop);
+            } catch (ActionFailedException e) {
+                if (firstRefusal == null) {
+                    firstRefusal = e;
+                }
+                return false;
             }
         }
-        if (firstOffline != null) {
-            throw firstOffline;
+
+        void offline(DeviceOfflineException e) {
+            if (firstOffline == null) {
+                firstOffline = e;
+            }
         }
-        if (lastUnsupported != null) {
-            throw lastUnsupported;
+
+        void unsupported(UnsupportedActionException e) {
+            lastUnsupported = e;
         }
-        throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
+
+        /** The reason that wins, or {@code otherwise} when no adapter was even asked. */
+        RuntimeException reason(Supplier<UnsupportedActionException> otherwise) {
+            if (firstRefusal != null) {
+                return firstRefusal;
+            }
+            if (firstOffline != null) {
+                return firstOffline;
+            }
+            if (lastUnsupported != null) {
+                return lastUnsupported;
+            }
+            return otherwise.get();
+        }
     }
 
     /**
@@ -707,7 +708,7 @@ public class DeviceManager implements AutoCloseable {
 
     static String uniqueId(List<Device> registered, String adapterId, String host) {
         String base = adapterId + "-" + host.toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+                .replaceAll("[^a-z0-9]+", "-").replaceFirst("^-", "").replaceFirst("-$", "");
         Set<String> taken = registered.stream().map(Device::id).collect(Collectors.toSet());
         String id = base;
         for (int n = 2; taken.contains(id); n++) {
@@ -737,16 +738,16 @@ public class DeviceManager implements AutoCloseable {
     private boolean tryConnect(Device device) {
         synchronized (lock) {
             closeHandles(device.id());
-            Map<String, DeviceState> states = new LinkedHashMap<>();
-            device.adapters().keySet().stream()
+            List<String> adapterIds = device.adapters().keySet().stream()
                     .filter(adapters::containsKey)
-                    .forEach(adapterId -> states.put(adapterId, DeviceState.initial()));
-            reported.put(device.id(), states);
+                    .toList();
+            Generation generation = new Generation(device.id(), adapterIds);
+            reported.put(device.id(), generation);
             Map<String, DeviceHandle> deviceHandles = new LinkedHashMap<>();
-            for (String adapterId : List.copyOf(states.keySet())) {
+            for (String adapterId : adapterIds) {
                 try {
                     deviceHandles.put(adapterId, adapters.get(adapterId).connect(device,
-                            state -> report(device.id(), states, adapterId, state),
+                            state -> generation.report(adapterId, state),
                             updates -> updateAdapterSettings(device.id(), adapterId, updates)));
                 } catch (RuntimeException e) {
                     log.warn("Could not connect {} via the {} adapter; leaving it disconnected",
@@ -762,17 +763,33 @@ public class DeviceManager implements AutoCloseable {
     }
 
     /**
-     * Publishes the composed state inside the generation's monitor, so two adapters' updates
-     * reach SSE in the order they were composed.
+     * One connect of one device: adapter id → the state that adapter last reported, in the
+     * device's adapter order. Its own monitor guards the entries.
      */
-    private void report(String deviceId, Map<String, DeviceState> states, String adapterId, DeviceState state) {
-        synchronized (states) {
-            if (reported.get(deviceId) != states) {
+    private final class Generation {
+
+        private final String deviceId;
+        private final Map<String, DeviceState> states = new LinkedHashMap<>();
+
+        Generation(String deviceId, List<String> adapterIds) {
+            this.deviceId = deviceId;
+            adapterIds.forEach(adapterId -> states.put(adapterId, DeviceState.initial()));
+        }
+
+        synchronized DeviceState composed() {
+            return DeviceStates.compose(List.copyOf(states.values()));
+        }
+
+        /**
+         * Publishes the composed state inside this monitor, so two adapters' updates reach SSE in
+         * the order they were composed.
+         */
+        synchronized void report(String adapterId, DeviceState state) {
+            if (reported.get(deviceId) != this) {
                 return; // a handle from a closed generation reporting late
             }
             states.put(adapterId, state);
-            events.publishEvent(new DeviceStateChangedEvent(deviceId,
-                    DeviceStates.compose(List.copyOf(states.values()))));
+            events.publishEvent(new DeviceStateChangedEvent(deviceId, composed()));
         }
     }
 

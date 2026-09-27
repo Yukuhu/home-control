@@ -55,7 +55,7 @@ public record SsdpMessage(Kind kind, Map<String, String> headers) {
 
     /** {@code NT} for announcements, {@code ST} for search requests and responses. */
     public Optional<String> type() {
-        return kind == Kind.NOTIFY ? header("NT") : header("ST");
+        return header(kind == Kind.NOTIFY ? "NT" : "ST");
     }
 
     public boolean isByeBye() {
