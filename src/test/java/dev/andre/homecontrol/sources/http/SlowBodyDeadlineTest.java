@@ -5,6 +5,9 @@ import dev.andre.homecontrol.sources.jellyfin.JellyfinConnection;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinException;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinProperties;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
+import dev.andre.homecontrol.sources.sports.calendar.CalendarFetchException;
+import dev.andre.homecontrol.sources.sports.calendar.CalendarFetcher;
+import dev.andre.homecontrol.sources.sports.calendar.CalendarUrlPolicy;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbClient;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbException;
 import dev.andre.homecontrol.sources.tmdb.TmdbClient;
@@ -94,6 +97,20 @@ class SlowBodyDeadlineTest {
                 .isInstanceOf(YouTubeException.class)
                 .hasFieldOrPropertyWithValue("kind", YouTubeException.Kind.UNREACHABLE)
                 .hasMessage("Could not reach 127.0.0.1");
+        assertThat(server.bytesSent()).isGreaterThan(1);
+    }
+
+    @Test
+    void calendars() {
+        URI calendar = server.url("/cal.ics");
+        try (CalendarFetcher fetcher = new CalendarFetcher(
+                new SportsProperties.Calendar(Duration.ofHours(6), 1, 1, 5 * 1024 * 1024, 3, true),
+                new CalendarUrlPolicy(true))) {
+            assertThatThrownBy(() -> fetcher.fetch(calendar))
+                    .isInstanceOf(CalendarFetchException.class)
+                    .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNREACHABLE)
+                    .hasMessage("Could not reach 127.0.0.1");
+        }
         assertThat(server.bytesSent()).isGreaterThan(1);
     }
 }
