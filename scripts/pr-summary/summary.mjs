@@ -16,7 +16,8 @@ const MAX_TRACE_LINES = 30;
 export const CHECKS = [
     { key: "jar", job: "Build the jar", label: "Jar" },
     { key: "test", job: "Build and test", label: "Unit and integration tests", suite: "test" },
-    { key: "e2e", job: "Browser tests (Chromium, WebKit)", label: "Browser tests (Chromium, WebKit)", suite: "e2e" },
+    { key: "e2e-chromium", job: "Browser tests (Chromium)", label: "Browser tests (Chromium)", suite: "e2e-chromium" },
+    { key: "e2e-webkit", job: "Browser tests (WebKit)", label: "Browser tests (WebKit)", suite: "e2e-webkit" },
     { key: "sonar", job: "SonarCloud quality gate", label: "SonarCloud quality gate" },
     { key: "image", job: "Build the self-contained image", label: "Image built from source (amd64)" },
     { key: "smoke", job: "Smoke-test the image", label: "Image smoke test (amd64, arm64)" },
@@ -331,7 +332,11 @@ export function buildModel({ env, suites, gate, now }) {
 }
 
 export async function main(env, fetch = globalThis.fetch) {
-    const suites = { test: await collectSuite(env.JUNIT_TEST_DIR), e2e: await collectSuite(env.JUNIT_E2E_DIR) };
+    const suites = {
+        test: await collectSuite(env.JUNIT_TEST_DIR),
+        "e2e-chromium": await collectSuite(env.JUNIT_E2E_CHROMIUM_DIR),
+        "e2e-webkit": await collectSuite(env.JUNIT_E2E_WEBKIT_DIR),
+    };
     const sonar = JSON.parse(env.NEEDS_JSON).sonar?.result;
     const gate = sonar === "success" || sonar === "failure"
         ? await fetchGate({ projectKey: env.SONAR_PROJECT_KEY, pullRequest: env.PR_NUMBER,

@@ -268,33 +268,19 @@ jobs:
           version: ${{ needs.jar.outputs.version }}
           token: ${{ github.token }}
 
-  e2e:
-    name: Browser tests (Chromium, WebKit)
+  # The browser tests run in one job for each browser, so that each takes half the time and the
+  # SonarCloud scan waits only for Chromium, the one browser that can say which JavaScript ran.
+  e2e-chromium:
+    name: Browser tests (Chromium)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+      - uses: ./.github/actions/browser-tests
         with:
-          distribution: temurin
-          java-version: '25'
-
-      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
-
-      # Browser binaries are version-pinned by gradle/libs.versions.toml; OS packages are re-installed every
-      # run by --with-deps (fast when already present) because the runner image is fresh.
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
-
-      - name: Install Chromium and WebKit
-        run: ./gradlew installPlaywrightBrowsers
-
-      - name: Run the browser tests
-        run: ./gradlew e2eTest -Pe2eCoverage=true
+          browser: chromium
+          coverage: true
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -331,27 +317,21 @@ jobs:
           path: build/reports/pr-summary/lcov.info
           if-no-files-found: error
 
-      - name: Upload the browser test report and traces
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: e2e-report
-          path: |
-            build/reports/tests/e2eTest
-            build/e2e-artifacts
-          if-no-files-found: ignore
+  e2e-webkit:
+    name: Browser tests (WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Upload the test results for the pull request summary
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: ./.github/actions/browser-tests
         with:
-          name: junit-e2e
-          path: build/test-results/e2eTest/TEST-*.xml
-          if-no-files-found: ignore
+          browser: webkit
 
   sonar:
     name: SonarCloud quality gate
-    needs: [test, e2e]
+    # Not the WebKit tests: they add nothing to the scan, and the release waits for them itself.
+    needs: [test, e2e-chromium]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -437,7 +417,7 @@ jobs:
     # One comment per pull request, replaced on every run. Runs when earlier jobs failed, which
     # is when it matters, but not when the run was cancelled. Fork pull requests get a read-only
     # token, so they are left out.
-    needs: [jar, test, e2e, image, smoke, smoke-bluetooth, sonar, dependencies]
+    needs: [jar, test, e2e-chromium, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies]
     if: >-
       !cancelled()
       && github.event_name == 'pull_request'
@@ -469,12 +449,19 @@ jobs:
           name: junit-test
           path: junit/test
 
-      - name: Download the browser test results
+      - name: Download the Chromium test results
         continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: junit-e2e
-          path: junit/e2e
+          name: junit-e2e-chromium
+          path: junit/e2e-chromium
+
+      - name: Download the WebKit test results
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: junit-e2e-webkit
+          path: junit/e2e-webkit
 
       # The only step here that may fail the job: a broken summary script should fail the
       # pull request that broke it. Everything after it reports problems as warnings.
@@ -518,7 +505,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: Yukuhu_home-control
           JUNIT_TEST_DIR: ${{ github.workspace }}/junit/test
-          JUNIT_E2E_DIR: ${{ github.workspace }}/junit/e2e
+          JUNIT_E2E_CHROMIUM_DIR: ${{ github.workspace }}/junit/e2e-chromium
+          JUNIT_E2E_WEBKIT_DIR: ${{ github.workspace }}/junit/e2e-webkit
           SUMMARY_FILE: ${{ runner.temp }}/summary.md
         run: |
           if ! npm run --silent summary; then
@@ -557,7 +545,7 @@ jobs:
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && needs.jar.outputs.release == 'true'
-    needs: [jar, test, image, smoke, e2e, sonar]
+    needs: [jar, test, image, smoke, e2e-chromium, e2e-webkit, sonar]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -676,7 +664,17 @@ jobs:
     # repository's settings. The release jobs are not checks and are not needed. The summary
     # is: the one step of it that may fail tests the script that writes it.
     if: always()
-    needs: [jar, test, e2e, sonar, image, smoke, smoke-bluetooth, dependencies, pr-summary]
+    needs:
+      - jar
+      - test
+      - e2e-chromium
+      - e2e-webkit
+      - sonar
+      - image
+      - smoke
+      - smoke-bluetooth
+      - dependencies
+      - pr-summary
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

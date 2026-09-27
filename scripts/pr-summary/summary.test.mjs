@@ -241,8 +241,10 @@ function model(overrides = {}, results = {}) {
             { key: "jar", label: "Jar", result: result("jar"), logUrl: log("jar") },
             { key: "test", label: "Unit and integration tests", result: result("test"), logUrl: log("test"),
                 suite: suite({ passed: 842, skipped: 3 }) },
-            { key: "e2e", label: "Browser tests (Chromium, WebKit)", result: result("e2e"), logUrl: log("e2e"),
-                suite: suite({ passed: 96 }) },
+            { key: "e2e-chromium", label: "Browser tests (Chromium)", result: result("e2e-chromium"),
+                logUrl: log("e2e-chromium"), suite: suite({ passed: 59 }) },
+            { key: "e2e-webkit", label: "Browser tests (WebKit)", result: result("e2e-webkit"),
+                logUrl: log("e2e-webkit"), suite: suite({ passed: 59 }) },
             { key: "sonar", label: "SonarCloud quality gate", result: result("sonar"), logUrl: log("sonar") },
             { key: "image", label: "Image built from source (amd64)", result: result("image"), logUrl: log("image") },
             { key: "smoke", label: "Image smoke test (amd64, arm64)", result: result("smoke"),
@@ -269,7 +271,8 @@ test("a green run is the marker, the heading, the commit line and the table", ()
 |---|---|
 | Jar | ✅ |
 | Unit and integration tests | ✅ 842 passed, 3 skipped |
-| Browser tests (Chromium, WebKit) | ✅ 96 passed |
+| Browser tests (Chromium) | ✅ 59 passed |
+| Browser tests (WebKit) | ✅ 59 passed |
 | SonarCloud quality gate | ✅ passed · [details](${SONAR_URL}) |
 | Image built from source (amd64) | ✅ |
 | Image smoke test (amd64, arm64) | ✅ |
@@ -375,7 +378,7 @@ test("a suite job that failed without results failed before tests ran", () => {
 });
 
 test("a suite job that succeeded without results shows no counts", () => {
-    assert.match(render(withSuite(model(), "e2e", noResults)), /\| Browser tests \(Chromium, WebKit\) \| ✅ \|/);
+    assert.match(render(withSuite(model(), "e2e-webkit", noResults)), /\| Browser tests \(WebKit\) \| ✅ \|/);
 });
 
 test("a suite job that failed although every test passed does not look green", () => {
@@ -400,14 +403,14 @@ test("only the first ten failures are listed", () => {
 });
 
 test("failures of both suites are grouped under their own sub-heading", () => {
-    let base = model({ gate: null }, { test: "failure", e2e: "failure", sonar: "skipped" });
+    let base = model({ gate: null }, { test: "failure", "e2e-webkit": "failure", sonar: "skipped" });
     base = withSuite(base, "test", suite({ failed: 1, failures: failures(1, { name: "unit()" }) }));
-    base = withSuite(base, "e2e", suite({ failed: 1, failures: failures(1, { name: 'opens(String) ["webkit"]' }) }));
+    base = withSuite(base, "e2e-webkit", suite({ failed: 1, failures: failures(1, { name: 'opens(String) ["webkit"]' }) }));
     const comment = render(base);
     assert.ok(comment.includes("#### Unit and integration tests"));
-    assert.ok(comment.includes("#### Browser tests (Chromium, WebKit)"));
+    assert.ok(comment.includes("#### Browser tests (WebKit)"));
     const unitHeading = comment.indexOf("#### Unit and integration tests");
-    const browserHeading = comment.indexOf("#### Browser tests (Chromium, WebKit)");
+    const browserHeading = comment.indexOf("#### Browser tests (WebKit)");
     const unitEntry = comment.indexOf("` unit() `");
     const browserEntry = comment.indexOf('` opens(String) ["webkit"] `');
     assert.ok(unitHeading < unitEntry && unitEntry < browserHeading);
@@ -415,9 +418,9 @@ test("failures of both suites are grouped under their own sub-heading", () => {
 });
 
 test("more failures than the limit in one suite do not hide the other suite's failures", () => {
-    let base = model({ gate: null }, { test: "failure", e2e: "failure", sonar: "skipped" });
+    let base = model({ gate: null }, { test: "failure", "e2e-webkit": "failure", sonar: "skipped" });
     base = withSuite(base, "test", suite({ failed: 12, failures: failures(12) }));
-    base = withSuite(base, "e2e",
+    base = withSuite(base, "e2e-webkit",
         suite({ failed: 3, failures: failures(3, { className: "dev.andre.homecontrol.e2e.BrowserTest" }) }));
     const comment = render(base);
     assert.ok(comment.includes("` fails9() `"));
@@ -431,28 +434,28 @@ test("more failures than the limit in one suite do not hide the other suite's fa
 
 test("tests that passed on a retry keep the run green and are listed with what failed first", () => {
     const flaky = failures(1, { className: "dev.andre.homecontrol.e2e.RailFailureE2eTest",
-        name: 'retryRecoversTheRail(String) ["chromium"]', message: "Condition was not fulfilled" });
-    const comment = render(withSuite(model(), "e2e", suite({ passed: 96, flaky })));
+        name: 'retryRecoversTheRail(String) ["webkit"]', message: "Condition was not fulfilled" });
+    const comment = render(withSuite(model(), "e2e-webkit", suite({ passed: 96, flaky })));
     assert.match(comment, /^## ✅ CI passed$/m);
-    assert.match(comment, /\| Browser tests \(Chromium, WebKit\) \| ⚠️ 96 passed, 1 of them only on a retry \|/);
-    assert.ok(comment.includes("### Passed only on a retry\n\n#### Browser tests (Chromium, WebKit)\n\n"
-        + '**` RailFailureE2eTest `** › ` retryRecoversTheRail(String) ["chromium"] `\n\n'
+    assert.match(comment, /\| Browser tests \(WebKit\) \| ⚠️ 96 passed, 1 of them only on a retry \|/);
+    assert.ok(comment.includes("### Passed only on a retry\n\n#### Browser tests (WebKit)\n\n"
+        + '**` RailFailureE2eTest `** › ` retryRecoversTheRail(String) ["webkit"] `\n\n'
         + "```text\nCondition was not fulfilled\n```\n\n<details><summary>Stack trace</summary>"));
     assert.ok(!comment.includes("### Failed tests"));
 });
 
 test("a failed run lists its flaky tests after its failed ones", () => {
-    const base = model({ gate: null }, { e2e: "failure", sonar: "skipped" });
-    const comment = render(withSuite(base, "e2e", suite({ passed: 95, failed: 1,
+    const base = model({ gate: null }, { "e2e-webkit": "failure", sonar: "skipped" });
+    const comment = render(withSuite(base, "e2e-webkit", suite({ passed: 95, failed: 1,
         failures: failures(1, { name: "broken()" }), flaky: failures(2, { name: "unsteady()" }) })));
-    assert.match(comment, /\| Browser tests \(Chromium, WebKit\) \| ❌ 1 failed, 95 passed, 2 of them only on a retry \|/);
+    assert.match(comment, /\| Browser tests \(WebKit\) \| ❌ 1 failed, 95 passed, 2 of them only on a retry \|/);
     assert.ok(comment.indexOf("### Failed tests") < comment.indexOf("` broken() `"));
     assert.ok(comment.indexOf("` broken() `") < comment.indexOf("### Passed only on a retry"));
     assert.ok(comment.indexOf("### Passed only on a retry") < comment.indexOf("` unsteady() `"));
 });
 
 test("only the first ten flaky tests are listed", () => {
-    const comment = render(withSuite(model(), "e2e", suite({ passed: 96, flaky: failures(12) })));
+    const comment = render(withSuite(model(), "e2e-webkit", suite({ passed: 96, flaky: failures(12) })));
     assert.ok(comment.includes("` fails9() `"));
     assert.ok(!comment.includes("` fails10() `"));
     assert.ok(comment.includes(`…and 2 more · [full run](${RUN_URL})`));
@@ -510,7 +513,8 @@ test("hostile test output cannot leave its code spans and blocks", async () => {
 
 const environment = {
     NEEDS_JSON: JSON.stringify({
-        test: { result: "failure", outputs: {} }, e2e: { result: "success", outputs: {} },
+        test: { result: "failure", outputs: {} }, "e2e-chromium": { result: "success", outputs: {} },
+        "e2e-webkit": { result: "success", outputs: {} },
         sonar: { result: "skipped", outputs: {} }, image: { result: "success", outputs: {} },
         jar: { result: "success", outputs: {} },
         smoke: { result: "success", outputs: {} }, "smoke-bluetooth": { result: "success", outputs: {} },
@@ -528,7 +532,8 @@ const environment = {
 };
 
 test("the model is built from the needs context, the job list and the environment", () => {
-    const suites = { test: suite({ failed: 1 }), e2e: suite({ passed: 96 }) };
+    const suites = { test: suite({ failed: 1 }), "e2e-chromium": suite({ passed: 59 }),
+        "e2e-webkit": suite({ passed: 59 }) };
     const built = buildModel({ env: environment, suites, gate: null, now: Date.parse("2026-09-27T09:08:46Z") });
     assert.equal(built.headSha, HEAD);
     assert.equal(built.runNumber, 413);
@@ -536,18 +541,20 @@ test("the model is built from the needs context, the job list and the environmen
     assert.equal(built.durationSeconds, 580);
     assert.equal(built.sonarUrl, SONAR_URL);
     assert.deepEqual(built.checks.map((check) => [check.key, check.result]), [
-        ["jar", "success"], ["test", "failure"], ["e2e", "success"], ["sonar", "skipped"], ["image", "success"],
+        ["jar", "success"], ["test", "failure"], ["e2e-chromium", "success"], ["e2e-webkit", "success"],
+        ["sonar", "skipped"], ["image", "success"],
         ["smoke", "success"], ["smoke-bluetooth", "success"], ["dependencies", "success"],
     ]);
     const check = (key) => built.checks.find((entry) => entry.key === key);
     assert.equal(check("test").logUrl, "https://example.test/job/1");
-    assert.equal(check("e2e").logUrl, undefined);
+    assert.equal(check("e2e-chromium").logUrl, undefined);
     assert.equal(check("test").suite, suites.test);
+    assert.equal(check("e2e-webkit").suite, suites["e2e-webkit"]);
     assert.equal(check("sonar").suite, undefined);
 });
 
 test("a job that runs once per architecture links to the log of the one that failed", () => {
-    const suites = { test: suite(), e2e: suite() };
+    const suites = { test: suite(), "e2e-chromium": suite(), "e2e-webkit": suite() };
     const built = buildModel({ env: environment, suites, gate: null, now: 0 });
     const check = (key) => built.checks.find((entry) => entry.key === key);
     assert.equal(check("smoke-bluetooth").logUrl, "https://example.test/job/6");
@@ -559,13 +566,13 @@ test("a job list without conclusions still yields log links", () => {
     const env = { ...environment, JOBS_JSON: JSON.stringify([
         { name: "Smoke-test the image on arm64", html_url: "https://example.test/job/8" },
     ]) };
-    const built = buildModel({ env, suites: { test: suite(), e2e: suite() }, gate: null, now: 0 });
+    const built = buildModel({ env, suites: { test: suite(), "e2e-chromium": suite(), "e2e-webkit": suite() }, gate: null, now: 0 });
     assert.equal(built.checks.find((entry) => entry.key === "smoke").logUrl, "https://example.test/job/8");
 });
 
 test("a job missing from the needs context counts as not run, and a missing start time as zero", () => {
     const env = { ...environment, NEEDS_JSON: "{}", JOBS_JSON: "", RUN_STARTED_AT: "", RUN_ATTEMPT: "" };
-    const built = buildModel({ env, suites: { test: noResults, e2e: noResults }, gate: null, now: 0 });
+    const built = buildModel({ env, suites: { test: noResults, "e2e-chromium": noResults, "e2e-webkit": noResults }, gate: null, now: 0 });
     assert.ok(built.checks.every((check) => check.result === "skipped"));
     assert.equal(built.durationSeconds, 0);
     assert.equal(built.runAttempt, 1);
@@ -575,13 +582,15 @@ test("a vulnerable dependency fails the run and links to the log of its job", ()
     const env = {
         ...environment,
         NEEDS_JSON: JSON.stringify({
-            test: { result: "success" }, e2e: { result: "success" }, sonar: { result: "success" },
+            test: { result: "success" }, "e2e-chromium": { result: "success" },
+            "e2e-webkit": { result: "success" }, sonar: { result: "success" },
             jar: { result: "success" }, image: { result: "success" }, smoke: { result: "success" },
             "smoke-bluetooth": { result: "success" }, dependencies: { result: "failure" },
         }),
         JOBS_JSON: JSON.stringify([{ name: "Dependency vulnerabilities", html_url: "https://example.test/job/7" }]),
     };
-    const suites = { test: suite({ passed: 842 }), e2e: suite({ passed: 96 }) };
+    const suites = { test: suite({ passed: 842 }), "e2e-chromium": suite({ passed: 59 }),
+        "e2e-webkit": suite({ passed: 59 }) };
     const gate = { available: true, passed: true, failedConditions: [] };
     const comment = render(buildModel({ env, suites, gate, now: Date.parse("2026-09-27T09:08:46Z") }));
     assert.match(comment, /^## ❌ CI failed$/m);
@@ -590,8 +599,9 @@ test("a vulnerable dependency fails the run and links to the log of its job", ()
 
 test("main writes the comment and asks SonarCloud only when the sonar job ran", async (t) => {
     const root = await directory(t, "failed.xml");
-    const env = { ...environment, JUNIT_TEST_DIR: root, JUNIT_E2E_DIR: path.join(root, "absent"),
-        SUMMARY_FILE: path.join(root, "summary.md"), SONAR_TOKEN: "secret" };
+    const webkit = await directory(t, "passed.xml");
+    const env = { ...environment, JUNIT_TEST_DIR: root, JUNIT_E2E_CHROMIUM_DIR: path.join(root, "absent"),
+        JUNIT_E2E_WEBKIT_DIR: webkit, SUMMARY_FILE: path.join(root, "summary.md"), SONAR_TOKEN: "secret" };
     let requests = 0;
     const fetch = async (url) => {
         requests++;
@@ -603,7 +613,8 @@ test("main writes the comment and asks SonarCloud only when the sonar job ran", 
     assert.equal(requests, 0);
     const skipped = await readFile(env.SUMMARY_FILE, "utf8");
     assert.match(skipped, /\| Unit and integration tests \| ❌ 3 failed, 1 passed \|/);
-    assert.match(skipped, /\| Browser tests \(Chromium, WebKit\) \| ✅ \|/);
+    assert.match(skipped, /\| Browser tests \(Chromium\) \| ✅ \|/);
+    assert.match(skipped, /\| Browser tests \(WebKit\) \| ✅ 2 passed, 1 skipped \|/);
     assert.match(skipped, /⏭️ not run, because tests failed/);
 
     const needs = { ...JSON.parse(env.NEEDS_JSON), test: { result: "success" }, sonar: { result: "success" } };
