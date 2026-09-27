@@ -13,15 +13,15 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * One device's loop on one virtual thread: connect with doubling backoff, then poll at the delay
- * the link chooses. An {@link IOException} from a poll means the device is gone; anything else is
- * logged and polling continues. All {@link Link} callbacks run on the loop thread.
+ * the link chooses. An {@link IOException} from a poll means the device is gone; a {@link SoapFault}
+ * or runtime failure is logged and polling continues. All {@link Link} callbacks run on the loop thread.
  */
 public final class ReconnectingPoller implements AutoCloseable {
 
     public interface Link {
-        void connect() throws Exception;
+        void connect() throws IOException, SoapFault;
 
-        void poll() throws Exception;
+        void poll() throws IOException, SoapFault;
 
         Duration nextPollDelay();
 
@@ -87,7 +87,7 @@ public final class ReconnectingPoller implements AutoCloseable {
             connected = true;
             backoff = initialBackoff;
             schedule(this::pollOnce, link.nextPollDelay());
-        } catch (Exception e) {
+        } catch (IOException | SoapFault | RuntimeException e) {
             connected = false;
             link.disconnected(e);
             scheduleReconnect();
@@ -105,7 +105,7 @@ public final class ReconnectingPoller implements AutoCloseable {
             link.disconnected(e);
             scheduleReconnect();
             return;
-        } catch (Exception e) {
+        } catch (SoapFault | RuntimeException e) {
             log.debug("{}: poll failed: {}", name, e.getMessage());
         }
         schedule(this::pollOnce, link.nextPollDelay());

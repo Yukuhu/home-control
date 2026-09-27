@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -55,9 +56,16 @@ public class UpnpSession implements DeviceHandle {
     private final Runnable onClosed;
     private final ReconnectingPoller poller;
 
+    // Immutable record replaced wholesale by the poll loop (and cleared by close()); command threads only read it.
+    @SuppressWarnings("java:S3077")
     private volatile Endpoints endpoints;
-    private volatile TransportInfo transport = TransportInfo.NONE;
+    /** Poll loop only: chooses the next poll delay. */
+    private TransportInfo transport = TransportInfo.NONE;
+    // Immutable record written by the command thread that played it; the poll loop only reads it.
+    @SuppressWarnings("java:S3077")
     private volatile PlayedItem lastPlayed;
+    // Immutable snapshot written only by Link.publish on the poll loop; request threads only read it.
+    @SuppressWarnings("java:S3077")
     private volatile DeviceState state = DeviceState.initial();
 
     public UpnpSession(Device device, UpnpProperties properties, HttpClient http,
@@ -135,53 +143,6 @@ public class UpnpSession implements DeviceHandle {
         return new UnsupportedActionException(device.name() + " is a media renderer and " + what);
     }
 
-    /** Services on another host than the (already verified) description location are refused (epic constraint). */
-    private Optional<ServiceEndpoint> service(DeviceDescription description, String typePrefix, URI location) {
-        return description.service(typePrefix).map(ServiceEndpoint::of).filter(endpoint -> {
-            boolean sameHost = onHost(endpoint.controlUrl(), location);
-            if (!sameHost) {
-                log.warn("Ignoring {} of {}: its control URL is not on the host it announced itself from", typePrefix, device.id());
-            }
-            boolean validType = SoapClient.isValidServiceType(endpoint.serviceType());
-            if (!validType) {
-                log.warn("Ignoring {} of {}: malformed service type", typePrefix, device.id());
-            }
-            return sameHost && validType;
-        });
-    }
-
-    private static boolean onHost(URI url, URI location) {
-        return url != null && "http".equalsIgnoreCase(url.getScheme()) && url.getHost() != null
-                && url.getHost().equalsIgnoreCase(location.getHost());
-    }
-
-    private int volumeMaximum(ServiceEndpoint renderingControl, URI location, Duration timeout) {
-        URI scpd = renderingControl.scpdUrl();
-        if (!onHost(scpd, location)) {
-            return VolumeRange.DEFAULT_MAXIMUM;
-        }
-        try {
-            return VolumeRange.maximum(DeviceFetch.get(http, scpd, timeout, DeviceFetch.MAX_DESCRIPTION_BYTES));
-        } catch (IOException _) {
-            return VolumeRange.DEFAULT_MAXIMUM;
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            return VolumeRange.DEFAULT_MAXIMUM;
-        }
-    }
-
-    private synchronized void publish(DeviceState next) {
-        DeviceState previous = state;
-        state = next;
-        if (!next.sameIgnoringTime(previous)) {
-            try {
-                onChange.accept(next);
-            } catch (RuntimeException e) {
-                log.warn("A device state listener failed for {}", device.id(), e);
-            }
-        }
-    }
-
     @Override
     public void close() {
         poller.close();
@@ -189,6 +150,7 @@ public class UpnpSession implements DeviceHandle {
         onClosed.run();
     }
 
+    /** Every callback runs on the poll loop's thread. */
     private final class Link implements ReconnectingPoller.Link {
 
         /**
@@ -197,7 +159,7 @@ public class UpnpSession implements DeviceHandle {
          * plain HTTP to an IP literal, 64 KiB at most, no redirects — and only a description that names
          * this device's UDN. Locations are never logged.
          */
-        private Endpoints resolve() throws IOException, InterruptedException {
+        private Endpoints resolve() throws IOException {
             Optional<URI> announced = Optional.ofNullable(settings.udn()).flatMap(locator);
             URI location = announced.orElse(settings.location());
             // Whatever the source, the description must live on the registered device's address: an
@@ -212,6 +174,10 @@ public class UpnpSession implements DeviceHandle {
                         DeviceFetch.get(http, location, timeout, DeviceFetch.MAX_DESCRIPTION_BYTES), location);
             } catch (IllegalArgumentException _) {
                 throw new IOException("Unreadable description for " + device.id());
+            } catch (InterruptedException _) {
+                // Only close() interrupts the poll loop; the attempt fails like any unreachable device.
+                Thread.currentThread().interrupt();
+                throw new InterruptedIOException("Interrupted while reading the description of " + device.id());
             }
             if (settings.udn() != null && (description.udn() == null || !settings.udn().equalsIgnoreCase(description.udn()))) {
                 throw new IOException("The description at " + device.id() + "'s address belongs to another device");
@@ -230,6 +196,41 @@ public class UpnpSession implements DeviceHandle {
                 }
             }
             return new Endpoints(avTransport, renderingControl, volumeMax, sink);
+        }
+
+        /** Services on another host than the (already verified) description location are refused (epic constraint). */
+        private Optional<ServiceEndpoint> service(DeviceDescription description, String typePrefix, URI location) {
+            return description.service(typePrefix).map(ServiceEndpoint::of).filter(endpoint -> {
+                boolean sameHost = onHost(endpoint.controlUrl(), location);
+                if (!sameHost) {
+                    log.warn("Ignoring {} of {}: its control URL is not on the host it announced itself from", typePrefix, device.id());
+                }
+                boolean validType = SoapClient.isValidServiceType(endpoint.serviceType());
+                if (!validType) {
+                    log.warn("Ignoring {} of {}: malformed service type", typePrefix, device.id());
+                }
+                return sameHost && validType;
+            });
+        }
+
+        private static boolean onHost(URI url, URI location) {
+            return url != null && "http".equalsIgnoreCase(url.getScheme()) && url.getHost() != null
+                    && url.getHost().equalsIgnoreCase(location.getHost());
+        }
+
+        private int volumeMaximum(ServiceEndpoint renderingControl, URI location, Duration timeout) {
+            URI scpd = renderingControl.scpdUrl();
+            if (!onHost(scpd, location)) {
+                return VolumeRange.DEFAULT_MAXIMUM;
+            }
+            try {
+                return VolumeRange.maximum(DeviceFetch.get(http, scpd, timeout, DeviceFetch.MAX_DESCRIPTION_BYTES));
+            } catch (IOException _) {
+                return VolumeRange.DEFAULT_MAXIMUM;
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+                return VolumeRange.DEFAULT_MAXIMUM;
+            }
         }
 
         /** Reads the device and publishes; runs on the poll loop only. */
@@ -258,20 +259,32 @@ public class UpnpSession implements DeviceHandle {
             publish(next);
         }
 
+        private void publish(DeviceState next) {
+            DeviceState previous = state;
+            state = next;
+            if (!next.sameIgnoringTime(previous)) {
+                try {
+                    onChange.accept(next);
+                } catch (RuntimeException e) {
+                    log.warn("A device state listener failed for {}", device.id(), e);
+                }
+            }
+        }
+
         @Override
-        public void connect() throws Exception {
+        public void connect() throws IOException, SoapFault {
             Endpoints resolved = resolve();
             endpoints = resolved;
             try {
                 readState(resolved);
-            } catch (Exception e) {
+            } catch (IOException | SoapFault | RuntimeException e) {
                 endpoints = null;
                 throw e;
             }
         }
 
         @Override
-        public void poll() throws Exception {
+        public void poll() throws IOException, SoapFault {
             Endpoints current = endpoints;
             if (current != null) {
                 readState(current);

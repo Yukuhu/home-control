@@ -20,6 +20,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static dev.andre.homecontrol.adapters.sonos.SonosDiscoveryTest.KITCHEN;
 import static dev.andre.homecontrol.adapters.sonos.SonosDiscoveryTest.LIVING;
@@ -66,6 +67,25 @@ class SonosSessionTest {
         SonosSession session = connected(kitchen);
 
         assertThat(session.state().volumeLevel()).isEqualTo(20);
+    }
+
+    @Test
+    void aFailingStateListenerDoesNotStopPolling() {
+        AtomicBoolean failed = new AtomicBoolean();
+        SonosSession session = new SonosSession(kitchen.device("sonos-" + kitchen.uuid()), properties,
+                SoapClient.httpClient(Duration.ofSeconds(1)), state -> {
+                    states.add(state);
+                    if (state.status() == DeviceStatus.CONNECTED && failed.compareAndSet(false, true)) {
+                        throw new IllegalStateException("listener bug");
+                    }
+                }, () -> { });
+        sessions.add(session);
+        session.start();
+        await().atMost(WAIT).until(failed::get);
+
+        kitchen.setVolume(35);
+
+        await().atMost(WAIT).until(() -> states.getLast().volumeLevel() == 35);
     }
 
     @Test
