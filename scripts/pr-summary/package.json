@@ -1,0 +1,13 @@
+{
+  "name": "home-control-pr-summary",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test summary.test.mjs",
+    "summary": "node summary.mjs"
+  },
+  "engines": { "node": ">=22" },
+  "devDependencies": {
+    "fast-xml-parser": "5.11.1"
+  }
+}
