@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -61,7 +62,8 @@ public class CalendarSchedule {
     private final Clock clock;
 
     private final ConcurrentHashMap<String, Cached> cache = new ConcurrentHashMap<>();
-    private volatile Map<String, SportsEvent> byItemId = Map.of();
+    /** {@link #events()} replaces it under this object's lock; {@link #forget} edits it without that lock, atomically. */
+    private final AtomicReference<Map<String, SportsEvent>> byItemId = new AtomicReference<>(Map.of());
     private volatile boolean ranOnce;
 
     public CalendarSchedule(SportsSettingsService settingsService, CalendarFetcher fetcher, SecretStore secrets,
@@ -118,7 +120,7 @@ public class CalendarSchedule {
                 errors.add(entry.label() + ": " + cached.error());
             }
         }
-        byItemId = Map.copyOf(byId);
+        byItemId.set(Map.copyOf(byId));
         return new Result(events, errors, settings.calendars().size(), succeeded);
     }
 
@@ -132,13 +134,7 @@ public class CalendarSchedule {
                     "The link for " + entry.label() + " is missing; remove the calendar and add it again");
         }
         try {
-            String text = fetcher.fetch(URI.create(secret.get()));
-            IcsCalendar calendar;
-            try {
-                calendar = IcsParser.parse(text);
-            } catch (IcsFormatException e) {
-                throw new CalendarFetchException(CalendarFetchException.Kind.NOT_A_CALENDAR, e.getMessage());
-            }
+            IcsCalendar calendar = parse(fetcher.fetch(URI.create(secret.get())));
             return new Cached(calendar, now, now, null);
         } catch (ContentSourceException e) {
             String kind = e instanceof CalendarFetchException cfe ? cfe.kind().name() : "ERROR";
@@ -147,11 +143,19 @@ public class CalendarSchedule {
         }
     }
 
+    private static IcsCalendar parse(String text) {
+        try {
+            return IcsParser.parse(text);
+        } catch (IcsFormatException e) {
+            throw new CalendarFetchException(CalendarFetchException.Kind.NOT_A_CALENDAR, e.getMessage());
+        }
+    }
+
     public Optional<SportsEvent> find(String itemId) {
         if (!ranOnce) {
             events();
         }
-        return Optional.ofNullable(byItemId.get(itemId));
+        return Optional.ofNullable(byItemId.get().get(itemId));
     }
 
     public Optional<FeedStatus> status(String calendarId) {
@@ -189,10 +193,12 @@ public class CalendarSchedule {
 
     public void forget(String calendarId) {
         cache.remove(calendarId);
-        Map<String, SportsEvent> next = new HashMap<>(byItemId);
         String key = SportsSettings.calendarKey(calendarId);
-        next.values().removeIf(event -> event.competitionKey().equals(key));
-        byItemId = Map.copyOf(next);
+        byItemId.updateAndGet(current -> {
+            Map<String, SportsEvent> next = new HashMap<>(current);
+            next.values().removeIf(event -> event.competitionKey().equals(key));
+            return Map.copyOf(next);
+        });
     }
 
     public static SportsEvent toEvent(String calendarId, IcsOccurrence occurrence) {
