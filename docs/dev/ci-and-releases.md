@@ -70,9 +70,11 @@ pushed.
 The image that is published is the image that was tested. The `Build the jar` job
 builds the one jar of a run. The `Smoke-test the image on amd64` and `… on arm64`
 jobs each build the image from it, natively on a runner of that architecture, and
-start it; for a release they then push that image without a tag. Once every other
-check has passed, the `Release` job gives those two images the tags of the release,
-as one multi-arch image. It builds nothing itself.
+start it; for a release they then push that image without a tag. Once the tests, the
+image checks, both browser suites and the quality gate have passed, the `Release` job
+gives those two images the tags of the release, as one multi-arch image. It builds
+nothing itself, and it waits for neither `Dependency vulnerabilities` nor the Bluetooth
+image.
 
 `Smoke-test the Bluetooth image on …` does the same for the `-bluetooth` variant,
 which `Release the Bluetooth image` publishes after the release, without holding it

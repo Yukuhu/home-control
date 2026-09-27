@@ -106,6 +106,7 @@ tasks.named<Test>("test") {
         "casaos/docker-compose.yml",
         "casaos/docker-compose.bluetooth.yml",
         "docs/user/bluetooth-speakers.md",
+        "docs/bluetooth-speakers.md",
     ).withPropertyName("deploymentFiles").withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

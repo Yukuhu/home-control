@@ -65,13 +65,8 @@ Every setting, as a Spring property or an environment variable.
 | `home-control.bluetooth.audio-device-template` | *(blank: find the speaker's sink)* | e.g. `alsa/bluealsa:DEV={mac},PROFILE=a2dp` |
 | `home-control.bluetooth.default-volume` | `50` | Player volume until changed |
 
-The app only answers to host names that cannot be pointed at it by someone else's DNS
-(DNS rebinding): IP addresses, `localhost`, single-label names such as `nas`, and names
-ending in `.local`, `.lan`, `.home.arpa` or `.internal`. Any other name gets
-`421 Misdirected Request`. If you reach it under a real domain, for example through a
-reverse proxy, add that name to `HOME_CONTROL_ALLOWED_HOSTS` (or its origin to
-`HOME_CONTROL_TRUSTED_ORIGINS`). Changes (POST and other non-read requests) from another
-site's page are refused with `403`, whether or not a login exists.
+[Security](security.md#allowed-hosts-and-origins) explains which host names the app answers to, and when
+`HOME_CONTROL_ALLOWED_HOSTS` and `HOME_CONTROL_TRUSTED_ORIGINS` are needed.
 
 An older `devices.json` (from before multi-device support) is upgraded in place on
 first start; the upgrade keeps existing pairings, so no re-pairing is needed after

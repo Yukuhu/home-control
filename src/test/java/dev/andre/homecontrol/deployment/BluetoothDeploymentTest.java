@@ -203,6 +203,13 @@ class BluetoothDeploymentTest {
                 .contains("Nothing is playing");
     }
 
+    @Test
+    void theGuidesFormerPathLeadsToIt() throws Exception {
+        // Released images still name docs/bluetooth-speakers.md on the setup page and in their messages.
+        String text = Files.readString(Path.of("docs/bluetooth-speakers.md"));
+        assertThat(text).contains("](user/bluetooth-speakers.md)");
+    }
+
     private static Map<String, Object> load(String path) throws Exception {
         try (InputStream input = Files.newInputStream(Path.of(path))) {
             return new Yaml().load(input);

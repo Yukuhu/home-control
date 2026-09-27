@@ -110,7 +110,7 @@ Every section this README used to hold now lives in one of these pages, under th
 - [Content sources](docs/user/sources.md): login, dynamic workflows, Jellyfin, play routes, Netflix, Prime Video and
   DAZN, YouTube, sport.
 - [Configuration](docs/user/configuration.md): every property and environment variable.
-- [Security](docs/user/security.md): what is protected, secrets, reverse proxies.
+- [Security](docs/user/security.md): what is protected, secrets, reverse proxies, allowed hosts and origins.
 
 **Working on Home Control:**
 - [AGENTS.md](AGENTS.md): how to build and test, and the rules every change follows.
