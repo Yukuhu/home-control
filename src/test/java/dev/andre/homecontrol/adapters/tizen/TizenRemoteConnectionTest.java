@@ -13,6 +13,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 class TizenRemoteConnectionTest {
@@ -71,6 +72,30 @@ class TizenRemoteConnectionTest {
         fake.setAuthorization(FakeTizenServer.Authorization.IGNORE);
 
         assertThat(open(null).awaitAuthorization(Duration.ofSeconds(1))).isEqualTo(TizenRemoteConnection.Authorization.NO_ANSWER);
+    }
+
+    @Test
+    void theTvHangingUpBeforeAnsweringFailsTheAuthorization() throws Exception {
+        fake.setAuthorization(FakeTizenServer.Authorization.IGNORE);
+        TizenRemoteConnection opened = open(null);
+
+        fake.dropConnections();
+
+        assertThatThrownBy(() -> opened.awaitAuthorization(Duration.ofSeconds(5)))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("before answering");
+    }
+
+    @Test
+    void aMessageThatIsNotJsonIsSkipped() throws Exception {
+        fake.setAuthorization(FakeTizenServer.Authorization.IGNORE);
+        TizenRemoteConnection opened = open(null);
+        await().atMost(Duration.ofSeconds(5)).until(() -> !fake.queries().isEmpty());
+
+        fake.sendRaw("garbage");
+        fake.sendRaw("{\"event\":\"ms.channel.unauthorized\"}");
+
+        assertThat(opened.awaitAuthorization(Duration.ofSeconds(5))).isEqualTo(TizenRemoteConnection.Authorization.UNAUTHORIZED);
     }
 
     @Test
