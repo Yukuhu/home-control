@@ -134,9 +134,15 @@ class StreamingLaunchersEndToEndTest {
         return MAPPER.readTree(response.body());
     }
 
+    // browserBodies is the recorded actual value; java:S3415 mistakes the static final list for an expected constant.
+    @SuppressWarnings("java:S3415")
+    private static void assertNoBrowserBodyCarriesTheCredential() {
+        assertThat(browserBodies).noneMatch(body ->
+                body.contains(FakeTmdbServer.READ_TOKEN) || body.contains("api_key") || body.contains("Bearer"));
+    }
+
     // One journey (connect, launch, upgrade, pin, disconnect); each step needs the state the previous one left.
-    // S3415: browserBodies is the recorded actual value; the rule mistakes a static final field for an expected constant.
-    @SuppressWarnings({"java:S5961", "java:S3415"})
+    @SuppressWarnings("java:S5961")
     @Test
     @Order(1)
     void launchTrendingTitlesAndUpgradeThemWithPinnedLinks() throws Exception {
@@ -258,8 +264,7 @@ class StreamingLaunchersEndToEndTest {
                 assertThat(secretsText).doesNotContain(FakeTmdbServer.READ_TOKEN);
 
                 // 15. Nothing the browser received ever carried the credential.
-                assertThat(browserBodies).noneMatch(body ->
-                        body.contains(FakeTmdbServer.READ_TOKEN) || body.contains("api_key") || body.contains("Bearer"));
+                assertNoBrowserBodyCarriesTheCredential();
 
                 // 16. Disconnect: device-only again, but the pinned rail (no secret) still answers.
                 assertThat(send(browser, post("/setup/sources/tmdb/disconnect", Map.of())).statusCode()).isEqualTo(302);
