@@ -67,8 +67,8 @@ class AndroidTvAdapterTest {
 
             try (DeviceHandle handle = adapter(certificates).connect(device, seen::add)) {
                 assertThat(handle.state().status()).isEqualTo(DeviceStatus.UNPAIRED);
-                var failingAction70 = new Action.PressKey(RemoteKey.HOME);
-                assertThatThrownBy(() -> handle.execute(failingAction70))
+                var homeKey = new Action.PressKey(RemoteKey.HOME);
+                assertThatThrownBy(() -> handle.execute(homeKey))
                         .isInstanceOf(DeviceOfflineException.class)
                         .hasMessageContaining("paired");
             }

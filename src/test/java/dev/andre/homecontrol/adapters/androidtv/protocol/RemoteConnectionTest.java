@@ -330,7 +330,7 @@ class RemoteConnectionTest {
             // handshake round trip; if this is ever tightened enough to violate that, the test
             // fails loudly with a SocketTimeoutException escaping connect() itself, rather than
             // silently mis-asserting.
-            try (RemoteConnection _ = RemoteConnection.connect("127.0.0.1", silentDevice.port(),
+            try (var _ = RemoteConnection.connect("127.0.0.1", silentDevice.port(),
                     ClientCertificate.generate("shield-remote"), 300, staleListener)) {
                 silentDevice.awaitHandshake();
 

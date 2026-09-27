@@ -146,11 +146,11 @@ class BluetoothSpeakerSessionTest {
         start();
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
 
-        var failingAction149 = new Action.PlayMedia(URI.create("http://nas/f.mp4"), "video/mp4", "F", null);
-        assertThatThrownBy(() -> session.execute(failingAction149))
+        var video = new Action.PlayMedia(URI.create("http://nas/f.mp4"), "video/mp4", "F", null);
+        assertThatThrownBy(() -> session.execute(video))
                 .isInstanceOf(UnsupportedActionException.class).hasMessage("JBL Flip 5 plays audio only");
-        var failingAction151 = new Action.PlayMedia(URI.create("file:///etc/passwd"), "audio/mpeg", "F", null);
-        assertThatThrownBy(() -> session.execute(failingAction151))
+        var localFile = new Action.PlayMedia(URI.create("file:///etc/passwd"), "audio/mpeg", "F", null);
+        assertThatThrownBy(() -> session.execute(localFile))
                 .isInstanceOf(UnsupportedActionException.class).hasMessage("JBL Flip 5 plays http and https streams only");
         assertThat(launcher.starts).isEmpty();
     }
@@ -210,8 +210,8 @@ class BluetoothSpeakerSessionTest {
         start();
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
 
-        var failingAction211 = new Action.Pause();
-        assertThatThrownBy(() -> session.execute(failingAction211))
+        var pause = new Action.Pause();
+        assertThatThrownBy(() -> session.execute(pause))
                 .isInstanceOf(ActionFailedException.class).hasMessage("Nothing is playing on JBL Flip 5");
     }
 
@@ -234,9 +234,9 @@ class BluetoothSpeakerSessionTest {
         start();
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
 
-        var failingAction234 = new Action.PlayMedia(
+        var brokenStream = new Action.PlayMedia(
                 URI.create("http://127.0.0.1:9/broken.mp3?ApiKey=secret-key"), "audio/mpeg", "X", null);
-        assertThatThrownBy(() -> session.execute(failingAction234))
+        assertThatThrownBy(() -> session.execute(brokenStream))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessage("JBL Flip 5 could not play the stream: the stream could not be loaded (loading failed)");
         await().atMost(WAIT).untilAsserted(() -> assertThat(launcher.alive()).isZero());
@@ -338,10 +338,10 @@ class BluetoothSpeakerSessionTest {
         start();
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
 
-        var failingAction337 = new Action.PressKey(RemoteKey.HOME);
-        assertThatThrownBy(() -> session.execute(failingAction337)).isInstanceOf(UnsupportedActionException.class);
-        var failingAction338 = new Action.OpenAppLink(URI.create("https://youtube.com/watch?v=x"));
-        assertThatThrownBy(() -> session.execute(failingAction338))
+        var homeKey = new Action.PressKey(RemoteKey.HOME);
+        assertThatThrownBy(() -> session.execute(homeKey)).isInstanceOf(UnsupportedActionException.class);
+        var appLink = new Action.OpenAppLink(URI.create("https://youtube.com/watch?v=x"));
+        assertThatThrownBy(() -> session.execute(appLink))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 

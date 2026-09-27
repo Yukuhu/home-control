@@ -25,17 +25,14 @@ class MpvCommandLineTest {
 
     @Test
     void refusesUnsafeAudioDevices() {
-        var preparedArg28_0 = Path.of("/tmp/x.sock");
-        assertThatThrownBy(() -> MpvCommandLine.arguments(preparedArg28_0, "pulse/x --script=/tmp/evil.lua", 50))
+        Path socket = Path.of("/tmp/x.sock");
+        assertThatThrownBy(() -> MpvCommandLine.arguments(socket, "pulse/x --script=/tmp/evil.lua", 50))
                 .isInstanceOf(IllegalArgumentException.class);
-        var preparedArg30_0 = Path.of("/tmp/x.sock");
-        assertThatThrownBy(() -> MpvCommandLine.arguments(preparedArg30_0, "a\nb", 50))
+        assertThatThrownBy(() -> MpvCommandLine.arguments(socket, "a\nb", 50))
                 .isInstanceOf(IllegalArgumentException.class);
-        var preparedArg32_0 = Path.of("/tmp/x.sock");
-        assertThatThrownBy(() -> MpvCommandLine.arguments(preparedArg32_0, "", 50))
+        assertThatThrownBy(() -> MpvCommandLine.arguments(socket, "", 50))
                 .isInstanceOf(IllegalArgumentException.class);
-        var preparedArg34_0 = Path.of("/tmp/x.sock");
-        assertThatThrownBy(() -> MpvCommandLine.arguments(preparedArg34_0, null, 50))
+        assertThatThrownBy(() -> MpvCommandLine.arguments(socket, null, 50))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(MpvCommandLine.validAudioDevice("alsa/bluealsa:DEV=AA:BB:CC:DD:EE:FF,PROFILE=a2dp")).isTrue();
     }

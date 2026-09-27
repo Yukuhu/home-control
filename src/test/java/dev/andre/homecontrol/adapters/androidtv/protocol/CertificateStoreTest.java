@@ -27,7 +27,7 @@ class CertificateStoreTest {
     }
 
     @Test
-    void persistsAndReloadsTheSameKeyPair() throws Exception {
+    void persistsAndReloadsTheSameKeyPair() {
         Path file = dir.resolve("keystore.p12");
         CertificateStore store = new CertificateStore(file, "secret".toCharArray());
 
@@ -80,8 +80,8 @@ class CertificateStoreTest {
         Path file = dir.resolve("keystore.p12");
         new CertificateStore(file, "correct".toCharArray()).loadOrCreate("shield");
 
-        var preparedReceiver83 = new CertificateStore(file, "wrong".toCharArray());
-        assertThatThrownBy(() -> preparedReceiver83.load("shield"))
+        CertificateStore wrongPassword = new CertificateStore(file, "wrong".toCharArray());
+        assertThatThrownBy(() -> wrongPassword.load("shield"))
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("password");
