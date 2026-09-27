@@ -1,25 +1,18 @@
 package dev.andre.homecontrol.sources.tmdb;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
+import dev.andre.homecontrol.testsupport.FakeHttpServer;
+import dev.andre.homecontrol.testsupport.Request;
+import dev.andre.homecontrol.testsupport.Response;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
 
 /** In-process TMDB: canned responses keyed by "METHOD /path", every request recorded. Unknown routes → 404. */
 public final class FakeTmdbServer implements AutoCloseable {
@@ -34,23 +27,14 @@ public final class FakeTmdbServer implements AutoCloseable {
         }
     }
 
-    private record Canned(int status, String contentType, byte[] body, Duration delay, String redirect) {
-    }
-
-    private final HttpServer server;
-    private final Map<String, Canned> routes = new ConcurrentHashMap<>();
-    private final List<Recorded> requests = new CopyOnWriteArrayList<>();
-    private volatile Duration globalDelay = Duration.ZERO;
+    private final FakeHttpServer server;
 
     public FakeTmdbServer() throws IOException {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/", this::handle);
-        server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
-        server.start();
+        server = FakeHttpServer.start().fallback(Response.of(404, Response.JSON, fixture("not-found.json")));
     }
 
     public URI url() {
-        return URI.create("http://127.0.0.1:" + server.getAddress().getPort());
+        return server.url();
     }
 
     public URI apiBase() {
@@ -73,49 +57,49 @@ public final class FakeTmdbServer implements AutoCloseable {
     }
 
     public FakeTmdbServer respond(String method, String path, int status, String fixture) {
-        return respondBytes(method, path, status, "application/json; charset=utf-8",
+        return respondBytes(method, path, status, Response.JSON,
                 fixture == null ? new byte[0] : fixture(fixture).getBytes(StandardCharsets.UTF_8));
     }
 
     public FakeTmdbServer respondJson(String method, String path, int status, String json) {
-        return respondBytes(method, path, status, "application/json; charset=utf-8",
+        return respondBytes(method, path, status, Response.JSON,
                 json == null ? new byte[0] : json.getBytes(StandardCharsets.UTF_8));
     }
 
     public FakeTmdbServer respondBytes(String method, String path, int status, String contentType, byte[] body) {
-        routes.put(method + " " + path, new Canned(status, contentType, body, Duration.ZERO, null));
+        server.respond(method, path, Response.of(status, contentType, body));
         return this;
     }
 
     /** Every response (until changed) sleeps this long before answering — for timeout tests. */
     public FakeTmdbServer delay(Duration duration) {
-        this.globalDelay = duration;
+        server.delay(duration);
         return this;
     }
 
     public FakeTmdbServer redirect(String path, String location) {
-        routes.put("GET " + path, new Canned(302, "text/plain", new byte[0], Duration.ZERO, location));
+        server.respond("GET", path, Response.of(302, "text/plain", new byte[0]).withHeader("Location", location));
         return this;
     }
 
     public List<Recorded> requests(String method, String path) {
-        return requests.stream().filter(r -> r.method().equals(method) && r.path().equals(path)).toList();
+        return server.requests(method, path).stream().map(FakeTmdbServer::recorded).toList();
     }
 
     public Recorded last(String method, String path) {
         List<Recorded> matching = requests(method, path);
         if (matching.isEmpty()) {
-            throw new AssertionError("No " + method + " " + path + " received; got " + requests);
+            throw new AssertionError("No " + method + " " + path + " received; got " + requests());
         }
         return matching.getLast();
     }
 
     public int count(String method, String path) {
-        return requests(method, path).size();
+        return server.count(method, path);
     }
 
     public List<Recorded> requests() {
-        return List.copyOf(requests);
+        return server.requests().stream().map(FakeTmdbServer::recorded).toList();
     }
 
     public static String fixture(String name) {
@@ -129,67 +113,12 @@ public final class FakeTmdbServer implements AutoCloseable {
         }
     }
 
-    // A slow upstream is what the timeout tests exercise, so answering late on purpose is the point.
-    @SuppressWarnings("java:S2925")
-    private static void simulateLatency(Duration wait) {
-        if (wait.isZero()) {
-            return;
-        }
-        try {
-            Thread.sleep(wait);
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private void handle(HttpExchange exchange) throws IOException {
-        try (exchange) {
-            URI uri = exchange.getRequestURI();
-            Map<String, String> query = new LinkedHashMap<>();
-            if (uri.getRawQuery() != null) {
-                for (String pair : uri.getRawQuery().split("&")) {
-                    int eq = pair.indexOf('=');
-                    String key = URLDecoder.decode(eq < 0 ? pair : pair.substring(0, eq), StandardCharsets.UTF_8);
-                    String value = eq < 0 ? "" : URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8);
-                    query.put(key, value);
-                }
-            }
-            Map<String, String> headers = new TreeMap<>();
-            exchange.getRequestHeaders().forEach((name, values) ->
-                    headers.put(name.toLowerCase(Locale.ROOT), String.join(",", values)));
-            exchange.getRequestBody().readAllBytes();
-            requests.add(new Recorded(exchange.getRequestMethod(), uri.getRawPath(), query, headers,
-                    uri.getRawQuery() == null ? "" : uri.getRawQuery()));
-
-            simulateLatency(globalDelay);
-
-            Canned canned = routes.get(exchange.getRequestMethod() + " " + uri.getRawPath());
-            if (canned == null) {
-                byte[] body = fixture("not-found.json").getBytes(StandardCharsets.UTF_8);
-                exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
-                exchange.sendResponseHeaders(404, body.length);
-                try (OutputStream out = exchange.getResponseBody()) {
-                    out.write(body);
-                }
-                return;
-            }
-            exchange.getResponseHeaders().set("Content-Type", canned.contentType());
-            if (canned.redirect() != null) {
-                exchange.getResponseHeaders().set("Location", canned.redirect());
-            }
-            if (canned.body().length == 0) {
-                exchange.sendResponseHeaders(canned.status(), -1);
-                return;
-            }
-            exchange.sendResponseHeaders(canned.status(), canned.body().length);
-            try (OutputStream out = exchange.getResponseBody()) {
-                out.write(canned.body());
-            }
-        }
+    private static Recorded recorded(Request request) {
+        return new Recorded(request.method(), request.path(), request.query(), request.headers(), request.rawQuery());
     }
 
     @Override
     public void close() {
-        server.stop(0);
+        server.close();
     }
 }
