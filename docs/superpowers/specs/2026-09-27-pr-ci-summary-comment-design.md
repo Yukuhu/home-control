@@ -62,6 +62,12 @@ produces no XML and must not add a second failure.
 `sonar` keeps `needs: [test, e2e]` and therefore stays skipped when a suite
 fails. Analysing a broken build would report misleading coverage.
 
+`e2e` also runs the summary script's tests with coverage and uploads the LCOV
+file as artifact `pr-summary-coverage`. `sonar` downloads it and lists it in
+`sonar.javascript.lcov.reportPaths`. The script is new code that SonarCloud
+analyses, so without its coverage the pull request that introduces it fails
+the gate's condition on coverage of new code.
+
 ## The `pr-summary` job
 
 ```yaml
