@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest a change to how Home Control behaves.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Want support for a device or a content service that is not there yet? Use the
+        **Device or content source support** form instead.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe what you are trying to do and where the app gets in the way.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Your best guess is fine.
+      options:
+        - Device adapter (a TV, speaker or other device)
+        - Content source (Jellyfin, YouTube, TMDB, sports, workflows, pinned)
+        - Core (playback planning, device manager)
+        - Web (dashboard, setup, remote, themes)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Workarounds you use today, or other ways this could be solved.

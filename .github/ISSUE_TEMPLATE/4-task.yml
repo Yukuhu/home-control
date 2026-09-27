@@ -1,0 +1,37 @@
+name: Task
+description: A planned piece of work, usually one step of an epic. Mostly for maintainers.
+body:
+  - type: input
+    id: epic
+    attributes:
+      label: Parent epic
+      description: The epic this task belongs to, if any.
+      placeholder: "Task J2 of epic #14 (Bluetooth speakers)"
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What this task delivers, in a sentence or two.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: The observable conditions that make this task done.
+    validations:
+      required: true
+
+  - type: input
+    id: blocked-by
+    attributes:
+      label: Blocked by
+      placeholder: "#74"
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Spec, plan or concept documents, with the branch they live on if not yet merged.
