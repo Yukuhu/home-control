@@ -1,13 +1,10 @@
 package dev.andre.homecontrol.sources.workflows;
 
-import org.apache.hc.client5.http.DnsResolver;
+import dev.andre.homecontrol.sources.http.VettedHttpClients;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.util.Timeout;
 
@@ -53,29 +50,14 @@ public final class WorkflowHttpClient implements AutoCloseable {
         this.properties = properties;
         this.policy = policy;
         permits = new Semaphore(properties.maxConcurrentFetches());
-        DnsResolver dns = new DnsResolver() {
-            @Override public InetAddress[] resolve(String host) throws UnknownHostException {
-                Operation<?> operation = current.get();
-                operation.check();
-                InetAddress[] addresses = policy.addresses(host);
-                // A platform resolver can ignore interruption. Never connect after it returns late.
-                operation.check();
-                return addresses;
-            }
-            @Override public String resolveCanonicalHostname(String host) { return host; }
-        };
-        var manager = PoolingHttpClientConnectionManagerBuilder.create()
-                .setDnsResolver(dns)
-                .setMaxConnTotal(properties.maxConcurrentFetches())
-                .setMaxConnPerRoute(properties.maxConcurrentFetches())
-                .setDefaultConnectionConfig(ConnectionConfig.custom()
-                        .setConnectTimeout(timeout(properties.connectTimeout().toNanos())).build())
-                .build();
-        http = HttpClients.custom().setConnectionManager(manager)
-                .disableAutomaticRetries().disableRedirectHandling().disableCookieManagement()
-                .disableAuthCaching().disableContentCompression()
-                .setConnectionReuseStrategy((request, response, context) -> false)
-                .build();
+        http = VettedHttpClients.create(host -> {
+            Operation<?> operation = current.get();
+            operation.check();
+            InetAddress[] addresses = policy.addresses(host);
+            // A platform resolver can ignore interruption. Never connect after it returns late.
+            operation.check();
+            return addresses;
+        }, properties.maxConcurrentFetches(), properties.connectTimeout());
     }
 
     public byte[] fetch(WorkflowDraft.Fetch fetch) {
