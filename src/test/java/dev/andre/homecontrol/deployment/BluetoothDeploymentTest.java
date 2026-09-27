@@ -20,7 +20,7 @@ class BluetoothDeploymentTest {
 
         Map<String, Object> build = map(service, "build");
         assertThat(build).containsEntry("context", ".");
-        assertThat(map(build, "args")).containsEntry("WITH_MPV", "true");
+        assertThat(map(build, "args")).containsEntry("WITH_MPV", "true").containsEntry("RUN_AS", "0:0");
 
         Map<String, Object> environment = map(service, "environment");
         assertThat(environment)
@@ -120,8 +120,26 @@ class BluetoothDeploymentTest {
 
         Map<String, Object> action = map(load(".github/actions/smoke-image/action.yml"), "runs");
         assertThat(stepsUsing(action, "docker/build-push-action@")).hasSize(2)
-                .allSatisfy(step -> assertThat(map(step, "with"))
-                        .containsEntry("build-args", "WITH_MPV=${{ inputs.bluetooth }}"));
+                .allSatisfy(step -> assertThat(map(step, "with")).containsEntry("build-args",
+                        "WITH_MPV=${{ inputs.bluetooth }}\nRUN_AS=${{ steps.names.outputs.run-as }}\n"));
+    }
+
+    /** Only root may talk to BlueZ on the host's D-Bus, so only this variant runs as root. */
+    @Test
+    void onlyTheBluetoothVariantRunsAsRoot() throws Exception {
+        for (String dockerfile : List.of("Dockerfile", "Dockerfile.dist")) {
+            String text = Files.readString(Path.of(dockerfile));
+            String runtime = text.substring(text.lastIndexOf("FROM "));
+            assertThat(runtime).as(dockerfile).contains("ARG RUN_AS=1000:1000\n").contains("\nUSER ${RUN_AS}\n");
+            assertThat(runtime.indexOf("chown \"$RUN_AS\" /data")).as("%s hands /data over before declaring the volume", dockerfile)
+                    .isBetween(0, runtime.indexOf("VOLUME /data"));
+        }
+
+        String names = maps(map(load(".github/actions/smoke-image/action.yml"), "runs"), "steps").stream()
+                .filter(step -> "names".equals(step.get("id"))).findFirst().orElseThrow().get("run").toString();
+        assertThat(names).contains("run_as=1000:1000\nif [[ \"$BLUETOOTH\" == true ]]; then\n  variant=bluetooth\n  run_as=0:0\n");
+
+        assertThat(map(map(load("compose.yaml"), "services"), "shield-remote")).doesNotContainKey("user");
     }
 
     @Test

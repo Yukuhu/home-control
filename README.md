@@ -42,6 +42,24 @@ Swap `build: .` for `image: ghcr.io/yukuhu/home-control:latest` in
 Every releasable commit on `main` is released immediately, so `latest` is both
 the newest release and the newest code.
 
+### The user the image runs as
+
+The image runs as user 1000, not as root. That user must own the directory mounted at
+`/data`. A volume that Docker creates belongs to it from the start.
+
+- **Upgrading from 0.10 or older**, which ran as root: the data directory belongs to root, and
+  the app refuses to start and says so. Hand the directory over once, on the host:
+  `sudo chown -R 1000:1000 data`.
+- **A directory of the host** that does not exist yet is created by Docker as root. Create it
+  yourself first. The `data` directory of this repository exists for that reason.
+- **Another user**: `user: "1001:1001"` in the Compose file, or `--user 1001:1001`, runs the
+  app as that user, who must then own the directory.
+- **Root after all**: `user: "0:0"`, or `--user 0:0`.
+
+Two variants still run as root. The `-bluetooth` image does, because the host's D-Bus lets
+only root talk to BlueZ. The CasaOS manifest does, because CasaOS creates the data directory
+as root.
+
 ## CasaOS
 
 Import the CasaOS manifest directly from:

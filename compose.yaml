@@ -9,6 +9,9 @@ services:
     # networking the app still works, but devices must be added by address on the
     # setup page and smart TVs may not switch on.
     network_mode: host
+    # The app runs as user 1000, who must own ./data. If `id -u` says otherwise for you, run
+    # it as yourself: user: "1001:1001". A ./data that an older version wrote belongs to root;
+    # hand it over with `sudo chown -R 1000:1000 data`.
     volumes:
       - ./data:/data
     environment:

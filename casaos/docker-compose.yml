@@ -6,6 +6,8 @@ services:
     container_name: shield-remote
     network_mode: host
     restart: unless-stopped
+    # The image runs as user 1000, but CasaOS creates the data directory below as root.
+    user: "0:0"
     volumes:
       - type: bind
         source: /DATA/AppData/$AppID/data

@@ -1,7 +1,10 @@
 .gradle/
 node_modules/
 build/
-/data/
+# Kept as a directory, so that it belongs to who cloned the repository and not to root, who
+# would own it if Docker created it for the bind mount in compose.yaml.
+/data/*
+!/data/.gitkeep
 *.p12
 .worktrees/
 .superpowers/

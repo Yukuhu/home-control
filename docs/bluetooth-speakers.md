@@ -24,7 +24,8 @@ page shows the same checks under **Bluetooth speakers** once the module is on.
    Bluetooth manifest). A host without `/etc/machine-id` has `/var/lib/dbus/machine-id`; mount
    that to `/etc/machine-id` instead.
 4. **The container may talk to BlueZ.** BlueZ's D-Bus policy (`/etc/dbus-1/system.d/bluetooth.conf`)
-   allows `root`; the published image runs as root, so nothing is needed. Rootless Docker and
+   allows `root`; the `-bluetooth` image runs as root, unlike the default image, so nothing is
+   needed. A build of your own needs `--build-arg RUN_AS=0:0` for that. Rootless Docker and
    user-namespace remapping do not work. BlueZ does not use polkit for these calls. On hosts
    whose AppArmor denies D-Bus to containers (the setup page shows "refused this container"), add
    `security_opt: [apparmor:unconfined]` to the service.
@@ -96,7 +97,7 @@ Control; switching the module off (`HOME_CONTROL_BLUETOOTH_ENABLED=false`) remov
 | ✗ D-Bus system socket — "No D-Bus system socket (nothing at /run/dbus/system_bus_socket)" | `/run/dbus` is not mounted into the container | Add `/run/dbus:/run/dbus:ro` (use `compose.bluetooth.yaml` or the CasaOS Bluetooth manifest). |
 | ✗ BlueZ — "The container has no D-Bus machine id" | `/etc/machine-id` is not mounted into the container | Add `/etc/machine-id:/etc/machine-id:ro` (use `compose.bluetooth.yaml` or the CasaOS Bluetooth manifest). |
 | ✗ BlueZ — "BlueZ is not running on the host" | `bluez` missing or `bluetooth.service` stopped | `sudo apt install bluez && sudo systemctl enable --now bluetooth` |
-| ✗ BlueZ — "The host's D-Bus refused this container" | Rootless Docker, user-namespace remapping, a non-root container user, or AppArmor denying D-Bus | Run the container as root (default); with AppArmor add `security_opt: [apparmor:unconfined]`. |
+| ✗ BlueZ — "The host's D-Bus refused this container" | Rootless Docker, user-namespace remapping, a non-root container user, or AppArmor denying D-Bus | Run the container as root (the default of the `-bluetooth` image); with AppArmor add `security_opt: [apparmor:unconfined]`. |
 | ✗ Bluetooth adapter — "No Bluetooth adapter found on the host" | No controller (many NAS and virtual machines), USB dongle unplugged, hard-blocked radio | Plug in a dongle; `bluetoothctl list`; `sudo rfkill unblock bluetooth`. |
 | ✗ Bluetooth adapter — "hci0 (…) is powered off" | Soft-blocked or switched off | Scanning switches it on; otherwise `sudo rfkill unblock bluetooth`. |
 | ✗ mpv player — "mpv is not installed in this container" | The default image has no player | Use the tag `latest-bluetooth`, or build with `WITH_MPV=true`. |
