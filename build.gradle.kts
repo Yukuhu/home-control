@@ -48,6 +48,12 @@ sonar {
 
 dependencies {
     implementation(platform(libs.spring.boot.dependencies))
+    // Raises Tomcat above the version Spring Boot manages; gradle/libs.versions.toml says why.
+    constraints {
+        implementation(libs.tomcat.embed.core)
+        implementation(libs.tomcat.embed.el)
+        implementation(libs.tomcat.embed.websocket)
+    }
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
