@@ -9,7 +9,10 @@ updates:
     open-pull-requests-limit: 5
 
   - package-ecosystem: github-actions
-    directory: /
+    # The workflows, and the actions of this repository that they use.
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
 

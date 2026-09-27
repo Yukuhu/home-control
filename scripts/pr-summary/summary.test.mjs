@@ -238,16 +238,17 @@ function model(overrides = {}, results = {}) {
         headSha: HEAD, runUrl: RUN_URL, runNumber: 412, runAttempt: 1, durationSeconds: 663, sonarUrl: SONAR_URL,
         gate: { available: true, passed: true, failedConditions: [] },
         checks: [
+            { key: "jar", label: "Jar", result: result("jar"), logUrl: log("jar") },
             { key: "test", label: "Unit and integration tests", result: result("test"), logUrl: log("test"),
                 suite: suite({ passed: 842, skipped: 3 }) },
             { key: "e2e", label: "Browser tests (Chromium, WebKit)", result: result("e2e"), logUrl: log("e2e"),
                 suite: suite({ passed: 96 }) },
             { key: "sonar", label: "SonarCloud quality gate", result: result("sonar"), logUrl: log("sonar") },
-            { key: "image", label: "Image (amd64)", result: result("image"), logUrl: log("image") },
-            { key: "image-arm64", label: "Image smoke test (arm64)", result: result("image-arm64"),
-                logUrl: log("image-arm64") },
-            { key: "image-arm64-bluetooth", label: "Bluetooth image smoke test (arm64)",
-                result: result("image-arm64-bluetooth"), logUrl: log("image-arm64-bluetooth") },
+            { key: "image", label: "Image built from source (amd64)", result: result("image"), logUrl: log("image") },
+            { key: "smoke", label: "Image smoke test (amd64, arm64)", result: result("smoke"),
+                logUrl: log("smoke") },
+            { key: "smoke-bluetooth", label: "Bluetooth image smoke test (amd64, arm64)",
+                result: result("smoke-bluetooth"), logUrl: log("smoke-bluetooth") },
             { key: "dependencies", label: "Dependency vulnerabilities", result: result("dependencies"),
                 logUrl: log("dependencies") },
         ],
@@ -266,12 +267,13 @@ test("a green run is the marker, the heading, the commit line and the table", ()
 
 | Check | Result |
 |---|---|
+| Jar | ✅ |
 | Unit and integration tests | ✅ 842 passed, 3 skipped |
 | Browser tests (Chromium, WebKit) | ✅ 96 passed |
 | SonarCloud quality gate | ✅ passed · [details](${SONAR_URL}) |
-| Image (amd64) | ✅ |
-| Image smoke test (arm64) | ✅ |
-| Bluetooth image smoke test (arm64) | ✅ |
+| Image built from source (amd64) | ✅ |
+| Image smoke test (amd64, arm64) | ✅ |
+| Bluetooth image smoke test (amd64, arm64) | ✅ |
 | Dependency vulnerabilities | ✅ |
 `);
 });
@@ -346,11 +348,11 @@ test("a skipped sonar job without a failed suite is simply not run", () => {
 });
 
 test("failed, cancelled and skipped jobs without tests link to their log or say not run", () => {
-    const comment = render(model({}, { "image-arm64": "failure", "image-arm64-bluetooth": "skipped", image: "cancelled" }));
+    const comment = render(model({}, { smoke: "failure", "smoke-bluetooth": "skipped", image: "cancelled" }));
     assert.match(comment, /^## ❌ CI failed$/m);
-    assert.match(comment, /\| Image smoke test \(arm64\) \| ❌ \[job log\]\([^)]*\/job\/image-arm64\) \|/);
-    assert.match(comment, /\| Bluetooth image smoke test \(arm64\) \| ⏭️ not run \|/);
-    assert.match(comment, /\| Image \(amd64\) \| ❌ cancelled · \[job log\]\([^)]*\/job\/image\) \|/);
+    assert.match(comment, /\| Image smoke test \(amd64, arm64\) \| ❌ \[job log\]\([^)]*\/job\/smoke\) \|/);
+    assert.match(comment, /\| Bluetooth image smoke test \(amd64, arm64\) \| ⏭️ not run \|/);
+    assert.match(comment, /\| Image built from source \(amd64\) \| ❌ cancelled · \[job log\]\([^)]*\/job\/image\) \|/);
 });
 
 test("a cancelled suite job and a cancelled sonar job both read cancelled with a log link", () => {
@@ -363,7 +365,7 @@ test("a cancelled suite job and a cancelled sonar job both read cancelled with a
 test("a missing log link degrades to plain text", () => {
     const base = model({}, { image: "failure" });
     const comment = render({ ...base, checks: base.checks.map((check) => ({ ...check, logUrl: undefined })) });
-    assert.match(comment, /\| Image \(amd64\) \| ❌ job log \|/);
+    assert.match(comment, /\| Image built from source \(amd64\) \| ❌ job log \|/);
 });
 
 test("a suite job that failed without results failed before tests ran", () => {
@@ -510,12 +512,16 @@ const environment = {
     NEEDS_JSON: JSON.stringify({
         test: { result: "failure", outputs: {} }, e2e: { result: "success", outputs: {} },
         sonar: { result: "skipped", outputs: {} }, image: { result: "success", outputs: {} },
-        "image-arm64": { result: "success", outputs: {} }, "image-arm64-bluetooth": { result: "success", outputs: {} },
+        jar: { result: "success", outputs: {} },
+        smoke: { result: "success", outputs: {} }, "smoke-bluetooth": { result: "success", outputs: {} },
         dependencies: { result: "success", outputs: {} },
     }),
     JOBS_JSON: JSON.stringify([
-        { name: "Build and test", html_url: "https://example.test/job/1" },
-        { name: "Smoke-test the Bluetooth image on arm64", html_url: "https://example.test/job/6" },
+        { name: "Build and test", html_url: "https://example.test/job/1", conclusion: "failure" },
+        { name: "Smoke-test the Bluetooth image on amd64", html_url: "https://example.test/job/5", conclusion: "success" },
+        { name: "Smoke-test the Bluetooth image on arm64", html_url: "https://example.test/job/6", conclusion: "failure" },
+        { name: "Smoke-test the image on amd64", html_url: "https://example.test/job/7", conclusion: "success" },
+        { name: "Smoke-test the image on arm64", html_url: "https://example.test/job/8", conclusion: "success" },
     ]),
     HEAD_SHA: HEAD, PR_NUMBER: "105", RUN_URL, RUN_NUMBER: "413", RUN_ATTEMPT: "2",
     RUN_STARTED_AT: "2026-09-27T08:59:06Z", SONAR_PROJECT_KEY: "Yukuhu_home-control",
@@ -530,14 +536,31 @@ test("the model is built from the needs context, the job list and the environmen
     assert.equal(built.durationSeconds, 580);
     assert.equal(built.sonarUrl, SONAR_URL);
     assert.deepEqual(built.checks.map((check) => [check.key, check.result]), [
-        ["test", "failure"], ["e2e", "success"], ["sonar", "skipped"], ["image", "success"],
-        ["image-arm64", "success"], ["image-arm64-bluetooth", "success"], ["dependencies", "success"],
+        ["jar", "success"], ["test", "failure"], ["e2e", "success"], ["sonar", "skipped"], ["image", "success"],
+        ["smoke", "success"], ["smoke-bluetooth", "success"], ["dependencies", "success"],
     ]);
-    assert.equal(built.checks[0].logUrl, "https://example.test/job/1");
-    assert.equal(built.checks[1].logUrl, undefined);
-    assert.equal(built.checks[5].logUrl, "https://example.test/job/6");
-    assert.equal(built.checks[0].suite, suites.test);
-    assert.equal(built.checks[2].suite, undefined);
+    const check = (key) => built.checks.find((entry) => entry.key === key);
+    assert.equal(check("test").logUrl, "https://example.test/job/1");
+    assert.equal(check("e2e").logUrl, undefined);
+    assert.equal(check("test").suite, suites.test);
+    assert.equal(check("sonar").suite, undefined);
+});
+
+test("a job that runs once per architecture links to the log of the one that failed", () => {
+    const suites = { test: suite(), e2e: suite() };
+    const built = buildModel({ env: environment, suites, gate: null, now: 0 });
+    const check = (key) => built.checks.find((entry) => entry.key === key);
+    assert.equal(check("smoke-bluetooth").logUrl, "https://example.test/job/6");
+    // Without a failure the first one serves, and the Bluetooth jobs are never mistaken for these.
+    assert.equal(check("smoke").logUrl, "https://example.test/job/7");
+});
+
+test("a job list without conclusions still yields log links", () => {
+    const env = { ...environment, JOBS_JSON: JSON.stringify([
+        { name: "Smoke-test the image on arm64", html_url: "https://example.test/job/8" },
+    ]) };
+    const built = buildModel({ env, suites: { test: suite(), e2e: suite() }, gate: null, now: 0 });
+    assert.equal(built.checks.find((entry) => entry.key === "smoke").logUrl, "https://example.test/job/8");
 });
 
 test("a job missing from the needs context counts as not run, and a missing start time as zero", () => {
@@ -553,8 +576,8 @@ test("a vulnerable dependency fails the run and links to the log of its job", ()
         ...environment,
         NEEDS_JSON: JSON.stringify({
             test: { result: "success" }, e2e: { result: "success" }, sonar: { result: "success" },
-            image: { result: "success" }, "image-arm64": { result: "success" },
-            "image-arm64-bluetooth": { result: "success" }, dependencies: { result: "failure" },
+            jar: { result: "success" }, image: { result: "success" }, smoke: { result: "success" },
+            "smoke-bluetooth": { result: "success" }, dependencies: { result: "failure" },
         }),
         JOBS_JSON: JSON.stringify([{ name: "Dependency vulnerabilities", html_url: "https://example.test/job/7" }]),
     };

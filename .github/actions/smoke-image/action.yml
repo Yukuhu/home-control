@@ -1,0 +1,128 @@
+name: Smoke-test the image
+description: >-
+  Builds the image CI publishes from the jar of this run, natively on this runner, and starts it.
+  For a release it then pushes exactly that image by digest, for the release job to tag.
+
+inputs:
+  arch:
+    description: The runner's architecture, amd64 or arm64.
+    required: true
+  bluetooth:
+    description: Whether to build and test the -bluetooth variant, which adds mpv.
+    default: 'false'
+  version:
+    description: The version being released. Empty when this run releases nothing.
+    default: ''
+  token:
+    description: A token that may write packages. Only used when a version is being released.
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    # Dockerfile.dist copies the jar from its build context, which holds nothing else.
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: jar
+        path: dist
+
+    - name: Assemble the build context
+      shell: bash
+      run: cp Dockerfile.dist dist/Dockerfile
+
+    - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+    - name: Name the image and its cache
+      id: names
+      shell: bash
+      env:
+        ARCH: ${{ inputs.arch }}
+        BLUETOOTH: ${{ inputs.bluetooth }}
+        WRITE_CACHE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      run: |
+        # GHCR requires a lowercase name.
+        echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+        variant=image
+        if [[ "$BLUETOOTH" == true ]]; then
+          variant=bluetooth
+          # Only the layer that installs mpv is worth caching: the base image is pulled and the
+          # jar changes with every commit. One scope per variant and architecture, because a
+          # scope holds the cache of one writer, and written on main alone, because a cache
+          # written by a pull request is of no use to any other.
+          echo "cache-from=type=gha,scope=$variant-$ARCH" >> "$GITHUB_OUTPUT"
+          if [[ "$WRITE_CACHE" == true ]]; then
+            echo "cache-to=type=gha,mode=min,scope=$variant-$ARCH" >> "$GITHUB_OUTPUT"
+          fi
+        fi
+        echo "variant=$variant" >> "$GITHUB_OUTPUT"
+
+    # The labels are part of the image, so the image that is tested is built with the labels
+    # of the one that is published.
+    - id: meta
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+      with:
+        images: ${{ steps.names.outputs.image }}
+        tags: |
+          type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
+
+    - name: Build Dockerfile.dist
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+      with:
+        context: dist
+        platforms: linux/${{ inputs.arch }}
+        load: true
+        tags: home-control:smoke
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: WITH_MPV=${{ inputs.bluetooth }}
+        cache-from: ${{ steps.names.outputs.cache-from }}
+        cache-to: ${{ steps.names.outputs.cache-to }}
+
+    - name: Run the image
+      shell: bash
+      env:
+        BLUETOOTH: ${{ inputs.bluetooth }}
+      run: |
+        if [[ "$BLUETOOTH" == true ]]; then
+          scripts/smoke-test-image.sh --bluetooth home-control:smoke
+        else
+          scripts/smoke-test-image.sh home-control:smoke
+        fi
+
+    - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      if: inputs.version != ''
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+
+    # The same build again, which the builder answers from the layers it has just built: what
+    # is pushed is the image that ran above. It is pushed without a tag, so nobody pulls it
+    # before the release job has seen every other check pass and gives it its tags.
+    - name: Push the tested image by digest
+      id: push
+      if: inputs.version != ''
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+      with:
+        context: dist
+        platforms: linux/${{ inputs.arch }}
+        tags: ${{ steps.names.outputs.image }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: WITH_MPV=${{ inputs.bluetooth }}
+        outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+
+    - name: Note the digest
+      if: inputs.version != ''
+      shell: bash
+      env:
+        DIGEST: ${{ steps.push.outputs.digest }}
+      run: |
+        mkdir -p "$RUNNER_TEMP/digests"
+        touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      if: inputs.version != ''
+      with:
+        name: digest-${{ steps.names.outputs.variant }}-${{ inputs.arch }}
+        path: ${{ runner.temp }}/digests/*
+        if-no-files-found: error
+        retention-days: 1

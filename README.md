@@ -23,7 +23,7 @@ or the container will publish 8080 while the app listens on your chosen port.
 ## Running a prebuilt image
 
 CI publishes a multi-arch image (`linux/amd64` and `linux/arm64`) to
-`ghcr.io/yukuhu/home-control:latest` on every push to `main`, so you can skip
+`ghcr.io/yukuhu/home-control:latest` with every release, so you can skip
 building from source:
 
 ```bash
@@ -801,12 +801,21 @@ creates the tag and the GitHub release from the generated changelog — in that
 order, so a failed build never leaves a tag pointing at an image that was never
 pushed.
 
-The arm64 image is cross-built under QEMU, so a release also waits for the
-`Smoke-test the image on arm64` job, which builds the image natively on an arm64
-runner and starts it. `Smoke-test the Bluetooth image on arm64` does the same for
-the `-bluetooth` variant without holding up the release, just as that variant's
-publish step never does. The same check runs against a local build on any Linux
-Docker host, a Raspberry Pi included:
+The image that is published is the image that was tested. The `Build the jar` job
+builds the one jar of a run. The `Smoke-test the image on amd64` and `… on arm64`
+jobs each build the image from it, natively on a runner of that architecture, and
+start it; for a release they then push that image without a tag. Once every other
+check has passed, the `Release` job gives those two images the tags of the release,
+as one multi-arch image. It builds nothing itself.
+
+`Smoke-test the Bluetooth image on …` does the same for the `-bluetooth` variant,
+which `Release the Bluetooth image` publishes after the release, without holding it
+up. A variant that fails its smoke test is not published, and `latest-bluetooth`
+stays at the release before.
+
+Pull requests run the same jobs without pushing anything, and the `Build the jar`
+job says in its summary which version merging would release. The same check runs
+against a local build on any Linux Docker host, a Raspberry Pi included:
 
 ```bash
 docker build -t home-control:smoke . && scripts/smoke-test-image.sh home-control:smoke
