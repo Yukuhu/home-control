@@ -28,7 +28,8 @@ class WorkflowPointerAndPreviewTest {
             assertThatCode(() -> WorkflowValidator.validate(withPointer(valid))).as(valid).doesNotThrowAnyException();
         }
         for (String invalid : List.of("/a~", "/a~2", "/~~0", "/~0~", "/a~0~b")) {
-            assertThatThrownBy(() -> WorkflowValidator.validate(withPointer(invalid))).as(invalid)
+            WorkflowDraft draft = withPointer(invalid);
+            assertThatThrownBy(() -> WorkflowValidator.validate(draft)).as(invalid)
                     .isInstanceOf(WorkflowException.class)
                     .hasMessage("Workflow: invalid mapping A pointer escape");
         }

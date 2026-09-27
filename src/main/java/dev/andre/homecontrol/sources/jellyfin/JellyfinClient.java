@@ -167,8 +167,8 @@ public class JellyfinClient {
     public record Image(String contentType, byte[] bytes) {
         @Override
         public boolean equals(Object other) {
-            return other instanceof Image that && Objects.equals(contentType, that.contentType)
-                    && Arrays.equals(bytes, that.bytes);
+            return other instanceof Image(var otherContentType, var otherBytes)
+                    && Objects.equals(contentType, otherContentType) && Arrays.equals(bytes, otherBytes);
         }
 
         @Override

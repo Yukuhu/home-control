@@ -7,6 +7,8 @@ import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.storage.StorageException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -196,36 +198,11 @@ class JsonFileDeviceRegistryTest {
                 .doesNotContainKey("certificateFingerprint");
     }
 
-    @Test
-    void aVersionOneRecordWithAnOutOfRangePortIsAPathBearingStorageFailure() throws Exception {
+    @ParameterizedTest(name = "port field: {0}")
+    @ValueSource(strings = {"\"port\":99999,", "\"port\":\"not-a-number\",", ""})
+    void aVersionOneRecordWithAnUnusablePortIsAPathBearingStorageFailure(String portField) throws Exception {
         Path file = dir.resolve("devices.json");
-        Files.writeString(file, "[{\"id\":\"x\",\"name\":\"X\",\"host\":\"10.0.0.9\",\"port\":99999,"
-                + "\"certificateFingerprint\":null,\"lastSeen\":\"2026-08-29T18:00:00Z\"}]");
-
-        var registry = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(registry::findAll)
-                .isInstanceOf(StorageException.class)
-                .hasMessageContaining(file.toString())
-                .hasMessageContaining("integrity");
-    }
-
-    @Test
-    void aVersionOneRecordWithANonNumericPortIsAPathBearingStorageFailure() throws Exception {
-        Path file = dir.resolve("devices.json");
-        Files.writeString(file, "[{\"id\":\"x\",\"name\":\"X\",\"host\":\"10.0.0.9\",\"port\":\"not-a-number\","
-                + "\"certificateFingerprint\":null,\"lastSeen\":\"2026-08-29T18:00:00Z\"}]");
-
-        var registry = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(registry::findAll)
-                .isInstanceOf(StorageException.class)
-                .hasMessageContaining(file.toString())
-                .hasMessageContaining("integrity");
-    }
-
-    @Test
-    void aVersionOneRecordWithAMissingPortIsAPathBearingStorageFailure() throws Exception {
-        Path file = dir.resolve("devices.json");
-        Files.writeString(file, "[{\"id\":\"x\",\"name\":\"X\",\"host\":\"10.0.0.9\","
+        Files.writeString(file, "[{\"id\":\"x\",\"name\":\"X\",\"host\":\"10.0.0.9\"," + portField
                 + "\"certificateFingerprint\":null,\"lastSeen\":\"2026-08-29T18:00:00Z\"}]");
 
         var registry = new JsonFileDeviceRegistry(file);

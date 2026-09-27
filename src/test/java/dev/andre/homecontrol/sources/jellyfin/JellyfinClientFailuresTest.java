@@ -102,8 +102,8 @@ class JellyfinClientFailuresTest {
         assertThat(image).isEqualTo(same).hasSameHashCodeAs(same)
                 .isNotEqualTo(new JellyfinClient.Image("image/jpeg", new byte[] {1, 2, 4}))
                 .isNotEqualTo(new JellyfinClient.Image("image/png", new byte[] {1, 2, 3}))
-                .isNotEqualTo("image/jpeg");
-        assertThat(image).hasToString("Image[contentType=image/jpeg, bytes=3 bytes]");
+                .isNotEqualTo("image/jpeg")
+                .hasToString("Image[contentType=image/jpeg, bytes=3 bytes]");
         assertThat(new JellyfinClient.Image("image/png", null)).hasToString("Image[contentType=image/png, bytes=none]")
                 .isEqualTo(new JellyfinClient.Image("image/png", null));
     }
