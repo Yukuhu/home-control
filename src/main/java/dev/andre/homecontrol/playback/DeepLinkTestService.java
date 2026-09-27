@@ -1,14 +1,18 @@
 package dev.andre.homecontrol.playback;
 
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.device.DeviceManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +35,8 @@ import static dev.andre.homecontrol.playback.DeepLinkTestResult.Outcome.NO_CHANG
  */
 @Service
 public class DeepLinkTestService {
+
+    private static final Logger log = LoggerFactory.getLogger(DeepLinkTestService.class);
 
     private static final String CHECK_THE_SCREEN =
             " No adapter can see which video plays: check the screen for the test video.";
@@ -68,8 +74,15 @@ public class DeepLinkTestService {
         try {
             try {
                 devices.execute(deviceId, new Action.OpenAppLink(properties.youtubeUrl()));
-            } catch (RuntimeException e) {
+            } catch (ActionFailedException | DeviceNotFoundException | DeviceOfflineException
+                     | UnsupportedActionException e) {
+                // Written for the user: the device and what it could not do.
                 return new DeepLinkTestResult(FAILED, before, null, "The test link was not opened: " + e.getMessage());
+            } catch (RuntimeException e) {
+                // Anything else is a fault of this server, whose message may name its internals.
+                log.warn("The deep-link test on {} failed unexpectedly", deviceId, e);
+                return new DeepLinkTestResult(FAILED, before, null,
+                        "The test link was not opened: an unexpected error, which the server's log describes");
             }
             if (reporting == ForegroundAppReporting.NONE) {
                 return new DeepLinkTestResult(NOT_OBSERVABLE, before, null, "Sent. " + device.name()
