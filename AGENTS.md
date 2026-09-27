@@ -45,6 +45,8 @@ Rules for everyone who changes this repository, people and coding agents alike. 
 - Content sources: `src/main/java/dev/andre/homecontrol/sources/<source>/`.
 - Tests sit in the same package as the code they test. Fakes of devices and services are named `Fake…` and speak
   the real protocol; recorded device and API responses are in `src/test/resources/fixtures/<device or source>/`.
+- Shared test helpers: `src/test/java/dev/andre/homecontrol/testsupport/`. Build a new web-API fake on
+  `FakeHttpServer` instead of opening a server of its own.
 - Test configuration: `src/test/resources/config/application.yaml` holds only overrides of the production
   `application.yaml`.
 - User guides are in `docs/user/`, developer guides in `docs/dev/`. Specs, plans and reviews of larger pieces of work
