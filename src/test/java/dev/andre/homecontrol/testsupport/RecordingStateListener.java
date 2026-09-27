@@ -34,14 +34,24 @@ public final class RecordingStateListener implements Consumer<DeviceState> {
         states.clear();
     }
 
-    /** {@link #awaitStatus(DeviceStatus, Duration)} with Awaitility's default of 10 s. */
+    /** Waits until some state so far has {@code status}, using Awaitility's configured default timeout, and returns
+     * the first that has. */
     public DeviceState awaitStatus(DeviceStatus status) {
-        return awaitStatus(status, Duration.ofSeconds(10));
+        await().until(() -> hasStatus(status));
+        return firstWithStatus(status);
     }
 
     /** Waits until some state so far has {@code status}, and returns the first that has. */
     public DeviceState awaitStatus(DeviceStatus status, Duration atMost) {
-        await().atMost(atMost).until(() -> states.stream().anyMatch(state -> state.status() == status));
+        await().atMost(atMost).until(() -> hasStatus(status));
+        return firstWithStatus(status);
+    }
+
+    private boolean hasStatus(DeviceStatus status) {
+        return states.stream().anyMatch(state -> state.status() == status);
+    }
+
+    private DeviceState firstWithStatus(DeviceStatus status) {
         return states.stream().filter(state -> state.status() == status).findFirst().orElseThrow();
     }
 }

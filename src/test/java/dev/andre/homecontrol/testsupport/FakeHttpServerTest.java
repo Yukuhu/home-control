@@ -139,6 +139,20 @@ class FakeHttpServerTest {
     }
 
     @Test
+    void aHandlerCanReadTheRequestBody() throws Exception {
+        server.handle("POST", "/echo", exchange -> {
+            byte[] body = exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+        });
+
+        HttpResponse<String> response = post("/echo", "hello");
+
+        assertThat(response.body()).isEqualTo("hello");
+        assertThat(server.last("POST", "/echo").body()).isEqualTo("hello");
+    }
+
+    @Test
     void everyRequestIsRecordedWithMethodPathQueryHeadersAndBody() throws Exception {
         server.respond("POST", "/form", Response.empty(204));
 
@@ -241,7 +255,9 @@ class FakeHttpServerTest {
         CompletableFuture<HttpResponse<InputStream>> trickling = client.sendAsync(
                 HttpRequest.newBuilder(server.url("/trickle")).build(), HttpResponse.BodyHandlers.ofInputStream());
         entered.await();
-        await().atMost(Duration.ofSeconds(5)).until(() -> server.openTrickles() == 1);
+        // Wait for the trickle to have written past its headers, not just for openTrickles() to have been
+        // incremented (which happens before sendResponseHeaders and so can race close() below).
+        await().atMost(Duration.ofSeconds(5)).until(() -> server.bytesTrickled() > 0);
 
         server.close();
 

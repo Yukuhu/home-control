@@ -2,6 +2,7 @@ package dev.andre.homecontrol.testsupport;
 
 import com.sun.net.httpserver.HttpExchange;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -50,7 +51,11 @@ public record Request(String method, URI uri, Map<String, String> query, Map<Str
         Map<String, String> headers = new TreeMap<>();
         exchange.getRequestHeaders().forEach((name, values) ->
                 headers.put(name.toLowerCase(Locale.ROOT), String.join(",", values)));
-        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        byte[] bytes = exchange.getRequestBody().readAllBytes();
+        // A route handler reads exchange.getRequestBody() itself, so give it a fresh stream over the bytes we
+        // already consumed; a null output stream keeps the original.
+        exchange.setStreams(new ByteArrayInputStream(bytes), null);
+        String body = new String(bytes, StandardCharsets.UTF_8);
         URI uri = exchange.getRequestURI();
         return new Request(exchange.getRequestMethod(), uri, decode(uri.getRawQuery()), headers, body);
     }
