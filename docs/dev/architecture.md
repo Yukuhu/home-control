@@ -1,6 +1,54 @@
 # Architecture
 
-Phase 1.2 of the architecture roadmap extends this page with the package map and a dependency diagram.
+How the code is organised, the rules the build enforces on it, and how the architecture roadmap
+([spec](../superpowers/specs/2026-09-27-architecture-roadmap-design.md)) is measured.
+
+## Package map
+
+All code lives under `dev.andre.homecontrol`, with `HomeControlApplication` and `HomeControlConfiguration` at its
+root.
+
+| Package | Holds |
+| --- | --- |
+| `core` | The domain model every other package builds on: devices, capabilities, actions and device states, and the adapter contract (`DeviceAdapter`, `DeviceHandle`). `core.content` holds content sources, items and rails; `core.playback` playable references, routes and the playback planner. It depends only on the JDK. |
+| `device` | `DeviceManager`: the known devices, their connections and state, merging what discovery finds, and sending commands to a device's adapters. `JsonFileDeviceRegistry` stores the paired devices in `devices.json`. |
+| `adapters` | One package per device protocol: `androidtv`, `cast`, `webos`, `tizen`, `upnp`, `sonos`, `bluetooth`. Each is a module that can be switched off, with its wire protocol in a `protocol` subpackage where it has one. `adapters.net` (TLS, WebSockets, Wake-on-LAN) and `adapters.links` (content ids in service links) are shared. |
+| `discovery` | mDNS and SSDP discovery. |
+| `sources` | One package per content source: `jellyfin`, `youtube`, `tmdb`, `sports`, `pinned`, `workflows`. Each is a module that can be switched off. `sources.http` is shared: HTTP clients that connect only to vetted addresses and bound response bodies in size and time. |
+| `content` | The rail cache, search across sources, and source preferences. |
+| `playback` | `PlaybackService`, which plans a route for an item on a device, carries it out and reports the outcome, and the deep-link test. |
+| `web` | Controllers, view models and the server-sent event stream behind the dashboard and setup pages. |
+| `security` | Login, the host allowlist, cross-origin protection and the security headers. |
+| `storage` | The data directory, the encrypted secret store and its key, and source settings. |
+| `crypto` | Argon2id hashing for the login password and the secret key. |
+
+## Dependencies
+
+The dependencies between the top-level packages that the code has and the rules allow. Every package may also depend
+on `core`, which depends on nothing; those arrows are left out. The frozen violations below are the only other
+dependencies, and the roadmap removes them.
+
+```mermaid
+flowchart TD
+    sources --> web
+    sources --> content
+    sources --> device
+    sources --> security
+    sources --> storage
+    web --> playback
+    web --> content
+    web --> device
+    web --> security
+    web --> storage
+    playback --> device
+    content --> storage
+    device --> storage
+    adapters --> discovery
+    adapters --> storage
+    security --> storage
+    security --> crypto
+    storage --> crypto
+```
 
 ## Package rules
 
@@ -43,3 +91,21 @@ ones.
 
 The number of frozen violations only goes down. It is the progress measure for the roadmap's Phase 2 and 3
 workstreams, which remove them.
+
+## Progress measures
+
+The roadmap's measures, updated by each workstream that moves them.
+
+| Measure | Baseline (2026-09-27) | Now |
+| --- | --- | --- |
+| Frozen ArchUnit violations | 89 | 89 |
+| Largest class | 813 lines (`DeviceManager`) | 813 lines (`DeviceManager`) |
+| Summed test-class time | 495 s (one JVM) | 695 s (four JVMs) |
+| `test` task wall time | not measured | 4 min 37 s (four JVMs, 4 CPUs) |
+| Spring context starts per test run | 67 (one JVM) | 70 (four JVMs) |
+| CI "Build and test" job time | about 9 min | 5 min 13 s |
+| Wall-clock upper-bound assertions | 9 | 9 |
+| Copies of `MutableClock` | 4 | 5, one of them nested in `SsdpDiscoveryTest` |
+
+Since #117 the unit tests run in up to four JVMs at once. Summed class time and context starts count all of them, and
+a class takes longer while it shares the CPUs, so compare runs with the same number of JVMs.

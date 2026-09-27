@@ -224,6 +224,9 @@ dashboard is the new `/`; the classic remote stays reachable at `/remote/{device
 
 ## 7. Architecture
 
+> The package map in this section is the plan from 2026-09-16. The current one is in
+> [docs/dev/architecture.md](../../dev/architecture.md#package-map).
+
 The Spring Boot monolith stays. Packages become feature modules with the
 existing `shield` package retired into an adapter:
 
