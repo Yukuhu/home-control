@@ -1,6 +1,6 @@
 # Google Cast adapter (sub-project B) — manual acceptance
 
-**Release:** 0.7 · **Epic:** Google Cast adapter · **Plan:** `docs/superpowers/plans/2026-09-16-google-cast-adapter.md`
+**Release:** 0.7 · **Epic:** Google Cast adapter · **Plan:** `docs/superpowers/archive/2026-09-16-google-cast-adapter.md`
 
 Automated coverage: `CastEndToEndTest` (real application against the in-process fake receiver,
 `src/test/java/dev/andre/homecontrol/web/CastEndToEndTest.java`), `CastSessionTest`,

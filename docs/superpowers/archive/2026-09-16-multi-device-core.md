@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4.1.1 (Jackson 3 under `tools.jackson`), Gradle 9.7.1, Thymeleaf, htmx 2, vanilla ES modules, protobuf 4.36.0, jmDNS, JUnit 5, AssertJ, Mockito, Awaitility.
 
-**Spec:** `docs/superpowers/specs/2026-09-16-home-control-center-concept.md` — sections 5 (domain model), 6.1–6.2 (device strip, live state), 7 (architecture), 8 (storage, migration). Sub-project A row of §10. The program roadmap is `docs/superpowers/plans/2026-09-16-home-control-center-roadmap.md`.
+**Spec:** `docs/superpowers/specs/2026-09-16-home-control-center-concept.md` — sections 5 (domain model), 6.1–6.2 (device strip, live state), 7 (architecture), 8 (storage, migration). Sub-project A row of §10. The program roadmap is `docs/superpowers/archive/2026-09-16-home-control-center-roadmap.md`.
 
 ## Global Constraints
 

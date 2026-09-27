@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
-// Only CastMessage is included; see docs/superpowers/specs/2026-09-16-cast-sender-adr.md.
+// Only CastMessage is included; see docs/adr/0001-cast-sender.md.
 
 syntax = "proto2";
 

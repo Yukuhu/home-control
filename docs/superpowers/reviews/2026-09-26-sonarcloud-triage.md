@@ -126,7 +126,7 @@ visibility. Browser coverage is now 90.19% of lines and 93.97% of branches.
   or certificate pinning needs a protocol-specific design, pairing/re-pairing
   behavior, and device tests, including certificate rotation. The existing Cast
   trust decision is documented in the
-  [Cast sender ADR](../specs/2026-09-16-cast-sender-adr.md). These findings remain open.
+  [Cast sender ADR](../../adr/0001-cast-sender.md). These findings remain open.
 - **Tizen connection ownership (`java:S2095`):** the factory's connection object
   acquires no resource before the WebSocket open succeeds. Pairing uses
   try-with-resources; the session closes failed attempts and retained connections.
