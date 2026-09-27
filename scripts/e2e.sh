@@ -10,9 +10,9 @@
 #        scripts/e2e.sh -Pe2eBrowsers=chromium --tests '*PlaySheet*'
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="$(sed -n 's/^val playwrightVersion = "\(.*\)"$/\1/p' "$ROOT/build.gradle.kts")"
+VERSION="$(sed -n 's/^playwright = "\(.*\)"$/\1/p' "$ROOT/gradle/libs.versions.toml")"
 if [[ -z "$VERSION" ]]; then
-  echo "playwrightVersion not found in build.gradle.kts" >&2
+  echo "playwright version not found in gradle/libs.versions.toml" >&2
   exit 1
 fi
 IMAGE="home-control-e2e:playwright-$VERSION"
