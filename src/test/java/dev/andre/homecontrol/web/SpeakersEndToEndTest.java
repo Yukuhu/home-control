@@ -140,6 +140,8 @@ class SpeakersEndToEndTest {
                 + "\r\nX-RINCON-HOUSEHOLD: " + FakeSonosHousehold.HOUSEHOLD + "\r\n\r\n");
     }
 
+    // One journey (discover, control, group, forget); each step needs the state the previous one left behind.
+    @SuppressWarnings("java:S5961")
     @Test
     void discoversControlsAndGroupsSpeakers() throws Exception {
         // 1. The renderer answers the search; the Sonos household is learned from one room's announcement.

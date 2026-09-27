@@ -104,6 +104,8 @@ class YouTubeBrowserOAuthTest {
         return "/setup/sources/youtube/callback?state=" + request.get("state") + "&" + form(result);
     }
 
+    // One consent journey: every later callback is checked against the login, state and tokens the first one set up.
+    @SuppressWarnings("java:S5961")
     @Test
     void browserConsentStoresAndRefreshesTokensAndRejectsForeignCancelledAndReplayedCallbacks() throws Exception {
         var response = post(browser, "/setup/sources/youtube/browser/connect", Map.of(

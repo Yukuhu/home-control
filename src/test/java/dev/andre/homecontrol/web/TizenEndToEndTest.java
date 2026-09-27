@@ -135,6 +135,8 @@ class TizenEndToEndTest {
         return registry.findById(ID).orElseThrow().adapterSettings("tizen");
     }
 
+    // One journey (discover, pair, control, wake, forget); each step needs the state the previous one left behind.
+    @SuppressWarnings("java:S5961")
     @Test
     void discoversPairsControlsWakesAndTestsASamsungTv() throws Exception {
         // 1. Discovered through SSDP.

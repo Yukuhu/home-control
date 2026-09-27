@@ -134,6 +134,9 @@ class StreamingLaunchersEndToEndTest {
         return MAPPER.readTree(response.body());
     }
 
+    // One journey (connect, launch, upgrade, pin, disconnect); each step needs the state the previous one left.
+    // S3415: browserBodies is the recorded actual value; the rule mistakes a static final field for an expected constant.
+    @SuppressWarnings({"java:S5961", "java:S3415"})
     @Test
     @Order(1)
     void launchTrendingTitlesAndUpgradeThemWithPinnedLinks() throws Exception {
@@ -203,8 +206,8 @@ class StreamingLaunchersEndToEndTest {
                 send(browser, post("/devices/shield-e2e/play-attempt", Map.of("source", "tmdb", "item", "tv-66732")));
                 assertThat(shieldRemote.nextAppLink()).isEqualTo("https://www.netflix.com/title/80057281");
 
-                // 10. Pin a Prime Video share link directly (no upgrade of a TMDB item this time);
-                // the pinned rail refreshes on its own through the ContentChangedEvent.
+                // 10. Pin a Prime Video share link directly, without upgrading a TMDB item this time.
+                // The pinned rail refreshes on its own through the ContentChangedEvent.
                 assertThat(send(browser, post("/setup/sources/pinned", Map.of(
                         "url", "https://www.primevideo.com/region/eu/detail/" + GTI + "/ref=atv_dp_share_cu_r",
                         "title", "The Boys"))).statusCode()).isEqualTo(302);

@@ -101,6 +101,8 @@ class JellyfinEndToEndTest {
                 .POST(HttpRequest.BodyPublishers.ofString(body));
     }
 
+    // One journey (connect, browse, play every route, disconnect); each step builds on the last.
+    @SuppressWarnings("java:S5961")
     @Test
     void connectBrowseAndPlayThroughEveryRouteWithoutLeakingTheToken() throws Exception {
         try (FakeJellyfinServer jellyfin = new FakeJellyfinServer().withConnectableServer()

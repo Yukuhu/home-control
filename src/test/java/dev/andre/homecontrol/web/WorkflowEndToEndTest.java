@@ -70,8 +70,8 @@ class WorkflowEndToEndTest {
         @Override public String id() { return "workflow-test"; }
         @Override public DeviceKind kind() { return DeviceKind.ANDROID_TV; }
         @Override public Set<Capability> capabilities(Device device) {
-            return "true".equals(device.adapterSettings(id()).get("cast"))
-                    ? Set.of(Capability.CAST_RECEIVER) : Set.of(Capability.REMOTE_KEYS);
+            return Set.of("true".equals(device.adapterSettings(id()).get("cast"))
+                    ? Capability.CAST_RECEIVER : Capability.REMOTE_KEYS);
         }
         @Override public DeviceHandle connect(Device device, Consumer<DeviceState> changed) {
             DeviceState state = new DeviceState(DeviceStatus.CONNECTED, true, "", 0, 0, false, Instant.now());
@@ -79,7 +79,7 @@ class WorkflowEndToEndTest {
             return new DeviceHandle() {
                 @Override public DeviceState state() { return state; }
                 @Override public void execute(Action action) { actions.add(new Recorded(device.id(), action)); }
-                @Override public void close() {}
+                @Override public void close() { /* holds no connection to release */ }
             };
         }
         @Override public List<DiscoveredDevice> discovered() { return List.of(); }
