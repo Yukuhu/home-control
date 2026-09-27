@@ -56,7 +56,7 @@ public class SecretStore {
     private final SecretKeySource keys;
     private final SecureRandom random;
     private SecretKeySource.KeyHeader header;
-    private LoginCredential login;
+    private LoginCredential credential;
     private Map<String, String> secrets = Map.of();
 
     public SecretStore(Path file, SecretKeySource keys, SecureRandom random) {
@@ -65,7 +65,7 @@ public class SecretStore {
         this.random = random;
         load();
         if (header != null && keys.usesPassphrase() && SecretKeySource.SOURCE_KEY_FILE.equals(header.source())) {
-            write(login, secrets);
+            write(credential, secrets);
             log.info("Re-encrypted {} with HOME_CONTROL_SECRET; secret.key is no longer needed", file);
         }
     }
@@ -83,18 +83,18 @@ public class SecretStore {
     }
 
     public synchronized Optional<LoginCredential> login() {
-        return Optional.ofNullable(login);
+        return Optional.ofNullable(credential);
     }
 
     /** Adds or replaces secrets. A login must already exist. */
     public synchronized void putSecrets(Map<String, String> values) {
         validate(values);
-        if (login == null) {
+        if (credential == null) {
             throw new IllegalStateException("Set a login password before storing secrets");
         }
         Map<String, String> next = new HashMap<>(secrets);
         next.putAll(values);
-        write(login, next);
+        write(credential, next);
     }
 
     /** Stores the first secrets and the login that protects them in one atomic write. */
@@ -103,7 +103,7 @@ public class SecretStore {
         if (newLogin == null) {
             throw new IllegalArgumentException("A login is required");
         }
-        if (!secrets.isEmpty() || login != null) {
+        if (!secrets.isEmpty() || credential != null) {
             throw new IllegalStateException("Secrets already exist; log in to add more");
         }
         write(newLogin, values);
@@ -116,11 +116,11 @@ public class SecretStore {
         if (next.size() == secrets.size()) {
             return;
         }
-        write(next.isEmpty() ? null : login, next);
+        write(next.isEmpty() ? null : credential, next);
     }
 
     public synchronized void replaceLogin(LoginCredential newLogin) {
-        if (login == null || newLogin == null) {
+        if (credential == null || newLogin == null) {
             throw new IllegalStateException("There is no login to replace");
         }
         write(newLogin, secrets);
@@ -172,7 +172,7 @@ public class SecretStore {
             Map<String, String> values = new LinkedHashMap<>();
             document.path("secrets").properties().forEach(entry -> values.put(entry.getKey(), entry.getValue().asString("")));
             header = parsed;
-            login = loaded;
+            credential = loaded;
             secrets = Map.copyOf(values);
         } catch (JacksonException _) {
             // no cause: a parser message could quote the decrypted content
@@ -266,7 +266,7 @@ public class SecretStore {
             throw new StorageException("Could not write " + file + "; check that /data is bind-mounted and writable", e);
         }
         header = h;
-        login = nextLogin;
+        credential = nextLogin;
         secrets = Map.copyOf(nextSecrets);
     }
 }

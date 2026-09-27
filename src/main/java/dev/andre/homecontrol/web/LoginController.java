@@ -25,20 +25,20 @@ public class LoginController {
     private static final String ERROR = "error";
     private static final String LOGIN_ERROR = "loginError";
 
-    private final LoginService login;
+    private final LoginService loginService;
     private final LoginRateLimiter limiter;
 
-    public LoginController(LoginService login, LoginRateLimiter limiter) {
-        this.login = login;
+    public LoginController(LoginService loginService, LoginRateLimiter limiter) {
+        this.loginService = loginService;
         this.limiter = limiter;
     }
 
     @GetMapping("/login")
     public String page(@RequestParam(required = false) String next, HttpServletRequest request, Model model) {
-        if (!login.loginRequired()) {
+        if (!loginService.loginRequired()) {
             return HOME_REDIRECT;
         }
-        if (login.isAuthenticated(request)) {
+        if (loginService.isAuthenticated(request)) {
             return "redirect:" + safeNext(next);
         }
         model.addAttribute("next", safeNext(next));
@@ -48,7 +48,7 @@ public class LoginController {
     @PostMapping("/login")
     public String submit(@RequestParam(required = false) String password, @RequestParam(required = false) String next,
                          HttpServletRequest request, HttpServletResponse response, Model model) {
-        if (!login.loginRequired()) {
+        if (!loginService.loginRequired()) {
             return HOME_REDIRECT;
         }
         model.addAttribute("next", safeNext(next));
@@ -62,7 +62,7 @@ public class LoginController {
         }
         boolean ok;
         try {
-            ok = login.authenticate(password, request);
+            ok = loginService.authenticate(password, request);
         } catch (LoginBusyException e) {
             limiter.release(address);
             response.setStatus(429);
@@ -83,8 +83,8 @@ public class LoginController {
 
     @PostMapping("/logout")
     public String logout(HttpServletRequest request) {
-        login.logout(request);
-        return login.loginRequired() ? "redirect:/login" : HOME_REDIRECT;
+        loginService.logout(request);
+        return loginService.loginRequired() ? "redirect:/login" : HOME_REDIRECT;
     }
 
     @PostMapping("/setup/password")
@@ -98,7 +98,7 @@ public class LoginController {
             return "redirect:/setup";
         }
         try {
-            login.changePassword(current, password, confirmation, request);
+            loginService.changePassword(current, password, confirmation, request);
             limiter.succeeded(address);
             redirect.addFlashAttribute("loginMessage", "Password changed. Other browsers need to log in again.");
         } catch (WrongPasswordException e) {
