@@ -1402,7 +1402,7 @@ Finding out what broke meant opening the failed job and reading its log.
 
 - `scripts/pr-summary`: 42 tests with `node --test`.
 - On this pull request: see the verification checklist in
-  `docs/superpowers/plans/2026-09-27-pr-ci-summary-comment.md`, Task 5.
+  `docs/superpowers/archive/2026-09-27-pr-ci-summary-comment.md`, Task 5.
 EOF
 ```
 

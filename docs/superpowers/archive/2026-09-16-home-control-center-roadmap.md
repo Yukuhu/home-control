@@ -69,7 +69,7 @@ multi-device SSE, the dashboard shell with a device strip and per-device remote
 drawer, the playback planner skeleton, and app-link launching on Android TV
 (the pasted-URL form is the first "play something on a device" feature).
 
-Executable plan: `docs/superpowers/plans/2026-09-16-multi-device-core.md`.
+Executable plan: `docs/superpowers/archive/2026-09-16-multi-device-core.md`.
 
 | # | Task | Acceptance |
 |---|---|---|

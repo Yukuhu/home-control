@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4.1.1 (Jackson 3 under `tools.jackson`), Gradle (run through `.superpowers/gradle.sh`), Thymeleaf, htmx, vanilla ES modules, protobuf-java 4.36.0 + protoc 4.36.0 (already in `build.gradle.kts`), jmDNS 3.6.3 (already present), BouncyCastle `bcpkix-jdk18on` 1.85 (already present; used by the test fake for its certificate), JUnit 5, AssertJ, Mockito, Awaitility. **No new dependency.** Verified on Maven Central 2026-09-16 and rejected (see ADR): `su.litvak.chromecast:api-v2:0.11.3` (2020-04-09, protobuf 2.6 gencode fails with `IncompatibleClassChangeError` on protobuf-java 4.36), `org.digitalmediaserver:cast-api:0.2.0` (2026-09-15, Jackson 2.12 + pre-22 protobuf gencode flagged vulnerable at runtime).
 
-**Spec:** `docs/superpowers/specs/2026-09-16-home-control-center-concept.md` — §4.1 (Cast row), §5.1 (capabilities, merge by IP/name, manual split/merge), §5.2 (`CastLoad`, `StreamUrl`), §5.3 (planner order), §6.2 (now playing from Cast media status), §7 (adapters, one discovery), §11 (Cast library risk), §12 (fake Cast receiver). Roadmap: `docs/superpowers/plans/2026-09-16-home-control-center-roadmap.md`, section B. ADR: `docs/superpowers/specs/2026-09-16-cast-sender-adr.md`. Built on sub-project A: `docs/superpowers/plans/2026-09-16-multi-device-core.md`.
+**Spec:** `docs/superpowers/specs/2026-09-16-home-control-center-concept.md` — §4.1 (Cast row), §5.1 (capabilities, merge by IP/name, manual split/merge), §5.2 (`CastLoad`, `StreamUrl`), §5.3 (planner order), §6.2 (now playing from Cast media status), §7 (adapters, one discovery), §11 (Cast library risk), §12 (fake Cast receiver). Roadmap: `docs/superpowers/archive/2026-09-16-home-control-center-roadmap.md`, section B. ADR: `docs/adr/0001-cast-sender.md`. Built on sub-project A: `docs/superpowers/archive/2026-09-16-multi-device-core.md`.
 
 ## Global Constraints
 
@@ -69,7 +69,7 @@ Sources under `src/main/java/dev/andre/homecontrol/`, tests under `src/test/java
 
 ### Files to create
 
-- `docs/superpowers/specs/2026-09-16-cast-sender-adr.md` — ADR (already written; committed in Task 1).
+- `docs/adr/0001-cast-sender.md` — ADR (already written; committed in Task 1).
 - `src/main/proto/cast_channel.proto` — `CastMessage` wire format.
 - `discovery/MdnsBrowser.java` — the one jmDNS instance; adapters register service types.
 - `core/DeviceDiscoveredEvent.java` — published when an adapter's discovery resolves a device.
@@ -119,7 +119,7 @@ Sources under `src/main/java/dev/andre/homecontrol/`, tests under `src/test/java
 ### Task 1: B1 · Cast sender library choice (ADR)
 
 **Files:**
-- Commit: `docs/superpowers/specs/2026-09-16-cast-sender-adr.md` (already written by the planner; the spike code was throwaway and is not in the repo)
+- Commit: `docs/adr/0001-cast-sender.md` (already written by the planner; the spike code was throwaway and is not in the repo)
 
 **Interfaces:**
 - Consumes: nothing.
@@ -127,7 +127,7 @@ Sources under `src/main/java/dev/andre/homecontrol/`, tests under `src/test/java
 
 - [ ] **Step 1: Read the ADR and check it names the choice, licence and maintenance risk**
 
-Run: `grep -n "^## " docs/superpowers/specs/2026-09-16-cast-sender-adr.md`
+Run: `grep -n "^## " docs/adr/0001-cast-sender.md`
 Expected: headings `Decision`, `Options considered`, `Licence`, `Maintenance risk`, `Consequences`.
 
 - [ ] **Step 2: Build (nothing changed in code; proves the tree is green before B starts)**
@@ -138,7 +138,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/superpowers/specs/2026-09-16-cast-sender-adr.md
+git add docs/adr/0001-cast-sender.md
 git commit -m "docs: ADR for an in-house Cast sender"
 ```
 
@@ -2060,7 +2060,7 @@ git commit -m "feat: discover Cast receivers and merge them into existing device
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
-// Only CastMessage is included; see docs/superpowers/specs/2026-09-16-cast-sender-adr.md.
+// Only CastMessage is included; see docs/adr/0001-cast-sender.md.
 
 syntax = "proto2";
 
@@ -6513,7 +6513,7 @@ Expected: PASS. If a test fails, the defect is in Tasks 2–6 code, not in the t
 ```markdown
 # Google Cast adapter (sub-project B) — manual acceptance
 
-**Release:** 0.7 · **Epic:** #6 · **Plan:** `docs/superpowers/plans/2026-09-16-google-cast-adapter.md`
+**Release:** 0.7 · **Epic:** #6 · **Plan:** `docs/superpowers/archive/2026-09-16-google-cast-adapter.md`
 
 Automated coverage: `CastEndToEndTest` (real application against the in-process fake receiver),
 `CastSessionTest`, `CastConnectionTest`, `DeviceManagerMergeTest`, `DeviceManagerExecuteTest`,

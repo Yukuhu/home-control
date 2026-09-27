@@ -113,7 +113,7 @@ IDs, protocol messages, trust and pinning, timeouts and retries are unchanged.
 The per-issue reasons are in the decisions table; the groups are:
 
 - **Trust-all TLS towards LAN appliances (java:S4830, 12, accepted — owner decision).** Cast receivers
-  (`CastTls`, see the [Cast sender ADR](../specs/2026-09-16-cast-sender-adr.md)) and Samsung/LG TVs (`InsecureTls`:
+  (`CastTls`, see the [Cast sender ADR](../../adr/0001-cast-sender.md)) and Samsung/LG TVs (`InsecureTls`:
   Tizen `wss:8002`, webOS SSAP `wss:3001` fallback and pointer socket) only present self-signed certificates and none
   of these protocols offers a pinning handshake. The Shield never uses these trust managers: pairing authenticates via
   the on-screen code and every later session pins the stored certificate fingerprint.
