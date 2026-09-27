@@ -256,9 +256,8 @@ public class JellyfinClient {
 
     /** Sends the request; a transport failure becomes an UNREACHABLE naming what went wrong. */
     private HttpResponse<InputStream> exchange(URI serverUrl, HttpRequest request) {
-        HttpResponse<InputStream> response;
         try {
-            response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            return http.send(request, HttpResponse.BodyHandlers.ofInputStream());
         } catch (HttpConnectTimeoutException _) {
             throw unreachable(serverUrl, "connection timed out");
         } catch (HttpTimeoutException _) {
@@ -271,7 +270,6 @@ public class JellyfinClient {
             Thread.currentThread().interrupt();
             throw unreachable(serverUrl, "interrupted");
         }
-        return response;
     }
 
     /** Redirects, rejected credentials, unknown paths and every other 4xx/5xx answer end the call. */
