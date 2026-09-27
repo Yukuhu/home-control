@@ -12,7 +12,7 @@ const MAX_TRACE_LINES = 30;
 
 // The row order of the comment. `job` is the job's display name in ci.yml, which is how the
 // GitHub API identifies it; `suite` names the JUnit results that belong to the job. A job that
-// runs once per architecture is named "<job> on <architecture>" there.
+// runs several times is named "<job> on <architecture>" or "<job> (<language>)" there.
 export const CHECKS = [
     { key: "jar", job: "Build the jar", label: "Jar" },
     { key: "test", job: "Build and test", label: "Unit and integration tests", suite: "test" },
@@ -24,6 +24,7 @@ export const CHECKS = [
     { key: "smoke-bluetooth", job: "Smoke-test the Bluetooth image",
         label: "Bluetooth image smoke test (amd64, arm64)" },
     { key: "dependencies", job: "Dependency vulnerabilities", label: "Dependency vulnerabilities" },
+    { key: "codeql", job: "Scan the code", label: "Code scan (CodeQL)" },
 ];
 
 const METRICS = {
@@ -305,9 +306,10 @@ export function render(model) {
     return comment;
 }
 
-// Of a job that ran once per architecture, the log worth opening is that of a run that failed.
+// Of a job that ran several times, the log worth opening is that of a run that failed.
 function logUrl(jobs, job) {
-    const runs = jobs.filter((entry) => entry.name === job || entry.name.startsWith(`${job} on `));
+    const runs = jobs.filter((entry) => entry.name === job || entry.name.startsWith(`${job} on `)
+        || entry.name.startsWith(`${job} (`));
     return (runs.find((entry) => entry.conclusion === "failure") ?? runs[0])?.html_url;
 }
 
