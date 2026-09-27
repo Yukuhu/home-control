@@ -2,6 +2,23 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 
+export const MARKER = "<!-- home-control-ci-summary -->";
+
+const MAX_COMMENT = 60000;
+const MAX_FAILURES = 10;
+const MAX_MESSAGE = 300;
+const MAX_TRACE_LINES = 30;
+
+const METRICS = {
+    new_coverage: "Coverage on new code",
+    new_duplicated_lines_density: "Duplicated lines on new code",
+    new_security_hotspots_reviewed: "Security hotspots reviewed on new code",
+    new_reliability_rating: "Reliability rating on new code",
+    new_security_rating: "Security rating on new code",
+    new_maintainability_rating: "Maintainability rating on new code",
+    new_violations: "New issues",
+};
+
 const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "@",
@@ -100,4 +117,143 @@ export async function fetchGate({ projectKey, pullRequest, headSha, token, timeo
     } catch {
         return UNAVAILABLE;
     }
+}
+
+// Untrusted text is only ever rendered as code, where it cannot produce markup or mentions.
+function code(text) {
+    const flat = String(text).replace(/\s+/g, " ").trim() || " ";
+    const ticks = "`".repeat(longestRun(flat) + 1);
+    return `${ticks} ${flat} ${ticks}`;
+}
+
+function block(text) {
+    const ticks = "`".repeat(Math.max(3, longestRun(text) + 1));
+    return `${ticks}text\n${text}\n${ticks}`;
+}
+
+function longestRun(text) {
+    return Math.max(0, ...(String(text).match(/`+/g) ?? []).map((run) => run.length));
+}
+
+function shorten(text, limit) {
+    return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
+
+function counts(suite) {
+    const parts = [];
+    if (suite.failed > 0) parts.push(`${suite.failed} failed`);
+    parts.push(`${suite.passed} passed`);
+    if (suite.skipped > 0) parts.push(`${suite.skipped} skipped`);
+    if (suite.unreadable > 0) parts.push(`${suite.unreadable} result ${suite.unreadable === 1 ? "file" : "files"} unreadable`);
+    return parts.join(", ");
+}
+
+function link(text, url) {
+    return url ? `[${text}](${url})` : text;
+}
+
+function suiteRow(check) {
+    const { result, suite, logUrl } = check;
+    const log = link("job log", logUrl);
+    if (result === "success") return suite.found ? `✅ ${counts(suite)}` : "✅";
+    if (result !== "failure") return "⏭️ not run";
+    if (!suite.found) return `❌ failed before tests ran · ${log}`;
+    if (suite.failed > 0) return `❌ ${counts(suite)}`;
+    return `❌ ${counts(suite)}, but the job failed · ${log}`;
+}
+
+function sonarRow(check, model) {
+    const { result, logUrl } = check;
+    const gate = model.gate ?? UNAVAILABLE;
+    if (result === "success" || result === "failure") {
+        const state = result === "success" ? "✅ passed" : "❌ failed";
+        const log = result === "failure" ? ` · ${link("job log", logUrl)}` : "";
+        if (!gate.available) return `${state} · details unavailable · ${link("SonarCloud", model.sonarUrl)}${log}`;
+        // The job can fail with the gate green, for instance when the scanner itself breaks.
+        if (result === "failure" && gate.passed) return `❌ job failed, gate passed${log}`;
+        return `${state} · ${link("details", model.sonarUrl)}`;
+    }
+    const suiteFailed = model.checks.some((other) => other.suite && other.result === "failure");
+    return suiteFailed ? "⏭️ not run, because tests failed" : "⏭️ not run";
+}
+
+function row(check, model) {
+    if (check.key === "sonar") return sonarRow(check, model);
+    if (check.suite) return suiteRow(check);
+    if (check.result === "success") return "✅";
+    if (check.result === "failure") return `❌ ${link("job log", check.logUrl)}`;
+    return "⏭️ not run";
+}
+
+function rating(value) {
+    return "ABCDE"[Math.round(Number(value)) - 1];
+}
+
+function condition({ metricKey, comparator, actualValue, errorThreshold }) {
+    const name = METRICS[metricKey] ?? code(metricKey);
+    if (!Number.isFinite(Number(actualValue)) || !Number.isFinite(Number(errorThreshold))) {
+        return `- ${name}: ${code(actualValue)} (threshold ${code(errorThreshold)})`;
+    }
+    if (metricKey.endsWith("_rating") && rating(actualValue) && rating(errorThreshold)) {
+        const needed = rating(errorThreshold) === "A" ? "A" : `${rating(errorThreshold)} or better`;
+        return `- ${name}: ${rating(actualValue)} (needs ${needed})`;
+    }
+    const unit = /coverage|density|reviewed/.test(metricKey) ? "%" : "";
+    const bound = comparator === "LT" ? "≥" : "≤";
+    return `- ${name}: ${Number(actualValue)}${unit} (needs ${bound} ${Number(errorThreshold)}${unit})`;
+}
+
+function failedTest({ className, name, message, trace }, traces) {
+    const lines = [`**${code(className.split(".").pop())}** › ${code(name)}`, "", block(shorten(message, MAX_MESSAGE))];
+    if (traces && trace) {
+        const all = trace.split("\n");
+        const shown = all.slice(0, MAX_TRACE_LINES);
+        if (all.length > shown.length) shown.push(`… ${all.length - shown.length} more lines`);
+        lines.push("", "<details><summary>Stack trace</summary>", "", block(shown.join("\n")), "", "</details>");
+    }
+    return lines.join("\n");
+}
+
+function duration(seconds) {
+    const whole = Math.max(0, Math.round(seconds));
+    return whole < 60 ? `${whole}s` : `${Math.floor(whole / 60)}m ${whole % 60}s`;
+}
+
+function compose(model, { traces, limit }) {
+    const passed = model.checks.every((check) => check.result === "success");
+    const attempt = model.runAttempt > 1 ? `, attempt ${model.runAttempt}` : "";
+    const lines = [
+        MARKER,
+        passed ? "## ✅ CI passed" : "## ❌ CI failed",
+        `${code(model.headSha.slice(0, 7))} · ${link(`run #${model.runNumber}${attempt}`, model.runUrl)}`
+            + ` · ${duration(model.durationSeconds)}`,
+        "",
+        "| Check | Result |",
+        "|---|---|",
+        ...model.checks.map((check) => `| ${check.label} | ${row(check, model)} |`),
+    ];
+    const failures = model.checks.flatMap((check) => check.suite?.failures ?? []);
+    if (failures.length > 0) {
+        lines.push("", "### Failed tests");
+        for (const entry of failures.slice(0, limit)) lines.push("", failedTest(entry, traces));
+        if (failures.length > limit) {
+            lines.push("", `…and ${failures.length - limit} more · ${link("full run", model.runUrl)}`);
+        }
+    }
+    const sonar = model.checks.find((check) => check.key === "sonar");
+    if (sonar?.result === "failure" && model.gate?.available && !model.gate.passed) {
+        lines.push("", "### Quality gate", "", ...model.gate.failedConditions.map(condition),
+            "", link("Analysis on SonarCloud", model.sonarUrl));
+    }
+    return `${lines.join("\n")}\n`;
+}
+
+export function render(model) {
+    let options = { traces: true, limit: MAX_FAILURES };
+    let comment = compose(model, options);
+    if (comment.length > MAX_COMMENT) comment = compose(model, options = { ...options, traces: false });
+    while (comment.length > MAX_COMMENT && options.limit > 0) {
+        comment = compose(model, options = { ...options, limit: options.limit - 1 });
+    }
+    return comment;
 }

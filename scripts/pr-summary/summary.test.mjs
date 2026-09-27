@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { collectSuite, fetchGate, parseJUnit } from "./summary.mjs";
+import { MARKER, collectSuite, fetchGate, parseJUnit, render } from "./summary.mjs";
 
 const fixtures = fileURLToPath(new URL("./fixtures/", import.meta.url));
 const fixture = (name) => readFile(path.join(fixtures, name), "utf8");
@@ -177,4 +177,224 @@ test("HTTP errors, timeouts, unexpected shapes and unknown statuses are unavaila
     const never = (url, { signal }) => new Promise((resolve, reject) =>
         signal.addEventListener("abort", () => reject(signal.reason)));
     assert.deepEqual(await fetchGate({ ...gateOptions, timeoutMs: 20 }, never), { available: false });
+});
+
+// ---- render
+
+const SONAR_URL = "https://sonarcloud.io/summary/new_code?id=Yukuhu_home-control&pullRequest=105";
+const RUN_URL = "https://github.com/Yukuhu/home-control/actions/runs/36307910825";
+const noResults = { found: false, unreadable: 0, passed: 0, failed: 0, skipped: 0, failures: [] };
+
+function suite(values = {}) {
+    return { found: true, unreadable: 0, passed: 0, failed: 0, skipped: 0, failures: [], ...values };
+}
+
+function failures(count, values = {}) {
+    return Array.from({ length: count }, (_, index) => ({
+        className: "dev.andre.homecontrol.core.ExampleTest", name: `fails${index}()`,
+        message: "expected: <1> but was: <2>", trace: "AssertionFailedError\n\tat Example.java:1", ...values,
+    }));
+}
+
+function model(overrides = {}, results = {}) {
+    const result = (key) => results[key] ?? "success";
+    const log = (key) => `https://github.com/Yukuhu/home-control/actions/runs/36307910825/job/${key}`;
+    return {
+        headSha: HEAD, runUrl: RUN_URL, runNumber: 412, runAttempt: 1, durationSeconds: 663, sonarUrl: SONAR_URL,
+        gate: { available: true, passed: true, failedConditions: [] },
+        checks: [
+            { key: "test", label: "Unit and integration tests", result: result("test"), logUrl: log("test"),
+                suite: suite({ passed: 842, skipped: 3 }) },
+            { key: "e2e", label: "Browser tests (Chromium, WebKit)", result: result("e2e"), logUrl: log("e2e"),
+                suite: suite({ passed: 96 }) },
+            { key: "sonar", label: "SonarCloud quality gate", result: result("sonar"), logUrl: log("sonar") },
+            { key: "image", label: "Image (amd64)", result: result("image"), logUrl: log("image") },
+            { key: "image-arm64", label: "Image smoke test (arm64)", result: result("image-arm64"),
+                logUrl: log("image-arm64") },
+            { key: "image-arm64-bluetooth", label: "Bluetooth image smoke test (arm64)",
+                result: result("image-arm64-bluetooth"), logUrl: log("image-arm64-bluetooth") },
+        ],
+        ...overrides,
+    };
+}
+
+function withSuite(base, key, values) {
+    return { ...base, checks: base.checks.map((check) => (check.key === key ? { ...check, suite: values } : check)) };
+}
+
+test("a green run is the marker, the heading, the commit line and the table", () => {
+    assert.equal(render(model()), `${MARKER}
+## ✅ CI passed
+\` 1277414 \` · [run #412](${RUN_URL}) · 11m 3s
+
+| Check | Result |
+|---|---|
+| Unit and integration tests | ✅ 842 passed, 3 skipped |
+| Browser tests (Chromium, WebKit) | ✅ 96 passed |
+| SonarCloud quality gate | ✅ passed · [details](${SONAR_URL}) |
+| Image (amd64) | ✅ |
+| Image smoke test (arm64) | ✅ |
+| Bluetooth image smoke test (arm64) | ✅ |
+`);
+});
+
+test("the marker is the first line so the comment can be found again", () => {
+    assert.ok(render(model({}, { test: "failure" })).startsWith(`${MARKER}\n`));
+});
+
+test("a rerun names its attempt, and short runs show seconds only", () => {
+    const comment = render(model({ runAttempt: 2, durationSeconds: 42 }));
+    assert.match(comment, /\[run #412, attempt 2\]\(.*\) · 42s\n/);
+});
+
+test("failed tests are listed with class, name, message and a collapsed trace", () => {
+    const base = model({ gate: null }, { test: "failure", sonar: "skipped" });
+    const comment = render(withSuite(base, "test", suite({ passed: 840, failed: 2, skipped: 3, failures: failures(2) })));
+    assert.match(comment, /^## ❌ CI failed$/m);
+    assert.match(comment, /\| Unit and integration tests \| ❌ 2 failed, 840 passed, 3 skipped \|/);
+    assert.match(comment, /\| SonarCloud quality gate \| ⏭️ not run, because tests failed \|/);
+    assert.ok(comment.includes("### Failed tests\n\n**` ExampleTest `** › ` fails0() `\n\n"
+        + "```text\nexpected: <1> but was: <2>\n```\n\n"
+        + "<details><summary>Stack trace</summary>\n\n```text\nAssertionFailedError\n\tat Example.java:1\n```\n\n</details>"));
+    assert.ok(!comment.includes("### Quality gate"));
+});
+
+test("a failed gate lists its conditions with value and threshold", () => {
+    const gate = { available: true, passed: false, failedConditions: [
+        { metricKey: "new_coverage", comparator: "LT", actualValue: "71.2", errorThreshold: "80" },
+        { metricKey: "new_duplicated_lines_density", comparator: "GT", actualValue: "4.5", errorThreshold: "3" },
+        { metricKey: "new_reliability_rating", comparator: "GT", actualValue: "3", errorThreshold: "1" },
+        { metricKey: "new_maintainability_rating", comparator: "GT", actualValue: "4", errorThreshold: "2" },
+        { metricKey: "new_violations", comparator: "GT", actualValue: "3", errorThreshold: "0" },
+        { metricKey: "some_new_metric", comparator: "GT", actualValue: "7", errorThreshold: "5" },
+        { metricKey: "odd_metric", comparator: "GT", actualValue: "<b>@x", errorThreshold: "5" },
+    ] };
+    const comment = render(model({ gate }, { sonar: "failure" }));
+    assert.match(comment, /\| SonarCloud quality gate \| ❌ failed · \[details\]\(/);
+    assert.ok(comment.includes(`### Quality gate
+
+- Coverage on new code: 71.2% (needs ≥ 80%)
+- Duplicated lines on new code: 4.5% (needs ≤ 3%)
+- Reliability rating on new code: C (needs A)
+- Maintainability rating on new code: D (needs B or better)
+- New issues: 3 (needs ≤ 0)
+- \` some_new_metric \`: 7 (needs ≤ 5)
+- \` odd_metric \`: \` <b>@x \` (threshold \` 5 \`)
+
+[Analysis on SonarCloud](${SONAR_URL})
+`));
+});
+
+test("unavailable gate details fall back to the job result and links", () => {
+    const gate = { available: false };
+    assert.match(render(model({ gate })),
+        /\| SonarCloud quality gate \| ✅ passed · details unavailable · \[SonarCloud\]\([^)]*\) \|/);
+    const failed = render(model({ gate }, { sonar: "failure" }));
+    assert.match(failed,
+        /\| SonarCloud quality gate \| ❌ failed · details unavailable · \[SonarCloud\]\([^)]*\) · \[job log\]\([^)]*\/job\/sonar\) \|/);
+    assert.ok(!failed.includes("### Quality gate"));
+});
+
+test("a sonar job that failed with a green gate is reported as a job failure", () => {
+    const comment = render(model({}, { sonar: "failure" }));
+    assert.match(comment, /\| SonarCloud quality gate \| ❌ job failed, gate passed · \[job log\]\(/);
+    assert.ok(!comment.includes("### Quality gate"));
+});
+
+test("a skipped sonar job without a failed suite is simply not run", () => {
+    const comment = render(model({ gate: null }, { image: "failure", sonar: "skipped" }));
+    assert.match(comment, /\| SonarCloud quality gate \| ⏭️ not run \|/);
+});
+
+test("failed and skipped jobs without tests link to their log or say not run", () => {
+    const comment = render(model({}, { "image-arm64": "failure", "image-arm64-bluetooth": "skipped", image: "cancelled" }));
+    assert.match(comment, /^## ❌ CI failed$/m);
+    assert.match(comment, /\| Image smoke test \(arm64\) \| ❌ \[job log\]\([^)]*\/job\/image-arm64\) \|/);
+    assert.match(comment, /\| Bluetooth image smoke test \(arm64\) \| ⏭️ not run \|/);
+    assert.match(comment, /\| Image \(amd64\) \| ⏭️ not run \|/);
+});
+
+test("a missing log link degrades to plain text", () => {
+    const base = model({}, { image: "failure" });
+    const comment = render({ ...base, checks: base.checks.map((check) => ({ ...check, logUrl: undefined })) });
+    assert.match(comment, /\| Image \(amd64\) \| ❌ job log \|/);
+});
+
+test("a suite job that failed without results failed before tests ran", () => {
+    const comment = render(withSuite(model({ gate: null }, { test: "failure", sonar: "skipped" }), "test", noResults));
+    assert.match(comment, /\| Unit and integration tests \| ❌ failed before tests ran · \[job log\]\([^)]*\/job\/test\) \|/);
+});
+
+test("a suite job that succeeded without results shows no counts", () => {
+    assert.match(render(withSuite(model(), "e2e", noResults)), /\| Browser tests \(Chromium, WebKit\) \| ✅ \|/);
+});
+
+test("a suite job that failed although every test passed does not look green", () => {
+    const comment = render(model({ gate: null }, { test: "failure", sonar: "skipped" }));
+    assert.match(comment,
+        /\| Unit and integration tests \| ❌ 842 passed, 3 skipped, but the job failed · \[job log\]\(/);
+});
+
+test("unreadable result files are mentioned in the row", () => {
+    const comment = render(withSuite(model({ gate: null }, { test: "failure", sonar: "skipped" }), "test",
+        suite({ passed: 5, unreadable: 1 })));
+    assert.match(comment, /❌ 5 passed, 1 result file unreadable, but the job failed/);
+});
+
+test("only the first ten failures are listed", () => {
+    const base = model({ gate: null }, { test: "failure", sonar: "skipped" });
+    const comment = render(withSuite(base, "test", suite({ failed: 24, failures: failures(24) })));
+    assert.ok(comment.includes("` fails9() `"));
+    assert.ok(!comment.includes("` fails10() `"));
+    assert.ok(comment.includes(`…and 14 more · [full run](${RUN_URL})`));
+});
+
+test("failures of both suites are listed together", () => {
+    let base = model({ gate: null }, { test: "failure", e2e: "failure", sonar: "skipped" });
+    base = withSuite(base, "test", suite({ failed: 1, failures: failures(1, { name: "unit()" }) }));
+    base = withSuite(base, "e2e", suite({ failed: 1, failures: failures(1, { name: 'opens(String) ["webkit"]' }) }));
+    const comment = render(base);
+    assert.ok(comment.includes("` unit() `"));
+    assert.ok(comment.includes('` opens(String) ["webkit"] `'));
+});
+
+test("long messages and traces are cut", () => {
+    const trace = Array.from({ length: 45 }, (_, index) => `\tat line${index}`).join("\n");
+    const base = model({ gate: null }, { test: "failure", sonar: "skipped" });
+    const comment = render(withSuite(base, "test",
+        suite({ failed: 1, failures: failures(1, { message: "m".repeat(400), trace }) })));
+    assert.ok(comment.includes(`\n${"m".repeat(299)}…\n`));
+    assert.ok(comment.includes("\tat line29\n… 15 more lines\n"));
+    assert.ok(!comment.includes("line30"));
+});
+
+test("an oversized comment drops its traces, then failures, until it fits", () => {
+    const base = model({ gate: null }, { test: "failure", sonar: "skipped" });
+    const wide = "x".repeat(8000);
+    const traces = Array.from({ length: 30 }, () => wide).join("\n");
+    const withoutTraces = render(withSuite(base, "test",
+        suite({ failed: 10, failures: failures(10, { trace: traces }) })));
+    assert.ok(withoutTraces.length <= 60000);
+    assert.ok(!withoutTraces.includes("Stack trace"));
+    assert.ok(withoutTraces.includes("` fails9() `"));
+
+    const names = render(withSuite(base, "test",
+        suite({ failed: 10, failures: failures(10, { trace: "" }).map((entry) => ({ ...entry, name: "n".repeat(9000) })) })));
+    assert.ok(names.length <= 60000);
+    assert.match(names, /…and [4-9] more/);
+});
+
+test("hostile test output cannot leave its code spans and blocks", async () => {
+    const hostile = parseJUnit(await fixture("hostile.xml"));
+    const base = model({ gate: null }, { test: "failure", sonar: "skipped" });
+    const comment = render(withSuite(base, "test", suite({ failed: 1, failures: hostile.failures })));
+    assert.ok(comment.includes("**` <img src=x>HostileTest `** › ``` a`b``c() @Yukuhu ```"));
+    // The message contains a three-backtick run and the trace a four-backtick run.
+    assert.ok(comment.includes("\n````text\n```\n</details> @Yukuhu **bold** <script>alert(1)</script>\n````\n"));
+    assert.ok(comment.includes("\n`````text\nfirst\n````\n</details> @Yukuhu [link](https://example.com)\n`````\n"));
+    // Outside code, only our own markup remains.
+    const outside = comment.replace(/(`{3,})text\n[\s\S]*?\n\1\n/g, "").replace(/(`+) .*? \1/g, "");
+    assert.ok(!outside.includes("@"));
+    assert.ok(!outside.includes("<script"));
+    assert.equal(outside.match(/<\/details>/g).length, 1);
 });
