@@ -1,0 +1,388 @@
+/* Cyberpunk theme, after the Cyberpunk 2077 HUD: neon red lines on a night-city black, cyan for
+   whatever you can touch, yellow for what matters most, and chamfered corners throughout.
+   Every rule is scoped to :root[data-theme="cyberpunk"], which js/theme.js sets; without it this
+   stylesheet changes nothing and app.css is the whole look. */
+@font-face {
+    font-family: "Rajdhani";
+    font-weight: 500;
+    font-display: fallback;
+    size-adjust: 110%;
+    src: url(fonts/rajdhani-500.woff2) format("woff2");
+}
+@font-face {
+    font-family: "Rajdhani";
+    font-weight: 700;
+    font-display: fallback;
+    size-adjust: 110%;
+    src: url(fonts/rajdhani-700.woff2) format("woff2");
+}
+
+/* Chamfers are clip-paths, which also cut off borders on the diagonal: a 1px gradient line at
+   cut × √½ from the corner redraws them, so --line and --cut must match the element's clip. */
+:root[data-theme="cyberpunk"] {
+    --cp-red: #ff5f58; --cp-cyan: #5ef6ff; --cp-yellow: #fcee0a; --cp-ink: #07080d;
+    --cp-panel: #0a0c12;
+    --cp-mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    --bg: #07080d; --surface: #0d1017; --surface-raised: #151a24; --fg: #e6f3f4;
+    --muted: #8fa3ad; --border: #3d1f26; --accent: var(--cp-cyan); --accent-ink: #031316;
+    --danger: var(--cp-red); --btn: rgba(255, 95, 88, .07);
+    font-family: "Rajdhani", "Bahnschrift SemiCondensed", "Bahnschrift", "Roboto Condensed", "Arial Narrow", sans-serif;
+    scrollbar-color: #5a2a31 var(--bg);
+
+    & body {
+        font-weight: 500;
+        background:
+            repeating-linear-gradient(to bottom, transparent 0 3px, rgba(94, 246, 255, .022) 3px 4px),
+            radial-gradient(1100px 620px at 100% -160px, rgba(255, 95, 88, .17), transparent 70%),
+            radial-gradient(800px 520px at -200px 420px, rgba(94, 246, 255, .06), transparent 70%),
+            var(--bg);
+    }
+    & * { border-radius: 0; }
+    & ::selection { background: var(--cp-yellow); color: var(--cp-ink); }
+    & :focus-visible { outline: 2px solid var(--cp-cyan); outline-offset: 3px; }
+    /* Clipped controls would lose an outside ring, so theirs sits inside. */
+    & :is(button, .button, input, select, textarea, .chip):focus-visible { outline-offset: -5px; }
+
+    /* Type: condensed capitals for structure, monospace for readouts. */
+    & :is(h1, h2, h3) { text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+    & h1 { line-height: 1.02; letter-spacing: .03em; text-shadow: -.035em 0 rgba(255, 95, 88, .75), .035em 0 rgba(94, 246, 255, .45); }
+    & .eyebrow { color: var(--cp-red); font-family: var(--cp-mono); font-size: .66rem; font-weight: 600; letter-spacing: .22em; }
+    & .eyebrow::before { content: ""; display: inline-block; width: 1.5em; height: 2px; margin: 0 .7em .2em 0; vertical-align: middle; background: currentColor; }
+    & :is(.badge, .count, .chip .app, .rail .source, .connection-status, .meta, .remote-connection, kbd, .search-pending, .rail-stale, .tile .subtitle, .setup legend, .setup th, .auth-footer) {
+        font-family: var(--cp-mono); letter-spacing: .08em;
+    }
+    & kbd { border-color: rgba(255, 95, 88, .5); color: var(--cp-red); }
+    & summary:hover { color: var(--cp-cyan); }
+    & summary::marker { color: var(--cp-red); }
+
+    /* Buttons: red-lined chamfered plates; cyan when pointed at, yellow when primary. */
+    & :is(button, .button) {
+        --cut: 9px; --line: rgba(255, 95, 88, .55); --fill: rgba(255, 95, 88, .07);
+        border-color: var(--line); color: var(--fg);
+        background:
+            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--fill);
+        background-origin: border-box;
+        clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+        text-transform: uppercase; letter-spacing: .08em; font-weight: 700;
+    }
+    & :is(button, .button):not(:disabled):hover { --line: var(--cp-cyan); --fill: rgba(94, 246, 255, .1); color: var(--cp-cyan); }
+    & .secondary { --fill: transparent; }
+    & :is(button.primary, .button.primary), & #sheet-play {
+        --line: var(--cp-yellow); --fill: var(--cp-yellow); color: var(--cp-ink);
+        background:
+            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            var(--fill);
+        background-origin: border-box;
+    }
+    & :is(button.primary, .button.primary, #sheet-play):not(:disabled):hover { --line: #fff7a1; --fill: #fff7a1; color: var(--cp-ink); }
+    & :is(button.primary, .button.primary, #sheet-play):focus-visible { outline-color: var(--cp-ink); }
+    & button.danger {
+        --line: var(--cp-red); color: var(--cp-red);
+        background:
+            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            repeating-linear-gradient(-45deg, rgba(255, 95, 88, .16) 0 5px, transparent 5px 10px);
+        background-origin: border-box;
+    }
+    & button.danger:not(:disabled):hover { --line: var(--cp-red); color: #fff; background-color: rgba(255, 95, 88, .28); }
+
+    /* Header */
+    & .app-header { position: relative; border-bottom-color: rgba(255, 95, 88, .5); background: linear-gradient(rgba(255, 95, 88, .07), transparent); }
+    & .app-header::after {
+        content: ""; position: absolute; left: clamp(1.25rem, 4vw, 4rem); bottom: -2px; width: min(160px, 30%); height: 3px;
+        background: var(--cp-yellow); clip-path: polygon(0 0, 100% 0, calc(100% - 3px) 100%, 0 100%);
+    }
+    & .brand { color: var(--cp-yellow); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+    & .brand-light { color: var(--cp-red); font-weight: 500; }
+    & .brand-mark {
+        --cut: 8px; border-color: var(--cp-yellow); color: var(--cp-yellow);
+        background: linear-gradient(225deg, var(--cp-yellow) calc(var(--cut) * .7071 + 1px), transparent 0), rgba(252, 238, 10, .08);
+        background-origin: border-box;
+        clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+    }
+    & .header-nav a { text-transform: uppercase; letter-spacing: .12em; font-weight: 700; font-size: .8rem; }
+    & .header-nav a:hover { color: var(--cp-cyan); }
+    & .header-nav a[aria-current=page] { color: var(--cp-cyan); background: rgba(94, 246, 255, .08); box-shadow: inset 0 -2px 0 var(--cp-cyan); }
+    & .connection-status { color: var(--cp-yellow); text-transform: uppercase; font-size: .66rem; }
+    & .connection-status::before { border-radius: 0; background: var(--cp-yellow); box-shadow: 0 0 8px var(--cp-yellow); }
+    & .connection-status.connected { color: var(--cp-cyan); }
+    & .connection-status.connected::before { background: var(--cp-cyan); box-shadow: 0 0 8px var(--cp-cyan); }
+    & .theme-toggle { --line: rgba(252, 238, 10, .6); --fill: rgba(252, 238, 10, .1); color: var(--cp-yellow); }
+    & .theme-toggle:not(:disabled):hover { --line: var(--cp-yellow); --fill: rgba(252, 238, 10, .2); color: var(--cp-yellow); }
+    & .theme-toggle .control-icon { filter: drop-shadow(0 0 3px rgba(252, 238, 10, .8)); }
+    & .skip-link { background: var(--cp-yellow); color: var(--cp-ink); }
+
+    /* Dashboard */
+    & .page-heading > p, & .page-heading > div > p:not(.eyebrow) { color: var(--muted); }
+    & .section-heading h2 { letter-spacing: .08em; }
+    & .section-heading a { font-family: var(--cp-mono); text-transform: uppercase; letter-spacing: .04em; font-size: .66rem; }
+    & .section-heading a:hover { color: var(--cp-cyan); }
+    & .count { color: var(--cp-yellow); background: rgba(252, 238, 10, .08); border: 1px solid rgba(252, 238, 10, .45); }
+    & :is(.devices, .tiles) { scrollbar-color: rgba(255, 95, 88, .5) transparent; }
+    & .chip-group {
+        --cut: 14px; --line: rgba(255, 95, 88, .45);
+        border-color: var(--line);
+        background:
+            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            linear-gradient(160deg, rgba(255, 95, 88, .07), transparent 60%),
+            var(--surface);
+        background-origin: border-box;
+        clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+    }
+    & .chip-group:has(.selected) {
+        --line: var(--cp-cyan);
+        background:
+            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            linear-gradient(120deg, rgba(94, 246, 255, .15), rgba(94, 246, 255, .02) 65%),
+            var(--surface);
+        background-origin: border-box;
+        box-shadow: inset 3px 0 0 var(--cp-cyan);
+    }
+    & .chip .name { text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+    & .chip .device-icon { color: var(--cp-red); background: rgba(255, 95, 88, .08); border: 1px solid rgba(255, 95, 88, .35); }
+    & .chip.selected .device-icon { color: var(--cp-cyan); background: rgba(94, 246, 255, .08); border-color: rgba(94, 246, 255, .45); }
+    & .badge { color: var(--cp-red); letter-spacing: .12em; }
+    & .badge.ok { color: var(--cp-cyan); }
+    & .badge::before { border-radius: 0; box-shadow: 0 0 6px currentColor; }
+    & .drawer-toggle { --line: rgba(94, 246, 255, .6); --fill: rgba(94, 246, 255, .1); --cut: 7px; border: 1px solid var(--line); color: var(--cp-cyan); }
+    & .search-icon { color: var(--cp-cyan); }
+    & #search-q { border-radius: 0; }
+
+    /* Content tiles: chamfered artwork frames that light up cyan. */
+    & .rail header { border-left: 3px solid var(--cp-red); padding-left: .65rem; }
+    & .rail h2 { letter-spacing: .1em; }
+    & .rail .source { text-transform: uppercase; color: var(--cp-red); border-color: rgba(255, 95, 88, .45); }
+    & .rail.refreshing h2::after { color: var(--cp-cyan); }
+    & .tile { clip-path: none; background: none; border: 0; text-transform: none; letter-spacing: normal; font-weight: inherit; color: var(--fg); }
+    & .tile:focus-visible { outline-offset: 2px; }
+    & .tile .art {
+        --cut: 16px; --line: rgba(255, 95, 88, .4);
+        border-color: var(--line); background: linear-gradient(145deg, #1a1e2a, #0a0c12);
+        clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+    }
+    & .tile .art::after {
+        content: ""; position: absolute; inset: -1px; pointer-events: none;
+        background: linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0);
+    }
+    & :is(.tile:hover, .tile:focus-visible) .art { --line: var(--cp-cyan); border-color: var(--cp-cyan); }
+    & :is(.tile:hover, .tile:focus-visible) .art::after { box-shadow: inset 0 0 26px rgba(94, 246, 255, .3); }
+    & .tile .placeholder {
+        font-family: inherit; font-style: normal; font-weight: 700; color: var(--cp-red); text-shadow: 0 0 18px rgba(255, 95, 88, .65);
+        background: radial-gradient(circle at 70% 85%, rgba(255, 95, 88, .2), transparent 65%), repeating-linear-gradient(-45deg, rgba(255, 255, 255, .025) 0 2px, transparent 2px 9px);
+    }
+    & .tiles > :nth-child(3n+2) .placeholder {
+        color: var(--cp-cyan); text-shadow: 0 0 18px rgba(94, 246, 255, .6);
+        background: radial-gradient(circle at 70% 85%, rgba(94, 246, 255, .16), transparent 65%), repeating-linear-gradient(-45deg, rgba(255, 255, 255, .025) 0 2px, transparent 2px 9px);
+    }
+    & .tiles > :nth-child(3n+3) .placeholder {
+        color: var(--cp-yellow); text-shadow: 0 0 18px rgba(252, 238, 10, .5);
+        background: radial-gradient(circle at 70% 85%, rgba(252, 238, 10, .13), transparent 65%), repeating-linear-gradient(-45deg, rgba(255, 255, 255, .025) 0 2px, transparent 2px 9px);
+    }
+    & .tile-play { background: rgba(7, 8, 13, .8); border-color: var(--cp-cyan); color: var(--cp-cyan); backdrop-filter: none; }
+    & .tile .progress span { background: var(--cp-yellow); box-shadow: 0 0 8px var(--cp-yellow); }
+    & .tile .title { letter-spacing: .02em; font-weight: 700; }
+    & .tile.skeleton {
+        --cut: 16px;
+        background: linear-gradient(145deg, rgba(255, 95, 88, .12), rgba(94, 246, 255, .05)), var(--surface);
+        clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+    }
+    & :is(.rail-error, .rail-empty, .rails-empty, .error) {
+        --cut: 12px;
+        clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+    }
+    & :is(.rail-error, .error) {
+        border-color: var(--cp-red); border-left-width: 3px; color: #ffc3bf;
+        background:
+            linear-gradient(225deg, var(--cp-red) calc(var(--cut) * .7071 + 1px), transparent 0),
+            repeating-linear-gradient(-45deg, rgba(255, 95, 88, .09) 0 6px, transparent 6px 12px), #15090c;
+        background-origin: border-box;
+    }
+    & .rail-empty {
+        --line: rgba(255, 95, 88, .35); border-color: var(--line);
+        background: linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0), var(--surface);
+        background-origin: border-box;
+    }
+    & .rail-stale { color: var(--cp-yellow); text-transform: uppercase; }
+    & .rails-empty {
+        --line: rgba(255, 95, 88, .45); border-color: var(--line);
+        background:
+            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            radial-gradient(ellipse at top, rgba(255, 95, 88, .16), transparent 70%),
+            var(--surface);
+        background-origin: border-box;
+    }
+    & .empty-art span { border-color: rgba(255, 95, 88, .6); background: #160b0f; color: var(--cp-red); text-shadow: 0 0 12px currentColor; }
+    & .empty-art span:nth-child(2) { border-color: var(--cp-yellow); background: var(--cp-yellow); color: var(--cp-ink); text-shadow: none; }
+    & .empty-art span:nth-child(3) { border-color: rgba(94, 246, 255, .6); background: #06141a; color: var(--cp-cyan); }
+    & .empty-state.compact { border-color: rgba(255, 95, 88, .45); }
+
+    /* Fields */
+    & :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=hidden]), select, textarea) {
+        --cut: 8px;
+        border-color: rgba(94, 246, 255, .28); border-radius: 0; background-color: #05060a; color: var(--fg);
+        clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%);
+    }
+    & :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=hidden]), select, textarea):focus {
+        border-color: var(--cp-cyan); background-color: #061217;
+    }
+    & :is(input, textarea)::placeholder { color: #71878f; }
+
+    /* Remote */
+    & :is(.drawer, .sheet) {
+        --cut: 18px; --line: rgba(255, 95, 88, .6);
+        border-color: var(--line); background-color: var(--cp-panel);
+        background-image:
+            linear-gradient(315deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0);
+        background-origin: border-box;
+        clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+    }
+    & :is(.drawer, .sheet)::backdrop { background: rgba(3, 4, 8, .88); }
+    & .drawer-header { background: linear-gradient(var(--cp-yellow) 0 0) 0 0 / 72px 3px no-repeat, var(--cp-panel); }
+    & .remote-connection { text-transform: uppercase; color: var(--cp-red); }
+    & .remote-connection.ok { color: var(--cp-cyan); }
+    & .mode-switch { background: #05060a; border-color: rgba(255, 95, 88, .35); }
+    & .mode-switch button { --line: transparent; --fill: transparent; color: var(--muted); }
+    & .mode-switch button:not(:disabled):hover { --line: transparent; }
+    & .mode-switch [aria-selected=true] { --fill: rgba(94, 246, 255, .12); color: var(--cp-cyan); box-shadow: inset 0 -2px 0 var(--cp-cyan); }
+    & .dpad button { --line: transparent; --fill: rgba(255, 95, 88, .13); border: 0; color: var(--cp-red); }
+    & .dpad button:not(:disabled):hover { --line: transparent; --fill: rgba(94, 246, 255, .18); }
+    & .dpad button:focus-visible { --fill: rgba(94, 246, 255, .25); color: var(--cp-cyan); }
+    & .dpad .up { clip-path: polygon(0 0, 100% 0, 78% 100%, 22% 100%); }
+    & .dpad .down { clip-path: polygon(22% 0, 78% 0, 100% 100%, 0 100%); }
+    & .dpad .left { clip-path: polygon(0 0, 100% 22%, 100% 78%, 0 100%); }
+    & .dpad .right { clip-path: polygon(0 22%, 100% 0, 100% 100%, 0 78%); }
+    & .dpad .ok { --fill: var(--cp-yellow); color: var(--cp-ink); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+    & .dpad .ok:not(:disabled):hover { --fill: #fff7a1; color: var(--cp-ink); }
+    & .dpad .ok:focus-visible { --fill: var(--cp-cyan); color: var(--cp-ink); outline-color: var(--cp-ink); }
+    & .touchpad {
+        border-color: rgba(94, 246, 255, .35);
+        background:
+            linear-gradient(var(--cp-cyan) 0 0) top left / 22px 2px no-repeat,
+            linear-gradient(var(--cp-cyan) 0 0) top left / 2px 22px no-repeat,
+            linear-gradient(var(--cp-cyan) 0 0) top right / 22px 2px no-repeat,
+            linear-gradient(var(--cp-cyan) 0 0) top right / 2px 22px no-repeat,
+            linear-gradient(var(--cp-cyan) 0 0) bottom left / 22px 2px no-repeat,
+            linear-gradient(var(--cp-cyan) 0 0) bottom left / 2px 22px no-repeat,
+            linear-gradient(var(--cp-cyan) 0 0) bottom right / 22px 2px no-repeat,
+            linear-gradient(var(--cp-cyan) 0 0) bottom right / 2px 22px no-repeat,
+            linear-gradient(rgba(94, 246, 255, .06) 1px, transparent 1px) 0 0 / 22px 22px,
+            linear-gradient(90deg, rgba(94, 246, 255, .06) 1px, transparent 1px) 0 0 / 22px 22px,
+            radial-gradient(circle, rgba(94, 246, 255, .09), transparent 60%),
+            #05080c;
+    }
+    & .touchpad::before { color: var(--cp-cyan); text-shadow: 0 0 10px var(--cp-cyan); }
+    & .touchpad .hint { font-family: var(--cp-mono); font-size: .62rem; letter-spacing: .06em; }
+    & .touchpad.active { border-color: var(--cp-cyan); box-shadow: inset 0 0 40px rgba(94, 246, 255, .2); }
+
+    /* Play sheet */
+    & .sheet-item img { --cut: 10px; clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); }
+    & .sheet-device[aria-checked=true] { --line: var(--cp-cyan); --fill: rgba(94, 246, 255, .12); color: var(--cp-cyan); }
+    & .sheet-route { font-family: var(--cp-mono); font-size: .78rem; background: #04060a; border-left: 3px solid var(--cp-cyan); color: #b9f3f6; }
+    & .sheet-route.unroutable { border-left-color: var(--cp-red); color: var(--cp-red); }
+
+    /* Toast */
+    & #toast {
+        --cut: 10px; border-color: var(--cp-red); background: #16090c; color: var(--fg);
+        clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+    }
+    & #toast.ok { border-color: var(--cp-cyan); background: #061419; }
+
+    /* Setup */
+    & .setup-nav a { text-transform: uppercase; letter-spacing: .1em; font-weight: 700; font-size: .8rem; }
+    & .setup-nav a:is(:hover, :focus-visible) { background: rgba(94, 246, 255, .07); color: var(--cp-cyan); box-shadow: inset 2px 0 0 var(--cp-cyan); }
+    & .setup-nav a span { font-family: var(--cp-mono); color: var(--cp-red); }
+    & .setup-content > section {
+        --cut: 18px; --line: rgba(255, 95, 88, .4);
+        border-color: var(--line);
+        background:
+            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            linear-gradient(var(--cp-yellow) 0 0) 0 0 / 56px 3px no-repeat,
+            linear-gradient(rgba(255, 95, 88, .05), transparent 140px),
+            var(--surface);
+        background-origin: border-box;
+        clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+    }
+    & .setup-content > section:target { --line: var(--cp-cyan); }
+    & .setup-content > .setup-group-heading { background: none; border: 0; clip-path: none; }
+    & .setup .setup-welcome {
+        --line: var(--cp-yellow);
+        background:
+            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            radial-gradient(ellipse at top right, rgba(252, 238, 10, .1), transparent 70%),
+            var(--surface);
+        background-origin: border-box;
+    }
+    & .setup h3 { color: var(--cp-cyan); }
+    & .setup label { color: #c4ced8; }
+    & .setup legend { text-transform: uppercase; color: var(--cp-red); }
+    & .setup th { text-transform: uppercase; font-size: .7rem; color: var(--cp-red); }
+    & .setup code { color: #9ff9ff; }
+    & .setup-steps li::before { border-radius: 0; background: rgba(255, 95, 88, .12); border: 1px solid rgba(255, 95, 88, .5); color: var(--cp-red); font-family: var(--cp-mono); }
+    & .source-links a {
+        --cut: 7px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; border-color: rgba(94, 246, 255, .35);
+        clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+    }
+    & .source-links a:hover { background: rgba(94, 246, 255, .1); }
+    & .user-code { color: var(--cp-yellow); text-shadow: 0 0 14px rgba(252, 238, 10, .5); }
+    & .workflow-editor .workflow-sample { border-color: rgba(94, 246, 255, .3); background: #04060a; }
+
+    /* Login and offline */
+    & body.auth-page {
+        background:
+            repeating-linear-gradient(to bottom, transparent 0 3px, rgba(94, 246, 255, .022) 3px 4px),
+            radial-gradient(ellipse at 50% 15%, rgba(255, 95, 88, .2), transparent 60%),
+            var(--bg);
+    }
+    & .auth-card {
+        --cut: 22px; --line: rgba(255, 95, 88, .55);
+        border-color: var(--line);
+        background:
+            linear-gradient(225deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0),
+            linear-gradient(var(--cp-yellow) 0 0) 0 0 / 72px 3px no-repeat,
+            rgba(13, 16, 23, .94);
+        background-origin: border-box;
+        clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+    }
+    & .auth-footer { text-transform: uppercase; letter-spacing: .16em; }
+
+    @media (min-width: 64rem) {
+        /* The docked remote runs to the screen edge, so only its inner corner is cut. */
+        & .drawer[open]:not(:modal) {
+            border-radius: 0;
+            background-image: linear-gradient(45deg, var(--line) calc(var(--cut) * .7071 + 1px), transparent 0);
+            clip-path: polygon(0 0, 100% 0, 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+        }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        & .brand:hover > span:last-child { animation: cp-glitch .45s steps(2, jump-none) 1; }
+        & .connection-status:not(.connected)::before { animation: cp-blink 1s steps(2, jump-none) infinite; }
+        & .tile .art, & .tile .art::after { transition: border-color .15s, box-shadow .15s; }
+        /* Switching in: one scan line sweeps the screen. */
+        &.theme-boot body::after {
+            content: ""; position: fixed; inset: 0; z-index: 60; pointer-events: none;
+            background: linear-gradient(transparent 44%, rgba(94, 246, 255, .14) 49%, rgba(252, 238, 10, .5) 50%, transparent 50.6%) 0 100% / 100% 200% no-repeat;
+            animation: cp-scan .6s cubic-bezier(.3, .6, .3, 1) forwards;
+        }
+    }
+}
+
+@keyframes cp-glitch {
+    0% { text-shadow: 2px 0 var(--cp-red), -2px 0 var(--cp-cyan); }
+    50% { text-shadow: -3px 0 var(--cp-red), 3px 0 var(--cp-cyan); }
+    100% { text-shadow: none; }
+}
+@keyframes cp-blink { 50% { opacity: .2; } }
+@keyframes cp-scan {
+    to { background-position: 0 0; opacity: 0; }
+}
+
+@media (forced-colors: active) {
+    /* System colors replace the neon; keep the plain boxes and their outlines intact. */
+    :root[data-theme="cyberpunk"] * { clip-path: none !important; background-image: none !important; text-shadow: none !important; }
+}

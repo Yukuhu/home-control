@@ -13,6 +13,8 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <title>Home Control</title>
     <link rel="stylesheet" th:href="@{/app.css}">
+    <link rel="stylesheet" th:href="@{/themes/cyberpunk.css}">
+    <script th:src="@{/js/theme.js}"></script>
     <script th:src="@{/vendor/htmx.min.js}" defer></script>
     <script type="module" th:src="@{/js/app.js}"></script>
 </head>
@@ -24,6 +26,7 @@
         <a href="/" aria-current="page">Home</a><a href="/setup">Setup</a>
     </nav>
     <output id="connection-status" class="connection-status">Connecting…</output>
+    <button th:replace="~{fragments/theme-toggle :: toggle}"></button>
 </header>
 <main id="content">
     <div class="page-heading dashboard-heading">

@@ -12,10 +12,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 /**
- * Once a login exists every path except the login page, its stylesheet and the handful of PWA
- * assets a phone needs before it can even show the login page (D6) needs an authenticated
- * session — pages, JSON, SSE, scripts and artwork alike (spec §9). Without a login it lets every
- * request through. Cross-origin requests never get here: {@link CrossOriginFilter} runs first.
+ * Once a login exists every path except the login page, its stylesheets, theme script and fonts,
+ * and the handful of PWA assets a phone needs before it can even show the login page (D6) needs
+ * an authenticated session — pages, JSON, SSE, scripts and artwork alike (spec §9). Without a
+ * login it lets every request through. Cross-origin requests never get here: {@link CrossOriginFilter} runs first.
  */
 public class LoginGateFilter extends OncePerRequestFilter {
 
@@ -28,6 +28,8 @@ public class LoginGateFilter extends OncePerRequestFilter {
      */
     static final Set<String> OPEN_PATHS = Set.of(
             "/login", "/app.css", "/manifest.webmanifest", "/offline.html",
+            "/themes/cyberpunk.css", "/themes/fonts/rajdhani-500.woff2", "/themes/fonts/rajdhani-700.woff2",
+            "/js/theme.js",
             "/icons/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png",
             "/icons/maskable-512.png", "/icons/apple-touch-icon.png");
 

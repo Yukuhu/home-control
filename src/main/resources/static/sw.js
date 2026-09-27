@@ -1,8 +1,9 @@
-// Minimal service worker (registered on HTTPS only): an offline page and its presentation assets.
+// Minimal service worker (registered on HTTPS only): an offline page and its presentation assets,
+// including the theme switch so the offline page keeps the chosen theme.
 // Live state, writes, JSON, fragments and other assets always require the server.
-const CACHE = "home-control-offline-v2";
+const CACHE = "home-control-offline-v3";
 const OFFLINE = "/offline.html";
-const OFFLINE_ASSETS = new Set(["/app.css", "/icons/icon.svg"]);
+const OFFLINE_ASSETS = new Set(["/app.css", "/themes/cyberpunk.css", "/js/theme.js", "/icons/icon.svg"]);
 
 self.addEventListener("install", (event) => {
     event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([OFFLINE, ...OFFLINE_ASSETS])));

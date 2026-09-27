@@ -75,8 +75,24 @@ class StaticAssetsTest {
     }
 
     @Test
+    void servesTheThemeSwitchTheCyberpunkThemeAndItsFonts() throws Exception {
+        mockMvc.perform(get("/js/theme.js")).andExpect(status().isOk())
+                .andExpect(content().string(allOf(containsString("homecontrol.theme.v1"),
+                        containsString("data-theme-toggle"), containsString("aria-pressed"))));
+        mockMvc.perform(get("/themes/cyberpunk.css")).andExpect(status().isOk())
+                .andExpect(content().string(allOf(containsString(":root[data-theme=\"cyberpunk\"]"),
+                        containsString("url(fonts/rajdhani-500.woff2)"), containsString("url(fonts/rajdhani-700.woff2)"))));
+        for (String font : new String[] {"/themes/fonts/rajdhani-500.woff2", "/themes/fonts/rajdhani-700.woff2"}) {
+            mockMvc.perform(get(font)).andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "font/woff2"));
+        }
+        mockMvc.perform(get("/themes/fonts/OFL.txt")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("SIL OPEN FONT LICENSE Version 1.1")));
+    }
+
+    @Test
     void browsersRevalidateStylesAndScriptsSoARedeployIsPickedUp() throws Exception {
-        for (String path : new String[] {"/app.css", "/js/app.js"}) {
+        for (String path : new String[] {"/app.css", "/themes/cyberpunk.css", "/js/app.js", "/js/theme.js"}) {
             String lastModified = mockMvc.perform(get(path)).andExpect(status().isOk())
                     .andExpect(header().string("Cache-Control", "no-cache"))
                     .andReturn().getResponse().getHeader("Last-Modified");

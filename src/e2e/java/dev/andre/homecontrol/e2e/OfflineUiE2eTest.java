@@ -61,10 +61,18 @@ class OfflineUiE2eTest {
                 Locator retry = page.getByRole(AriaRole.LINK,
                         new Page.GetByRoleOptions().setName(Pattern.compile("Try again")));
                 assertThat(retry).isVisible();
-                screenshot(page, browser, width);
+                screenshot(page, browser, width, "");
                 assertThat(page.locator("body")).hasCSS("background-color", onlineBackground);
                 assertThat(retry).hasCSS("display", "inline-flex");
             }
+
+            // The theme switch is cached too, so the offline page keeps a chosen theme.
+            page.evaluate("() => localStorage.setItem('homecontrol.theme.v1', 'cyberpunk')");
+            page.setViewportSize(390, 844);
+            page.navigate("/missing-page-for-offline-test?theme=cyberpunk");
+            assertThat(page.locator("html")).hasAttribute("data-theme", "cyberpunk");
+            assertThat(page.locator("body")).hasCSS("background-color", "rgb(7, 8, 13)");
+            screenshot(page, browser, 390, "cyberpunk-");
 
             org.assertj.core.api.Assertions.assertThat(page.evaluate("""
                     async () => {
@@ -98,9 +106,9 @@ class OfflineUiE2eTest {
         }
     }
 
-    private static void screenshot(Page page, String browser, int width) {
+    private static void screenshot(Page page, String browser, int width, String prefix) {
         Path path = Path.of(System.getProperty("e2e.artifacts", "build/e2e-artifacts"),
-                "ui-offline-" + width + "-" + browser + ".png");
+                "ui-" + prefix + "offline-" + width + "-" + browser + ".png");
         page.screenshot(new Page.ScreenshotOptions().setPath(path).setFullPage(true)
                 .setAnimations(ScreenshotAnimations.DISABLED));
     }
@@ -111,6 +119,8 @@ class OfflineUiE2eTest {
                 "/offline.html", "text/html",
                 "/sw.js", "text/javascript",
                 "/app.css", "text/css",
+                "/themes/cyberpunk.css", "text/css",
+                "/js/theme.js", "text/javascript",
                 "/icons/icon.svg", "image/svg+xml");
 
         private final HttpServer server;
