@@ -17,6 +17,9 @@ jobs:
   test:
     name: Build and test
     runs-on: ubuntu-latest
+    # Every job has a limit a few times its usual duration: a build that hangs fails in minutes
+    # rather than holding the run for the six hours GitHub allows.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -71,6 +74,7 @@ jobs:
   image:
     name: Build the self-contained image
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -106,6 +110,7 @@ jobs:
     # runtime stage matches Dockerfile.dist, and actually runs it, so arm64-only breakage fails
     # here instead of on someone's Raspberry Pi.
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -130,6 +135,7 @@ jobs:
     # The same for the -bluetooth variant, as its own job so the release does not wait for it:
     # like the variant's publish step, it must never gate the release. A failure still shows here.
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -152,6 +158,7 @@ jobs:
   e2e:
     name: Browser tests (Chromium, WebKit)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -233,6 +240,7 @@ jobs:
     name: SonarCloud quality gate
     needs: [test, e2e]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -282,6 +290,7 @@ jobs:
       github.event_name == 'push'
       || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       # To submit the dependency graph.
       contents: write
@@ -321,6 +330,7 @@ jobs:
       && github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       # To read this run's start time and the links to its jobs.
@@ -434,6 +444,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [test, image, image-arm64, e2e, sonar]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       packages: write
