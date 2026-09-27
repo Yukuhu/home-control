@@ -59,9 +59,9 @@ class DeviceStateBroadcasterFailuresTest {
         assertThat(revoked.sends).hasValue(0);
     }
 
-    /** An Error is not a subscriber's failure: it reaches the thread's handler, and later events still go out. */
+    /** An Error reaches the thread's handler instead of being swallowed; its subscriber is dropped and later events go out. */
     @Test
-    void anErrorDuringASendIsNotSwallowedAndTheFanOutCarriesOn() {
+    void anErrorDuringASendIsNotSwallowedAndOnlyItsSubscriberIsDropped() {
         List<Throwable> uncaught = new CopyOnWriteArrayList<>();
         Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler((thread, error) -> uncaught.add(error));
@@ -83,8 +83,9 @@ class DeviceStateBroadcasterFailuresTest {
             assertThat(uncaught).singleElement().isInstanceOf(AssertionError.class);
 
             broadcaster.onStateChanged(event());
-            await().dontCatchUncaughtExceptions().until(() -> flaky.sends.get() == 2 && healthy.sends.get() >= 1);
-            assertThat(flaky.completed).as("an Error is not treated as a finished subscriber").isFalse();
+            await().dontCatchUncaughtExceptions().until(() -> healthy.sends.get() == 1);
+            assertThat(flaky.sends).as("the subscriber that raised the Error is off the list").hasValue(1);
+            assertThat(uncaught).hasSize(1);
         } finally {
             Thread.setDefaultUncaughtExceptionHandler(previous);
         }
