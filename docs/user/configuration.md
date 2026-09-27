@@ -1,0 +1,80 @@
+# Configuration
+
+Every setting, as a Spring property or an environment variable.
+
+| Property | Default | Meaning |
+|---|---|---|
+| `SERVER_PORT` | `8080` | Port the web UI listens on |
+| `shield.data-dir` | `/data` in Docker | Where the keystore and device registry live |
+| `SHIELD_KEYSTORE_PASSWORD` | `shield` | Keystore password |
+| `shield.discovery-enabled` | `true` | Turn mDNS off entirely |
+| `shield.stale-timeout-seconds` | `10` | No incoming message or successfully sent command for this long triggers a reconnect; commands can postpone device pings |
+| `shield.reconnect-max-delay-seconds` | `60` | Upper bound on reconnect backoff |
+| `HOME_CONTROL_CAST_ENABLED` | `true` | Turn the Cast module off entirely; Android TV devices keep working |
+| `home-control.cast.*` | see `CastProperties` | Cast receiver heartbeat interval, stale timeout, reconnect backoff, and command/load timeouts |
+| `home-control.ssdp.enabled` | `true` | SSDP discovery for smart TVs |
+| `home-control.webos.enabled` | `true` | LG webOS module (`HOME_CONTROL_WEBOS_ENABLED`) |
+| `home-control.webos.pairing-timeout-seconds` | `60` | How long pairing waits for the prompt |
+| `home-control.webos.liveness-interval-seconds` | `30` | How often a connected LG TV is checked; no answer means it is gone |
+| `home-control.tizen.enabled` | `true` | Samsung Tizen module (`HOME_CONTROL_TIZEN_ENABLED`) |
+| `home-control.tizen.client-name` | `Home Control` | Name shown in the Samsung Allow prompt |
+| `home-control.tizen.poll-interval-seconds` | `5` | How often Samsung state is polled |
+| `home-control.wake-on-lan.broadcast-address` | `255.255.255.255` | Use the subnet broadcast on multi-homed hosts |
+| `home-control.deep-link-test.youtube-url` | Big Buck Bunny on YouTube | Video the test button opens |
+| `home-control.deep-link-test.timeout` | `10s` | How long the test button watches for the app to change (the setup page says so) |
+| `HOME_CONTROL_SECRET` | unset | Passphrase that encrypts `secrets.json`; without it a random `secret.key` is created next to it on first use |
+| `HOME_CONTROL_TRUSTED_ORIGINS` | empty | Comma-separated origins allowed to send changes, e.g. `https://home.example.org` behind a reverse proxy; their host names are also allowed |
+| `HOME_CONTROL_ALLOWED_HOSTS` | empty | Comma-separated extra host names the app answers to: exact names, or `*.example.org` for its subdomains |
+| `HOME_CONTROL_SECURE_COOKIE` | `false` | Mark the login cookie `Secure` when the app is only reached over HTTPS |
+| `HOME_CONTROL_JELLYFIN_ENABLED` | `true` | Turn the Jellyfin module off entirely |
+| `HOME_CONTROL_YOUTUBE_ENABLED` | `true` | Turn the YouTube module off entirely |
+| `HOME_CONTROL_WORKFLOWS_ENABLED` | `true` | Turn the workflow UI, source, Test and Cast execution off while retaining encrypted definitions |
+| `HOME_CONTROL_WORKFLOWS_ALLOW_LOOPBACK` | `false` | Allow workflow source and media URLs to use this host's loopback address |
+| `home-control.youtube.daily-quota-units` | `10000` | Your Cloud project's daily YouTube Data API budget |
+| `home-control.youtube.searches-per-day` | `20` | On-demand searches allowed per day (100 quota units each) |
+| `home-control.youtube.channels-per-refresh` | `30` | Subscribed channels read per subscriptions refresh |
+| `home-control.youtube.refresh-interval` | `60m` | How often every YouTube rail (subscriptions, Watch Later, chosen playlists) refreshes in the background |
+| `HOME_CONTROL_TMDB_ENABLED` | `true` | Turn the TMDB module off entirely |
+| `HOME_CONTROL_TMDB_API_BASE_URL` | `https://api.themoviedb.org/3` | TMDB API base URL |
+| `HOME_CONTROL_TMDB_IMAGE_BASE_URL` | discovered from TMDB's `/configuration` | Override the poster CDN, e.g. with a mirror, for privacy |
+| `HOME_CONTROL_TMDB_PROVIDER_IDS_NETFLIX` | `8,1796` | TMDB watch-provider ids counted as Netflix |
+| `HOME_CONTROL_TMDB_PROVIDER_IDS_PRIMEVIDEO` | `9,119,2100` | TMDB watch-provider ids counted as Prime Video |
+| `HOME_CONTROL_PINNED_ENABLED` | `true` | Turn pinned shortcuts off entirely |
+| `HOME_CONTROL_PINNED_MAX_PINS` | `200` | How many links a household can pin |
+| `home-control.upnp.enabled` | `true` | DLNA/UPnP media renderer module (`HOME_CONTROL_UPNP_ENABLED`) |
+| `home-control.upnp.poll-interval-seconds` | `2` | State polling while something plays |
+| `home-control.upnp.idle-poll-interval-seconds` | `10` | State polling while idle |
+| `home-control.sonos.enabled` | `true` | Sonos module (`HOME_CONTROL_SONOS_ENABLED`; off: players appear as plain renderers) |
+| `home-control.sonos.topology-interval-seconds` | `30` | How often group topology is re-read |
+| `HOME_CONTROL_SPORTS_ENABLED` | `true` | Turn the sports module off entirely |
+| `HOME_CONTROL_SPORTS_TIME_ZONE` | empty | Time zone for kick-off times when none is chosen in setup; falls back to the container's `TZ` |
+| `HOME_CONTROL_SPORTS_RAIL_SIZE` | `30` | Items kept in the "Live now / Today" rail |
+| `HOME_CONTROL_SPORTS_MAX_CALENDARS` | `10` | Calendars a household can add |
+| `HOME_CONTROL_SPORTS_MAX_COMPETITIONS` | `10` | TheSportsDB competitions a household can add |
+| `HOME_CONTROL_SPORTS_DEFAULT_EVENT_DURATION` | `120m` | Assumed length when a calendar event has no end time or duration |
+| `HOME_CONTROL_SPORTS_CALENDAR_REFRESH` | `6h` | How often each calendar is refetched |
+| `HOME_CONTROL_SPORTS_CALENDAR_ALLOW_LOOPBACK` | `false` | Allow calendar links that resolve to this machine's own address (only if a calendar is served here) |
+| `HOME_CONTROL_SPORTS_THESPORTSDB_ENABLED` | `true` | Turn TheSportsDB fixtures off; calendars keep working |
+| `HOME_CONTROL_SPORTS_THESPORTSDB_API_BASE_URL` | `https://www.thesportsdb.com/api/v1/json` | TheSportsDB API base URL |
+| `HOME_CONTROL_SPORTS_THESPORTSDB_FIXTURES_TTL` | `24h` | How long a competition's daily fixtures are cached |
+| `home-control.bluetooth.enabled` | `false` | Bluetooth speaker module |
+| `home-control.bluetooth.dbus-address` | `unix:path=/run/dbus/system_bus_socket` | Host D-Bus system bus |
+| `home-control.bluetooth.adapter` | *(first powered)* | Adapter MAC or id such as `hci0` |
+| `home-control.bluetooth.scan-seconds` | `10` | Length of a scan |
+| `home-control.bluetooth.mpv-path` | `mpv` | Player executable |
+| `home-control.bluetooth.audio-device-template` | *(blank: find the speaker's sink)* | e.g. `alsa/bluealsa:DEV={mac},PROFILE=a2dp` |
+| `home-control.bluetooth.default-volume` | `50` | Player volume until changed |
+
+The app only answers to host names that cannot be pointed at it by someone else's DNS
+(DNS rebinding): IP addresses, `localhost`, single-label names such as `nas`, and names
+ending in `.local`, `.lan`, `.home.arpa` or `.internal`. Any other name gets
+`421 Misdirected Request`. If you reach it under a real domain, for example through a
+reverse proxy, add that name to `HOME_CONTROL_ALLOWED_HOSTS` (or its origin to
+`HOME_CONTROL_TRUSTED_ORIGINS`). Changes (POST and other non-read requests) from another
+site's page are refused with `403`, whether or not a login exists.
+
+An older `devices.json` (from before multi-device support) is upgraded in place on
+first start; the upgrade keeps existing pairings, so no re-pairing is needed after
+updating. The upgrade is one-way: an older image cannot read the new file. The original
+is kept once as `devices.v1.json` in the same directory — to roll back, stop the app,
+restore that file as `devices.json`, and start the older image.
