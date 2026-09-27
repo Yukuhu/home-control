@@ -114,8 +114,8 @@ class LoginGateEndToEndTest {
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/events")).header("Cookie", cookie)
                         .header("Accept", "text/event-stream").GET().build(),
                 HttpResponse.BodyHandlers.ofString());
-        Thread.sleep(1_000);
-        assertThat(events).as("the stream stays open while logged in").isNotDone();
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(3)).untilAsserted(() ->
+                assertThat(events).as("the stream stays open while logged in").isNotDone());
 
         HttpResponse<Void> logout = http.send(request("/logout").header("Cookie", cookie)
                         .header("Origin", "http://localhost:" + port)

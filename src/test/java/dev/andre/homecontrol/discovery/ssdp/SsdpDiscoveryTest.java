@@ -134,6 +134,7 @@ class SsdpDiscoveryTest {
         discovery.addListener("urn:x:1", new SsdpListener() {
             @Override
             public void alive(SsdpService service) {
+                // only bye-byes are recorded; alive announcements are checked through services()
             }
 
             @Override
@@ -170,8 +171,8 @@ class SsdpDiscoveryTest {
         discovery.watch(LG_TARGET);
 
         responder.sendGarbage(discovery.listenPort());
-        Thread.sleep(300);
-        assertThat(discovery.services(LG_TARGET)).isEmpty();
+        await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                assertThat(discovery.services(LG_TARGET)).isEmpty());
 
         String alive = "NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: " + LG_TARGET + "\r\nNTS: ssdp:alive\r\n"
                 + "USN: uuid:after-garbage::" + LG_TARGET + "\r\nCACHE-CONTROL: max-age=120\r\n\r\n";
@@ -212,15 +213,15 @@ class SsdpDiscoveryTest {
     }
 
     @Test
-    void disabledDiscoveryOpensNoSockets() throws InterruptedException {
+    void disabledDiscoveryOpensNoSockets() {
         try (SsdpDiscovery disabled = new SsdpDiscovery(
                 new SsdpProperties(false, "127.0.0.1", responder.port(), 0, 1, 1))) {
             disabled.start();
             disabled.watch(LG_TARGET);
 
             assertThat(disabled.listenPort()).isEqualTo(-1);
-            Thread.sleep(1500);
-            assertThat(responder.searches()).isZero();
+            await().during(Duration.ofMillis(1500)).atMost(Duration.ofSeconds(3)).untilAsserted(() ->
+                    assertThat(responder.searches()).isZero());
         }
     }
 
@@ -275,7 +276,7 @@ class SsdpDiscoveryTest {
     }
 
     @Test
-    void ignoresADescriptionLargerThanTheSizeCap() throws IOException, InterruptedException {
+    void ignoresADescriptionLargerThanTheSizeCap() throws IOException {
         responder.answer(LG_TARGET, FakeSsdpResponder.fixture("lg-search-response.txt", "127.0.0.1", httpPort())
                 .replace("/lg/description.xml", "/big/description.xml"));
 
@@ -283,10 +284,11 @@ class SsdpDiscoveryTest {
 
         await().atMost(Duration.ofSeconds(5)).until(() -> httpRequests.get() >= 1);
         // The fetch is rejected on the Content-Length pre-check, so no async parse ever completes;
-        // give it a moment to prove that, rather than racing a negative assertion.
-        Thread.sleep(500);
-        assertThat(discovery.services(LG_TARGET)).hasSize(1);
-        assertThat(discovery.services(LG_TARGET).getFirst().friendlyName()).isEmpty();
+        // hold the assertion for a moment to prove that, rather than racing a negative assertion.
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            assertThat(discovery.services(LG_TARGET)).hasSize(1);
+            assertThat(discovery.services(LG_TARGET).getFirst().friendlyName()).isEmpty();
+        });
     }
 
     @Test

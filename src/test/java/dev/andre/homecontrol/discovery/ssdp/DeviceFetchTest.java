@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.discovery.ssdp;
 
+import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,19 +49,7 @@ class DeviceFetchTest {
                 // the client hung up once over the cap
             }
         });
-        server.createContext("/trickle", exchange -> {
-            try (exchange) {
-                exchange.sendResponseHeaders(200, 0);
-                OutputStream out = exchange.getResponseBody();
-                for (int i = 0; i < 50; i++) {
-                    out.write('a');
-                    out.flush();
-                    Thread.sleep(100);
-                }
-            } catch (IOException | InterruptedException _) {
-                // the client gave up
-            }
-        });
+        server.createContext("/trickle", DeviceFetchTest::trickle);
         server.createContext("/moved", exchange -> {
             try (exchange) {
                 exchange.getResponseHeaders().set("Location", "/small");
@@ -73,6 +62,24 @@ class DeviceFetchTest {
     @AfterEach
     void tearDown() {
         server.stop(0);
+    }
+
+    // A device that drips its description byte by byte: the slowness is what the deadline test needs.
+    @SuppressWarnings("java:S2925")
+    private static void trickle(HttpExchange exchange) {
+        try (exchange) {
+            exchange.sendResponseHeaders(200, 0);
+            OutputStream out = exchange.getResponseBody();
+            for (int i = 0; i < 50; i++) {
+                out.write('a');
+                out.flush();
+                Thread.sleep(100);
+            }
+        } catch (IOException _) {
+            // the client gave up
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private URI url(String path) {

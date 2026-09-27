@@ -108,6 +108,19 @@ public final class FakeTheSportsDbServer implements AutoCloseable {
         }
     }
 
+    // A slow upstream is what the timeout tests exercise, so answering late on purpose is the point.
+    @SuppressWarnings("java:S2925")
+    private static void simulateLatency(Duration wait) {
+        if (wait.isZero()) {
+            return;
+        }
+        try {
+            Thread.sleep(wait);
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private void handle(HttpExchange exchange) throws IOException {
         try (exchange) {
             URI uri = exchange.getRequestURI();
@@ -133,14 +146,7 @@ public final class FakeTheSportsDbServer implements AutoCloseable {
             exchange.getRequestBody().readAllBytes();
             requests.add(new Recorded(key, endpoint, query, headers));
 
-            Duration wait = globalDelay;
-            if (!wait.isZero()) {
-                try {
-                    Thread.sleep(wait);
-                } catch (InterruptedException _) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            simulateLatency(globalDelay);
 
             if (!FREE_KEY.equals(key) && !PERSONAL_KEY.equals(key)) {
                 respond(exchange, 400, fixtureBytes("invalid-key.json"));

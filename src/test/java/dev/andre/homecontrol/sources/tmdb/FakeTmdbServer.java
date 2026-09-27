@@ -129,6 +129,19 @@ public final class FakeTmdbServer implements AutoCloseable {
         }
     }
 
+    // A slow upstream is what the timeout tests exercise, so answering late on purpose is the point.
+    @SuppressWarnings("java:S2925")
+    private static void simulateLatency(Duration wait) {
+        if (wait.isZero()) {
+            return;
+        }
+        try {
+            Thread.sleep(wait);
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private void handle(HttpExchange exchange) throws IOException {
         try (exchange) {
             URI uri = exchange.getRequestURI();
@@ -148,14 +161,7 @@ public final class FakeTmdbServer implements AutoCloseable {
             requests.add(new Recorded(exchange.getRequestMethod(), uri.getRawPath(), query, headers,
                     uri.getRawQuery() == null ? "" : uri.getRawQuery()));
 
-            Duration wait = globalDelay;
-            if (!wait.isZero()) {
-                try {
-                    Thread.sleep(wait);
-                } catch (InterruptedException _) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            simulateLatency(globalDelay);
 
             Canned canned = routes.get(exchange.getRequestMethod() + " " + uri.getRawPath());
             if (canned == null) {
