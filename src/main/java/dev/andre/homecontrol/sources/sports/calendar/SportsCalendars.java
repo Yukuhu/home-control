@@ -38,6 +38,8 @@ public class SportsCalendars {
     private final Clock clock;
     private final SecureRandom random;
 
+    // Spring constructor injection of seven distinct collaborators plus the clock and id randomness tests pin.
+    @SuppressWarnings("java:S107")
     public SportsCalendars(SportsSettingsService settingsService, CalendarUrlPolicy policy, CalendarFetcher fetcher,
                            CalendarSchedule schedule, SecretStore secrets, LoginService login,
                            SportsProperties properties, Clock clock, SecureRandom random) {
@@ -85,10 +87,8 @@ public class SportsCalendars {
         String id = newId(settings);
         login.storeSecrets(Map.of(secretName(id), uriString), request.loginPassword(),
                 request.loginPasswordConfirmation(), http);
-        String resolvedLabel = !label.isEmpty() ? label
-                : parsed.name() != null && !parsed.name().isBlank() ? cut(parsed.name()) : uri.getHost();
-        SportsSettings.CalendarEntry entry =
-                new SportsSettings.CalendarEntry(id, resolvedLabel, uri.getHost(), null, clock.instant());
+        SportsSettings.CalendarEntry entry = new SportsSettings.CalendarEntry(
+                id, resolvedLabel(label, parsed, uri), uri.getHost(), null, clock.instant());
         try {
             settingsService.update(s -> s.withCalendars(append(s.calendars(), entry)));
         } catch (RuntimeException e) {
@@ -118,6 +118,17 @@ public class SportsCalendars {
             }
         }
         throw new IllegalStateException("Could not generate a calendar id");
+    }
+
+    /** The user's label, else the calendar's own name, else the host. */
+    private static String resolvedLabel(String label, IcsCalendar parsed, URI uri) {
+        if (!label.isEmpty()) {
+            return label;
+        }
+        if (parsed.name() != null && !parsed.name().isBlank()) {
+            return cut(parsed.name());
+        }
+        return uri.getHost();
     }
 
     private static String cut(String value) {

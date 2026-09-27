@@ -82,13 +82,17 @@ public class SportsSetupController {
 
     @PostMapping("/setup/sources/sports/time-zone")
     public String timeZone(@RequestParam(required = false) String timeZone, RedirectAttributes redirect) {
+        String stripped = timeZone == null ? "" : timeZone.strip();
+        if (!stripped.isEmpty() && SportsTimeZones.parse(stripped).isEmpty()) {
+            redirect.addFlashAttribute(ERROR, "Use a time zone such as Europe/Berlin");
+        } else {
+            saveTimeZone(stripped.isEmpty() ? null : stripped, redirect);
+        }
+        return REDIRECT;
+    }
+
+    private void saveTimeZone(String stored, RedirectAttributes redirect) {
         try {
-            String stripped = timeZone == null ? "" : timeZone.strip();
-            if (!stripped.isEmpty() && SportsTimeZones.parse(stripped).isEmpty()) {
-                redirect.addFlashAttribute(ERROR, "Use a time zone such as Europe/Berlin");
-                return REDIRECT;
-            }
-            String stored = stripped.isEmpty() ? null : stripped;
             settings.update(s -> s.withTimeZone(stored));
             String message = stored != null
                     ? "Times are shown in " + stored
@@ -98,7 +102,6 @@ public class SportsSetupController {
             log.warn(SAVE_ERROR, e);
             redirect.addFlashAttribute(ERROR, SAVE_ERROR);
         }
-        return REDIRECT;
     }
 
     @PostMapping("/setup/sources/sports/providers")

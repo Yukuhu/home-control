@@ -145,11 +145,19 @@ public class TheSportsDbClient {
     }
 
     private URI uri(String key, String endpoint, Map<String, String> query) {
-        String base = properties.apiBaseUrl().toString().replaceAll("/+$", "");
+        String base = withoutTrailingSlashes(properties.apiBaseUrl().toString());
         StringJoiner parameters = new StringJoiner("&");
         query.forEach((name, value) -> parameters.add(encode(name) + "=" + encode(value)));
         String queryString = parameters.length() == 0 ? "" : "?" + parameters;
         return URI.create(base + "/" + key + "/" + endpoint + queryString);
+    }
+
+    private static String withoutTrailingSlashes(String value) {
+        int end = value.length();
+        while (end > 0 && value.charAt(end - 1) == '/') {
+            end--;
+        }
+        return value.substring(0, end);
     }
 
     private static String encode(String value) {

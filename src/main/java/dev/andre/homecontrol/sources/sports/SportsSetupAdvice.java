@@ -108,18 +108,20 @@ public class SportsSetupAdvice {
             text.append(status.events()).append(" events · updated ").append(time);
         }
         if (status.unsupportedRules() > 0) {
-            text.append("; ").append(status.unsupportedRules())
-                    .append(status.unsupportedRules() == 1 ? " repeating event uses" : " repeating events use")
+            text.append(count(status.unsupportedRules(), " repeating event uses", " repeating events use"))
                     .append(" rules Home Control shows only once");
         }
         if (status.unknownZones() > 0) {
-            text.append("; ").append(status.unknownZones())
-                    .append(status.unknownZones() == 1 ? " unknown time zone" : " unknown time zones");
+            text.append(count(status.unknownZones(), " unknown time zone", " unknown time zones"));
         }
         if (status.skippedEvents() > 0) {
-            text.append("; ").append(status.skippedEvents())
-                    .append(status.skippedEvents() == 1 ? " unreadable event" : " unreadable events");
+            text.append(count(status.skippedEvents(), " unreadable event", " unreadable events"));
         }
         return text.toString();
+    }
+
+    /** {@code "; 1 thing"} or {@code "; 3 things"}. */
+    private static String count(int n, String one, String many) {
+        return "; " + n + (n == 1 ? one : many);
     }
 }

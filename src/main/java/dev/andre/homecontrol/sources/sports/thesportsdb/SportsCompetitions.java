@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 /** Adds/removes TheSportsDB competitions and switches between the free and a personal API key. */
 public class SportsCompetitions {
 
-    private static final Pattern LEAGUE_ID = Pattern.compile("^[0-9]{1,9}$");
+    private static final Pattern LEAGUE_ID = Pattern.compile("^\\d{1,9}$");
     private static final Pattern KEY = Pattern.compile("^[A-Za-z0-9]{1,64}$");
     private static final int MAX_FIELD = 60;
 

@@ -85,67 +85,23 @@ public class TheSportsDbSchedule {
         Instant now = clock.instant();
         ZoneId zone = zones.effective();
         Set<LocalDate> dates = utcDates(now, zone);
-        LocalDate firstDate = dates.stream().min(LocalDate::compareTo).orElse(null);
-
-        Set<String> known = new LinkedHashSet<>();
-        settings.competitions().forEach(c -> known.add(c.leagueId()));
-        cache.keySet().removeIf(key -> !known.contains(leagueIdOf(key))
-                || (firstDate != null && dateOf(key).isBefore(firstDate.minusDays(1))));
-        lastFailure.keySet().removeIf(key -> !known.contains(leagueIdOf(key)));
-        errors.keySet().removeIf(leagueId -> !known.contains(leagueId));
-
-        List<String> errorList = new ArrayList<>();
-        List<SportsEvent> allEvents = new ArrayList<>();
-        int succeeded = 0;
+        dropUnknownAndOld(settings, dates);
 
         String key;
         try {
             key = keys.current();
         } catch (TheSportsDbException e) {
-            for (SportsSettings.CompetitionEntry competition : settings.competitions()) {
-                errors.put(competition.leagueId(), e.getMessage());
-                errorList.add(competition.name() + ": " + e.getMessage());
-            }
-            return new Result(List.of(), errorList, settings.competitions().size(), 0);
+            return keyUnavailable(settings, e);
         }
 
-        boolean rateLimitedThisRound = false;
+        Round round = new Round(key, now, zone);
+        List<String> errorList = new ArrayList<>();
+        List<SportsEvent> allEvents = new ArrayList<>();
+        int succeeded = 0;
         for (SportsSettings.CompetitionEntry competition : settings.competitions()) {
             boolean hasEntry = false;
             for (LocalDate date : dates) {
-                String cacheKey = cacheKey(competition.leagueId(), date);
-                Entry entry = cache.get(cacheKey);
-                boolean fresh = entry != null && entry.fetchedAt().plus(properties.theSportsDb().fixturesTtl()).isAfter(now);
-                if (!fresh) {
-                    Instant failedAt = lastFailure.get(cacheKey);
-                    boolean recentFailure = failedAt != null && failedAt.plus(RETRY_BACKOFF).isAfter(now);
-                    if (!recentFailure && !rateLimitedThisRound) {
-                        try {
-                            List<JsonNode> raw = client.eventsDay(key, date, competition.leagueId());
-                            List<SportsEvent> mapped = new ArrayList<>();
-                            for (JsonNode node : raw) {
-                                TheSportsDbEventMapper.toEvent(node, competition.leagueId(), competition.badge(), zone,
-                                        sport -> properties.theSportsDb().durationFor(sport, properties.defaultEventDuration()))
-                                        .ifPresent(mapped::add);
-                            }
-                            entry = new Entry(mapped, now);
-                            cache.put(cacheKey, entry);
-                            lastFailure.remove(cacheKey);
-                            errors.remove(competition.leagueId());
-                        } catch (TheSportsDbException e) {
-                            lastFailure.put(cacheKey, now);
-                            errors.put(competition.leagueId(), e.getMessage());
-                            log.warn("TheSportsDB fixtures for competition {} on {} failed ({})",
-                                    competition.leagueId(), date, e.kind());
-                            if (e.kind() == TheSportsDbException.Kind.RATE_LIMITED) {
-                                rateLimitedThisRound = true;
-                            }
-                        }
-                    } else if (rateLimitedThisRound && entry == null) {
-                        errors.put(competition.leagueId(), "TheSportsDB is limiting requests; try again in a minute");
-                    }
-                }
-                entry = cache.get(cacheKey);
+                Entry entry = entry(competition, date, round);
                 if (entry != null) {
                     hasEntry = true;
                     allEvents.addAll(entry.events());
@@ -160,6 +116,81 @@ public class TheSportsDbSchedule {
             }
         }
         return new Result(allEvents, errorList, settings.competitions().size(), succeeded);
+    }
+
+    /** One {@link #events()} pass: once TheSportsDB rate-limits a request, the rest of the pass stays on the cache. */
+    private static final class Round {
+
+        private final String key;
+        private final Instant now;
+        private final ZoneId zone;
+        private boolean rateLimited;
+
+        Round(String key, Instant now, ZoneId zone) {
+            this.key = key;
+            this.now = now;
+            this.zone = zone;
+        }
+    }
+
+    private void dropUnknownAndOld(SportsSettings settings, Set<LocalDate> dates) {
+        LocalDate firstDate = dates.stream().min(LocalDate::compareTo).orElse(null);
+        Set<String> known = new LinkedHashSet<>();
+        settings.competitions().forEach(c -> known.add(c.leagueId()));
+        cache.keySet().removeIf(key -> !known.contains(leagueIdOf(key))
+                || (firstDate != null && dateOf(key).isBefore(firstDate.minusDays(1))));
+        lastFailure.keySet().removeIf(key -> !known.contains(leagueIdOf(key)));
+        errors.keySet().removeIf(leagueId -> !known.contains(leagueId));
+    }
+
+    private Result keyUnavailable(SportsSettings settings, TheSportsDbException e) {
+        List<String> errorList = new ArrayList<>();
+        for (SportsSettings.CompetitionEntry competition : settings.competitions()) {
+            errors.put(competition.leagueId(), e.getMessage());
+            errorList.add(competition.name() + ": " + e.getMessage());
+        }
+        return new Result(List.of(), errorList, settings.competitions().size(), 0);
+    }
+
+    /** The cached day, refetched first when stale and no recent failure or rate limit holds it back. */
+    private Entry entry(SportsSettings.CompetitionEntry competition, LocalDate date, Round round) {
+        String cacheKey = cacheKey(competition.leagueId(), date);
+        Entry entry = cache.get(cacheKey);
+        boolean fresh = entry != null
+                && entry.fetchedAt().plus(properties.theSportsDb().fixturesTtl()).isAfter(round.now);
+        if (!fresh) {
+            Instant failedAt = lastFailure.get(cacheKey);
+            boolean recentFailure = failedAt != null && failedAt.plus(RETRY_BACKOFF).isAfter(round.now);
+            if (!recentFailure && !round.rateLimited) {
+                fetch(competition, date, cacheKey, round);
+            } else if (round.rateLimited && entry == null) {
+                errors.put(competition.leagueId(), "TheSportsDB is limiting requests; try again in a minute");
+            }
+        }
+        return cache.get(cacheKey);
+    }
+
+    private void fetch(SportsSettings.CompetitionEntry competition, LocalDate date, String cacheKey, Round round) {
+        try {
+            List<JsonNode> raw = client.eventsDay(round.key, date, competition.leagueId());
+            List<SportsEvent> mapped = new ArrayList<>();
+            for (JsonNode node : raw) {
+                TheSportsDbEventMapper.toEvent(node, competition.leagueId(), competition.badge(), round.zone,
+                        sport -> properties.theSportsDb().durationFor(sport, properties.defaultEventDuration()))
+                        .ifPresent(mapped::add);
+            }
+            cache.put(cacheKey, new Entry(mapped, round.now));
+            lastFailure.remove(cacheKey);
+            errors.remove(competition.leagueId());
+        } catch (TheSportsDbException e) {
+            lastFailure.put(cacheKey, round.now);
+            errors.put(competition.leagueId(), e.getMessage());
+            log.warn("TheSportsDB fixtures for competition {} on {} failed ({})",
+                    competition.leagueId(), date, e.kind());
+            if (e.kind() == TheSportsDbException.Kind.RATE_LIMITED) {
+                round.rateLimited = true;
+            }
+        }
     }
 
     public Optional<SportsEvent> find(String itemId) {

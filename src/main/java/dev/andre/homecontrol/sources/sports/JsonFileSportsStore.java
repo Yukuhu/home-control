@@ -39,7 +39,7 @@ public class JsonFileSportsStore {
     private static final int VERSION = 1;
     private static final String VERSION_KEY = "version";
     private static final Pattern CALENDAR_ID = Pattern.compile("^c-[0-9a-f]{12}$");
-    private static final Pattern LEAGUE_ID = Pattern.compile("^[0-9]{1,9}$");
+    private static final Pattern LEAGUE_ID = Pattern.compile("^\\d{1,9}$");
     private static final int MAX_LABEL = 80;
     private static final int MAX_HOST = 253;
     private static final int MAX_NAME = 120;
@@ -74,49 +74,59 @@ public class JsonFileSportsStore {
             throw new StorageException("Could not read sports settings in " + file + "; fix or delete it", null);
         }
 
-        String timeZone = null;
-        JsonNode tzNode = root.path(TIME_ZONE);
-        if (tzNode.isString() && SportsTimeZones.parse(tzNode.asString()).isPresent()) {
-            timeZone = tzNode.asString();
-        } else if (tzNode.isString() && !tzNode.asString().isBlank()) {
-            log.warn("Dropping unreadable sports time zone {}", tzNode.asString());
-        }
-
-        List<SportsSettings.CalendarEntry> calendars = new ArrayList<>();
-        Set<String> seenCalendarIds = new HashSet<>();
-        int index = 0;
-        for (JsonNode entry : root.path("calendars")) {
-            SportsSettings.CalendarEntry parsed = parseCalendar(entry, index);
-            index++;
-            if (parsed == null) {
-                continue;
-            }
-            if (!seenCalendarIds.add(parsed.id())) {
-                continue;
-            }
-            calendars.add(parsed);
-        }
+        String timeZone = timeZone(root.path(TIME_ZONE));
+        List<SportsSettings.CalendarEntry> calendars = calendars(root.path("calendars"));
 
         JsonNode tsdb = root.path("theSportsDb");
         SportsSettings.KeyKind keyKind = "personal".equals(tsdb.path("key").asString(""))
                 ? SportsSettings.KeyKind.PERSONAL : SportsSettings.KeyKind.FREE;
-
-        List<SportsSettings.CompetitionEntry> competitions = new ArrayList<>();
-        Set<String> seenLeagueIds = new HashSet<>();
-        int compIndex = 0;
-        for (JsonNode entry : tsdb.path("competitions")) {
-            SportsSettings.CompetitionEntry parsed = parseCompetition(entry, compIndex);
-            compIndex++;
-            if (parsed == null) {
-                continue;
-            }
-            if (!seenLeagueIds.add(parsed.leagueId())) {
-                continue;
-            }
-            competitions.add(parsed);
-        }
+        List<SportsSettings.CompetitionEntry> competitions = competitions(tsdb.path("competitions"));
 
         return new SportsSettings(timeZone, calendars, keyKind, competitions);
+    }
+
+    private static String timeZone(JsonNode node) {
+        if (!node.isString()) {
+            return null;
+        }
+        String value = node.asString();
+        if (SportsTimeZones.parse(value).isPresent()) {
+            return value;
+        }
+        if (!value.isBlank()) {
+            log.warn("Dropping unreadable sports time zone {}", value);
+        }
+        return null;
+    }
+
+    /** Valid entries in file order; a repeated id keeps its first entry. */
+    private List<SportsSettings.CalendarEntry> calendars(JsonNode entries) {
+        List<SportsSettings.CalendarEntry> calendars = new ArrayList<>();
+        Set<String> seenCalendarIds = new HashSet<>();
+        int index = 0;
+        for (JsonNode entry : entries) {
+            SportsSettings.CalendarEntry parsed = parseCalendar(entry, index);
+            index++;
+            if (parsed != null && seenCalendarIds.add(parsed.id())) {
+                calendars.add(parsed);
+            }
+        }
+        return calendars;
+    }
+
+    /** Valid entries in file order; a repeated league id keeps its first entry. */
+    private List<SportsSettings.CompetitionEntry> competitions(JsonNode entries) {
+        List<SportsSettings.CompetitionEntry> competitions = new ArrayList<>();
+        Set<String> seenLeagueIds = new HashSet<>();
+        int index = 0;
+        for (JsonNode entry : entries) {
+            SportsSettings.CompetitionEntry parsed = parseCompetition(entry, index);
+            index++;
+            if (parsed != null && seenLeagueIds.add(parsed.leagueId())) {
+                competitions.add(parsed);
+            }
+        }
+        return competitions;
     }
 
     private SportsSettings.CalendarEntry parseCalendar(JsonNode entry, int index) {
@@ -196,54 +206,48 @@ public class JsonFileSportsStore {
     public synchronized void save(SportsSettings settings) {
         ObjectNode root = mapper.createObjectNode();
         root.put(VERSION_KEY, VERSION);
-        if (settings.timeZone() == null) {
-            root.putNull(TIME_ZONE);
-        } else {
-            root.put(TIME_ZONE, settings.timeZone());
-        }
+        putOrNull(root, TIME_ZONE, settings.timeZone());
         ArrayNode calendarsNode = root.putArray("calendars");
         for (SportsSettings.CalendarEntry entry : settings.calendars()) {
-            ObjectNode node = calendarsNode.addObject();
-            node.put("id", entry.id());
-            node.put("label", entry.label());
-            node.put("host", entry.host());
-            if (entry.provider() == null) {
-                node.putNull(PROVIDER);
-            } else {
-                node.put(PROVIDER, entry.provider());
-            }
-            node.put(ADDED_AT, entry.addedAt().toString());
+            writeCalendar(calendarsNode.addObject(), entry);
         }
         ObjectNode tsdb = root.putObject("theSportsDb");
         tsdb.put("key", settings.keyKind() == SportsSettings.KeyKind.PERSONAL ? "personal" : "free");
         ArrayNode competitionsNode = tsdb.putArray("competitions");
         for (SportsSettings.CompetitionEntry entry : settings.competitions()) {
-            ObjectNode node = competitionsNode.addObject();
-            node.put("leagueId", entry.leagueId());
-            node.put("name", entry.name());
-            if (entry.sport() == null) {
-                node.putNull(SPORT);
-            } else {
-                node.put(SPORT, entry.sport());
-            }
-            if (entry.country() == null) {
-                node.putNull(COUNTRY);
-            } else {
-                node.put(COUNTRY, entry.country());
-            }
-            if (entry.badge() == null) {
-                node.putNull(BADGE);
-            } else {
-                node.put(BADGE, entry.badge().toString());
-            }
-            if (entry.provider() == null) {
-                node.putNull(PROVIDER);
-            } else {
-                node.put(PROVIDER, entry.provider());
-            }
-            node.put(ADDED_AT, entry.addedAt().toString());
+            writeCompetition(competitionsNode.addObject(), entry);
         }
+        writeAtomically(root);
+    }
 
+    private static void writeCalendar(ObjectNode node, SportsSettings.CalendarEntry entry) {
+        node.put("id", entry.id());
+        node.put("label", entry.label());
+        node.put("host", entry.host());
+        putOrNull(node, PROVIDER, entry.provider());
+        node.put(ADDED_AT, entry.addedAt().toString());
+    }
+
+    private static void writeCompetition(ObjectNode node, SportsSettings.CompetitionEntry entry) {
+        node.put("leagueId", entry.leagueId());
+        node.put("name", entry.name());
+        putOrNull(node, SPORT, entry.sport());
+        putOrNull(node, COUNTRY, entry.country());
+        putOrNull(node, BADGE, entry.badge() == null ? null : entry.badge().toString());
+        putOrNull(node, PROVIDER, entry.provider());
+        node.put(ADDED_AT, entry.addedAt().toString());
+    }
+
+    private static void putOrNull(ObjectNode node, String name, String value) {
+        if (value == null) {
+            node.putNull(name);
+        } else {
+            node.put(name, value);
+        }
+    }
+
+    /** Writes a temp file next to the target and moves it into place, so readers never see half a file. */
+    private void writeAtomically(ObjectNode root) {
         Path parent = file.toAbsolutePath().getParent();
         Path temp = null;
         try {
@@ -252,14 +256,19 @@ public class JsonFileSportsStore {
             Files.write(temp, mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(root));
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException | JacksonException e) {
-            if (temp != null) {
-                try {
-                    Files.deleteIfExists(temp);
-                } catch (IOException _) {
-                    // Cleanup error; let the original exception propagate
-                }
-            }
+            deleteQuietly(temp);
             throw new StorageException("Could not write sports settings to " + file, e);
+        }
+    }
+
+    private static void deleteQuietly(Path temp) {
+        if (temp == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(temp);
+        } catch (IOException _) {
+            // Cleanup error; let the original exception propagate
         }
     }
 }
