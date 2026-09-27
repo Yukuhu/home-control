@@ -20,9 +20,11 @@ import java.net.http.HttpTimeoutException;
 import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -161,7 +163,23 @@ public class JellyfinClient {
         return header.toString();
     }
 
+    /** An image as served; compared by its bytes' content, and printed with their count only. */
     public record Image(String contentType, byte[] bytes) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Image that && Objects.equals(contentType, that.contentType)
+                    && Arrays.equals(bytes, that.bytes);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hashCode(contentType) + Arrays.hashCode(bytes);
+        }
+
+        @Override
+        public String toString() {
+            return "Image[contentType=" + contentType + ", bytes=" + (bytes == null ? "none" : bytes.length + " bytes") + "]";
+        }
     }
 
     /** Jellyfin's item image endpoint is anonymous; no credential is sent, so none can leak. */
@@ -178,21 +196,7 @@ public class JellyfinClient {
                 .header("Accept", "image/*")
                 .GET()
                 .build();
-        HttpResponse<InputStream> response;
-        try {
-            response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
-        } catch (HttpConnectTimeoutException _) {
-            throw unreachable(serverUrl, "connection timed out");
-        } catch (HttpTimeoutException _) {
-            throw unreachable(serverUrl, "no answer in time");
-        } catch (ConnectException e) {
-            throw unreachable(serverUrl, e.getCause() instanceof UnresolvedAddressException ? "unknown host" : "connection refused");
-        } catch (IOException e) {
-            throw unreachable(serverUrl, e.getClass().getSimpleName());
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            throw unreachable(serverUrl, "interrupted");
-        }
+        HttpResponse<InputStream> response = exchange(serverUrl, request);
         try (InputStream body = response.body()) {
             if (response.statusCode() == 404) {
                 return Optional.empty();
@@ -232,9 +236,29 @@ public class JellyfinClient {
     }
 
     private JsonNode send(URI serverUrl, HttpRequest.Builder builder) {
+        HttpResponse<InputStream> response = exchange(serverUrl, builder.build());
+        try (InputStream body = response.body()) {
+            requireSuccess(serverUrl, response.statusCode());
+            // A cap, not a limit we expect to hit: a well-behaved Jellyfin answer never comes close, and a
+            // misbehaving or hostile server can't make us buffer an unbounded amount of it into heap.
+            if (contentLengthExceeds(response, MAX_JSON_BYTES)) {
+                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized response");
+            }
+            byte[] bytes = body.readNBytes(MAX_JSON_BYTES + 1);
+            if (bytes.length > MAX_JSON_BYTES) {
+                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized response");
+            }
+            return bytes.length == 0 ? MissingNode.getInstance() : parse(serverUrl, bytes);
+        } catch (IOException e) {
+            throw unreachable(serverUrl, e.getClass().getSimpleName());
+        }
+    }
+
+    /** Sends the request; a transport failure becomes an UNREACHABLE naming what went wrong. */
+    private HttpResponse<InputStream> exchange(URI serverUrl, HttpRequest request) {
         HttpResponse<InputStream> response;
         try {
-            response = http.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+            response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
         } catch (HttpConnectTimeoutException _) {
             throw unreachable(serverUrl, "connection timed out");
         } catch (HttpTimeoutException _) {
@@ -247,41 +271,32 @@ public class JellyfinClient {
             Thread.currentThread().interrupt();
             throw unreachable(serverUrl, "interrupted");
         }
-        int status = response.statusCode();
-        try (InputStream body = response.body()) {
-            if (status >= 300 && status < 400) {
-                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE,
-                        "Jellyfin at " + serverUrl + " redirected elsewhere; enter the final server address");
-            }
-            if (status == 401 || status == 403) {
-                throw new JellyfinException(JellyfinException.Kind.UNAUTHORIZED,
-                        "Jellyfin rejected the stored credentials; reconnect Jellyfin on the setup page");
-            }
-            if (status == 404) {
-                throw new JellyfinException(JellyfinException.Kind.NOT_FOUND, "Jellyfin at " + serverUrl + " does not know that");
-            }
-            if (status >= 400) {
-                throw new JellyfinException(JellyfinException.Kind.SERVER_ERROR, "Jellyfin at " + serverUrl + " answered HTTP " + status);
-            }
-            // A cap, not a limit we expect to hit: a well-behaved Jellyfin answer never comes close, and a
-            // misbehaving or hostile server can't make us buffer an unbounded amount of it into heap.
-            if (contentLengthExceeds(response, MAX_JSON_BYTES)) {
-                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized response");
-            }
-            byte[] bytes = body.readNBytes(MAX_JSON_BYTES + 1);
-            if (bytes.length > MAX_JSON_BYTES) {
-                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized response");
-            }
-            if (bytes.length == 0) {
-                return MissingNode.getInstance();
-            }
-            try {
-                return mapper.readTree(bytes);
-            } catch (JacksonException _) {
-                throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an unreadable answer");
-            }
-        } catch (IOException e) {
-            throw unreachable(serverUrl, e.getClass().getSimpleName());
+        return response;
+    }
+
+    /** Redirects, rejected credentials, unknown paths and every other 4xx/5xx answer end the call. */
+    private static void requireSuccess(URI serverUrl, int status) {
+        if (status >= 300 && status < 400) {
+            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE,
+                    "Jellyfin at " + serverUrl + " redirected elsewhere; enter the final server address");
+        }
+        if (status == 401 || status == 403) {
+            throw new JellyfinException(JellyfinException.Kind.UNAUTHORIZED,
+                    "Jellyfin rejected the stored credentials; reconnect Jellyfin on the setup page");
+        }
+        if (status == 404) {
+            throw new JellyfinException(JellyfinException.Kind.NOT_FOUND, "Jellyfin at " + serverUrl + " does not know that");
+        }
+        if (status >= 400) {
+            throw new JellyfinException(JellyfinException.Kind.SERVER_ERROR, "Jellyfin at " + serverUrl + " answered HTTP " + status);
+        }
+    }
+
+    private JsonNode parse(URI serverUrl, byte[] bytes) {
+        try {
+            return mapper.readTree(bytes);
+        } catch (JacksonException _) {
+            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an unreadable answer");
         }
     }
 

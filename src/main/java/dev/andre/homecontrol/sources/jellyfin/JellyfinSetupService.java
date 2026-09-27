@@ -48,16 +48,7 @@ public class JellyfinSetupService {
 
     public JellyfinSettings connect(ConnectRequest request, HttpServletRequest http) {
         JellyfinSettings.AuthMode mode = request.mode() == null ? JellyfinSettings.AuthMode.PASSWORD : request.mode();
-        // Whichever gate applies (a fresh login password, or this browser's own session) is checked
-        // before anything else, including parsing the rest of the request, so a rejected request
-        // never touches Jellyfin and never learns whether its other fields would have been valid.
-        if (login.loginRequired()) {
-            if (!login.isAuthenticated(http)) {
-                throw new LoginRequiredException();
-            }
-        } else {
-            login.checkNewPassword(request.loginPassword(), request.loginPasswordConfirmation());
-        }
+        passLoginGate(request, http);
         URI server = JellyfinClient.normalizeServerUrl(request.serverUrl());
         URI deviceServer = request.deviceServerUrl() == null || request.deviceServerUrl().isBlank()
                 ? server : JellyfinClient.normalizeServerUrl(request.deviceServerUrl());
@@ -70,21 +61,9 @@ public class JellyfinSetupService {
                 .orElseGet(() -> UUID.randomUUID().toString().replace("-", ""));
 
         JsonNode info = client.publicInfo(server);
-        String token;
-        JsonNode user;
-        if (mode == JellyfinSettings.AuthMode.PASSWORD) {
-            JsonNode authenticated = client.authenticateByName(server, deviceId, request.userName().strip(),
-                    request.password() == null ? "" : request.password());
-            token = authenticated.path("AccessToken").asString("");
-            user = authenticated.path("User");
-        } else {
-            if (request.apiKey() == null || request.apiKey().isBlank()) {
-                throw new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Enter the Jellyfin API key");
-            }
-            token = request.apiKey().strip();
-            user = findUser(client.get(new JellyfinConnection(server, token, deviceId, null), "/Users", Map.of()),
-                    request.userName().strip());
-        }
+        Grant grant = grant(mode, request, server, deviceId);
+        String token = grant.token();
+        JsonNode user = grant.user();
         if (token.isBlank() || user.path("Id").asString("").isBlank()) {
             throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin did not return a usable login");
         }
@@ -109,6 +88,41 @@ public class JellyfinSetupService {
                 .ifPresent(old -> previousToken.filter(oldToken -> !oldToken.equals(token))
                         .ifPresent(oldToken -> revokeQuietly(new JellyfinConnection(old.serverUrl(), oldToken, old.deviceId(), old.userId()))));
         return next;
+    }
+
+    /**
+     * Whichever gate applies (a fresh login password, or this browser's own session) is checked
+     * before anything else, including parsing the rest of the request, so a rejected request
+     * never touches Jellyfin and never learns whether its other fields would have been valid.
+     */
+    private void passLoginGate(ConnectRequest request, HttpServletRequest http) {
+        if (login.loginRequired()) {
+            if (!login.isAuthenticated(http)) {
+                throw new LoginRequiredException();
+            }
+        } else {
+            login.checkNewPassword(request.loginPassword(), request.loginPasswordConfirmation());
+        }
+    }
+
+    /** What Jellyfin granted: an access token and the user it belongs to. */
+    private record Grant(String token, JsonNode user) {
+    }
+
+    /** A password login for the named user, or an API key checked by finding that user with it. */
+    private Grant grant(JellyfinSettings.AuthMode mode, ConnectRequest request, URI server, String deviceId) {
+        if (mode == JellyfinSettings.AuthMode.PASSWORD) {
+            JsonNode authenticated = client.authenticateByName(server, deviceId, request.userName().strip(),
+                    request.password() == null ? "" : request.password());
+            return new Grant(authenticated.path("AccessToken").asString(""), authenticated.path("User"));
+        }
+        if (request.apiKey() == null || request.apiKey().isBlank()) {
+            throw new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Enter the Jellyfin API key");
+        }
+        String token = request.apiKey().strip();
+        JsonNode user = findUser(client.get(new JellyfinConnection(server, token, deviceId, null), "/Users", Map.of()),
+                request.userName().strip());
+        return new Grant(token, user);
     }
 
     /** Session links and other non-secret changes. */

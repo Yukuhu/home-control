@@ -15,6 +15,8 @@ import java.util.Optional;
 /** Jellyfin BaseItemDto → ContentItem. Only token-free references are attached. */
 public final class JellyfinItemMapper {
 
+    // This app's own image proxy route (same origin), not an environment-specific location to configure.
+    @SuppressWarnings("java:S1075")
     public static final String IMAGE_PATH = "/sources/jellyfin/images/";
 
     private JellyfinItemMapper() {
@@ -67,10 +69,10 @@ public final class JellyfinItemMapper {
     static String episodeLabel(JsonNode item, String name) {
         int season = item.path("ParentIndexNumber").asInt(-1);
         int episode = item.path("IndexNumber").asInt(-1);
-        String number = episode < 0 ? null : season < 0 ? "E" + episode : "S" + season + ":E" + episode;
-        if (number == null) {
+        if (episode < 0) {
             return name.isBlank() ? null : name;
         }
+        String number = season < 0 ? "E" + episode : "S" + season + ":E" + episode;
         return name.isBlank() ? number : number + " · " + name;
     }
 
