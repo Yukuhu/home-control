@@ -1,10 +1,8 @@
 package dev.andre.homecontrol.adapters.net;
 
-import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
+import dev.andre.homecontrol.testsupport.TestTls;
 
 import javax.net.ServerSocketFactory;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -15,10 +13,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.KeyStore;
 import java.security.MessageDigest;
-import java.security.SecureRandom;
-import java.security.cert.Certificate;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -117,7 +112,7 @@ public final class FakeWebSocketServer implements AutoCloseable {
     }
 
     public static FakeWebSocketServer tls(Handler handler) throws IOException {
-        return new FakeWebSocketServer(tlsContext().getServerSocketFactory(), handler, true);
+        return new FakeWebSocketServer(TestTls.serverContext("fake-tv.invalid").getServerSocketFactory(), handler, true);
     }
 
     private FakeWebSocketServer(ServerSocketFactory factory, Handler handler, boolean tls) throws IOException {
@@ -270,23 +265,6 @@ public final class FakeWebSocketServer implements AutoCloseable {
             }
         }
         return line.toString(StandardCharsets.US_ASCII);
-    }
-
-    private static SSLContext tlsContext() {
-        try {
-            ClientCertificate identity = ClientCertificate.generate("fake-tv.invalid");
-            char[] password = "fake".toCharArray();
-            KeyStore store = KeyStore.getInstance("PKCS12");
-            store.load(null, null);
-            store.setKeyEntry("tv", identity.keyPair().getPrivate(), password, new Certificate[]{identity.certificate()});
-            KeyManagerFactory keys = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            keys.init(store, password);
-            SSLContext context = SSLContext.getInstance("TLS");
-            context.init(keys.getKeyManagers(), null, new SecureRandom());
-            return context;
-        } catch (GeneralSecurityException | IOException e) {
-            throw new IllegalStateException("Could not build the fake TV's TLS identity", e);
-        }
     }
 
     @Override
