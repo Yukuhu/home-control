@@ -150,7 +150,7 @@ CLAUDE.md                    a single line: @AGENTS.md
 
 **Safety nets.**
 - `src/test/resources/junit-platform.properties` sets `junit.jupiter.execution.timeout.default = 60 s`. The few tests that need longer declare `@Timeout` themselves.
-- Every job in `.github/workflows/ci.yml` gets `timeout-minutes`, sized at about twice its current duration.
+- Every job in `.github/workflows/ci.yml` has `timeout-minutes`. Done in #117 ("ci: give every job a time limit").
 
 **Wall-clock assertions.** These tests assert an upper bound on elapsed time:
 - `SearchServiceTest`
@@ -185,16 +185,18 @@ Each assertion becomes one on the outcome: the timeout exception, or the order o
 - `BluetoothClassLoadingTest` and `BluetoothSpeakerEndToEndTest`, which start child JVMs on purpose;
 - `RemoteConnectionTest`'s TLS round trips.
 
-**Expected result.** The slowest adapter tests drop from about 250 s to about 60 s, and the summed suite time from 495 s to about 300 s, before parallel forks.
+**Expected result.** The slowest adapter tests drop from about 250 s to about 60 s, and the summed test-class time from 495 s to about 300 s. That sum does not depend on how many forks run.
 
-### 1.3c Parallel test forks (S, after 1.3a)
+### 1.3c Test isolation under parallel forks (S, now independent of 1.3a)
 
-- `tasks.test` sets `maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)`: 2 forks on CI's 4-vCPU runners. Each fork is its own JVM, so tests stay single-threaded within a fork.
+#117 already runs the unit tests in parallel JVMs: `maxParallelForks = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)`, with the Gradle build cache on (`org.gradle.caching=true`). What remains is making the suite safe and stable under those forks.
+
 - **Isolation:**
   - The test data directory becomes per fork, via `shield.data-dir: build/test-data/${org.gradle.test.worker:0}` in `config/application.yaml`.
   - The fixed paths in `SmartTvModulesOffTest` (`build/tmp/tv-modules-off-test`) and `AndroidTvSessionTest` (`./build/test-data`) become temporary directories.
   - Bluetooth's runtime directory (`java.io.tmpdir/home-control-bluetooth`) becomes per fork in tests.
-  - Before the switch is turned on, the suite runs three times in a row with 4 forks, and every fixed port, UDP bind or shared file that fails is made per fork.
+  - The suite runs three times in a row with 4 forks, and every fixed port, UDP bind or shared file that fails is made per fork.
+- **Timing under load.** With 4 forks on a busy 4-CPU host, webOS timing tests have already failed locally on 2026-09-27: `WebOsSessionTest.listsAndSwitchesInputs` (5 s wait) and `WebOsEndToEndTest.discoversPairsControlsWakesAndTestsALgTv` (10 s wait). Both pass on their own. 1.3b's timing seams remove the whole-second waits behind them. Until then, 1.3c records every timing test that fails in the three runs and gives it a wait that does not depend on CPU share.
 - **Measured:** the `test` task's wall time locally and CI's "Build and test" job time.
 
 ### 1.3d Shared Spring contexts (L, after 1.3a and 1.3c)
@@ -251,7 +253,7 @@ Roadmap workstream 2B folds the store resets into its shared store type.
 | 1.2 | Documentation | #113 (roadmap docs) merged |
 | 1.3a | Shared test support | #108 (test configuration) merged |
 | 1.3b | Timeouts and slow waits | #108 merged; independent of 1.3a |
-| 1.3c | Parallel test forks | 1.3a |
+| 1.3c | Test isolation under parallel forks (the forks themselves came with #117) | #108 merged |
 | 1.3d | Shared Spring contexts | 1.3a and 1.3c |
 
 - Every pull request starts from `main` and keeps `./gradlew build` green.
