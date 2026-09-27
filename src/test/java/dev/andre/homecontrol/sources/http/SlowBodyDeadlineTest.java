@@ -62,8 +62,9 @@ class SlowBodyDeadlineTest {
     void theSportsDb() {
         TheSportsDbClient client = new TheSportsDbClient(new SportsProperties.TheSportsDb(true,
                 server.url("/api/v1/json"), "123", Duration.ofHours(24), 1, 1, null));
+        Map<String, String> league = Map.of("id", "4331");
 
-        assertThatThrownBy(() -> client.get("123", "eventsnextleague.php", Map.of("id", "4331")))
+        assertThatThrownBy(() -> client.get("123", "eventsnextleague.php", league))
                 .isInstanceOf(TheSportsDbException.class)
                 .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.UNREACHABLE)
                 .hasMessage("Could not reach TheSportsDB");

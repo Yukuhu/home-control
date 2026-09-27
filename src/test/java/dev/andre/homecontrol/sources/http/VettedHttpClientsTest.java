@@ -3,6 +3,7 @@ package dev.andre.homecontrol.sources.http;
 import com.sun.net.httpserver.HttpServer;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,7 +84,7 @@ class VettedHttpClientsTest {
         }, 2, Duration.ofSeconds(1))) {
             HttpGet request = new HttpGet(unresolvable("/ok"));
 
-            assertThatThrownBy(() -> http.execute(request, response -> response.getCode()))
+            assertThatThrownBy(() -> http.execute(request, HttpResponse::getCode))
                     .isInstanceOf(UnknownHostException.class)
                     .hasMessage("calendar.test is not allowed");
         }
@@ -93,7 +94,7 @@ class VettedHttpClientsTest {
     @Test
     void redirectsAreReturnedNotFollowed() throws IOException {
         try (CloseableHttpClient http = VettedHttpClients.create(LOOPBACK, 2, Duration.ofSeconds(1))) {
-            int status = http.execute(new HttpGet(unresolvable("/moved")), response -> response.getCode());
+            int status = http.execute(new HttpGet(unresolvable("/moved")), HttpResponse::getCode);
 
             assertThat(status).isEqualTo(302);
         }

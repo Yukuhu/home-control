@@ -67,8 +67,12 @@ class CalendarFetcherFailureTest {
         try (ServerSocket truncating = new ServerSocket(0, 1, InetAddress.ofLiteral("127.0.0.1"))) {
             Thread.ofVirtual().start(() -> {
                 try (Socket accepted = truncating.accept()) {
-                    accepted.getOutputStream().write(("HTTP/1.1 200 OK\r\nContent-Type: text/calendar\r\n"
-                            + "Content-Length: 100\r\n\r\nBEGIN:VCAL").getBytes(StandardCharsets.US_ASCII));
+                    accepted.getOutputStream().write("""
+                            HTTP/1.1 200 OK\r
+                            Content-Type: text/calendar\r
+                            Content-Length: 100\r
+                            \r
+                            BEGIN:VCAL""".getBytes(StandardCharsets.US_ASCII));
                     accepted.getOutputStream().flush();
                 } catch (IOException _) {
                     // The test is over.
