@@ -119,13 +119,12 @@ class CastConnectionTest {
     }
 
     @Test
-    void closingByTheOwnerIsNotReportedAsADisconnect() throws Exception {
+    void closingByTheOwnerIsNotReportedAsADisconnect() {
         await().until(() -> receiver.pings() >= 1);
 
         connection.close();
 
-        Thread.sleep(500);
-        assertThat(disconnects).isEmpty();
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).until(disconnects::isEmpty);
     }
 
     @Test
@@ -141,10 +140,9 @@ class CastConnectionTest {
 
     @Test
     void theStaleTimeoutMustExceedTheHeartbeatInterval() {
-        var preparedArg144_1 = receiver.port();
-        var preparedArg144_2 = Duration.ofSeconds(3);
-        var preparedArg144_3 = Duration.ofSeconds(3);
-        assertThatThrownBy(() -> CastConnection.open("127.0.0.1", preparedArg144_1, preparedArg144_2, preparedArg144_3, listener))
+        int port = receiver.port();
+        Duration interval = Duration.ofSeconds(3);
+        assertThatThrownBy(() -> CastConnection.open("127.0.0.1", port, interval, interval, listener))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

@@ -112,9 +112,8 @@ class WebOsAdapterTest {
         handle.close();
         int connections = tv.connections();
         tv.dropConnections();
-        Thread.sleep(2000);
 
-        assertThat(tv.connections()).isEqualTo(connections);
+        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).until(() -> tv.connections() == connections);
     }
 
     @Test

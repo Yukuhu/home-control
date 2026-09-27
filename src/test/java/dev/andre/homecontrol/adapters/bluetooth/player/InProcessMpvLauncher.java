@@ -6,7 +6,9 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** In-process fake mpv launcher for unit tests: starts real {@link FakeMpv} instances, no subprocess. */
@@ -37,9 +39,7 @@ public final class InProcessMpvLauncher implements MpvLauncher {
         FakeMpv.Options currentOptions = options;
         Thread.ofVirtual().name("in-process-mpv-" + process.pid()).start(() -> {
             try {
-                if (!delay.isZero()) {
-                    Thread.sleep(delay.toMillis());
-                }
+                simulateLatency(delay);
             } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 process.exit.complete(1);
@@ -56,7 +56,7 @@ public final class InProcessMpvLauncher implements MpvLauncher {
                 // A real OS process's exit is detected with some latency (a reaper thread, waitpid);
                 // this keeps the fake from "exiting" before an already-sent IPC event (e.g. end-file,
                 // broadcast just before mpv's --idle=once quit) has been read and dispatched.
-                Thread.sleep(50);
+                simulateLatency(Duration.ofMillis(50));
                 process.exit.complete(0);
             } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
@@ -94,6 +94,14 @@ public final class InProcessMpvLauncher implements MpvLauncher {
 
     public long alive() {
         return players.stream().filter(fake -> !fake.hasQuit()).count();
+    }
+
+    // Simulated process timing (a slow start, exit-detection latency), not a wait for a condition.
+    @SuppressWarnings("java:S2925")
+    private static void simulateLatency(Duration delay) throws InterruptedException {
+        if (!delay.isZero()) {
+            Thread.sleep(delay);
+        }
     }
 
     private static String value(List<String> argv, String prefix) {
@@ -146,7 +154,10 @@ public final class InProcessMpvLauncher implements MpvLauncher {
             }
             try {
                 exit.get(2, TimeUnit.SECONDS);
-            } catch (Exception _) {
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            } catch (ExecutionException | TimeoutException _) {
+                // Like the real launcher after its kill timeout: stop waiting; alive() still tells the truth.
             }
         }
     }

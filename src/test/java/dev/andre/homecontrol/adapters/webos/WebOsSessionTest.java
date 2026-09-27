@@ -145,8 +145,8 @@ class WebOsSessionTest {
         started();
         connected();
 
-        var failingAction148 = new Action.PressKey(RemoteKey.MEDIA_NEXT);
-        assertThatThrownBy(() -> session.execute(failingAction148))
+        var nextTrack = new Action.PressKey(RemoteKey.MEDIA_NEXT);
+        assertThatThrownBy(() -> session.execute(nextTrack))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessageContaining("LG TV");
     }
@@ -208,9 +208,10 @@ class WebOsSessionTest {
         connected();
 
         assertThat(tv.nextRequest(SsapUris.CONNECTION_INFO)).isNotNull();
-        Thread.sleep(500);
 
-        assertThat(storedSetting("macAddress")).isEqualTo("11:22:33:44:55:66");
+        // The TV reports A8:23:FE:01:02:03; the hand-entered MAC must survive that answer.
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
+                .until(() -> "11:22:33:44:55:66".equals(storedSetting("macAddress")));
     }
 
     @Test
@@ -234,8 +235,8 @@ class WebOsSessionTest {
         started();
         awaitStatus(DeviceStatus.DISCONNECTED);
 
-        var failingAction236 = new Action.PressKey(RemoteKey.POWER);
-        assertThatThrownBy(() -> session.execute(failingAction236))
+        var power = new Action.PressKey(RemoteKey.POWER);
+        assertThatThrownBy(() -> session.execute(power))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("MAC address")
                 .hasMessageContaining("setup page");
@@ -247,8 +248,8 @@ class WebOsSessionTest {
         tv.refuseConnections(true);
         started();
 
-        var failingAction248 = new Action.PressKey(RemoteKey.HOME);
-        assertThatThrownBy(() -> session.execute(failingAction248))
+        var home = new Action.PressKey(RemoteKey.HOME);
+        assertThatThrownBy(() -> session.execute(home))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("not connected");
         tv.refuseConnections(false);
@@ -275,8 +276,8 @@ class WebOsSessionTest {
         started();
         connected();
 
-        var failingAction275 = new Action.CastLoad("CC1AD845", Map.of());
-        assertThatThrownBy(() -> session.execute(failingAction275))
+        var castLoad = new Action.CastLoad("CC1AD845", Map.of());
+        assertThatThrownBy(() -> session.execute(castLoad))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -312,9 +313,8 @@ class WebOsSessionTest {
         session(Map.of("clientKey", "stale")).start();
 
         awaitStatus(DeviceStatus.UNPAIRED);
-        Thread.sleep(3000);
 
-        assertThat(tv.registrations()).isEqualTo(1);
+        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4)).until(() -> tv.registrations() == 1);
     }
 
     @Test
@@ -322,9 +322,8 @@ class WebOsSessionTest {
         session(Map.of()).start();
 
         awaitStatus(DeviceStatus.UNPAIRED);
-        Thread.sleep(1000);
 
-        assertThat(tv.connections()).isZero();
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).until(() -> tv.connections() == 0);
     }
 
     @Test
@@ -344,8 +343,7 @@ class WebOsSessionTest {
         int connections = tv.connections();
         assertThat(connections).isGreaterThan(initialConnections);
         session.reconnectNow();
-        Thread.sleep(500);
-        assertThat(tv.connections()).isEqualTo(connections);
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).until(() -> tv.connections() == connections);
     }
 
     @Test
@@ -354,8 +352,8 @@ class WebOsSessionTest {
         connected();
         tv.ignoreRequests(SsapUris.LAUNCH);
 
-        var failingAction353 = new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ"));
-        assertThatThrownBy(() -> session.execute(failingAction353))
+        var youTubeVideo = new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ"));
+        assertThatThrownBy(() -> session.execute(youTubeVideo))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("did not answer in time");
         assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
@@ -395,10 +393,12 @@ class WebOsSessionTest {
         int connections = tv.connections();
 
         assertThat(tv.nextRequest(SsapUris.SYSTEM_INFO)).isNotNull();
-        Thread.sleep(2500);
 
-        assertThat(tv.connections()).isEqualTo(connections);
-        assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
+        // Two more liveness checks (1 s interval, 1 s timeout) come and go.
+        await().during(Duration.ofMillis(2500)).atMost(Duration.ofSeconds(4)).untilAsserted(() -> {
+            assertThat(tv.connections()).isEqualTo(connections);
+            assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
+        });
     }
 
     @Test
@@ -409,8 +409,7 @@ class WebOsSessionTest {
         session.close();
         states.clear();
         tv.dropConnections();
-        Thread.sleep(2000);
 
-        assertThat(states).isEmpty();
+        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).until(states::isEmpty);
     }
 }

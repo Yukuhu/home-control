@@ -2,10 +2,12 @@ package dev.andre.homecontrol.adapters.net;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 class WakeOnLanTest {
 
@@ -37,12 +39,11 @@ class WakeOnLanTest {
     @Test
     void anInvalidMacIsRejectedBeforeSending() throws Exception {
         try (FakeWakeOnLanReceiver receiver = new FakeWakeOnLanReceiver()) {
-            var preparedReceiver40 = new WakeOnLan(receiver.address());
-            assertThatThrownBy(() -> preparedReceiver40.wake("nope"))
+            WakeOnLan wakeOnLan = new WakeOnLan(receiver.address());
+            assertThatThrownBy(() -> wakeOnLan.wake("nope"))
                     .isInstanceOf(IllegalArgumentException.class);
 
-            Thread.sleep(500);
-            assertThat(receiver.received()).isZero();
+            await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).until(() -> receiver.received() == 0);
         }
     }
 }

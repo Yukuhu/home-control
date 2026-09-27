@@ -145,13 +145,13 @@ class UpnpSessionTest {
     void rejectsWhatARendererCannotDo() {
         startConnected();
 
-        var failingAction148 = new Action.PressKey(RemoteKey.HOME);
-        assertThatThrownBy(() -> session.execute(failingAction148)).isInstanceOf(UnsupportedActionException.class);
-        var failingAction149 = new Action.OpenAppLink(URI.create("https://x"));
-        assertThatThrownBy(() -> session.execute(failingAction149))
+        var homeKey = new Action.PressKey(RemoteKey.HOME);
+        assertThatThrownBy(() -> session.execute(homeKey)).isInstanceOf(UnsupportedActionException.class);
+        var appLink = new Action.OpenAppLink(URI.create("https://x"));
+        assertThatThrownBy(() -> session.execute(appLink))
                 .isInstanceOf(UnsupportedActionException.class);
-        var failingAction151 = new Action.SelectInput("HDMI_1");
-        assertThatThrownBy(() -> session.execute(failingAction151)).isInstanceOf(UnsupportedActionException.class);
+        var selectInput = new Action.SelectInput("HDMI_1");
+        assertThatThrownBy(() -> session.execute(selectInput)).isInstanceOf(UnsupportedActionException.class);
     }
 
     @Test
@@ -160,8 +160,8 @@ class UpnpSessionTest {
 
         fake.hangUp(true);
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.DISCONNECTED);
-        var failingAction160 = new Action.SetVolume(10);
-        assertThatThrownBy(() -> session.execute(failingAction160)).isInstanceOf(DeviceOfflineException.class);
+        var offlineVolume = new Action.SetVolume(10);
+        assertThatThrownBy(() -> session.execute(offlineVolume)).isInstanceOf(DeviceOfflineException.class);
 
         fake.hangUp(false);
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
@@ -176,7 +176,7 @@ class UpnpSessionTest {
     }
 
     @Test
-    void neverFetchesAStoredLocationOffTheDevicesAddress() throws InterruptedException {
+    void neverFetchesAStoredLocationOffTheDevicesAddress() {
         // A location naming another host than the registered device (or a host name) is never requested.
         Device forged = new Device("kitchen", "Kitchen Speaker", DeviceKind.UPNP, "127.0.0.2",
                 Map.of("upnp", Map.of("udn", FakeUpnpRenderer.UDN, "location", fake.location().toString())), Instant.now());
@@ -184,11 +184,11 @@ class UpnpSessionTest {
         Device named = withLocation(fake.device("named"), "http://localhost:" + fake.port() + "/description.xml");
         UpnpSession byName = start(named, udn -> Optional.empty());
 
-        Thread.sleep(1500);
-
-        assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
-        assertThat(byName.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
-        assertThat(fake.requestedPaths()).isEmpty();
+        await().during(Duration.ofMillis(1500)).atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+            assertThat(byName.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+            assertThat(fake.requestedPaths()).isEmpty();
+        });
     }
 
     @Test
@@ -205,12 +205,12 @@ class UpnpSessionTest {
         });
         session = start(redirecting.device("redirecting"), udn -> Optional.empty());
 
-        Thread.sleep(1500);
-
-        assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
-        assertThat(redirecting.requestedPaths()).isNotEmpty();
-        assertThat(victim.calls()).isEmpty();
-        assertThat(victim.requestedPaths()).isEmpty();
+        await().atMost(WAIT).until(() -> !redirecting.requestedPaths().isEmpty());
+        await().during(Duration.ofMillis(1500)).atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+            assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+            assertThat(victim.calls()).isEmpty();
+            assertThat(victim.requestedPaths()).isEmpty();
+        });
     }
 
     @Test
@@ -271,8 +271,8 @@ class UpnpSessionTest {
         startConnected();
 
         fake.delayAnswers(Duration.ofSeconds(2));
-        var failingAction270 = new Action.SetVolume(30);
-        assertThatThrownBy(() -> session.execute(failingAction270))
+        var slowVolume = new Action.SetVolume(30);
+        assertThatThrownBy(() -> session.execute(slowVolume))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("did not answer in time");
 
@@ -289,8 +289,8 @@ class UpnpSessionTest {
                 .until(() -> session.state().status() == DeviceStatus.CONNECTED);
 
         fake.answerRaw("Pause", 200, "<x/>");
-        var failingAction287 = new Action.Pause();
-        assertThatThrownBy(() -> session.execute(failingAction287))
+        var unreadablePause = new Action.Pause();
+        assertThatThrownBy(() -> session.execute(unreadablePause))
                 .isInstanceOf(ActionFailedException.class)
                 .hasMessageContaining("Unreadable answer to Pause");
     }
@@ -358,14 +358,15 @@ class UpnpSessionTest {
     }
 
     @Test
-    void closeStopsPolling() throws InterruptedException {
+    void closeStopsPolling() {
         startConnected();
 
+        long closedAt = System.nanoTime();
         session.close();
-        Thread.sleep(300); // a call already on the wire may still land
-        int calls = fake.calls().size();
-        Thread.sleep(2500);
 
-        assertThat(fake.calls()).hasSize(calls);
+        // A call already on the wire may still land shortly after; nothing may be sent later.
+        long lastAllowed = closedAt + Duration.ofMillis(300).toNanos();
+        await().during(Duration.ofMillis(2800)).atMost(Duration.ofSeconds(4)).untilAsserted(() ->
+                assertThat(fake.calls()).allSatisfy(call -> assertThat(call.receivedNanos()).isLessThan(lastAllowed)));
     }
 }
