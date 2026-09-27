@@ -42,10 +42,12 @@ class ProcessMpvLauncherTest {
         return new MpvIpc.EventListener() {
             @Override
             public void onEvent(JsonNode event) {
+                // These tests check the process, not the events mpv sends.
             }
 
             @Override
             public void onClosed() {
+                // Closing is observed through the process's exit instead.
             }
         };
     }

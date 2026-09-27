@@ -41,6 +41,7 @@ class MpvIpcTest {
 
             @Override
             public void onClosed() {
+                // Only events are recorded; aClosedSocketFailsPendingRequestsAndReportsClosed tracks closing.
             }
         };
     }
@@ -137,6 +138,7 @@ class MpvIpcTest {
             try {
                 silent.accept();
             } catch (IOException _) {
+                // Thrown once the test closes the server socket; this server never answers anyway.
             }
         });
         try {
@@ -196,12 +198,14 @@ class MpvIpcTest {
             try {
                 accepted[0] = silent.accept();
             } catch (IOException _) {
+                // Left null: the await on accepted[0] below then fails the test.
             }
         });
         java.util.concurrent.atomic.AtomicBoolean closedCalled = new java.util.concurrent.atomic.AtomicBoolean();
         MpvIpc.EventListener trackingListener = new MpvIpc.EventListener() {
             @Override
             public void onEvent(JsonNode event) {
+                // Only the close notification matters here.
             }
 
             @Override
@@ -238,9 +242,9 @@ class MpvIpcTest {
     void neverSendsGarbageForUnknownArgumentTypes() throws Exception {
         MpvIpc ipc = MpvIpc.connect(socket(), Duration.ofSeconds(1), () -> true, listener());
         try {
-            var preparedArg237_0 = Duration.ofSeconds(1);
-            var preparedArg237_3 = new Object();
-            assertThatThrownBy(() -> ipc.command(preparedArg237_0, "set_property", "volume", preparedArg237_3))
+            Duration timeout = Duration.ofSeconds(1);
+            Object unsupported = new Object();
+            assertThatThrownBy(() -> ipc.command(timeout, "set_property", "volume", unsupported))
                     .isInstanceOf(IllegalArgumentException.class);
         } finally {
             ipc.close();

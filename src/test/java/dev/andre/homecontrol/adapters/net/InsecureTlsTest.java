@@ -25,6 +25,7 @@ class InsecureTlsTest {
 
         @Override
         public void onClosed(String reason) {
+            // Only received texts matter here.
         }
     };
 

@@ -163,6 +163,7 @@ public class FakeSsapServer implements AutoCloseable {
             case DECLINE -> connection.send(
                     "{\"type\":\"error\",\"id\":\"register_0\",\"error\":\"403 User denied access\",\"payload\":{}}");
             case IGNORE -> {
+                // Never answers, like a TV whose Allow prompt nobody confirms.
             }
         }
     }
