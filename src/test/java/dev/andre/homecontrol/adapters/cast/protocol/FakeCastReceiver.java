@@ -1,34 +1,19 @@
 package dev.andre.homecontrol.adapters.cast.protocol;
 
 import dev.andre.homecontrol.adapters.cast.protocol.channel.CastMessage;
-import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import dev.andre.homecontrol.testsupport.TestTls;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLSocket;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.KeyStore;
-import java.security.SecureRandom;
-import java.security.cert.Certificate;
-import java.security.cert.X509Certificate;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -88,8 +73,7 @@ public class FakeCastReceiver implements AutoCloseable {
 
     /** A fixed port lets a test bring a "rebooted" receiver back where the sender expects it. */
     public FakeCastReceiver(int port) throws Exception {
-        SSLContext context = SSLContext.getInstance("TLS");
-        context.init(selfSignedKeyManagers(), null, new SecureRandom());
+        SSLContext context = TestTls.serverContext("fake-cast-receiver");
         serverSocket = (SSLServerSocket) context.getServerSocketFactory().createServerSocket();
         serverSocket.setReuseAddress(true);
         serverSocket.bind(new InetSocketAddress("127.0.0.1", port));
@@ -488,26 +472,6 @@ public class FakeCastReceiver implements AutoCloseable {
                 .setPayloadType(CastMessage.PayloadType.STRING)
                 .setPayloadUtf8(CastPayloads.toJson(payload))
                 .build());
-    }
-
-    private static KeyManager[] selfSignedKeyManagers() throws Exception {
-        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-        generator.initialize(2048, new SecureRandom());
-        KeyPair keyPair = generator.generateKeyPair();
-        X500Name subject = new X500Name("CN=fake-cast-receiver");
-        Instant now = Instant.now();
-        X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(
-                new JcaX509v3CertificateBuilder(subject, new BigInteger(64, new SecureRandom()),
-                        Date.from(now.minus(Duration.ofDays(1))), Date.from(now.plus(Duration.ofDays(1))),
-                        subject, keyPair.getPublic())
-                        .build(new JcaContentSignerBuilder("SHA256WithRSA").build(keyPair.getPrivate())));
-        char[] password = "fake".toCharArray();
-        KeyStore keyStore = KeyStore.getInstance("PKCS12");
-        keyStore.load(null, null);
-        keyStore.setKeyEntry("receiver", keyPair.getPrivate(), password, new Certificate[]{certificate});
-        KeyManagerFactory factory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        factory.init(keyStore, password);
-        return factory.getKeyManagers();
     }
 
     @Override
