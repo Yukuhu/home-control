@@ -1,12 +1,12 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.sources.http.BoundedBody;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -59,13 +59,10 @@ public class TheSportsDbClient {
                 .header("Accept", "application/json")
                 .header("User-Agent", "HomeControl")
                 .build();
-        HttpResponse<InputStream> response;
-        byte[] body;
+        HttpResponse<byte[]> response;
         try {
-            response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            try (InputStream in = response.body()) {
-                body = in.readNBytes(MAX_BODY_BYTES + 1);
-            }
+            response = http.send(request,
+                    BoundedBody.handler(MAX_BODY_BYTES, Duration.ofSeconds(properties.requestTimeoutSeconds())));
         } catch (IOException _) {
             // No cause attached: the request URI (which the JDK's IOException/timeout messages can
             // quote in full, e.g. via a wrapped ConnectException) embeds the API key in its path.
@@ -74,6 +71,7 @@ public class TheSportsDbClient {
             Thread.currentThread().interrupt();
             throw new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
         }
+        byte[] body = response.body();
         int status = response.statusCode();
         if (body.length > MAX_BODY_BYTES) {
             throw new TheSportsDbException(TheSportsDbException.Kind.BAD_RESPONSE, "TheSportsDB answered with more data than expected");

@@ -1,11 +1,11 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import dev.andre.homecontrol.sources.http.BoundedBody;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -49,19 +49,17 @@ public class TmdbClient {
         if (credential.kind() == TmdbCredential.Kind.BEARER) {
             request.header("Authorization", "Bearer " + credential.value());
         }
-        HttpResponse<InputStream> response;
-        byte[] body;
+        HttpResponse<byte[]> response;
         try {
-            response = http.send(request.build(), HttpResponse.BodyHandlers.ofInputStream());
-            try (InputStream in = response.body()) {
-                body = in.readNBytes(MAX_BODY_BYTES + 1);
-            }
+            response = http.send(request.build(),
+                    BoundedBody.handler(MAX_BODY_BYTES, Duration.ofSeconds(properties.requestTimeoutSeconds())));
         } catch (IOException e) {
             throw new TmdbException(TmdbException.Kind.UNREACHABLE, unreachable(), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new TmdbException(TmdbException.Kind.UNREACHABLE, unreachable(), e);
         }
+        byte[] body = response.body();
         int status = response.statusCode();
         if (status == 401 || status == 403) {
             throw new TmdbException(TmdbException.Kind.UNAUTHORIZED, "TMDB rejected the API key or read access token");
