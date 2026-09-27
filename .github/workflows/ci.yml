@@ -14,13 +14,56 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  changes:
+    name: Find out what changed
+    # A pull request that changes only documentation has nothing to build or test, so the jobs
+    # below are left out for it and "CI passed" passes on their absence. A push to main always
+    # runs them all: a run there can stand in for an earlier one that was superseded while it
+    # waited, and what that one would have tested is not in this push's changes.
+    runs-on: ubuntu-latest
+    # Every job has a limit a few times its usual duration: a build that hangs fails in minutes
+    # rather than holding the run for the six hours GitHub allows.
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # To list the files the pull request changes.
+      pull-requests: read
+    outputs:
+      # 'false' only for a pull request whose every file scripts/code-changed.sh knows as documentation.
+      code: ${{ steps.changed.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Look at the files the pull request changes
+        id: changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          code=true
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            # A file that was moved counts under both of its names.
+            if files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
+                --jq '.[] | .filename, (.previous_filename // empty)'); then
+              code=$(scripts/code-changed.sh <<< "$files")
+            else
+              echo "::warning::The changed files could not be listed, so every job runs."
+            fi
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+          if [[ "$code" == false ]]; then
+            echo "Only documentation changed: nothing is built or tested." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   jar:
     name: Build the jar
     # The one jar of this run: the images that are tested and the images that are published are
     # all built from it. It carries its version, so the version is worked out here, first.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    # Every job has a limit a few times its usual duration: a build that hangs fails in minutes
-    # rather than holding the run for the six hours GitHub allows.
     timeout-minutes: 10
     outputs:
       # 'true' on a push to main with commits to release. Pull requests never release.
@@ -136,6 +179,8 @@ jobs:
 
   test:
     name: Build and test
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -193,6 +238,8 @@ jobs:
 
   image:
     name: Build the self-contained image
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -283,6 +330,8 @@ jobs:
   # SonarCloud scan waits only for Chromium, the one browser that can say which JavaScript ran.
   e2e-chromium:
     name: Browser tests (Chromium)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -330,6 +379,8 @@ jobs:
 
   e2e-webkit:
     name: Browser tests (WebKit)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -390,9 +441,11 @@ jobs:
     # of them until the resolved graph is submitted. Fork pull requests get a read-only token,
     # which cannot submit, so they are left out. Deliberately not needed by the release: a newly
     # disclosed vulnerability must not block shipping an unrelated fix.
+    needs: changes
     if: >-
-      github.event_name == 'push'
-      || github.event.pull_request.head.repo.full_name == github.repository
+      needs.changes.outputs.code == 'true'
+      && (github.event_name == 'push'
+      || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -428,7 +481,7 @@ jobs:
     # One comment per pull request, replaced on every run. Runs when earlier jobs failed, which
     # is when it matters, but not when the run was cancelled. Fork pull requests get a read-only
     # token, so they are left out.
-    needs: [jar, test, e2e-chromium, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies]
+    needs: [changes, jar, test, e2e-chromium, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies]
     if: >-
       !cancelled()
       && github.event_name == 'pull_request'
@@ -506,6 +559,7 @@ jobs:
         env:
           # Passed as environment variables rather than interpolated into the script.
           NEEDS_JSON: ${{ toJSON(needs) }}
+          CODE_CHANGED: ${{ needs.changes.outputs.code }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -676,6 +730,7 @@ jobs:
     # is: the one step of it that may fail tests the script that writes it.
     if: always()
     needs:
+      - changes
       - jar
       - test
       - e2e-chromium
@@ -695,7 +750,8 @@ jobs:
         run: |
           jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS_JSON"
           # A job is skipped when a job it needs failed, which fails this one anyway, or when
-          # its own condition leaves it out, as for the dependencies of a fork's pull request.
+          # its own condition leaves it out, as for the dependencies of a fork's pull request
+          # and for everything when only documentation changed.
           failed=$(jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key]
             | join(", ")' <<< "$NEEDS_JSON")
           if [[ -n "$failed" ]]; then
