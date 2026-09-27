@@ -63,11 +63,13 @@ class ArchitectureTest {
                     .and(not(resideInAnyPackage("..protocol..", "dev.andre.homecontrol.adapters.net.."))))
             .because("wire protocols are libraries: they take plain values and know nothing of Spring or the app"));
 
+    /** Frozen per cycle, by the packages it runs through (see {@link CycleViolations}). */
     @ArchTest
     static final ArchRule topLevelPackagesAreFreeOfCycles = freeze(slices()
             .matching("dev.andre.homecontrol.(*)..")
             .should().beFreeOfCycles()
-            .because("packages in a cycle cannot be understood, tested or split apart on their own"));
+            .because("packages in a cycle cannot be understood, tested or split apart on their own"))
+            .associateViolationLinesVia(new CycleViolations());
 
     @ArchTest
     static final ArchRule sourcesDoNotDependOnAdapters = freeze(noClasses()

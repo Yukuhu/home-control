@@ -26,9 +26,20 @@ ones.
 
 - **Fixing a violation** removes it from the store the next time the tests run. Commit the smaller store with the fix.
   CI fails when a build leaves the store changed.
+- **A frozen violation whose text changes** is reported as new, and the failing run drops the old entry from the store.
+  This happens when a method with a frozen violation is renamed or gains a parameter. Copy the violation from the
+  failure message into that rule's store file, in place of the old line and in the same commit as the change, so the
+  review sees a one-for-one swap. `stored.rules` names each rule's file, and each violation is one line.
+- **After a failing run,** restore the store (`git checkout -- src/test/archunit-store`) before running again, unless
+  you meant to change it: a failing run can already have removed entries.
 - **Never refreeze to make a build pass.** `freeze.refreeze` stays `false`.
 - **Changing a frozen rule's description** (its `because` text included) makes ArchUnit treat it as a new rule and
-  record all of its current violations again. The store diff shows this, so review it like code.
+  record all of its current violations again. Delete the old rule's line in `stored.rules` and its file in the same
+  commit. The store diff shows the change, so review it like code.
+- **Package cycles are frozen per cycle**, by the packages they run through (`CycleViolations`). ArchUnit lists up to
+  20 concrete dependencies under each cycle, and an unrelated edit along the cycle would otherwise make a known cycle
+  look new. So a new dependency along an already frozen cycle is not reported; only a new cycle is. Removing a
+  back-edge breaks its cycle and removes the entry.
 
 The number of frozen violations only goes down. It is the progress measure for the roadmap's Phase 2 and 3
 workstreams, which remove them.
