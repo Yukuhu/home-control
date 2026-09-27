@@ -1,0 +1,104 @@
+name: Bug report
+description: Something does not work the way the README or the app says it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report this.
+
+        **Before you paste anything:** remove API keys, tokens, pairing codes and any
+        `user:password@` part of a URL. Issues here are public.
+
+        Found a security problem? Please do not open an issue. Report it privately through
+        [a security advisory](https://github.com/Yukuhu/home-control/security/advisories/new).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, including any message the page showed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open /setup
+        2. Pick the device …
+        3. …
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The image tag you run (for example `0.8.0` or `sha-343d27c`), or the commit you built from.
+      placeholder: "0.8.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How do you run Home Control?
+      options:
+        - Docker Compose, built from source (`docker compose up --build`)
+        - Prebuilt image from ghcr.io
+        - CasaOS
+        - Bluetooth image or compose.bluetooth.yaml
+        - From source with Gradle
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Your best guess is fine.
+      options:
+        - Device adapter (a TV, speaker or other device)
+        - Content source (Jellyfin, YouTube, TMDB, sports, workflows, pinned)
+        - Core (playback planning, device manager)
+        - Web (dashboard, setup, remote, themes)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: device-or-source
+    attributes:
+      label: Affected device or content source
+      description: Make, model and software version of the device, or the name and version of the service.
+      placeholder: "NVIDIA Shield TV Pro 2019, Android 11"
+
+  - type: input
+    id: host
+    attributes:
+      label: Host and browser
+      description: Where the app runs, and the browser you used if the problem is on a page.
+      placeholder: "Raspberry Pi 5 (arm64), Firefox 143 on Android"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The relevant part of `docker compose logs`, with secrets removed. No need for code fences.
+      render: text
+
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Screenshots, network setup (VLANs, reverse proxy, bridge networking), or what you already tried.

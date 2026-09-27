@@ -1,0 +1,62 @@
+name: Device or content source support
+description: Ask for a device or a content service that Home Control cannot use yet.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Home Control talks to devices on your own network and to content services through
+        their documented interfaces. The details below decide whether support is feasible.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What should be supported?
+      options:
+        - A device (TV, streaming box, speaker, …)
+        - A content source (media server, streaming or schedule service, …)
+    validations:
+      required: true
+
+  - type: input
+    id: name
+    attributes:
+      label: Name
+      description: Make, model and software version of the device, or the name of the service.
+      placeholder: "Roku Ultra 4802, Roku OS 14"
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: What do you want to do with it?
+      description: For example remote control, volume, starting a link in an app, showing a rail of content.
+    validations:
+      required: true
+
+  - type: textarea
+    id: protocol
+    attributes:
+      label: Known protocol or API
+      description: >
+        Links to official documentation or an existing open implementation. For a content
+        source, say whether it offers a public API and how you sign in to it.
+
+  - type: textarea
+    id: discovery
+    attributes:
+      label: What does Home Control show today?
+      description: >
+        For a device: does it appear in the discovered list on `/setup`, and under which name
+        or type? Remove anything you would not want public.
+
+  - type: dropdown
+    id: testing
+    attributes:
+      label: Can you test on the real device or account?
+      options:
+        - "Yes, I can test builds"
+        - "No"
+    validations:
+      required: true
