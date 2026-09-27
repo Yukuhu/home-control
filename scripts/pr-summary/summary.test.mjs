@@ -253,7 +253,8 @@ test("failed tests are listed with class, name, message and a collapsed trace", 
     assert.match(comment, /^## ❌ CI failed$/m);
     assert.match(comment, /\| Unit and integration tests \| ❌ 2 failed, 840 passed, 3 skipped \|/);
     assert.match(comment, /\| SonarCloud quality gate \| ⏭️ not run, because tests failed \|/);
-    assert.ok(comment.includes("### Failed tests\n\n**` ExampleTest `** › ` fails0() `\n\n"
+    assert.ok(comment.includes("### Failed tests\n\n#### Unit and integration tests\n\n"
+        + "**` ExampleTest `** › ` fails0() `\n\n"
         + "```text\nexpected: <1> but was: <2>\n```\n\n"
         + "<details><summary>Stack trace</summary>\n\n```text\nAssertionFailedError\n\tat Example.java:1\n```\n\n</details>"));
     assert.ok(!comment.includes("### Quality gate"));
@@ -330,6 +331,7 @@ test("a missing log link degrades to plain text", () => {
 test("a suite job that failed without results failed before tests ran", () => {
     const comment = render(withSuite(model({ gate: null }, { test: "failure", sonar: "skipped" }), "test", noResults));
     assert.match(comment, /\| Unit and integration tests \| ❌ failed before tests ran · \[job log\]\([^)]*\/job\/test\) \|/);
+    assert.match(comment, /\| SonarCloud quality gate \| ⏭️ not run, because an earlier job failed \|/);
 });
 
 test("a suite job that succeeded without results shows no counts", () => {
@@ -340,6 +342,7 @@ test("a suite job that failed although every test passed does not look green", (
     const comment = render(model({ gate: null }, { test: "failure", sonar: "skipped" }));
     assert.match(comment,
         /\| Unit and integration tests \| ❌ 842 passed, 3 skipped, but the job failed · \[job log\]\(/);
+    assert.match(comment, /\| SonarCloud quality gate \| ⏭️ not run, because an earlier job failed \|/);
 });
 
 test("unreadable result files are mentioned in the row", () => {
@@ -356,13 +359,41 @@ test("only the first ten failures are listed", () => {
     assert.ok(comment.includes(`…and 14 more · [full run](${RUN_URL})`));
 });
 
-test("failures of both suites are listed together", () => {
+test("failures of both suites are grouped under their own sub-heading", () => {
     let base = model({ gate: null }, { test: "failure", e2e: "failure", sonar: "skipped" });
     base = withSuite(base, "test", suite({ failed: 1, failures: failures(1, { name: "unit()" }) }));
     base = withSuite(base, "e2e", suite({ failed: 1, failures: failures(1, { name: 'opens(String) ["webkit"]' }) }));
     const comment = render(base);
-    assert.ok(comment.includes("` unit() `"));
-    assert.ok(comment.includes('` opens(String) ["webkit"] `'));
+    assert.ok(comment.includes("#### Unit and integration tests"));
+    assert.ok(comment.includes("#### Browser tests (Chromium, WebKit)"));
+    const unitHeading = comment.indexOf("#### Unit and integration tests");
+    const browserHeading = comment.indexOf("#### Browser tests (Chromium, WebKit)");
+    const unitEntry = comment.indexOf("` unit() `");
+    const browserEntry = comment.indexOf('` opens(String) ["webkit"] `');
+    assert.ok(unitHeading < unitEntry && unitEntry < browserHeading);
+    assert.ok(browserHeading < browserEntry);
+});
+
+test("more failures than the limit in one suite do not hide the other suite's failures", () => {
+    let base = model({ gate: null }, { test: "failure", e2e: "failure", sonar: "skipped" });
+    base = withSuite(base, "test", suite({ failed: 12, failures: failures(12) }));
+    base = withSuite(base, "e2e",
+        suite({ failed: 3, failures: failures(3, { className: "dev.andre.homecontrol.e2e.BrowserTest" }) }));
+    const comment = render(base);
+    assert.ok(comment.includes("` fails9() `"));
+    assert.ok(!comment.includes("` fails10() `"));
+    assert.ok(comment.includes(`…and 2 more · [full run](${RUN_URL})`));
+    assert.ok(comment.includes("**` BrowserTest `** › ` fails0() `"));
+    assert.ok(comment.includes("**` BrowserTest `** › ` fails1() `"));
+    assert.ok(comment.includes("**` BrowserTest `** › ` fails2() `"));
+    assert.equal((comment.match(/…and/g) ?? []).length, 1);
+});
+
+test("a check without failures gets no sub-heading", () => {
+    const base = model({ gate: null }, { test: "failure", sonar: "skipped" });
+    const comment = render(withSuite(base, "test", suite({ failed: 1, failures: failures(1) })));
+    assert.ok(comment.includes("#### Unit and integration tests"));
+    assert.ok(!comment.includes("#### Browser tests"));
 });
 
 test("long messages and traces are cut", () => {

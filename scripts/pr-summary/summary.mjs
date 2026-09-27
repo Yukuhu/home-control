@@ -191,8 +191,10 @@ function sonarRow(check, model) {
         if (result === "failure" && gate.passed) return `❌ job failed, gate passed${log}`;
         return `${state} · ${link("details", model.sonarUrl)}`;
     }
-    const suiteFailed = model.checks.some((other) => other.suite && other.result === "failure");
-    return suiteFailed ? "⏭️ not run, because tests failed" : "⏭️ not run";
+    const failedSuites = model.checks.filter((other) => other.suite && other.result === "failure");
+    if (failedSuites.length === 0) return "⏭️ not run";
+    const testsFailed = failedSuites.some((other) => other.suite.failed > 0);
+    return testsFailed ? "⏭️ not run, because tests failed" : "⏭️ not run, because an earlier job failed";
 }
 
 function row(check, model) {
@@ -253,12 +255,16 @@ function compose(model, { traces, limit }) {
         "|---|---|",
         ...model.checks.map((check) => `| ${check.label} | ${row(check, model)} |`),
     ];
-    const failures = model.checks.flatMap((check) => check.suite?.failures ?? []);
-    if (failures.length > 0) {
+    const groups = model.checks.filter((check) => check.suite?.failures.length > 0);
+    if (groups.length > 0) {
         lines.push("", "### Failed tests");
-        for (const entry of failures.slice(0, limit)) lines.push("", failedTest(entry, traces));
-        if (failures.length > limit) {
-            lines.push("", `…and ${failures.length - limit} more · ${link("full run", model.runUrl)}`);
+        for (const check of groups) {
+            lines.push("", `#### ${check.label}`);
+            const entries = check.suite.failures;
+            for (const entry of entries.slice(0, limit)) lines.push("", failedTest(entry, traces));
+            if (entries.length > limit) {
+                lines.push("", `…and ${entries.length - limit} more · ${link("full run", model.runUrl)}`);
+            }
         }
     }
     const sonar = model.checks.find((check) => check.key === "sonar");
