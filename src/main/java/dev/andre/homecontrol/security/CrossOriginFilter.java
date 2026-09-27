@@ -12,7 +12,8 @@ import java.io.IOException;
  * The first filter on every request and path, before the login gate and whether or not a login
  * exists. It refuses a Host name this app does not answer to (DNS rebinding: 421, the name is not
  * echoed), then applies {@link CrossOriginGuard}, so a page on another site cannot press keys,
- * change setup or try passwords through a visitor's LAN access.
+ * change setup or try passwords through a visitor's LAN access. It also sends the security headers
+ * on every response.
  */
 public class CrossOriginFilter extends OncePerRequestFilter {
 
@@ -29,6 +30,7 @@ public class CrossOriginFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
+        secure(response);
         if (!hosts.allows(host(request))) {
             plain(response, MISDIRECTED_REQUEST,
                     "This host name is not allowed; add it to HOME_CONTROL_ALLOWED_HOSTS to use it");
@@ -45,6 +47,18 @@ public class CrossOriginFilter extends OncePerRequestFilter {
     private static String host(HttpServletRequest request) {
         String host = request.getHeader("Host");
         return host != null ? host.strip() : request.getServerName();
+    }
+
+    /**
+     * Every response, refused or not and whether or not a login exists: nothing may be framed (the setup page
+     * works without a login too) or content-sniffed. Set before the chain runs, so a page can still choose a
+     * stricter Referrer-Policy of its own, as the YouTube sign-in callback does.
+     */
+    private static void secure(HttpServletResponse response) {
+        response.setHeader("X-Frame-Options", "DENY");
+        response.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader("Referrer-Policy", "same-origin"); // no-referrer would make Chrome send Origin: null
     }
 
     private static void plain(HttpServletResponse response, int status, String body) throws IOException {

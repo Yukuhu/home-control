@@ -46,9 +46,6 @@ public class LoginGateFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
             return;
         }
-        response.setHeader("X-Frame-Options", "DENY");
-        response.setHeader("X-Content-Type-Options", "nosniff");
-        response.setHeader("Referrer-Policy", "same-origin"); // no-referrer would make Chrome send Origin: null
         String path = path(request);
         if (OPEN_PATHS.contains(path) || login.isAuthenticated(request)) {
             chain.doFilter(request, response);
