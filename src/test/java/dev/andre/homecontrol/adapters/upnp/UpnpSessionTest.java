@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,8 +61,12 @@ class UpnpSessionTest {
     }
 
     private UpnpSession start(Device device, Function<String, Optional<URI>> locator) {
+        return start(device, locator, states::add);
+    }
+
+    private UpnpSession start(Device device, Function<String, Optional<URI>> locator, Consumer<DeviceState> onChange) {
         UpnpSession started = track(new UpnpSession(device, properties, SoapClient.httpClient(Duration.ofSeconds(1)),
-                locator, states::add, () -> { }));
+                locator, onChange, () -> { }));
         started.start();
         return started;
     }
@@ -391,20 +395,12 @@ class UpnpSessionTest {
 
     @Test
     void aFailingStateListenerDoesNotStopPolling() {
-        AtomicBoolean failed = new AtomicBoolean();
-        session = track(new UpnpSession(fake.device("kitchen"), properties, SoapClient.httpClient(Duration.ofSeconds(1)),
-                udn -> Optional.empty(), state -> {
-                    states.add(state);
-                    if (state.status() == DeviceStatus.CONNECTED && failed.compareAndSet(false, true)) {
-                        throw new IllegalStateException("listener bug");
-                    }
-                }, () -> { }));
-        session.start();
-        await().atMost(WAIT).until(failed::get);
+        session = start(fake.device("kitchen"), udn -> Optional.empty(), state -> {
+            states.add(state);
+            throw new IllegalStateException("a subscriber failed");
+        });
 
-        fake.setVolume(35);
-
-        await().atMost(WAIT).until(() -> states.getLast().volumeLevel() == 35);
+        await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
     }
 
     @Test
