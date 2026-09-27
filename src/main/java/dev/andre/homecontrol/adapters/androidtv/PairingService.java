@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Holds the one in-flight pairing attempt.
@@ -34,12 +35,13 @@ public class PairingService {
 
     /**
      * One in-flight attempt's state, captured atomically. {@code submit()} reads this
-     * field exactly once into a local, so a concurrent {@code begin()} — which replaces
-     * the field with a brand new {@code Attempt} rather than mutating fields in place —
-     * can never leave {@code submit()} working off a mix of the old attempt's session and
-     * the new attempt's credential/host/name.
+     * reference exactly once into a local, so a concurrent {@code begin()} — which replaces
+     * it with a brand new {@code Attempt} rather than mutating fields in place — can never
+     * leave {@code submit()} working off a mix of the old attempt's session and the new
+     * attempt's credential/host/name. Whoever takes an attempt out of here closes its session,
+     * so every session is closed exactly once, and an attempt that ends only ever clears itself.
      */
-    private volatile Attempt attempt;
+    private final AtomicReference<Attempt> attempt = new AtomicReference<>();
 
     public PairingService(CertificateStore certificates, DeviceManager sessions,
                           DataDirectory dataDirectory) {
@@ -69,11 +71,12 @@ public class PairingService {
             starting.close();
             throw e;
         }
-        this.attempt = new Attempt(starting, credential, host, resolvedName, deviceId);
+        // A concurrent begin() may have installed its attempt meanwhile: the newest one wins.
+        close(attempt.getAndSet(new Attempt(starting, credential, host, resolvedName, deviceId)));
     }
 
     public boolean inProgress() {
-        return attempt != null;
+        return attempt.get() != null;
     }
 
     /**
@@ -82,7 +85,7 @@ public class PairingService {
      * this is where the internal handshake result is translated into the public outcome.
      */
     public PairingOutcome submit(String code) {
-        Attempt current = attempt;
+        Attempt current = attempt.get();
         if (current == null) {
             return new PairingOutcome.Failed("No pairing is in progress; start again from the device list");
         }
@@ -109,16 +112,21 @@ public class PairingService {
             // The device shows a brand new code next time whatever happened here, so the
             // attempt is over either way. In a finally because an exception out of adopt()
             // would otherwise strand inProgress() at true forever, leaving the setup page
-            // showing a code form for a session that is already dead.
-            cancel();
+            // showing a code form for a session that is already dead. Only this attempt ends: a
+            // begin() that replaced it meanwhile has already closed it and must keep its own.
+            if (attempt.compareAndSet(current, null)) {
+                close(current);
+            }
         }
     }
 
     public void cancel() {
-        Attempt current = attempt;
-        attempt = null;
-        if (current != null) {
-            current.session().close();
+        close(attempt.getAndSet(null));
+    }
+
+    private static void close(Attempt ended) {
+        if (ended != null) {
+            ended.session().close();
         }
     }
 

@@ -17,10 +17,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -130,6 +134,32 @@ class PairingServiceTest {
         assertThat(service.inProgress())
                 .as("a failure after the code was accepted must not strand the setup page on a dead session")
                 .isFalse();
+    }
+
+    @Test
+    void aSubmitThatEndsAfterANewAttemptBeganLeavesTheNewAttemptInProgress() throws Exception {
+        CountDownLatch adopting = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(_ -> {
+            adopting.countDown();
+            assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+            return null;
+        }).when(sessions).adopt(any());
+        service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
+        String code = fakeDevice.awaitDisplayedCode();
+        CompletableFuture<PairingOutcome> first = CompletableFuture.supplyAsync(() -> service.submit(code));
+        assertThat(adopting.await(5, TimeUnit.SECONDS)).isTrue();
+
+        try (FakePairingServer secondDevice = new FakePairingServer()) {
+            service.begin("127.0.0.1", secondDevice.port(), "Bedroom Shield");
+            release.countDown();
+            assertThat(first.get(5, TimeUnit.SECONDS)).isInstanceOf(PairingOutcome.Paired.class);
+
+            assertThat(service.inProgress())
+                    .as("the first attempt ending late must not cancel the attempt that replaced it")
+                    .isTrue();
+            assertThat(service.submit(secondDevice.awaitDisplayedCode())).isInstanceOf(PairingOutcome.Paired.class);
+        }
     }
 
     @Test
