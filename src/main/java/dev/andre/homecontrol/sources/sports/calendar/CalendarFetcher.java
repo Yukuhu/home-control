@@ -1,13 +1,19 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
+import dev.andre.homecontrol.sources.http.VettedHttpClients;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
+import dev.andre.homecontrol.sources.sports.calendar.CalendarFetchException.Kind;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.io.CloseMode;
+import org.apache.hc.core5.util.Timeout;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.StandardCharsets;
@@ -18,39 +24,33 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import dev.andre.homecontrol.sources.sports.calendar.CalendarFetchException.Kind;
-
 /**
  * Fetches a calendar over HTTP(S), following only validated redirects. Never trusts the caller's URL:
- * {@link CalendarUrlPolicy#checkAddress(URI)} runs before every connection attempt, including each hop.
+ * {@link CalendarUrlPolicy} vets every hop, and the connection goes to exactly the addresses it vetted, so a
+ * host cannot pass the check with one address and be connected to at another.
  */
-public class CalendarFetcher {
+public class CalendarFetcher implements AutoCloseable {
 
+    /** The schedule fetches calendars one after another; a few more connections cover the setup page's checks. */
+    private static final int MAX_CONNECTIONS = 4;
     private static final Set<Integer> REDIRECTS = Set.of(301, 302, 303, 307, 308);
     private static final Pattern CHARSET = Pattern.compile("charset=\"?([^;\"]+)\"?", Pattern.CASE_INSENSITIVE);
 
     private final SportsProperties.Calendar properties;
     private final CalendarUrlPolicy policy;
-    private final HttpClient client;
+    private final CloseableHttpClient http;
 
     public CalendarFetcher(SportsProperties.Calendar properties, CalendarUrlPolicy policy) {
-        this(properties, policy, HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .connectTimeout(Duration.ofSeconds(properties.connectTimeoutSeconds()))
-                .build());
-    }
-
-    public CalendarFetcher(SportsProperties.Calendar properties, CalendarUrlPolicy policy, HttpClient client) {
         this.properties = properties;
         this.policy = policy;
-        this.client = client;
+        this.http = VettedHttpClients.create(policy::addresses, MAX_CONNECTIONS,
+                Duration.ofSeconds(properties.connectTimeoutSeconds()));
     }
 
     public String fetch(URI url) {
         URI current = url;
         for (int hop = 0; ; hop++) {
-            policy.checkAddress(current);
-            Hop answer = read(send(current), current, hop);
+            Hop answer = request(current, hop);
             if (answer.redirect() == null) {
                 return answer.text();
             }
@@ -62,71 +62,85 @@ public class CalendarFetcher {
     private record Hop(String text, URI redirect) {
     }
 
-    private HttpResponse<InputStream> send(URI target) {
-        HttpRequest request = HttpRequest.newBuilder(target)
-                .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
-                .header("Accept", "text/calendar, text/plain;q=0.9, */*;q=0.5")
-                .header("User-Agent", "HomeControl")
-                .GET().build();
-        try {
-            return client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-        } catch (IOException e) {
-            throw unreachable(target.getHost(), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw unreachable(target.getHost(), e);
+    private Hop request(URI target, int hop) {
+        String host = target.getHost();
+        if (Thread.currentThread().isInterrupted()) {
+            // Shutting down: keep the interrupt for the caller and open no new connection.
+            throw new CalendarFetchException(Kind.UNREACHABLE, "Could not reach " + host);
         }
-    }
-
-    /** Reads (and always closes) the response body. */
-    private Hop read(HttpResponse<InputStream> response, URI current, int hop) {
-        String host = current.getHost();
-        try (InputStream body = response.body()) {
-            int status = response.statusCode();
-            if (REDIRECTS.contains(status)) {
-                return new Hop(null, redirectTarget(response, current, hop));
-            }
-            if (status == 401 || status == 403) {
-                throw new CalendarFetchException(Kind.UNAUTHORIZED, host + " refused access to the calendar");
-            }
-            if (status == 404 || status == 410) {
-                throw new CalendarFetchException(Kind.NOT_FOUND, host + " has no calendar at that link");
-            }
-            if (status != 200) {
-                throw new CalendarFetchException(Kind.BAD_RESPONSE, host + " answered HTTP " + status);
-            }
-            byte[] bytes = body.readNBytes(properties.maxBytes() + 1);
-            if (bytes.length > properties.maxBytes()) {
-                throw new CalendarFetchException(Kind.TOO_LARGE,
-                        "The calendar is larger than " + (properties.maxBytes() / 1_048_576) + " MB");
-            }
-            return new Hop(new String(bytes, charsetOf(response)), null);
+        // A clear answer before any connection; the connection itself is vetted again by the same policy.
+        policy.checkAddress(target);
+        Timeout timeout = Timeout.ofSeconds(properties.requestTimeoutSeconds());
+        HttpGet request = new HttpGet(target);
+        request.setConfig(RequestConfig.custom()
+                .setAuthenticationEnabled(false)
+                .setHardCancellationEnabled(true)
+                .setConnectionRequestTimeout(timeout)
+                .setResponseTimeout(timeout)
+                .build());
+        request.setHeader("Accept", "text/calendar, text/plain;q=0.9, */*;q=0.5");
+        request.setHeader("User-Agent", "HomeControl");
+        CloseableHttpResponse response = null;
+        try {
+            response = CloseableHttpResponse.adapt(http.executeOpen(null, request, null));
+            return read(response, target, hop);
         } catch (IOException e) {
             throw unreachable(host, e);
+        } finally {
+            // Never drain a redirect or error body: drop the connection at once.
+            request.cancel();
+            if (response != null) {
+                response.close(CloseMode.IMMEDIATE);
+            }
         }
     }
 
-    private URI redirectTarget(HttpResponse<?> response, URI current, int hop) {
+    /** Reads the calendar from a 200, or where a redirect points; every other answer ends the fetch. */
+    private Hop read(CloseableHttpResponse response, URI current, int hop) throws IOException {
         String host = current.getHost();
-        String location = response.headers().firstValue("Location").orElse(null);
+        int status = response.getCode();
+        if (REDIRECTS.contains(status)) {
+            return new Hop(null, redirectTarget(response, current, hop));
+        }
+        if (status == 401 || status == 403) {
+            throw new CalendarFetchException(Kind.UNAUTHORIZED, host + " refused access to the calendar");
+        }
+        if (status == 404 || status == 410) {
+            throw new CalendarFetchException(Kind.NOT_FOUND, host + " has no calendar at that link");
+        }
+        if (status != 200) {
+            throw new CalendarFetchException(Kind.BAD_RESPONSE, host + " answered HTTP " + status);
+        }
+        HttpEntity entity = response.getEntity();
+        byte[] bytes = entity == null ? new byte[0] : entity.getContent().readNBytes(properties.maxBytes() + 1);
+        if (bytes.length > properties.maxBytes()) {
+            throw new CalendarFetchException(Kind.TOO_LARGE,
+                    "The calendar is larger than " + (properties.maxBytes() / 1_048_576) + " MB");
+        }
+        return new Hop(new String(bytes, charsetOf(response)), null);
+    }
+
+    private URI redirectTarget(CloseableHttpResponse response, URI current, int hop) {
+        String host = current.getHost();
+        Header location = response.getFirstHeader("Location");
         if (location == null) {
-            throw new CalendarFetchException(Kind.BAD_RESPONSE, host + " answered HTTP " + response.statusCode());
+            throw new CalendarFetchException(Kind.BAD_RESPONSE, host + " answered HTTP " + response.getCode());
         }
         if (hop >= properties.maxRedirects()) {
             throw new CalendarFetchException(Kind.BAD_RESPONSE, "The calendar link redirected too many times");
         }
         try {
-            return policy.parse(current.resolve(location).toString());
+            return policy.parse(current.resolve(location.getValue()).toString());
         } catch (IllegalArgumentException _) {
             throw new CalendarFetchException(Kind.BAD_RESPONSE,
                     host + " redirected to a link Home Control does not follow");
         }
     }
 
-    private static Charset charsetOf(HttpResponse<?> response) {
-        String contentType = response.headers().firstValue("Content-Type").orElse(null);
+    private static Charset charsetOf(CloseableHttpResponse response) {
+        Header contentType = response.getFirstHeader("Content-Type");
         if (contentType != null) {
-            Matcher m = CHARSET.matcher(contentType);
+            Matcher m = CHARSET.matcher(contentType.getValue());
             if (m.find()) {
                 try {
                     if (Charset.isSupported(m.group(1).strip())) {
@@ -147,5 +161,10 @@ public class CalendarFetcher {
         return leaksUrl
                 ? new CalendarFetchException(Kind.UNREACHABLE, "Could not reach " + host)
                 : new CalendarFetchException(Kind.UNREACHABLE, "Could not reach " + host, cause);
+    }
+
+    @Override
+    public void close() {
+        http.close(CloseMode.IMMEDIATE);
     }
 }

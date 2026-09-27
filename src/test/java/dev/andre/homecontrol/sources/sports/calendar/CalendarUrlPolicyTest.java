@@ -95,4 +95,15 @@ class CalendarUrlPolicyTest {
                 .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNREACHABLE)
                 .hasMessage("Could not find nowhere.invalid");
     }
+
+    @Test
+    void vetsBracketedAndBareIpv6LiteralsAlike() {
+        CalendarUrlPolicy lan = new CalendarUrlPolicy(false);
+
+        assertThat(lan.addresses("[fd00::5]")).containsExactly(InetAddress.ofLiteral("fd00::5"));
+        assertThat(lan.addresses("fd00::5")).containsExactly(InetAddress.ofLiteral("fd00::5"));
+        assertThatThrownBy(() -> lan.addresses("[::1]"))
+                .isInstanceOf(CalendarFetchException.class)
+                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BLOCKED);
+    }
 }
