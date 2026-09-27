@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="dev.andre.homecontrol.e2e.RailFailureE2eTest" tests="3" skipped="0" failures="1" errors="0" timestamp="2026-09-27T14:48:37.038Z" hostname="runner" time="21.412">
+  <properties/>
+  <testcase name="retryRecoversTheRail(String) [&quot;chromium&quot;]" classname="dev.andre.homecontrol.e2e.RailFailureE2eTest" time="1.204">
+    <flakyFailure message="org.awaitility.core.ConditionTimeoutException: Condition was not fulfilled within 5 seconds." type="org.awaitility.core.ConditionTimeoutException">
+      <stackTrace>org.awaitility.core.ConditionTimeoutException: Condition was not fulfilled within 5 seconds.
+	at org.awaitility.core.ConditionAwaiter.await(ConditionAwaiter.java:167)
+	at dev.andre.homecontrol.e2e.RailFailureE2eTest.retryRecoversTheRail(RailFailureE2eTest.java:35)</stackTrace>
+      <system-out><![CDATA[output of the failed attempt]]></system-out>
+      <system-err><![CDATA[]]></system-err>
+    </flakyFailure>
+  </testcase>
+  <testcase name="retryRecoversTheRail(String) [&quot;webkit&quot;]" classname="dev.andre.homecontrol.e2e.RailFailureE2eTest" time="1.175"/>
+  <testcase name="aFailedRailSaysSo(String) [&quot;webkit&quot;]" classname="dev.andre.homecontrol.e2e.RailFailureE2eTest" time="5.911">
+    <failure message="org.opentest4j.AssertionFailedError: expected: &lt;true&gt; but was: &lt;false&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: expected: &lt;true&gt; but was: &lt;false&gt;
+	at dev.andre.homecontrol.e2e.RailFailureE2eTest.aFailedRailSaysSo(RailFailureE2eTest.java:52)</failure>
+    <rerunFailure message="org.opentest4j.AssertionFailedError: expected: &lt;true&gt; but was: &lt;false&gt;" type="org.opentest4j.AssertionFailedError">
+      <stackTrace>org.opentest4j.AssertionFailedError: expected: &lt;true&gt; but was: &lt;false&gt;
+	at dev.andre.homecontrol.e2e.RailFailureE2eTest.aFailedRailSaysSo(RailFailureE2eTest.java:52)</stackTrace>
+    </rerunFailure>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
