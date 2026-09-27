@@ -13,6 +13,7 @@ commons-lang3 = "3.20.0"
 protobuf = "4.36.2"
 protobuf-plugin = "0.10.0"
 sonarqube = "7.5.0.8588"
+test-retry = "1.6.6"
 jmdns = "3.6.3"
 bouncycastle = "1.86"
 bluez-dbus = "0.3.5"
@@ -40,3 +41,4 @@ playwright = { module = "com.microsoft.playwright:playwright", version.ref = "pl
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
 sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
+test-retry = { id = "org.gradle.test-retry", version.ref = "test-retry" }

@@ -50,10 +50,13 @@ export function parseJUnit(xml) {
     const document = parser.parse(xml);
     const suites = document.testsuites?.testsuite ?? document.testsuite;
     if (!suites) throw new Error("Malformed JUnit XML: no testsuite element");
-    const result = { passed: 0, failed: 0, skipped: 0, failures: [] };
+    const result = { passed: 0, failed: 0, skipped: 0, failures: [], flaky: [] };
     for (const suite of suites) {
         for (const testcase of suite.testcase ?? []) {
             const problem = [testcase.failure, testcase.error].flat().find((entry) => entry !== undefined);
+            // Gradle merges the attempts of a retried test into one testcase: the failed attempts
+            // of a test that passed in the end are its flakyFailure elements.
+            const retried = [testcase.flakyFailure].flat().find((entry) => entry !== undefined);
             if (problem !== undefined) {
                 result.failed++;
                 result.failures.push(failure(testcase, problem));
@@ -61,6 +64,7 @@ export function parseJUnit(xml) {
                 result.skipped++;
             } else {
                 result.passed++;
+                if (retried !== undefined) result.flaky.push(failure(testcase, retried));
             }
         }
     }
@@ -68,14 +72,15 @@ export function parseJUnit(xml) {
 }
 
 function failure(testcase, problem) {
-    const trace = String(typeof problem === "string" ? problem : problem["#text"] ?? "").trim();
+    // A failure holds its trace as text, the failed attempt of a retried test in a stackTrace element.
+    const trace = String(typeof problem === "string" ? problem : problem["#text"] ?? problem.stackTrace ?? "").trim();
     const stated = typeof problem === "string" ? "" : String(problem["@message"] ?? "").trim();
     const message = stated || trace.split("\n")[0] || "No failure message";
     return { className: String(testcase["@classname"] ?? ""), name: String(testcase["@name"] ?? ""), message, trace };
 }
 
 export async function collectSuite(directory) {
-    const result = { found: false, unreadable: 0, passed: 0, failed: 0, skipped: 0, failures: [] };
+    const result = { found: false, unreadable: 0, passed: 0, failed: 0, skipped: 0, failures: [], flaky: [] };
     let names;
     try {
         names = (await readdir(directory, { recursive: true }))
@@ -92,6 +97,7 @@ export async function collectSuite(directory) {
             result.failed += parsed.failed;
             result.skipped += parsed.skipped;
             result.failures.push(...parsed.failures);
+            result.flaky.push(...parsed.flaky);
         } catch {
             // A test JVM that died mid-write leaves a truncated file; the others still count.
             result.unreadable++;
@@ -160,6 +166,7 @@ function counts(suite) {
     const parts = [];
     if (suite.failed > 0) parts.push(`${suite.failed} failed`);
     parts.push(`${suite.passed} passed`);
+    if (suite.flaky.length > 0) parts.push(`${suite.flaky.length} of them only on a retry`);
     if (suite.skipped > 0) parts.push(`${suite.skipped} skipped`);
     if (suite.unreadable > 0) {
         parts.push(`${suite.unreadable} result ${suite.unreadable === 1 ? "file" : "files"} unreadable`);
@@ -174,6 +181,7 @@ function link(text, url) {
 function suiteRow(check) {
     const { result, suite, logUrl } = check;
     const log = link("job log", logUrl);
+    if (result === "success" && suite.flaky.length > 0) return `⚠️ ${counts(suite)}`;
     if (result === "success") return suite.found ? `✅ ${counts(suite)}` : "✅";
     if (result !== "failure") return "⏭️ not run";
     if (!suite.found) return `❌ failed before tests ran · ${log}`;
@@ -243,6 +251,21 @@ function duration(seconds) {
     return whole < 60 ? `${whole}s` : `${Math.floor(whole / 60)}m ${whole % 60}s`;
 }
 
+function tests(heading, kind, model, { traces, limit }) {
+    const groups = model.checks.filter((check) => check.suite?.[kind].length > 0);
+    if (groups.length === 0) return [];
+    const lines = ["", `### ${heading}`];
+    for (const check of groups) {
+        lines.push("", `#### ${check.label}`);
+        const entries = check.suite[kind];
+        for (const entry of entries.slice(0, limit)) lines.push("", failedTest(entry, traces));
+        if (entries.length > limit) {
+            lines.push("", `…and ${entries.length - limit} more · ${link("full run", model.runUrl)}`);
+        }
+    }
+    return lines;
+}
+
 function compose(model, { traces, limit }) {
     const passed = model.checks.every((check) => check.result === "success");
     const attempt = model.runAttempt > 1 ? `, attempt ${model.runAttempt}` : "";
@@ -256,18 +279,8 @@ function compose(model, { traces, limit }) {
         "|---|---|",
         ...model.checks.map((check) => `| ${check.label} | ${row(check, model)} |`),
     ];
-    const groups = model.checks.filter((check) => check.suite?.failures.length > 0);
-    if (groups.length > 0) {
-        lines.push("", "### Failed tests");
-        for (const check of groups) {
-            lines.push("", `#### ${check.label}`);
-            const entries = check.suite.failures;
-            for (const entry of entries.slice(0, limit)) lines.push("", failedTest(entry, traces));
-            if (entries.length > limit) {
-                lines.push("", `…and ${entries.length - limit} more · ${link("full run", model.runUrl)}`);
-            }
-        }
-    }
+    lines.push(...tests("Failed tests", "failures", model, { traces, limit }));
+    lines.push(...tests("Passed only on a retry", "flaky", model, { traces, limit }));
     const sonar = model.checks.find((check) => check.key === "sonar");
     if (sonar?.result === "failure" && model.gate?.available && !model.gate.passed) {
         lines.push("", "### Quality gate", "", ...model.gate.failedConditions.map(condition),

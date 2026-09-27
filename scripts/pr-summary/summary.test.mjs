@@ -12,7 +12,7 @@ const fixture = (name) => readFile(path.join(fixtures, name), "utf8");
 // ---- parseJUnit
 
 test("counts passed and skipped tests and ignores captured output", async () => {
-    assert.deepEqual(parseJUnit(await fixture("passed.xml")), { passed: 2, failed: 0, skipped: 1, failures: [] });
+    assert.deepEqual(parseJUnit(await fixture("passed.xml")), { passed: 2, failed: 0, skipped: 1, failures: [], flaky: [] });
 });
 
 test("counts failures and errors as failed and keeps their message and trace", async () => {
@@ -40,7 +40,8 @@ test("a failure with only a body uses its first line as the message", () => {
 });
 
 test("an empty suite has no tests", () => {
-    assert.deepEqual(parseJUnit('<testsuite name="x" tests="0"/>'), { passed: 0, failed: 0, skipped: 0, failures: [] });
+    assert.deepEqual(parseJUnit('<testsuite name="x" tests="0"/>'),
+        { passed: 0, failed: 0, skipped: 0, failures: [], flaky: [] });
 });
 
 test("reads suites wrapped in a testsuites element", () => {
@@ -68,6 +69,34 @@ test("reads a result file with thousands of entities and megabytes of captured o
     assert.equal(parseJUnit(xml).passed, 3000);
 });
 
+test("a test that passed on a retry counts as passed and is kept as flaky", async () => {
+    const result = parseJUnit(await fixture("flaky.xml"));
+    assert.equal(result.passed, 2);
+    assert.equal(result.failed, 1);
+    assert.deepEqual(result.flaky, [{
+        className: "dev.andre.homecontrol.e2e.RailFailureE2eTest",
+        name: 'retryRecoversTheRail(String) ["chromium"]',
+        message: "org.awaitility.core.ConditionTimeoutException: Condition was not fulfilled within 5 seconds.",
+        trace: "org.awaitility.core.ConditionTimeoutException: Condition was not fulfilled within 5 seconds.\n"
+            + "\tat org.awaitility.core.ConditionAwaiter.await(ConditionAwaiter.java:167)\n"
+            + "\tat dev.andre.homecontrol.e2e.RailFailureE2eTest.retryRecoversTheRail(RailFailureE2eTest.java:35)",
+    }]);
+});
+
+test("a test that failed its retry too is listed once, as failed", async () => {
+    const result = parseJUnit(await fixture("flaky.xml"));
+    assert.deepEqual(result.failures.map((failure) => failure.name), ['aFailedRailSaysSo(String) ["webkit"]']);
+    assert.match(result.failures[0].trace, /^org\.opentest4j.*\n\tat dev\.andre/);
+});
+
+test("a test that failed several attempts before passing is flaky once", () => {
+    const xml = '<testsuite><testcase name="a()" classname="x.Y"><flakyFailure message="first"/>'
+        + '<flakyFailure message="second"/></testcase></testsuite>';
+    const result = parseJUnit(xml);
+    assert.equal(result.passed, 1);
+    assert.deepEqual(result.flaky.map((entry) => entry.message), ["first"]);
+});
+
 test("rejects malformed XML and documents that are not JUnit results", async () => {
     assert.throws(() => parseJUnit(""), /Malformed JUnit XML/);
     assert.throws(() => parseJUnit("<html></html>"), /Malformed JUnit XML/);
@@ -86,7 +115,13 @@ async function directory(t, ...names) {
 test("sums every result file in a directory", async (t) => {
     const result = await collectSuite(await directory(t, "passed.xml", "failed.xml"));
     assert.deepEqual({ ...result, failures: result.failures.length },
-        { found: true, unreadable: 0, passed: 3, failed: 3, skipped: 1, failures: 3 });
+        { found: true, unreadable: 0, passed: 3, failed: 3, skipped: 1, failures: 3, flaky: [] });
+});
+
+test("collects the flaky tests of every result file", async (t) => {
+    const result = await collectSuite(await directory(t, "passed.xml", "flaky.xml"));
+    assert.equal(result.passed, 4);
+    assert.equal(result.flaky.length, 1);
 });
 
 test("finds result files in nested directories and ignores other files", async (t) => {
@@ -100,7 +135,7 @@ test("finds result files in nested directories and ignores other files", async (
 });
 
 test("an empty or missing directory has no results", async (t) => {
-    const empty = { found: false, unreadable: 0, passed: 0, failed: 0, skipped: 0, failures: [] };
+    const empty = { found: false, unreadable: 0, passed: 0, failed: 0, skipped: 0, failures: [], flaky: [] };
     const root = await directory(t);
     assert.deepEqual(await collectSuite(root), empty);
     assert.deepEqual(await collectSuite(path.join(root, "absent")), empty);
@@ -183,10 +218,10 @@ test("HTTP errors, timeouts, unexpected shapes and unknown statuses are unavaila
 
 const SONAR_URL = "https://sonarcloud.io/summary/new_code?id=Yukuhu_home-control&pullRequest=105";
 const RUN_URL = "https://github.com/Yukuhu/home-control/actions/runs/36307910825";
-const noResults = { found: false, unreadable: 0, passed: 0, failed: 0, skipped: 0, failures: [] };
+const noResults = { found: false, unreadable: 0, passed: 0, failed: 0, skipped: 0, failures: [], flaky: [] };
 
 function suite(values = {}) {
-    return { found: true, unreadable: 0, passed: 0, failed: 0, skipped: 0, failures: [], ...values };
+    return { found: true, unreadable: 0, passed: 0, failed: 0, skipped: 0, failures: [], flaky: [], ...values };
 }
 
 function failures(count, values = {}) {
@@ -390,6 +425,35 @@ test("more failures than the limit in one suite do not hide the other suite's fa
     assert.ok(comment.includes("**` BrowserTest `** › ` fails1() `"));
     assert.ok(comment.includes("**` BrowserTest `** › ` fails2() `"));
     assert.equal((comment.match(/…and/g) ?? []).length, 1);
+});
+
+test("tests that passed on a retry keep the run green and are listed with what failed first", () => {
+    const flaky = failures(1, { className: "dev.andre.homecontrol.e2e.RailFailureE2eTest",
+        name: 'retryRecoversTheRail(String) ["chromium"]', message: "Condition was not fulfilled" });
+    const comment = render(withSuite(model(), "e2e", suite({ passed: 96, flaky })));
+    assert.match(comment, /^## ✅ CI passed$/m);
+    assert.match(comment, /\| Browser tests \(Chromium, WebKit\) \| ⚠️ 96 passed, 1 of them only on a retry \|/);
+    assert.ok(comment.includes("### Passed only on a retry\n\n#### Browser tests (Chromium, WebKit)\n\n"
+        + '**` RailFailureE2eTest `** › ` retryRecoversTheRail(String) ["chromium"] `\n\n'
+        + "```text\nCondition was not fulfilled\n```\n\n<details><summary>Stack trace</summary>"));
+    assert.ok(!comment.includes("### Failed tests"));
+});
+
+test("a failed run lists its flaky tests after its failed ones", () => {
+    const base = model({ gate: null }, { e2e: "failure", sonar: "skipped" });
+    const comment = render(withSuite(base, "e2e", suite({ passed: 95, failed: 1,
+        failures: failures(1, { name: "broken()" }), flaky: failures(2, { name: "unsteady()" }) })));
+    assert.match(comment, /\| Browser tests \(Chromium, WebKit\) \| ❌ 1 failed, 95 passed, 2 of them only on a retry \|/);
+    assert.ok(comment.indexOf("### Failed tests") < comment.indexOf("` broken() `"));
+    assert.ok(comment.indexOf("` broken() `") < comment.indexOf("### Passed only on a retry"));
+    assert.ok(comment.indexOf("### Passed only on a retry") < comment.indexOf("` unsteady() `"));
+});
+
+test("only the first ten flaky tests are listed", () => {
+    const comment = render(withSuite(model(), "e2e", suite({ passed: 96, flaky: failures(12) })));
+    assert.ok(comment.includes("` fails9() `"));
+    assert.ok(!comment.includes("` fails10() `"));
+    assert.ok(comment.includes(`…and 2 more · [full run](${RUN_URL})`));
 });
 
 test("a check without failures gets no sub-heading", () => {

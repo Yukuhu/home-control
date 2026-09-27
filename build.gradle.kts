@@ -14,6 +14,7 @@ plugins {
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.protobuf)
     alias(libs.plugins.sonarqube)
+    alias(libs.plugins.test.retry)
 }
 
 group = "dev.andre"
@@ -140,6 +141,17 @@ val e2eTest by tasks.registering(Test::class) {
         doFirst { delete(browserCoverageDirectory) }
     }
     maxParallelForks = 1
+    // A browser test that fails is run once more, and passes the build if it then passes. The
+    // merged report marks it as flaky, which the pull request summary shows, so a retry is never
+    // silent. More than three failures is a real breakage, which retrying would only slow down.
+    retry {
+        maxRetries = 1
+        maxFailures = 3
+    }
+    reports.junitXml.mergeReruns = true
+    // Never taken from the build cache: the result depends on the installed browsers, which are
+    // not an input Gradle tracks, and a cached report would show an old retry as if it just happened.
+    outputs.cacheIf { false }
 }
 
 val installPlaywrightBrowsers by tasks.registering(JavaExec::class) {
