@@ -58,21 +58,29 @@ public final class BoundedBody {
         }
 
         @Override
-        public synchronized void onNext(List<ByteBuffer> buffers) {
-            if (body.isDone()) {
-                return;
+        public void onNext(List<ByteBuffer> buffers) {
+            boolean cappedOut;
+            synchronized (this) {
+                if (body.isDone()) {
+                    return;
+                }
+                for (ByteBuffer buffer : buffers) {
+                    int take = (int) Math.min(buffer.remaining(), limit - bytes.size());
+                    byte[] chunk = new byte[take];
+                    buffer.get(chunk);
+                    bytes.write(chunk, 0, take);
+                }
+                cappedOut = bytes.size() >= limit;
+                if (cappedOut) {
+                    finish();
+                } else {
+                    // A request after cancel is a no-op and cancel is idempotent, so request(1) stays inside
+                    // the monitor while cancel() (below) is called outside it.
+                    subscription.request(1);
+                }
             }
-            for (ByteBuffer buffer : buffers) {
-                int take = (int) Math.min(buffer.remaining(), limit - bytes.size());
-                byte[] chunk = new byte[take];
-                buffer.get(chunk);
-                bytes.write(chunk, 0, take);
-            }
-            if (bytes.size() >= limit) {
-                finish();
+            if (cappedOut) {
                 subscription.cancel();
-            } else {
-                subscription.request(1);
             }
         }
 
@@ -89,14 +97,22 @@ public final class BoundedBody {
             }
         }
 
-        /** Completes first, then cancels: cancelling first lets the client fail the exchange with its own error. */
-        private synchronized void expire() {
-            if (body.isDone()) {
-                return;
+        /**
+         * Completes first, then cancels: cancelling first lets the client fail the exchange with its own error.
+         * The decision (and the completion) is made under the monitor; {@code cancel()} runs after it is released.
+         */
+        private void expire() {
+            boolean timedOut;
+            synchronized (this) {
+                timedOut = !body.isDone();
+                if (timedOut) {
+                    bytes = null;
+                    body.completeExceptionally(new HttpTimeoutException("request timed out"));
+                }
             }
-            bytes = null;
-            body.completeExceptionally(new HttpTimeoutException("request timed out"));
-            subscription.cancel();
+            if (timedOut) {
+                subscription.cancel();
+            }
         }
 
         /** Hands the bytes over and drops the buffer: the pending expiry keeps this subscriber until the deadline. */
