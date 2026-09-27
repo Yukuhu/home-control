@@ -20,24 +20,29 @@ similar actions that would raise overall quality and maintainability.
 - Four visible changes are approved: the login no longer disappears with the last secret, configuration keys are
   renamed with the old names still accepted, the unused `ContentController` JSON API is deleted, and virtual threads
   are enabled.
+- After the Cyberpunk theme was merged during the analysis, the user asked whether theme switching and adding themes
+  need a proper architecture base too. They do (theme 10 below, workstream 2F). The theme choice stays per browser,
+  and how people pick among more than two themes is decided when a third theme is planned.
 
 **Assumptions:**
 
 - This document is a roadmap. Each workstream marked M or L gets its own spec, plan and pull requests; S items are
   handled as bounded changes with a short design in chat. Nothing here authorizes implementation by itself.
 - The product, its protocols and its user-facing behaviour stay as they are unless this document names a change.
-- The analysis reflects `main` at `89e8491` (CI green). Line numbers below are from that commit and will move.
+- The analysis reflects `main` at `89e8491` (CI green), plus the theme feature merged after it (`55aa212`,
+  `343d27c`). Line numbers below are from those commits and will move.
 
 ## Baseline
 
-| Measure | Value at `89e8491` |
+| Measure | Value at `343d27c` |
 | --- | --- |
 | Main source | 423 Java files, 34,275 lines; largest class `DeviceManager` at 813 lines |
-| Tests | 326 test files: 240 plain JUnit, 28 `@WebMvcTest`, 27 `@SpringBootTest`, 11 Playwright classes |
+| Tests | 326 test files: 240 plain JUnit, 28 `@WebMvcTest`, 27 `@SpringBootTest`, 12 Playwright classes |
 | Coverage | 87.6% (SonarCloud) |
 | Spring context starts per test run | about 60 (estimate from annotations; measured in Phase 1) |
-| CI on a push to `main` | about 16 minutes end to end; "Build and test" alone about 9 minutes |
+| CI on a push to `main` | about 16 minutes end to end; "Build and test" alone about 9 minutes (measured at `89e8491`) |
 | Architecture rules enforced by the build | none |
+| Places to edit when adding a UI theme | 9 (see theme 10) |
 
 ## What the analysis found
 
@@ -81,6 +86,7 @@ the architecture the [concept](2026-09-16-home-control-center-concept.md) descri
 | 7 | Seven JSON stores | The atomic write is reimplemented five times without fsync, while a correct `OwnerOnlyFiles` (fsync, directory sync, mode 0600) exists but is package-private. `JsonFileSourceSettings` re-parses `sources.json` on every call, about ten times per rail refresh. webOS and Tizen credentials sit in plaintext `devices.json`; the Android TV keystore password defaults to `shield`. | bugs |
 | 8 | The web edge | `HttpServletRequest` is passed into services and stores (`WorkflowStore`, the Jellyfin, TMDB and YouTube setup services, `SportsCalendars`, `SportsCompetitions`). The login check is written four times. Error bodies come in four shapes, with duplicated `@ExceptionHandler` sets. `ContentController` serves a JSON API no page calls. `setup.html` lists every source by hand and its nav already lacks `#workflows`. The page head and header are copied into four templates. Removing the last secret silently removes the login. | navigate, extend |
 | 9 | Test and CI speed | 25 of 27 `@SpringBootTest` classes declare their own temp data directory; `LoginGatingTest` dirties the context after every method. HTTP fakes are copied seven times and `MutableClock` four times. Nine assertions put upper bounds on wall-clock time. Gradle compiles about seven times per push; `Dockerfile.dist` is not built on pull requests. | CI |
+| 10 | No base for UI themes | Adding a theme touches nine places: the stylesheet, the `THEME_COLORS` map in `js/theme.js`, the two-state toggle hard-wired to `cyberpunk` in `fragments/theme-toggle.html`, the heads of five pages (dashboard, setup, workflow editor, login, `offline.html`), each CSS and font path in the `LoginGateFilter.OPEN_PATHS` security allowlist, the `sw.js` asset list and cache version, and two tests fixed to Cyberpunk. The default browser colour `#101917` is written in 11 places. `app.css` has about ten colour tokens but 76 colour literals outside them, so `themes/cyberpunk.css` restyles by overriding component selectors (394 lines mirroring the header, dashboard, tiles, fields, remote, play sheet, toast, setup and login rules). A class or markup change can break a theme silently, and nothing checks what a theme looks like. | extend, navigate |
 
 ## Principles
 
@@ -156,7 +162,8 @@ The `hasAdapter("androidtv")` string checks are invisible to ArchUnit; 3B remove
 
 ## Phase 2: Shared building blocks
 
-2A comes first; 2B, 2C, 2D and 2E are independent of each other after it.
+2A comes first; 2B, 2C, 2D and 2E are independent of each other after it. 2F follows 2E, whose layout fragments it
+builds on.
 
 ### 2A: Configuration root and module switches (S–M)
 
@@ -227,13 +234,46 @@ The `hasAdapter("androidtv")` string checks are invisible to ArchUnit; 3B remove
   stores take a value instead of `HttpServletRequest`. The login check lives in one place.
 - `SetupSection` beans (id, title, fragment, order) that `setup.html` iterates over, replacing the hand-written list
   and the seven `*SetupAdvice` → `web.SetupController` imports.
-- Layout fragments for the page head, the app header and the first-password fields; the theme colour is defined
-  once. With the inline module script, the `onsubmit` attribute and the `hx-on` attributes gone, a full CSP with
-  `script-src 'self'` is sent.
+- Layout fragments for the page head, the app header and the first-password fields, used by every page including
+  `login.html` and the workflow editor. With the inline module script, the `onsubmit` attribute and the `hx-on`
+  attributes gone, a full CSP with `script-src 'self'` is sent. The synchronous `js/theme.js` in the head is an
+  external script and stays compatible with it.
 - **Visible change (approved):** the unused `ContentController` JSON API (`/sources`, `/sources/{s}/rails/{r}`, JSON
   `/search`) is deleted. The documented `GET /devices/<id>/route` stays.
 - The event stream sends a heartbeat comment every 25 seconds and completes its emitters on shutdown.
   `DeviceStateBroadcaster` and `StateController` are renamed for what they carry now.
+
+### 2F: Theme architecture (M, after 2E)
+
+What the merged Cyberpunk theme already does well stays: the saved theme is applied from `localStorage` before the
+first paint, other tabs follow a switch, private mode falls back to the default, and forced-colours and
+reduced-motion are respected. The choice stays per browser.
+
+- **A token contract.** Every colour, radius, font and shadow in `app.css` becomes a semantic token, including
+  `--theme-color` for the browser UI; the 76 colour literals outside the token block go. `app.css` and every theme
+  use cascade layers (`@layer base, components, theme`), so a theme wins by layer rather than by out-specifying
+  component selectors. A guard test fails when `app.css` gains a colour literal outside its token block.
+- **A theme is tokens first.** A theme file redefines tokens under `:root[data-theme="<id>"]`. Decorations that
+  tokens cannot express, such as Cyberpunk's chamfers, scan lines and glitch text, go in a marked section that
+  targets documented hook classes. A colour-only theme is then a token block of about 30 lines, and `cyberpunk.css`
+  shrinks to its tokens plus its decorations.
+- **One theme catalog on the server.** A `ThemeCatalog` lists each theme's id, label, stylesheet, font files and
+  browser colour; the default theme's colour is defined there once instead of in 11 places (only the static
+  `icons/icon.svg` keeps its own copy). Everything else is generated from it:
+  - the stylesheet links and the default `theme-color` meta in the 2E head fragment;
+  - a JSON data block that `js/theme.js` reads instead of its own `THEME_COLORS` map (a non-executable data block, so
+    the CSP allows it);
+  - the header toggle, which stays two-state while there are two themes;
+  - the login gate's open paths, still an exact-match set, extended with the catalog's asset paths at startup;
+  - the PWA manifest colour and `IconRenderer`'s background;
+  - the service worker's offline asset list, with its cache version derived from the assets so nobody bumps it by
+    hand. `offline.html` stops being a hand-written copy of the page head.
+- **Tests over the catalog.** One parameterized test checks every theme: its assets are served without a login, it
+  declares every required token, and it has a browser colour. `ThemeE2eTest` runs once per catalog theme. The e2e
+  job saves a screenshot per theme and page as a CI artifact for review; it does not fail the build.
+
+**2F is done when** adding a theme means one stylesheet, its fonts and one catalog entry, and the existing themes look
+the same as before.
 
 **Phase 2 is done when** each workstream's violations have left the frozen store and every data-format change has a
 migration test.
@@ -312,8 +352,8 @@ Independent S items that can land at any time.
 - **Tooling:** `.editorconfig`, Error Prone, Spotless with `ratchetFrom("origin/main")`, the jacoco version moved into
   the version catalog, `scripts/` made the only copy of the helper scripts, and the absolute paths removed from
   `.codex/config.toml`.
-- **Frontend hygiene:** `app.css` one declaration per line with hover colours as tokens; the remote drawer moved out
-  of `app.js`; the vendored htmx version and source recorded.
+- **Frontend hygiene:** the remote drawer moved out of `app.js`; the vendored htmx version and source recorded. (The
+  `app.css` token and layout work belongs to 2F.)
 
 ## How the program runs
 
@@ -321,7 +361,7 @@ Independent S items that can land at any time.
 Phase 0 ──▶ Phase 1 ──▶ 2A ──┬──▶ 2B ──▶ 3A ──▶ 3B ──▶ 3C ──┐
                              ├──▶ 2C ──▶ 3D ─────────────────┤
                              ├──▶ 2D ──▶ 3E ─────────────────┼──▶ Phase 4
-                             └──▶ 2E ────────────────────────┘
+                             └──▶ 2E ──▶ 2F ─────────────────┘
 Parallel track (CI, Docker, tooling): any time
 ```
 
@@ -342,6 +382,8 @@ Recorded in `docs/dev/architecture.md` at the end of each workstream.
 | Spring context starts per test run | about 60 (estimate) | under 10 |
 | CI time for a push to `main` | about 16 minutes | recorded after the parallel track; no target yet |
 | Copies of the atomic write, backoff, HTTP error mapping | 5, 4, 6 | 1 each |
+| Places to edit when adding a UI theme | 9 | a stylesheet, its fonts and one catalog entry |
+| Colour literals in `app.css` outside its token block | 76 | 0 |
 
 ## Out of scope
 
@@ -356,3 +398,5 @@ Recorded in `docs/dev/architecture.md` at the end of each workstream.
 - The capability that replaces `hasAdapter("androidtv")` in Jellyfin (3B).
 - The exact extension point for source-specific playable refs and routes (3C).
 - Whether `app` is split further than three modules (Phase 4).
+- How people choose among more than two themes (a header menu, a Setup section, or both), decided when a third theme
+  is planned. 2F keeps the two-state toggle and makes that later change local to the toggle fragment.
