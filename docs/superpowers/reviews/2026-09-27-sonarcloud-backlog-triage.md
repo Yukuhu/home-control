@@ -191,6 +191,14 @@ All runs used the repository's Gradle wrapper inside `gradle:jdk25` (the host ha
 - An independent review of the whole diff found no critical or important issues; its two actionable minor points
   (the SSE subscriber on Error, an over-broad S3415 declaration) are fixed.
 - All 480 issue keys appear exactly once in the decisions table; every Java declaration was checked against its key.
+- A pull request's analysis only reports issues on changed lines, so fixes whose flagged line stays unchanged (a
+  method signature, a loop header) were checked separately. PMD 7.28's `CognitiveComplexity`, which follows the same
+  specification, finds all 29 flagged methods at or below 15 now (30 methods above it on `main`, one of which Sonar
+  itself never flagged). Every flagged loop has at most one `break`/`continue`, every moved method sits in `Link`, and
+  the remaining one-off fixes were read. This audit caught one fix that had silently not happened (the BOM escape).
+- The pull request's first analysis passed its gate but reported 13 minor findings in new code (record patterns in
+  the new `equals` methods, an unused import, two assertion chains, long lines in the e2e image, a parameterizable
+  trio of tests, a helper that Sonar wanted inside `CalendarReader`). All are fixed except the last, which is declared.
 
 SonarCloud itself has not analyzed this branch yet: the pull request's CI run imports JaCoCo and browser LCOV and
 applies the gate to the changed lines. After merge, `main` needs the [SonarCloud follow-up](#sonarcloud-follow-up)
