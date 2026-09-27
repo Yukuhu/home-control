@@ -27,6 +27,11 @@ When this page was written, the unit, slice, end-to-end and architecture tests n
 
 - A fake of a device or a service is named `Fake…` and sits in the test package of the code it fakes, for example
   `FakeCastReceiver` or `FakeJellyfinServer`. It speaks the real protocol, so the production client runs unchanged.
+- Shared helpers live in `dev.andre.homecontrol.testsupport`: `FakeHttpServer` for any HTTP or HTTPS fake,
+  `TestTls` for a self-signed server certificate, `MutableClock`, `RecordingStateListener` and `EventStreamReader`.
+  A fake of a web API (Jellyfin, TMDB, Google, TheSportsDB, calendars, workflows) is a thin wrapper over
+  `FakeHttpServer` that keeps the service's own vocabulary; a fake of a socket protocol (UPnP, Tizen, Cast, Android
+  TV, mpv) stays protocol-specific.
 - Recorded device and API responses live in `src/test/resources/fixtures/<device or source>/`, for example
   `fixtures/cast/` or `fixtures/jellyfin/`.
 - Waiting for something asynchronous uses Awaitility (`await().atMost(...)`), never `Thread.sleep`. A fake may

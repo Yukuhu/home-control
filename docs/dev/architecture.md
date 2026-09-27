@@ -105,7 +105,7 @@ The roadmap's measures, updated by each workstream that moves them.
 | Spring context starts per test run | 67 (one JVM) | 70 (four JVMs) |
 | CI "Build and test" job time | about 9 min | 5 min 13 s |
 | Wall-clock upper-bound assertions | 9 | 9 |
-| Copies of `MutableClock` | 5, one of them nested in `SsdpDiscoveryTest` | 5 |
+| Copies of `MutableClock` | 5, one of them nested in `SsdpDiscoveryTest` | 1 |
 
 Since #117 the unit tests run in up to four JVMs at once. Summed class time and context starts count all of them, and
 a class takes longer while it shares the CPUs, so compare runs with the same number of JVMs.
