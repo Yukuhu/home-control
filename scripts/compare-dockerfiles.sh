@@ -10,7 +10,8 @@ cd "$(dirname "$0")/.."
 
 # The last stage of a Dockerfile, without comments, blank lines and the line that copies the jar.
 runtime() {
-  awk '/^FROM /{ stage = "" } { stage = stage $0 "\n" } END { printf "%s", stage }' "$1" \
+  local dockerfile="$1"
+  awk '/^FROM /{ stage = "" } { stage = stage $0 "\n" } END { printf "%s", stage }' "$dockerfile" \
     | grep -Ev '^[[:space:]]*(#|$)|^COPY .*[[:space:]]app\.jar$'
 }
 
