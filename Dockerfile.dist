@@ -27,7 +27,7 @@ COPY *.jar app.jar
 # to that user here, so that a volume Docker creates for it belongs to that user too. A directory
 # of the host mounted there keeps the owner it has on the host.
 # The -bluetooth image is built with RUN_AS=0:0 and stays root, because the host's D-Bus lets
-# only root talk to BlueZ (docs/bluetooth-speakers.md).
+# only root talk to BlueZ (docs/user/bluetooth-speakers.md).
 ARG RUN_AS=1000:1000
 RUN mkdir -p /data && chown "$RUN_AS" /data
 VOLUME /data
