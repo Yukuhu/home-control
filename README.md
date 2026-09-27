@@ -751,8 +751,10 @@ restore that file as `devices.json`, and start the older image.
 ## CI quality gate
 
 The `SonarCloud quality gate` job scans the results of the `Build and test` and
-`Browser tests` jobs with SonarCloud. On pull requests, it waits for the quality gate, so a
-failed scan, failed gate, or missing `SONAR_TOKEN` fails the job. Main-branch
+`Browser tests (Chromium)` jobs with SonarCloud. The browser tests run in one job for each
+browser; the scan waits for Chromium alone, the one browser that records which JavaScript
+ran. On pull requests, it waits for the quality gate, so a failed scan, failed gate, or
+missing `SONAR_TOKEN` fails the job. Main-branch
 scans update the analysis baseline without waiting for the gate. Keep `SONAR_TOKEN` in both
 the GitHub Actions and Dependabot secret stores. GitHub does not provide that secret to fork
 pull requests, so their build stays red until a separate scan path is configured.

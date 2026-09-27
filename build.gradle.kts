@@ -155,9 +155,10 @@ val e2eTest by tasks.registering(Test::class) {
 }
 
 val installPlaywrightBrowsers by tasks.registering(JavaExec::class) {
-    description = "Installs Playwright's Chromium and WebKit plus their OS packages (needs root or passwordless sudo)."
+    description = "Installs Playwright's Chromium and WebKit plus their OS packages (needs root or passwordless sudo)." +
+        " -Pe2eBrowsers=chromium installs one of them."
     group = "verification"
     classpath = configurations["e2eRuntimeClasspath"]
     mainClass = "com.microsoft.playwright.CLI"
-    args("install", "--with-deps", "chromium", "webkit")
+    args(listOf("install", "--with-deps") + ((findProperty("e2eBrowsers") as String?) ?: "chromium,webkit").split(","))
 }
