@@ -148,7 +148,7 @@ class RailControllerTest {
     }
 
     @Test
-    void anEmptyRailSaysSo() throws Exception {
+    void anEmptyRailIsHiddenButStaysInThePageForLiveUpdates() throws Exception {
         mockJellyfin();
         RailSnapshot snapshot = new RailSnapshot(resume(), RailStatus.READY, List.of(),
                 Instant.parse("2026-09-17T00:00:00Z"), null, false, 7);
@@ -156,7 +156,44 @@ class RailControllerTest {
 
         mockMvc.perform(get("/rails/jellyfin/resume"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Nothing here right now")));
+                .andExpect(content().string(containsString("data-rail=\"jellyfin/resume\"")))
+                .andExpect(content().string(containsString("hidden=\"hidden\"")))
+                .andExpect(content().string(not(containsString("Nothing here right now"))));
+    }
+
+    @Test
+    void aReadyRailWithItemsIsNotHidden() throws Exception {
+        mockJellyfin();
+        RailSnapshot snapshot = new RailSnapshot(resume(), RailStatus.READY, List.of(item()),
+                Instant.parse("2026-09-17T00:00:00Z"), null, false, 7);
+        given(rails.snapshot("jellyfin", "resume")).willReturn(Optional.of(snapshot));
+
+        mockMvc.perform(get("/rails/jellyfin/resume"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("hidden=\"hidden\""))));
+    }
+
+    @Test
+    void aLoadingRailIsNotHidden() throws Exception {
+        mockJellyfin();
+        RailSnapshot snapshot = new RailSnapshot(resume(), RailStatus.LOADING, List.of(), null, null, false, 7);
+        given(rails.snapshot("jellyfin", "resume")).willReturn(Optional.of(snapshot));
+
+        mockMvc.perform(get("/rails/jellyfin/resume"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("hidden=\"hidden\""))));
+    }
+
+    @Test
+    void aFailedEmptyRailIsNotHidden() throws Exception {
+        mockJellyfin();
+        RailSnapshot snapshot = new RailSnapshot(resume(), RailStatus.FAILED, List.of(), null,
+                "Could not reach Jellyfin at http://nas:8096", false, 7);
+        given(rails.snapshot("jellyfin", "resume")).willReturn(Optional.of(snapshot));
+
+        mockMvc.perform(get("/rails/jellyfin/resume"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("hidden=\"hidden\""))));
     }
 
     @Test

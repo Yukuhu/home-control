@@ -84,6 +84,7 @@ main#content { max-width: 1600px; margin: 0 auto; padding: 3.25rem clamp(1.25rem
 .search-pending { position: absolute; top: 100%; right: .5rem; padding-top: .2rem; color: var(--muted); font-size: .7rem; }
 #rails { display: grid; gap: 2rem; }
 .rail { min-width: 0; }
+.rail[hidden] { display: none; }
 .rail header { display: flex; align-items: center; gap: .7rem; margin-bottom: .9rem; flex-wrap: wrap; }
 .rail h2 { font-size: 1rem; margin: 0; }
 .rail .source { font-size: .65rem; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: .15rem .4rem; }

@@ -16,7 +16,10 @@
          th:id="${rail.domId()}"
          th:classappend="${rail.refreshing()} ? 'refreshing'"
          th:attr="data-rail=${rail.key()},data-version=${rail.version()},data-status=${rail.status()},aria-busy=${rail.status() == 'LOADING'}"
-         th:with="failed=${rail.status() == 'FAILED'}, hasItems=${!#lists.isEmpty(rail.items())}">
+         th:with="failed=${rail.status() == 'FAILED'}, hasItems=${!#lists.isEmpty(rail.items())}"
+         th:hidden="${rail.status() == 'READY' and !hasItems}">
+    <!-- A rail with nothing in it is hidden rather than left out: rails.js finds a rail by its
+         element to re-fetch it, so it has to stay in the page to come back once it has items. -->
     <header>
         <h2 th:text="${rail.title()}">Continue watching</h2>
         <span class="source" th:text="${rail.sourceName()}">Jellyfin</span>
@@ -40,8 +43,6 @@
             <button th:replace="~{fragments/rails :: tile(${item})}"></button>
         </li>
     </ul>
-
-    <p class="rail-empty" th:if="${rail.status() == 'READY' and !hasItems}">Nothing here right now</p>
 
     <div class="rail-error" role="alert" th:if="${failed and !hasItems}">
         <p th:text="|Couldn't load ${rail.title()}: ${rail.error()}|">Couldn't load</p>
