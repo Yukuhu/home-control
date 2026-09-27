@@ -77,7 +77,9 @@ class LoginGatingTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("Current password"))))
                 .andExpect(header().doesNotExist("Set-Cookie"))
-                .andExpect(header().doesNotExist("X-Frame-Options"));
+                // No login, but the page still cannot be framed.
+                .andExpect(header().string("X-Frame-Options", "DENY"))
+                .andExpect(header().string("Content-Security-Policy", "frame-ancestors 'none'"));
         mockMvc.perform(post("/devices/nope/key/HOME").header("Host", "localhost").header("Origin", "http://localhost"))
                 .andExpect(status().isNotFound());
         mockMvc.perform(post("/devices/nope/key/HOME")).andExpect(status().isNotFound());

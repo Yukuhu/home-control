@@ -1,5 +1,8 @@
 package dev.andre.homecontrol.security;
 
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -105,5 +108,39 @@ class CrossOriginFilterTest {
         run(filter, withHost("evil.example", "POST", "/devices/abc/key/HOME", "Sec-Fetch-Site", "cross-site"), response);
 
         assertThat(response.getStatus()).isEqualTo(421);
+    }
+
+    @Test
+    void sendsTheSecurityHeadersOnEveryResponseWithOrWithoutALogin() throws Exception {
+        MockHttpServletResponse allowed = new MockHttpServletResponse();
+        run(filter, request("GET", "/setup"), allowed);
+        MockHttpServletResponse refused = new MockHttpServletResponse();
+        run(filter, request("POST", "/setup/forget", "Sec-Fetch-Site", "cross-site"), refused);
+        MockHttpServletResponse misdirected = new MockHttpServletResponse();
+        run(filter, withHost("evil.example:8080", "GET", "/"), misdirected);
+
+        assertThat(refused.getStatus()).isEqualTo(403);
+        assertThat(misdirected.getStatus()).isEqualTo(421);
+        for (MockHttpServletResponse response : List.of(allowed, refused, misdirected)) {
+            assertThat(response.getHeader("X-Frame-Options")).isEqualTo("DENY");
+            assertThat(response.getHeader("Content-Security-Policy")).isEqualTo("frame-ancestors 'none'");
+            assertThat(response.getHeader("X-Content-Type-Options")).isEqualTo("nosniff");
+            assertThat(response.getHeader("Referrer-Policy")).isEqualTo("same-origin");
+        }
+    }
+
+    @Test
+    void aPageMaySetAStricterReferrerPolicyOfItsOwn() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain(new HttpServlet() {
+            @Override
+            protected void service(HttpServletRequest request, HttpServletResponse servletResponse) {
+                servletResponse.setHeader("Referrer-Policy", "no-referrer");
+            }
+        });
+
+        filter.doFilter(request("GET", "/setup/youtube/callback"), response, chain);
+
+        assertThat(response.getHeader("Referrer-Policy")).isEqualTo("no-referrer");
     }
 }
