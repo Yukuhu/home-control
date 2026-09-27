@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.tizen;
 
+import dev.andre.homecontrol.core.Hosts;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,7 +20,7 @@ final class DialClient {
     }
 
     void launch(String host, String app, String body) throws IOException {
-        String authority = host.contains(":") ? "[" + host + "]" : host;
+        String authority = Hosts.authority(host);
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://" + authority + ":" + properties.dialPort() + "/ws/apps/" + app))
                 .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
                 .header("Content-Type", "text/plain; charset=utf-8")

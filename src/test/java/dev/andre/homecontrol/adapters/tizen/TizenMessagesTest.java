@@ -31,6 +31,13 @@ class TizenMessagesTest {
     }
 
     @Test
+    void aHostThatWouldChangeTheUrlIsRefused() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> TizenMessages.remoteUri("evil.example/x?", 8002, "Home Control", null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void aKeyIsAClick() {
         assertThat(TizenMessages.key("KEY_HOME")).isEqualTo("{\"method\":\"ms.remote.control\",\"params\":{\"Cmd\":\"Click\","
                 + "\"DataOfCmd\":\"KEY_HOME\",\"Option\":\"false\",\"TypeOfRemote\":\"SendRemoteKey\"}}");

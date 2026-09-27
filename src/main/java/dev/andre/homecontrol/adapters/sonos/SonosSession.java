@@ -17,6 +17,7 @@ import dev.andre.homecontrol.adapters.upnp.protocol.SoapFault;
 import dev.andre.homecontrol.adapters.upnp.protocol.TransportInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.UpnpActions;
 import dev.andre.homecontrol.adapters.upnp.protocol.VolumeReading;
+import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
@@ -240,7 +241,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
                     .flatMap(ZoneGroupState.Group::coordinatorMember)
                     .filter(member -> !member.uuid().equals(settings.uuid()));
             if (coordinator.isPresent()) {
-                return SonosEndpoints.endpoint(coordinator.get().host(), coordinator.get().port(), AV_TRANSPORT_PATH, AV_TRANSPORT);
+                return SonosEndpoints.endpoint(Hosts.authority(coordinator.get().host()), coordinator.get().port(), AV_TRANSPORT_PATH, AV_TRANSPORT);
             }
         }
         return own(AV_TRANSPORT_PATH, AV_TRANSPORT);
@@ -251,7 +252,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
     }
 
     private ServiceEndpoint own(String path, String serviceType) {
-        return SonosEndpoints.endpoint(device.host(), settings.port(), path, serviceType);
+        return SonosEndpoints.endpoint(Hosts.authority(device.host()), settings.port(), path, serviceType);
     }
 
     private UnsupportedActionException unsupported(String what) {

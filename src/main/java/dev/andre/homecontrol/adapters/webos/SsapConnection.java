@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.webos;
 
+import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.adapters.net.TextWebSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +73,7 @@ final class SsapConnection implements AutoCloseable {
                 onClosed.accept(reason);
             }
         };
-        String authority = host.contains(":") ? "[" + host + "]" : host;
+        String authority = Hosts.authority(host);
         try {
             connection.socket = TextWebSocket.connect(http,
                     URI.create("ws://" + authority + ":" + properties.port()), connection.connectTimeout, listener);
