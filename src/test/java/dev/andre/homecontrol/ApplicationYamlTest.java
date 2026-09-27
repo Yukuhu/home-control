@@ -49,7 +49,7 @@ class ApplicationYamlTest {
             assertThat(environment.getProperty("home-control.ssdp.enabled")).isEqualTo("false");
             assertThat(environment.getProperty("home-control.content.rails.scheduler-enabled")).isEqualTo("false");
             assertThat(environment.getProperty("home-control.tmdb.api-base-url")).isEqualTo("http://127.0.0.1:9/3");
-            assertThat(environment.getProperty("home-control.security.secret")).isEqualTo("");
+            assertThat(environment.getProperty("home-control.security.secret")).isEmpty();
         });
     }
 }

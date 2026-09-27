@@ -180,8 +180,8 @@ class CalendarFetcherTest {
         server.respondFixture("/cal.ics", "bundesliga.ics");
         AtomicInteger lookups = new AtomicInteger();
         // The first answer passes the policy; every later one points at this machine, which the policy refuses.
-        CalendarUrlPolicy.HostResolver rebinding = host -> new InetAddress[] {lookups.getAndIncrement() == 0
-                ? InetAddress.ofLiteral("192.0.2.10") : InetAddress.ofLiteral("127.0.0.1")};
+        CalendarUrlPolicy.HostResolver rebinding = host -> new InetAddress[] {
+                InetAddress.ofLiteral(lookups.getAndIncrement() == 0 ? "192.0.2.10" : "127.0.0.1")};
 
         try (CalendarFetcher rebound = new CalendarFetcher(properties, new CalendarUrlPolicy(false, rebinding))) {
             URI url = unresolvable("/cal.ics");
