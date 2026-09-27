@@ -15,8 +15,10 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -90,7 +92,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
         });
     }
 
-    private byte[] fetchBody(WorkflowDraft.Fetch fetch) throws Exception {
+    private byte[] fetchBody(WorkflowDraft.Fetch fetch) throws IOException {
         if (fetch == null || fetch.headers() == null || fetch.headers().size() > 16) {
             throw failure(Stage.FETCH, "invalid request settings");
         }
@@ -176,21 +178,20 @@ public final class WorkflowHttpClient implements AutoCloseable {
         }
     }
 
-    private static final class FetchResponse {
-        private final byte[] body;
-        private final String redirectLocation;
-
-        private FetchResponse(byte[] body, String redirectLocation) {
-            this.body = body;
-            this.redirectLocation = redirectLocation;
+    /** A response body, or where a redirect points; compared and printed by the body's content, not its identity. */
+    record FetchResponse(byte[] body, String redirectLocation) {
+        @Override public boolean equals(Object other) {
+            return other instanceof FetchResponse that && Arrays.equals(body, that.body)
+                    && Objects.equals(redirectLocation, that.redirectLocation);
         }
 
-        private byte[] body() {
-            return body;
+        @Override public int hashCode() {
+            return 31 * Arrays.hashCode(body) + Objects.hashCode(redirectLocation);
         }
 
-        private String redirectLocation() {
-            return redirectLocation;
+        @Override public String toString() {
+            return "FetchResponse[body=" + (body == null ? "none" : body.length + " bytes")
+                    + ", redirectLocation=" + redirectLocation + "]";
         }
     }
 
@@ -211,26 +212,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
         var operation = new Operation<T>(stage);
         operations.add(operation);
         try {
-            executor.execute(() -> {
-                T value = null;
-                Throwable error = null;
-                operation.worker = Thread.currentThread();
-                current.set(operation);
-                try {
-                    operation.check();
-                    value = work.call();
-                    operation.check();
-                } catch (Throwable e) {
-                    error = e;
-                } finally {
-                    current.remove();
-                    operations.remove(operation);
-                    // Only the worker releases admission, even when its caller has already timed out.
-                    permits.release();
-                }
-                if (error == null) operation.result.complete(value);
-                else operation.result.completeExceptionally(error);
-            });
+            executor.execute(() -> runOperation(operation, work));
         } catch (RejectedExecutionException _) {
             operations.remove(operation);
             permits.release();
@@ -251,6 +233,31 @@ public final class WorkflowHttpClient implements AutoCloseable {
         }
     }
 
+    /** Runs on the worker; its caller learns the outcome only once admission is released. */
+    private <T> void runOperation(Operation<T> operation, Callable<T> work) {
+        T value = null;
+        // Replaced by the outcome. Left as is only when an Error escapes to the thread's handler,
+        // so the caller still hears at once that the request failed instead of waiting out its deadline.
+        Exception error = failure(operation.stage, "request failed");
+        operation.worker = Thread.currentThread();
+        current.set(operation);
+        try {
+            operation.check();
+            value = work.call();
+            operation.check();
+            error = null;
+        } catch (Exception e) {
+            error = e;
+        } finally {
+            current.remove();
+            operations.remove(operation);
+            // Only the worker releases admission, even when its caller has already timed out.
+            permits.release();
+            if (error == null) operation.result.complete(value);
+            else operation.result.completeExceptionally(error);
+        }
+    }
+
     private static Timeout timeout(long nanos) { return Timeout.ofMilliseconds(Math.max(1, TimeUnit.NANOSECONDS.toMillis(nanos))); }
     private static WorkflowException failure(Stage stage, String detail) { return new WorkflowException(stage, detail); }
 
@@ -260,6 +267,8 @@ public final class WorkflowHttpClient implements AutoCloseable {
         private final AtomicBoolean cancelled = new AtomicBoolean();
         private final AtomicReference<HttpGet> active = new AtomicReference<>();
         private final CompletableFuture<T> result = new CompletableFuture<>();
+        // Set once by the worker before it runs; cancel() only reads it to interrupt that thread.
+        @SuppressWarnings("java:S3077")
         private volatile Thread worker;
 
         Operation(Stage stage) { this.stage = stage; }

@@ -16,7 +16,9 @@ public final class WorkflowValidator {
 
     private static final String INVALID_PREFIX = "invalid ";
     private static final int MAX_URL = 8_192;
-    private static final Pattern NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,31}");
+    private static final Pattern NAME = Pattern.compile("[A-Za-z]\\w{0,31}");
+    /** In a JSON pointer, {@code ~} only ever starts {@code ~0} or {@code ~1}. */
+    private static final Pattern BAD_POINTER_ESCAPE = Pattern.compile("~(?![01])");
     private static final Pattern MIME = Pattern.compile("[A-Za-z0-9!#$&^_.+*-]+/[A-Za-z0-9!#$&^_.+*-]+");
     private static final Pattern HEADER_NAME = Pattern.compile("[!#$%&'*+.^_`|~0-9A-Za-z-]+");
     private static final Set<String> DENIED_HEADERS = Set.of("host", "cookie", "connection", "content-length",
@@ -127,13 +129,7 @@ public final class WorkflowValidator {
             return;
         }
         if (value.length() > 512 || (!value.isEmpty() && !value.startsWith("/"))) fail(INVALID_PREFIX + field + " pointer");
-        for (int i = 0; i < value.length(); i++) {
-            if (value.charAt(i) == '~' && (i + 1 >= value.length()
-                    || (value.charAt(i + 1) != '0' && value.charAt(i + 1) != '1'))) {
-                fail(INVALID_PREFIX + field + " pointer escape");
-            }
-            if (value.charAt(i) == '~') i++;
-        }
+        if (BAD_POINTER_ESCAPE.matcher(value).find()) fail(INVALID_PREFIX + field + " pointer escape");
     }
 
     private static void text(String value, int max, String field) {
