@@ -1,6 +1,3 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="en">
-<body>
 <section th:fragment="section" id="bluetooth" class="bluetooth">
     <p class="eyebrow">SOUND AROUND YOUR HOME</p>
     <h2>Bluetooth speakers</h2>
@@ -74,5 +71,3 @@
     </ul>
     <p class="hint" th:if="${!#lists.isEmpty(bluetooth.speakers())}">Forget a speaker in the device list to unpair it from the host.</p>
 </section>
-</body>
-</html>

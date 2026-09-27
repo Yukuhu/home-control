@@ -202,7 +202,7 @@
     </div>
     <p class="eyebrow sheet-label">PLAY ON</p>
     <div class="sheet-devices" role="radiogroup" aria-label="Play on">
-        <button type="button" role="radio" class="sheet-device" th:each="device : ${devices}"
+        <button type="button" role="radio" aria-checked="false" class="sheet-device" th:each="device : ${devices}"
                 th:attr="data-sheet-device=${device.id()},aria-checked=${device.id() == selected.id()}">
             <span th:text="${device.name()}">Shield</span>
             <span class="badge" th:attr="data-status-for=${device.id()}"
