@@ -50,8 +50,14 @@ public class SsdpDiscovery implements AutoCloseable {
     private final Map<String, List<SsdpListener>> listeners = new ConcurrentHashMap<>();
 
     private volatile boolean running;
+    // Assigned once in start() and never replaced; the socket is thread-safe, volatile only publishes it.
+    @SuppressWarnings("java:S3077")
     private volatile DatagramSocket searchSocket;
+    // Assigned once in start() and never replaced; the socket is thread-safe, volatile only publishes it.
+    @SuppressWarnings("java:S3077")
     private volatile MulticastSocket notifySocket;
+    // Assigned once in start() and never replaced; the executor is thread-safe, volatile only publishes it.
+    @SuppressWarnings("java:S3077")
     private volatile ScheduledExecutorService scheduler;
 
     public SsdpDiscovery(SsdpProperties properties) {
