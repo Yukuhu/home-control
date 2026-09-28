@@ -28,7 +28,9 @@ class DialClientTest {
 
     private DialClient dial(int dialPort) {
         return new DialClient(InsecureTls.httpClient(Duration.ofSeconds(2)),
-                new TizenProperties(true, fake.port(), fake.httpPort(), dialPort, "Home Control", 2, 2, 2, 1, 0));
+                new TizenProperties(true, fake.port(), fake.httpPort(), dialPort, "Home Control",
+                Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(1),
+                Duration.ofSeconds(0)));
     }
 
     @Test

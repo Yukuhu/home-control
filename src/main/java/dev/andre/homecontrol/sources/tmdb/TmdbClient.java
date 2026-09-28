@@ -32,7 +32,7 @@ public class TmdbClient {
     public TmdbClient(TmdbProperties properties) {
         this(properties, HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NEVER)
-                .connectTimeout(Duration.ofSeconds(properties.connectTimeoutSeconds()))
+                .connectTimeout(properties.connectTimeout())
                 .build());
     }
 
@@ -44,7 +44,7 @@ public class TmdbClient {
     public JsonNode get(TmdbCredential credential, String path, Map<String, String> query) {
         HttpRequest.Builder request = HttpRequest.newBuilder(uri(credential, path, query))
                 .GET()
-                .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
+                .timeout(properties.requestTimeout())
                 .header("Accept", "application/json");
         if (credential.kind() == TmdbCredential.Kind.BEARER) {
             request.header("Authorization", "Bearer " + credential.value());
@@ -52,7 +52,7 @@ public class TmdbClient {
         HttpResponse<byte[]> response;
         try {
             response = http.send(request.build(),
-                    BoundedBody.handler(MAX_BODY_BYTES, Duration.ofSeconds(properties.requestTimeoutSeconds())));
+                    BoundedBody.handler(MAX_BODY_BYTES, properties.requestTimeout()));
         } catch (IOException e) {
             throw new TmdbException(TmdbException.Kind.UNREACHABLE, unreachable(), e);
         } catch (InterruptedException e) {

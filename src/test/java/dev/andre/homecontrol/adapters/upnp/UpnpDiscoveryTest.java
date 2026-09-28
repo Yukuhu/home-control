@@ -36,7 +36,7 @@ class UpnpDiscoveryTest {
         responder = new FakeSsdpResponder();
         fake = new FakeUpnpRenderer();
         responder.answer(UpnpDiscovery.SEARCH_TARGET, fake.searchResponse());
-        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, Duration.ofSeconds(1), 1),
                 new SsdpTimings(Duration.ofMillis(200)));
         ssdp.start();
         discovery = new UpnpDiscovery(ssdp, events::add, true);

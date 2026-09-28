@@ -50,7 +50,7 @@ class TmdbTrendingPagingTest {
 
     private TmdbContentSource source() {
         TmdbProperties properties = new TmdbProperties(true, fake.apiBase(), URI.create("https://img.example/t/p"),
-                1, 2, 20, 40, Duration.ofHours(24), Duration.ofHours(24), null);
+                Duration.ofSeconds(1), Duration.ofSeconds(2), 20, 40, Duration.ofHours(24), Duration.ofHours(24), null);
         TmdbClient client = new TmdbClient(properties);
         return new TmdbContentSource(setup, client, new TmdbImages(client, properties, Clock.systemUTC()),
                 new TmdbWatchProviders(client, properties, Clock.systemUTC()), properties,

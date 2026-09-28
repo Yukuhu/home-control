@@ -30,7 +30,7 @@ public class WebOsPairing implements PromptPairing {
         this.properties = properties;
         this.ssdp = ssdp;
         this.devices = devices;
-        this.http = InsecureTls.httpClient(Duration.ofSeconds(properties.connectTimeoutSeconds()));
+        this.http = InsecureTls.httpClient(properties.connectTimeout());
     }
 
     @Override
@@ -46,7 +46,7 @@ public class WebOsPairing implements PromptPairing {
     @Override
     public String instructions() {
         return "The TV asks whether to allow Home Control. Accept with the TV remote within "
-                + properties.pairingTimeoutSeconds() + " seconds.";
+                + properties.pairingTimeout().toSeconds() + " seconds.";
     }
 
     @Override
@@ -54,7 +54,7 @@ public class WebOsPairing implements PromptPairing {
         SsapConnection connection = null;
         try {
             connection = SsapConnection.open(http, host, properties, reason -> { });
-            String key = connection.register(null, Duration.ofSeconds(properties.pairingTimeoutSeconds()));
+            String key = connection.register(null, properties.pairingTimeout());
             Device device = devices.attach(host, deviceName(connection, host, name), DeviceKind.WEBOS,
                     WebOsAdapter.ADAPTER_ID, Map.of(WebOsSettings.CLIENT_KEY, key));
             return new PromptPairingResult.Paired(device);

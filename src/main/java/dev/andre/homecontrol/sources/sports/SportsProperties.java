@@ -2,8 +2,11 @@ package dev.andre.homecontrol.sources.sports;
 
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.time.temporal.ChronoUnit;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
 
 import java.net.URI;
@@ -25,8 +28,10 @@ public record SportsProperties(@DefaultValue("true") boolean enabled,
 
     @Validated
     public record Calendar(@DefaultValue("6h") Duration refresh,
-                           @DefaultValue("5") @Positive int connectTimeoutSeconds,
-                           @DefaultValue("15") @Positive int requestTimeoutSeconds,
+                           @DefaultValue("5s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                           Duration connectTimeout,
+                           @DefaultValue("15s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                           Duration requestTimeout,
                            @DefaultValue("5242880") @Positive int maxBytes,
                            @DefaultValue("3") @PositiveOrZero int maxRedirects,
                            @DefaultValue("false") boolean allowLoopback) {
@@ -37,8 +42,10 @@ public record SportsProperties(@DefaultValue("true") boolean enabled,
                               @DefaultValue("https://www.thesportsdb.com/api/v1/json") URI apiBaseUrl,
                               @DefaultValue("123") String freeKey,
                               @DefaultValue("24h") Duration fixturesTtl,
-                              @DefaultValue("5") @Positive int connectTimeoutSeconds,
-                              @DefaultValue("15") @Positive int requestTimeoutSeconds,
+                              @DefaultValue("5s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                              Duration connectTimeout,
+                              @DefaultValue("15s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                              Duration requestTimeout,
                               Map<String, Duration> sportDurations) {
 
         public static final Map<String, Duration> DEFAULT_DURATIONS = Map.of(

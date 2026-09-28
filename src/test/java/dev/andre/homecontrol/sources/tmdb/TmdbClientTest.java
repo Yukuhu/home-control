@@ -28,7 +28,8 @@ class TmdbClientTest {
     @BeforeEach
     void setUp() throws IOException {
         fake = new FakeTmdbServer().withStandardResponses();
-        TmdbProperties properties = new TmdbProperties(true, fake.apiBase(), null, 1, 1, 20, 40,
+        TmdbProperties properties = new TmdbProperties(true, fake.apiBase(), null, Duration.ofSeconds(1),
+                Duration.ofSeconds(1), 20, 40,
                 Duration.ofHours(24), Duration.ofHours(24), null);
         client = new TmdbClient(properties);
         bearer = TmdbCredential.parse(FakeTmdbServer.READ_TOKEN);
@@ -130,7 +131,8 @@ class TmdbClientTest {
 
     @Test
     void unreachableAndSlowServersAreUnreachable() {
-        TmdbProperties properties = new TmdbProperties(true, URI.create("http://127.0.0.1:9/3"), null, 1, 1, 20, 40,
+        TmdbProperties properties = new TmdbProperties(true, URI.create("http://127.0.0.1:9/3"), null,
+                Duration.ofSeconds(1), Duration.ofSeconds(1), 20, 40,
                 Duration.ofHours(24), Duration.ofHours(24), null);
         TmdbClient unreachableClient = new TmdbClient(properties);
 

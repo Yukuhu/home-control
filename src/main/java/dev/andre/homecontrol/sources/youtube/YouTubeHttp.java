@@ -70,9 +70,9 @@ public class YouTubeHttp {
     public YouTubeHttp(YouTubeProperties properties) {
         this.http = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NEVER)
-                .connectTimeout(Duration.ofSeconds(properties.connectTimeoutSeconds()))
+                .connectTimeout(properties.connectTimeout())
                 .build();
-        this.requestTimeout = Duration.ofSeconds(properties.requestTimeoutSeconds());
+        this.requestTimeout = properties.requestTimeout();
     }
 
     public Response get(URI uri, Map<String, String> headers) {

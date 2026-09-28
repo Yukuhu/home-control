@@ -49,12 +49,12 @@ class CastEndToEndTest {
     static void fastCastAndAnIsolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
         String dataDir = Files.createTempDirectory("cast-e2e").toString();
         registry.add("home-control.data-dir", () -> dataDir);
-        registry.add("home-control.cast.heartbeat-interval-seconds", () -> "1");
-        registry.add("home-control.cast.stale-timeout-seconds", () -> "3");
-        registry.add("home-control.cast.reconnect-max-delay-seconds", () -> "2");
-        registry.add("home-control.cast.command-timeout-seconds", () -> "3");
-        registry.add("home-control.cast.load-timeout-seconds", () -> "5");
-        registry.add("home-control.cast.media-status-interval-seconds", () -> "1");
+        registry.add("home-control.cast.heartbeat-interval", () -> "1s");
+        registry.add("home-control.cast.stale-timeout", () -> "3s");
+        registry.add("home-control.cast.reconnect-max-delay", () -> "2s");
+        registry.add("home-control.cast.command-timeout", () -> "3s");
+        registry.add("home-control.cast.load-timeout", () -> "5s");
+        registry.add("home-control.cast.media-status-interval", () -> "1s");
     }
 
     @LocalServerPort

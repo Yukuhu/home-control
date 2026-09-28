@@ -54,10 +54,10 @@ public class BluetoothSpeakerAdapter implements DeviceAdapter {
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
         MpvPlayer player = new MpvPlayer(launcher, MpvPlayer.socketFor(properties.runtimeDir(), device.id()),
-                Duration.ofSeconds(properties.playerStartTimeoutSeconds()), Duration.ofSeconds(properties.loadTimeoutSeconds()),
-                Duration.ofSeconds(properties.commandTimeoutSeconds()));
+                properties.playerStartTimeout(), properties.loadTimeout(),
+                properties.commandTimeout());
         AudioDeviceResolver audioDevices = new AudioDeviceResolver(launcher, properties.audioDeviceTemplate(),
-                Duration.ofSeconds(properties.playerStartTimeoutSeconds()));
+                properties.playerStartTimeout());
         BluetoothSpeakerSession session = new BluetoothSpeakerSession(device, properties, bluez, player, audioDevices, onChange);
         session.start();
         return session;

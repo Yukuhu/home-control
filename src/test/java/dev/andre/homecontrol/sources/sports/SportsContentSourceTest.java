@@ -27,9 +27,10 @@ class SportsContentSourceTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-19T14:00:00Z"), ZoneOffset.UTC);
 
     private static final SportsProperties PROPERTIES = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
-            new SportsProperties.Calendar(Duration.ofHours(6), 5, 15, 5242880, 3, false),
+            new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(5), Duration.ofSeconds(15),
+            5242880, 3, false),
             new SportsProperties.TheSportsDb(true, URI.create("https://www.thesportsdb.com/api/v1/json"), "123",
-                    Duration.ofHours(24), 5, 15, null));
+                    Duration.ofHours(24), Duration.ofSeconds(5), Duration.ofSeconds(15), null));
 
     private static SportsSettingsService settingsWith(List<SportsSettings.CalendarEntry> calendars) {
         SportsSettingsService service = mock(SportsSettingsService.class);

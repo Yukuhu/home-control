@@ -36,7 +36,8 @@ class TmdbContentSourceTest {
     @BeforeEach
     void setUp() throws IOException {
         fake = new FakeTmdbServer().withStandardResponses();
-        properties = new TmdbProperties(true, fake.apiBase(), null, 1, 2, 20, 40,
+        properties = new TmdbProperties(true, fake.apiBase(), null, Duration.ofSeconds(1), Duration.ofSeconds(2), 20,
+                40,
                 Duration.ofHours(24), Duration.ofHours(24), null);
         client = new TmdbClient(properties);
         images = new TmdbImages(client, properties, Clock.systemUTC());

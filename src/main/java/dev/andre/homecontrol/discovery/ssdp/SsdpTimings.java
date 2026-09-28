@@ -9,6 +9,6 @@ import java.time.Duration;
 public record SsdpTimings(Duration searchInterval) {
 
     public static SsdpTimings from(SsdpProperties properties) {
-        return new SsdpTimings(Duration.ofSeconds(properties.searchIntervalSeconds()));
+        return new SsdpTimings(properties.searchInterval());
     }
 }

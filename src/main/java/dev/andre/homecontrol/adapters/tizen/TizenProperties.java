@@ -3,10 +3,12 @@ package dev.andre.homecontrol.adapters.tizen;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.PositiveOrZero;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -20,9 +22,14 @@ public record TizenProperties(@DefaultValue("true") boolean enabled,
                               @DefaultValue("8001") @Min(1) @Max(65535) int restPort,
                               @DefaultValue("8080") @Min(1) @Max(65535) int dialPort,
                               @DefaultValue("Home Control") @NotBlank String clientName,
-                              @DefaultValue("3") @Positive int connectTimeoutSeconds,
-                              @DefaultValue("5") @Positive int requestTimeoutSeconds,
-                              @DefaultValue("30") @Positive int pairingTimeoutSeconds,
-                              @DefaultValue("5") @Positive int pollIntervalSeconds,
-                              @DefaultValue("3") @PositiveOrZero int wakeGraceSeconds) {
+                              @DefaultValue("3s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                              Duration connectTimeout,
+                              @DefaultValue("5s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                              Duration requestTimeout,
+                              @DefaultValue("30s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                              Duration pairingTimeout,
+                              @DefaultValue("5s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                              Duration pollInterval,
+                              @DefaultValue("3s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 0)
+                              Duration wakeGrace) {
 }

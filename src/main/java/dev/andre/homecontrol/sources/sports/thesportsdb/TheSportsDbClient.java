@@ -40,7 +40,7 @@ public class TheSportsDbClient {
     public TheSportsDbClient(SportsProperties.TheSportsDb properties) {
         this(properties, HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NEVER)
-                .connectTimeout(Duration.ofSeconds(properties.connectTimeoutSeconds()))
+                .connectTimeout(properties.connectTimeout())
                 .build());
     }
 
@@ -55,14 +55,14 @@ public class TheSportsDbClient {
         }
         HttpRequest request = HttpRequest.newBuilder(uri(key, endpoint, query))
                 .GET()
-                .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
+                .timeout(properties.requestTimeout())
                 .header("Accept", "application/json")
                 .header("User-Agent", "HomeControl")
                 .build();
         HttpResponse<byte[]> response;
         try {
             response = http.send(request,
-                    BoundedBody.handler(MAX_BODY_BYTES, Duration.ofSeconds(properties.requestTimeoutSeconds())));
+                    BoundedBody.handler(MAX_BODY_BYTES, properties.requestTimeout()));
         } catch (IOException _) {
             // No cause attached: the request URI (which the JDK's IOException/timeout messages can
             // quote in full, e.g. via a wrapped ConnectException) embeds the API key in its path.

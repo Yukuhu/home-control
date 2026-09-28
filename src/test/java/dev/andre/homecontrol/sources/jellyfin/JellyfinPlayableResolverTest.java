@@ -38,7 +38,8 @@ class JellyfinPlayableResolverTest {
     private static final PlayableRef.JellyfinItem WANTED =
             new PlayableRef.JellyfinItem(FakeJellyfinServer.SERVER_ID, ITEM_ID, 6_120_000_000L);
 
-    private final JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, 2, 5, 20));
+    private final JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, Duration.ofSeconds(2),
+            Duration.ofSeconds(5), 20, Duration.ofSeconds(30)));
     private final JellyfinSetupService setup = mock(JellyfinSetupService.class);
     private final JellyfinSessions sessions = new JellyfinSessions(client, setup, JellyfinSessions::resolve);
     private final JellyfinStreams streams = new JellyfinStreams(client);

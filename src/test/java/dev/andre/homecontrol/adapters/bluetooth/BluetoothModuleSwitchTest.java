@@ -6,6 +6,7 @@ import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure;
 import dev.andre.homecontrol.adapters.bluetooth.player.MpvLauncher;
 import dev.andre.homecontrol.adapters.bluetooth.player.ProcessMpvLauncher;
 import dev.andre.homecontrol.device.DeviceManager;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -53,7 +54,7 @@ class BluetoothModuleSwitchTest {
                     assertThat(context.getBean(MpvLauncher.class)).isInstanceOf(ProcessMpvLauncher.class);
                     BluetoothProperties properties = context.getBean(BluetoothProperties.class);
                     assertThat(properties.dbusAddress()).isEqualTo("unix:path=/nonexistent/hc-bus.sock");
-                    assertThat(properties.scanSeconds()).isEqualTo(10);
+                    assertThat(properties.scanDuration()).isEqualTo(Duration.ofSeconds(10));
                     assertThat(properties.defaultVolume()).isEqualTo(50);
                     assertThat(properties.mpvPath()).isEqualTo("mpv");
                     assertThat(properties.runtimeDir())
@@ -67,7 +68,7 @@ class BluetoothModuleSwitchTest {
 
     @Test
     void anInvalidScanSecondsFailsStartup() {
-        runner.withPropertyValues("home-control.bluetooth.enabled=true", "home-control.bluetooth.scan-seconds=0")
+        runner.withPropertyValues("home-control.bluetooth.enabled=true", "home-control.bluetooth.scan-duration=0s")
                 .run(context -> assertThat(context).hasFailed());
     }
 
@@ -80,18 +81,20 @@ class BluetoothModuleSwitchTest {
     @Test
     void withMethodsReplaceASingleField() {
         BluetoothProperties base = BluetoothProperties.defaults();
-        assertThat(base.withScanSeconds(1).scanSeconds()).isEqualTo(1);
+        assertThat(base.withScanDuration(Duration.ofSeconds(1)).scanDuration()).isEqualTo(Duration.ofSeconds(1));
         assertThat(base.withAdapter("hci1").adapter()).isEqualTo("hci1");
         assertThat(base.withAutoConnect(false).autoConnect()).isFalse();
         assertThat(base.withMpvPath("/usr/bin/mpv").mpvPath()).isEqualTo("/usr/bin/mpv");
         assertThat(base.withRuntimeDir(Path.of("/tmp/x")).runtimeDir()).isEqualTo(Path.of("/tmp/x"));
         assertThat(base.withAudioDeviceTemplate("alsa/x").audioDeviceTemplate()).isEqualTo("alsa/x");
-        BluetoothProperties timed = base.withTimings(2, 3, 4, 5, 6);
-        assertThat(timed.pollIntervalSeconds()).isEqualTo(2);
-        assertThat(timed.playingPollIntervalSeconds()).isEqualTo(3);
-        assertThat(timed.playerStartTimeoutSeconds()).isEqualTo(4);
-        assertThat(timed.loadTimeoutSeconds()).isEqualTo(5);
-        assertThat(timed.commandTimeoutSeconds()).isEqualTo(6);
+        BluetoothProperties timed = base.withTimings(Duration.ofSeconds(2), Duration.ofSeconds(3),
+                Duration.ofSeconds(4),
+                Duration.ofSeconds(5), Duration.ofSeconds(6));
+        assertThat(timed.pollInterval()).isEqualTo(Duration.ofSeconds(2));
+        assertThat(timed.playingPollInterval()).isEqualTo(Duration.ofSeconds(3));
+        assertThat(timed.playerStartTimeout()).isEqualTo(Duration.ofSeconds(4));
+        assertThat(timed.loadTimeout()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(timed.commandTimeout()).isEqualTo(Duration.ofSeconds(6));
     }
 
     @Test

@@ -55,7 +55,8 @@ public class BluetoothSetupAdvice {
                             manager.state(device.id()).status().name(), settings.audioDevice());
                 })
                 .toList();
-        return new View(results, results.stream().allMatch(HostCheck::ok), service.lastScan(), props.scanSeconds(),
+        return new View(results, results.stream().allMatch(HostCheck::ok), service.lastScan(),
+                Math.toIntExact(props.scanDuration().toSeconds()),
                 speakers, speakers.stream().map(SpeakerRow::address).collect(Collectors.toSet()));
     }
 }

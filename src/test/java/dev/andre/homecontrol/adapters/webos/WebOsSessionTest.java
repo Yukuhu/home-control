@@ -96,7 +96,9 @@ class WebOsSessionTest {
             throws IOException {
         Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1", Map.of("webos", settings), Instant.now());
         registry.save(device);
-        WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 2, 2, 1, 2, 0);
+        WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(),
+                Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(1),
+                Duration.ofSeconds(2), Duration.ofSeconds(0));
         session = new WebOsSession(device, properties, timings, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
                 learned(), new WakeOnLan(receiver.address()), listener, () -> { });
         return session;
@@ -412,8 +414,11 @@ class WebOsSessionTest {
         Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1",
                 Map.of("webos", Map.of("clientKey", FakeSsapServer.CLIENT_KEY)), Instant.now());
         registry.save(device);
-        WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 1, 2, 1, 2, 0, 1);
-        session = new WebOsSession(device, properties, LIVENESS, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
+        WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(),
+                Duration.ofSeconds(2), Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(1),
+                Duration.ofSeconds(2), Duration.ofSeconds(0), Duration.ofSeconds(1));
+        session = new WebOsSession(device, properties, LIVENESS, InsecureTls.httpClient(Duration.ofSeconds(2)),
+                registry,
                 learned(), new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         connected();
@@ -432,8 +437,11 @@ class WebOsSessionTest {
         Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1",
                 Map.of("webos", Map.of("clientKey", FakeSsapServer.CLIENT_KEY)), Instant.now());
         registry.save(device);
-        WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 1, 2, 1, 2, 0, 1);
-        session = new WebOsSession(device, properties, LIVENESS, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
+        WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(),
+                Duration.ofSeconds(2), Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(1),
+                Duration.ofSeconds(2), Duration.ofSeconds(0), Duration.ofSeconds(1));
+        session = new WebOsSession(device, properties, LIVENESS, InsecureTls.httpClient(Duration.ofSeconds(2)),
+                registry,
                 learned(), new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         connected();

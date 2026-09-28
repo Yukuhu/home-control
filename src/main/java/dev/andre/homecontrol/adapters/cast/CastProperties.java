@@ -1,8 +1,11 @@
 package dev.andre.homecontrol.adapters.cast;
 
-import jakarta.validation.constraints.Positive;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -12,20 +15,27 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties("home-control.cast")
 @Validated
 public record CastProperties(@DefaultValue("true") boolean enabled,
-                             @DefaultValue("5") @Positive int heartbeatIntervalSeconds,
-                             @DefaultValue("15") @Positive int staleTimeoutSeconds,
-                             @DefaultValue("1") @Positive int reconnectInitialDelaySeconds,
-                             @DefaultValue("60") @Positive int reconnectMaxDelaySeconds,
-                             @DefaultValue("5") @Positive int commandTimeoutSeconds,
-                             @DefaultValue("20") @Positive int loadTimeoutSeconds,
-                             @DefaultValue("5") @Positive int mediaStatusIntervalSeconds) {
+                             @DefaultValue("5s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                             Duration heartbeatInterval,
+                             @DefaultValue("15s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                             Duration staleTimeout,
+                             @DefaultValue("1s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                             Duration reconnectInitialDelay,
+                             @DefaultValue("60s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                             Duration reconnectMaxDelay,
+                             @DefaultValue("5s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                             Duration commandTimeout,
+                             @DefaultValue("20s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                             Duration loadTimeout,
+                             @DefaultValue("5s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                             Duration mediaStatusInterval) {
 
     public CastProperties {
         // The stale timeout is the socket read timeout; a healthy receiver answers each ping, so
         // it must be longer than one heartbeat interval or every idle connection reads as stale.
-        if (staleTimeoutSeconds <= heartbeatIntervalSeconds) {
-            throw new IllegalArgumentException("home-control.cast.stale-timeout-seconds (" + staleTimeoutSeconds
-                    + ") must be greater than home-control.cast.heartbeat-interval-seconds (" + heartbeatIntervalSeconds + ")");
+        if (staleTimeout != null && heartbeatInterval != null && staleTimeout.compareTo(heartbeatInterval) <= 0) {
+            throw new IllegalArgumentException("home-control.cast.stale-timeout (" + staleTimeout
+                    + ") must be greater than home-control.cast.heartbeat-interval (" + heartbeatInterval + ")");
         }
     }
 }

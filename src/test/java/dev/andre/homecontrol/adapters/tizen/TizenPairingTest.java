@@ -5,6 +5,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.PromptPairingResult;
 import dev.andre.homecontrol.device.DeviceManager;
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,8 +44,9 @@ class TizenPairingTest {
     }
 
     private TizenPairing pairing(int port, int pairingTimeoutSeconds) {
-        return new TizenPairing(new TizenProperties(true, port, tv.httpPort(), tv.httpPort(), "Home Control", 2, 2,
-                pairingTimeoutSeconds, 1, 0), devices);
+        return new TizenPairing(new TizenProperties(true, port, tv.httpPort(), tv.httpPort(), "Home Control",
+                Duration.ofSeconds(2), Duration.ofSeconds(2),
+                Duration.ofSeconds(pairingTimeoutSeconds), Duration.ofSeconds(1), Duration.ofSeconds(0)), devices);
     }
 
     @Test
@@ -102,7 +104,9 @@ class TizenPairingTest {
 
     @Test
     void describesItselfForTheSetupPage() {
-        TizenPairing pairing = new TizenPairing(new TizenProperties(true, 8002, 8001, 8080, "Home Control", 3, 5, 30, 5, 3),
+        TizenPairing pairing = new TizenPairing(new TizenProperties(true, 8002, 8001, 8080, "Home Control",
+                Duration.ofSeconds(3), Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofSeconds(5),
+                Duration.ofSeconds(3)),
                 devices);
 
         assertThat(pairing.adapterId()).isEqualTo("tizen");

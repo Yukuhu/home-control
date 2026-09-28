@@ -66,7 +66,7 @@ public class BluetoothPairingService {
             if (!adapter.powered()) {
                 bluez.powerOn(adapter.address());
             }
-            List<BluetoothDeviceInfo> found = bluez.discover(adapter.address(), Duration.ofSeconds(properties.scanSeconds()));
+            List<BluetoothDeviceInfo> found = bluez.discover(adapter.address(), properties.scanDuration());
             List<BluetoothDeviceInfo> speakers = found.stream().filter(BluetoothDeviceInfo::mayBeSpeaker).sorted(SPEAKERS_FIRST).toList();
             result = new BluetoothScan(clock.instant(), speakers, found.size() - speakers.size(), null);
         } catch (BluezException e) {

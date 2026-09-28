@@ -50,9 +50,11 @@ class SonosDiscoveryTest {
         // The announcement comes from the living room's own address, as a real player's does.
         responder = new FakeSsdpResponder(InetAddress.getByName("127.0.0.2"));
         responder.answer(SonosDiscovery.SEARCH_TARGET, living.searchResponse());
-        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.2", responder.port(), 0, 1, 1),
+        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.2", responder.port(), 0, Duration.ofSeconds(1), 1),
                 new SsdpTimings(Duration.ofMillis(200)));
-        discovery = new SonosDiscovery(ssdp, new SonosProperties(true, 1, 1, 0, 1, 1, 1, 2), events::add);
+        discovery = new SonosDiscovery(ssdp, new SonosProperties(true, Duration.ofSeconds(1), Duration.ofSeconds(1),
+                Duration.ofSeconds(0), Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1),
+                Duration.ofSeconds(2)), events::add);
     }
 
     /** Searching starts only once a test has set up what the responder answers. */
@@ -113,7 +115,9 @@ class SonosDiscoveryTest {
 
     /** Runs a real device manager fed by this discovery's events and checks {@code registered} stays as it was. */
     private void assertRegistryUntouchedBy(DeviceRegistry registry, Device registered) {
-        SonosProperties properties = new SonosProperties(true, 1, 1, 0, 1, 1, 1, 2);
+        SonosProperties properties = new SonosProperties(true, Duration.ofSeconds(1), Duration.ofSeconds(1),
+                Duration.ofSeconds(0), Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1),
+                Duration.ofSeconds(2));
         DeviceManager[] manager = new DeviceManager[1];
         List<Object> managerEvents = new CopyOnWriteArrayList<>();
         SonosDiscovery fed = new SonosDiscovery(ssdp, properties, event -> {

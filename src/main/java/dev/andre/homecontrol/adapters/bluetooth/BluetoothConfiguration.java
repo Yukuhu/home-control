@@ -28,7 +28,7 @@ public class BluetoothConfiguration {
         // The only reference to the D-Bus implementation class in the whole codebase: importing it
         // here as a return type would defeat the point, so it is named only inside this method body.
         return new dev.andre.homecontrol.adapters.bluetooth.bluez.DbusBluezClient(properties.dbusAddress(),
-                properties.dbusSocketPath(), Duration.ofSeconds(properties.bluezTimeoutSeconds()));
+                properties.dbusSocketPath(), properties.bluezTimeout());
     }
 
     @Bean(destroyMethod = "close")

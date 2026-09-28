@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.playback.PlayableRef;
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -17,7 +18,8 @@ class JellyfinStreamsTest {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final URI DEVICE_SERVER_URL = URI.create("http://192.168.1.20:8096");
 
-    private final JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, 2, 5, 20));
+    private final JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, Duration.ofSeconds(2),
+            Duration.ofSeconds(5), 20, Duration.ofSeconds(30)));
     private final JellyfinStreams streams = new JellyfinStreams(client);
     private FakeJellyfinServer fake;
 

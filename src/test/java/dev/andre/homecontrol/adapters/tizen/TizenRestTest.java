@@ -16,7 +16,9 @@ class TizenRestTest {
     private TizenRest rest;
 
     static TizenProperties properties(FakeTizenServer fake) {
-        return new TizenProperties(true, fake.port(), fake.httpPort(), fake.httpPort(), "Home Control", 2, 2, 2, 1, 0);
+        return new TizenProperties(true, fake.port(), fake.httpPort(), fake.httpPort(), "Home Control",
+                Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(1),
+                Duration.ofSeconds(0));
     }
 
     @BeforeEach

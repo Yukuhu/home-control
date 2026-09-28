@@ -4,8 +4,12 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -19,6 +23,7 @@ public record SsdpProperties(@DefaultValue("true") boolean enabled,
                              @DefaultValue("239.255.255.250") @NotBlank String multicastAddress,
                              @DefaultValue("1900") @Min(0) @Max(65535) int port,
                              @DefaultValue("1900") @Min(0) @Max(65535) int listenPort,
-                             @DefaultValue("60") @Positive int searchIntervalSeconds,
+                             @DefaultValue("60s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                             Duration searchInterval,
                              @DefaultValue("2") @Positive int mx) {
 }

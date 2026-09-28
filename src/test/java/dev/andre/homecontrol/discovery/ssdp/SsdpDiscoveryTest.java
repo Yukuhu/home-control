@@ -46,7 +46,8 @@ class SsdpDiscoveryTest {
         http.createContext("/big/description.xml", this::serveOversized);
         http.start();
         clock = new MutableClock(Instant.parse("2026-09-16T12:00:00Z"), ZoneOffset.UTC);
-        discovery = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+        discovery = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0,
+                Duration.ofSeconds(1), 1),
                 new SsdpTimings(Duration.ofMillis(200)), clock, HttpClient.newHttpClient());
         discovery.start();
     }
@@ -214,7 +215,7 @@ class SsdpDiscoveryTest {
     @Test
     void disabledDiscoveryOpensNoSockets() {
         try (SsdpDiscovery disabled = new SsdpDiscovery(
-                new SsdpProperties(false, "127.0.0.1", responder.port(), 0, 1, 1))) {
+                new SsdpProperties(false, "127.0.0.1", responder.port(), 0, Duration.ofSeconds(1), 1))) {
             disabled.start();
             disabled.watch(LG_TARGET);
 
@@ -302,7 +303,8 @@ class SsdpDiscoveryTest {
         });
         responder.answer(LG_TARGET, FakeSsdpResponder.fixture("lg-search-response.txt", "127.0.0.1", httpPort()));
 
-        try (SsdpDiscovery real = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+        try (SsdpDiscovery real = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0,
+                Duration.ofSeconds(1), 1),
                 new SsdpTimings(Duration.ofMillis(200)))) {
             real.start();
             real.watch(LG_TARGET);

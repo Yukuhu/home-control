@@ -53,8 +53,8 @@ final class SsapConnection implements AutoCloseable {
 
     private SsapConnection(HttpClient http, WebOsProperties properties) {
         this.http = http;
-        this.connectTimeout = Duration.ofSeconds(properties.connectTimeoutSeconds());
-        this.requestTimeout = Duration.ofSeconds(properties.requestTimeoutSeconds());
+        this.connectTimeout = properties.connectTimeout();
+        this.requestTimeout = properties.requestTimeout();
     }
 
     /** ws://host:port first, then wss://host:securePort (firmware that closed the plain port or insists on TLS). */

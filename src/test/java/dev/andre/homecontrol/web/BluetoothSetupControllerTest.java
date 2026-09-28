@@ -12,6 +12,7 @@ import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
+import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +44,7 @@ class BluetoothSetupControllerTest extends WebSliceTest {
         given(devices.devices()).willReturn(List.of());
         given(devices.pairable()).willReturn(List.of());
         given(devices.addable()).willReturn(List.of());
-        given(bluetoothProperties.scanSeconds()).willReturn(10);
+        given(bluetoothProperties.scanDuration()).willReturn(Duration.ofSeconds(10));
         given(bluetoothChecks.results()).willReturn(List.of(
                 new HostCheck("dbus-socket", "D-Bus system socket", true, "Found /run/dbus/system_bus_socket"),
                 new HostCheck("bluez", "BlueZ", true, "BlueZ answered on the system bus"),

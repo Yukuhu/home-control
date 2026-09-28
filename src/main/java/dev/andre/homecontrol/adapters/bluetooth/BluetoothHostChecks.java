@@ -62,7 +62,7 @@ public class BluetoothHostChecks {
 
     public synchronized List<HostCheck> results() {
         Instant now = clock.instant();
-        if (cached != null && now.isBefore(cachedAt.plusSeconds(properties.hostCheckCacheSeconds()))) {
+        if (cached != null && now.isBefore(cachedAt.plus(properties.hostCheckCacheTtl()))) {
             return cached;
         }
         cached = run();

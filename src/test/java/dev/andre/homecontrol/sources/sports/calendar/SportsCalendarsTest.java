@@ -81,9 +81,10 @@ class SportsCalendarsTest {
         settingsService = new SportsSettingsService(store, events);
 
         properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
-                new SportsProperties.Calendar(Duration.ofHours(6), 1, 2, 5242880, 3, true),
+                new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                5242880, 3, true),
                 new SportsProperties.TheSportsDb(true, URI.create("http://127.0.0.1:9/api/v1/json"), "123",
-                        Duration.ofHours(24), 1, 2, null));
+                        Duration.ofHours(24), Duration.ofSeconds(1), Duration.ofSeconds(2), null));
 
         policy = new CalendarUrlPolicy(true);
         fetcher = new CalendarFetcher(properties.calendar(), policy);

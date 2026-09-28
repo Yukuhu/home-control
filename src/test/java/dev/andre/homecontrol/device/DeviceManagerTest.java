@@ -71,7 +71,8 @@ class DeviceManagerTest {
     private final ApplicationEventPublisher publisher = published::add;
 
     private AndroidTvProperties properties() {
-        return new AndroidTvProperties(true, "shield", Duration.ofSeconds(10), Duration.ofSeconds(1), Duration.ofSeconds(4));
+        return new AndroidTvProperties(true, "shield", Duration.ofSeconds(10), Duration.ofSeconds(1),
+                Duration.ofSeconds(4));
     }
 
     private CertificateStore certificates() {
@@ -530,9 +531,12 @@ class DeviceManagerTest {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
         registry.save(new Device("webos-10-0-0-60", "Living Room TV", DeviceKind.WEBOS, "10.0.0.60",
                 Map.of("webos", Map.of("clientKey", "k")), Instant.now()));
-        SsdpDiscovery ssdp = new SsdpDiscovery(new SsdpProperties(false, "239.255.255.250", 1900, 1900, 60, 2));
+        SsdpDiscovery ssdp = new SsdpDiscovery(new SsdpProperties(false, "239.255.255.250", 1900, 1900,
+                Duration.ofSeconds(60), 2));
         UpnpDiscovery upnpDiscovery = new UpnpDiscovery(ssdp, event -> { }, true);
-        UpnpAdapter upnp = new UpnpAdapter(new UpnpProperties(true, 1, 1, 1, 1, 1, 2), upnpDiscovery);
+        UpnpAdapter upnp = new UpnpAdapter(new UpnpProperties(true, Duration.ofSeconds(1), Duration.ofSeconds(1),
+                Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(2)),
+                upnpDiscovery);
 
         try (DeviceManager manager = new DeviceManager(registry, List.of(upnp), publisher)) {
             manager.onDiscovered(new DeviceDiscoveredEvent(new DiscoveredDevice("upnp", "[LG] webOS TV", "10.0.0.60", 1780,

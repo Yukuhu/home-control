@@ -25,7 +25,8 @@ class TheSportsDbClientTest {
     void start() throws IOException {
         server = new FakeTheSportsDbServer().withStandardResponses();
         SportsProperties.TheSportsDb properties = new SportsProperties.TheSportsDb(
-                true, server.apiBase(), "123", Duration.ofHours(24), 1, 2, null);
+                true, server.apiBase(), "123", Duration.ofHours(24), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                null);
         client = new TheSportsDbClient(properties);
     }
 

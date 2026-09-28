@@ -51,7 +51,7 @@ final class TizenRest {
     private Optional<JsonNode> getJson(String host, String path) {
         String authority = Hosts.authority(host);
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://" + authority + ":" + properties.restPort() + path))
-                .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
+                .timeout(properties.requestTimeout())
                 .GET().build();
         try {
             HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());

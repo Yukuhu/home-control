@@ -7,11 +7,11 @@ record SonosTimings(Duration pollInterval, Duration idlePollInterval, Duration t
                     Duration commandTimeout, Duration reconnectInitialDelay, Duration reconnectMaxDelay) {
 
     static SonosTimings from(SonosProperties properties) {
-        return new SonosTimings(Duration.ofSeconds(properties.pollIntervalSeconds()),
-                Duration.ofSeconds(properties.idlePollIntervalSeconds()),
-                Duration.ofSeconds(properties.topologyIntervalSeconds()),
-                Duration.ofSeconds(properties.commandTimeoutSeconds()),
-                Duration.ofSeconds(properties.reconnectInitialDelaySeconds()),
-                Duration.ofSeconds(properties.reconnectMaxDelaySeconds()));
+        return new SonosTimings(properties.pollInterval(),
+                properties.idlePollInterval(),
+                properties.topologyInterval(),
+                properties.commandTimeout(),
+                properties.reconnectInitialDelay(),
+                properties.reconnectMaxDelay());
     }
 }

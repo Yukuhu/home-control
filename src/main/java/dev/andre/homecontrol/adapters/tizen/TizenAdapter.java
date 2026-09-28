@@ -45,7 +45,7 @@ public class TizenAdapter implements WakeOnLanAdapter {
         this.ssdp = ssdp;
         this.registry = registry;
         this.wakeOnLan = wakeOnLan;
-        this.http = InsecureTls.httpClient(Duration.ofSeconds(properties.connectTimeoutSeconds()));
+        this.http = InsecureTls.httpClient(properties.connectTimeout());
         // A TV that just woke announces itself: poll now instead of at the next interval.
         // Plain string comparison: SSDP listeners must not block on DNS.
         ssdp.addListener(SEARCH_TARGET, service -> sessions.values().stream()

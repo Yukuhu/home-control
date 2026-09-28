@@ -19,7 +19,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CalendarFetcherFailureTest {
 
     private final SportsProperties.Calendar properties =
-            new SportsProperties.Calendar(Duration.ofHours(6), 1, 2, 2 * 1024 * 1024, 3, false);
+            new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
+            2 * 1024 * 1024, 3, false);
     private final CalendarUrlPolicy policy = new CalendarUrlPolicy(true);
     private FakeCalendarServer server;
 

@@ -23,7 +23,7 @@ public class TizenPairing implements PromptPairing {
     public TizenPairing(TizenProperties properties, DeviceManager devices) {
         this.properties = properties;
         this.devices = devices;
-        this.http = InsecureTls.httpClient(Duration.ofSeconds(properties.connectTimeoutSeconds()));
+        this.http = InsecureTls.httpClient(properties.connectTimeout());
         this.rest = new TizenRest(http, properties);
     }
 
@@ -40,13 +40,13 @@ public class TizenPairing implements PromptPairing {
     @Override
     public String instructions() {
         return "The TV asks whether to allow \"" + properties.clientName() + "\". Choose Allow with the TV remote within "
-                + properties.pairingTimeoutSeconds() + " seconds.";
+                + properties.pairingTimeout().toSeconds() + " seconds.";
     }
 
     @Override
     public PromptPairingResult pair(String host, String name) {
         try (TizenRemoteConnection connection = TizenRemoteConnection.open(http, host, properties, null, reason -> { })) {
-            return switch (connection.awaitAuthorization(Duration.ofSeconds(properties.pairingTimeoutSeconds()))) {
+            return switch (connection.awaitAuthorization(properties.pairingTimeout())) {
                 case CONNECTED -> {
                     Map<String, String> settings = new LinkedHashMap<>();
                     settings.put(TizenSettings.PAIRED_KEY, "true");
@@ -58,7 +58,7 @@ public class TizenPairing implements PromptPairing {
                 }
                 case UNAUTHORIZED -> new PromptPairingResult.Declined("The TV declined the connection request");
                 case NO_ANSWER -> new PromptPairingResult.Failed("Nobody allowed the connection on the TV within "
-                        + properties.pairingTimeoutSeconds() + " seconds; try again");
+                        + properties.pairingTimeout().toSeconds() + " seconds; try again");
             };
         } catch (IOException e) {
             return new PromptPairingResult.Failed("Could not reach a Samsung TV at " + host + ": " + e.getMessage());

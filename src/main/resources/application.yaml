@@ -37,23 +37,23 @@ home-control:
     multicast-address: 239.255.255.250
     port: 1900
     listen-port: 1900
-    search-interval-seconds: 60
+    search-interval: 60s
     mx: 2
   webos:
     enabled: true
     # SSAP over ws:// first, then wss:// (newer firmware) with the TV's self-signed certificate.
     port: 3000
     secure-port: 3001
-    connect-timeout-seconds: 3
-    request-timeout-seconds: 10
+    connect-timeout: 3s
+    request-timeout: 10s
     # How long the setup page waits for someone to accept the prompt on the TV.
-    pairing-timeout-seconds: 60
-    reconnect-initial-delay-seconds: 1
-    reconnect-max-delay-seconds: 30
+    pairing-timeout: 60s
+    reconnect-initial-delay: 1s
+    reconnect-max-delay: 30s
     # After a Wake-on-LAN packet, how long the TV gets before the first reconnect.
-    wake-grace-seconds: 3
+    wake-grace: 3s
     # SSAP has no heartbeat: a connected TV is asked a cheap question this often; silence means it is gone.
-    liveness-interval-seconds: 30
+    liveness-interval: 30s
   tizen:
     enabled: true
     # Remote-control WebSocket (TLS, self-signed), REST API and DIAL.
@@ -62,32 +62,32 @@ home-control:
     dial-port: 8080
     # What the TV shows in its Allow prompt and its list of connected devices.
     client-name: Home Control
-    connect-timeout-seconds: 3
-    request-timeout-seconds: 5
-    pairing-timeout-seconds: 30
+    connect-timeout: 3s
+    request-timeout: 5s
+    pairing-timeout: 30s
     # Samsung pushes no state: power and the app in front are polled.
-    poll-interval-seconds: 5
-    wake-grace-seconds: 3
+    poll-interval: 5s
+    wake-grace: 3s
   upnp:
     # DLNA/UPnP media renderers found over SSDP (needs host networking).
     enabled: true
     # State is polled: every poll-interval while something plays, idle-poll-interval otherwise.
-    poll-interval-seconds: 2
-    idle-poll-interval-seconds: 10
-    command-timeout-seconds: 5
-    connect-timeout-seconds: 3
-    reconnect-initial-delay-seconds: 1
-    reconnect-max-delay-seconds: 60
+    poll-interval: 2s
+    idle-poll-interval: 10s
+    command-timeout: 5s
+    connect-timeout: 3s
+    reconnect-initial-delay: 1s
+    reconnect-max-delay: 60s
   sonos:
     # Sonos rooms found over SSDP; grouping from the device drawer. Off: players appear as plain UPnP renderers.
     enabled: true
-    poll-interval-seconds: 2
-    idle-poll-interval-seconds: 10
-    topology-interval-seconds: 30
-    command-timeout-seconds: 5
-    connect-timeout-seconds: 3
-    reconnect-initial-delay-seconds: 1
-    reconnect-max-delay-seconds: 60
+    poll-interval: 2s
+    idle-poll-interval: 10s
+    topology-interval: 30s
+    command-timeout: 5s
+    connect-timeout: 3s
+    reconnect-initial-delay: 1s
+    reconnect-max-delay: 60s
   bluetooth:
     # Bluetooth speakers through the host's BlueZ and a server-side mpv player.
     # Needs host plumbing and the -bluetooth image: see docs/user/bluetooth-speakers.md.
@@ -95,20 +95,20 @@ home-control:
     dbus-address: unix:path=/run/dbus/system_bus_socket
     # Blank = first powered adapter; otherwise an adapter MAC or id such as hci0.
     adapter: ""
-    scan-seconds: 10
-    bluez-timeout-seconds: 45
-    poll-interval-seconds: 5
-    playing-poll-interval-seconds: 1
+    scan-duration: 10s
+    bluez-timeout: 45s
+    poll-interval: 5s
+    playing-poll-interval: 1s
     auto-connect: true
     mpv-path: mpv
     # runtime-dir defaults to <java.io.tmpdir>/home-control-bluetooth
     # e.g. alsa/bluealsa:DEV={mac},PROFILE=a2dp - blank = find the speaker's PipeWire/PulseAudio sink.
     audio-device-template: ""
     default-volume: 50
-    player-start-timeout-seconds: 5
-    load-timeout-seconds: 15
-    command-timeout-seconds: 3
-    host-check-cache-seconds: 30
+    player-start-timeout: 5s
+    load-timeout: 15s
+    command-timeout: 3s
+    host-check-cache-ttl: 30s
   deep-link-test:
     # Blender Foundation's "Big Buck Bunny": long-lived and region-free.
     youtube-url: https://www.youtube.com/watch?v=aqz-KE-bpKQ
@@ -120,13 +120,13 @@ home-control:
   cast:
     enabled: true
     # A PING every 5 s; 15 s without any inbound frame means the receiver is gone.
-    heartbeat-interval-seconds: 5
-    stale-timeout-seconds: 15
-    reconnect-initial-delay-seconds: 1
-    reconnect-max-delay-seconds: 60
-    command-timeout-seconds: 5
-    load-timeout-seconds: 20
-    media-status-interval-seconds: 5
+    heartbeat-interval: 5s
+    stale-timeout: 15s
+    reconnect-initial-delay: 1s
+    reconnect-max-delay: 60s
+    command-timeout: 5s
+    load-timeout: 20s
+    media-status-interval: 5s
   security:
     # Optional passphrase for secrets.json; without it a random /data/secret.key is created on first use.
     secret: ${HOME_CONTROL_SECRET:}
@@ -142,17 +142,17 @@ home-control:
     allow-loopback: ${HOME_CONTROL_WORKFLOWS_ALLOW_LOOPBACK:false}
   jellyfin:
     enabled: ${HOME_CONTROL_JELLYFIN_ENABLED:true}
-    connect-timeout-seconds: 5
-    request-timeout-seconds: 15
-    startup-timeout-seconds: 30
+    connect-timeout: 5s
+    request-timeout: 15s
+    startup-timeout: 30s
     rail-size: 20
   tmdb:
     enabled: true
     api-base-url: https://api.themoviedb.org/3
     # Leave empty to use TMDB's /configuration; set to serve posters from a mirror.
     image-base-url:
-    connect-timeout-seconds: 5
-    request-timeout-seconds: 10
+    connect-timeout: 5s
+    request-timeout: 10s
     rail-size: 20
     trending-candidates: 40
     provider-cache-ttl: 24h
@@ -173,8 +173,8 @@ home-control:
     default-event-duration: 120m
     calendar:
       refresh: 6h
-      connect-timeout-seconds: 5
-      request-timeout-seconds: 15
+      connect-timeout: 5s
+      request-timeout: 15s
       max-bytes: 5242880
       max-redirects: 3
       # Loopback addresses reach this box's own services; allow only if the calendar is served here.
@@ -185,8 +185,8 @@ home-control:
       # TheSportsDB's documented free key; a personal key is entered in Setup and stored as a secret.
       free-key: "123"
       fixtures-ttl: 24h
-      connect-timeout-seconds: 5
-      request-timeout-seconds: 15
+      connect-timeout: 5s
+      request-timeout: 15s
       sport-durations:
         soccer: 120m
         basketball: 150m
@@ -203,8 +203,8 @@ home-control:
     api-base-url: https://www.googleapis.com/youtube/v3
     lounge-base-url: https://www.youtube.com/api/lounge
     thumbnail-base-url: https://i.ytimg.com
-    connect-timeout-seconds: 5
-    request-timeout-seconds: 15
+    connect-timeout: 5s
+    request-timeout: 15s
     # Your Cloud project's daily YouTube Data API quota (10000 unless Google raised it).
     daily-quota-units: 10000
     # Each search costs 100 units.
