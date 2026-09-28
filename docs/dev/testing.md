@@ -7,12 +7,27 @@ How the test suites are built and how to run them.
 | Layer | What it is | Where |
 | --- | --- | --- |
 | Unit tests | Plain JUnit 5 with AssertJ, Mockito and Awaitility. Most device and source tests drive the real client against an in-process fake that speaks the real protocol over a socket. | `src/test/java`, next to the code |
-| Web slices | `@WebMvcTest` of one controller with its collaborators mocked. | `src/test/java/.../web`, and next to each content source's own controllers |
+| Web slices | One shared `@WebMvcTest` context over every controller, with their collaborators mocked: test classes extend `WebSliceTest`. | `src/test/java/.../web`, and next to each content source's own controllers |
 | End to end | `@SpringBootTest` with the whole application and fake devices or services, over MockMvc or real HTTP. | classes named `*EndToEndTest` |
 | Browser tests | Playwright driving the dashboard in Chromium, Firefox and WebKit. | `src/e2e/java`, see [Browser tests](#browser-tests) |
 | Architecture | ArchUnit package rules. | `ArchitectureTest`, see [Architecture](architecture.md#package-rules) |
 
 When this page was written, the unit, slice, end-to-end and architecture tests numbered 2,689.
+
+## Web slices
+
+A web-layer test extends `testsupport.WebSliceTest`. That class is one `@WebMvcTest` over every controller and
+controller advice, with every collaborator declared once as a `@MockitoBean`, so all web tests share one Spring context
+per test JVM.
+- A test class stubs the base's mocks (`devices`, `pairing`, `sources`, …) and declares no beans of its own: no
+  `@MockitoBean`, `@Import` or nested `@TestConfiguration`. Any of those would give it a context of its own, and
+  `WebSliceRulesTest` fails.
+- A controller that needs a new collaborator gets it as a `@MockitoBean` in `WebSliceTest`. If every `/setup` render
+  calls it and Mockito's `null` would break the page, `stubSafeDefaults()` gives it a safe value.
+- Every `/setup` render carries every module's section, so a check on the setup page names its own section (an element
+  id, or the section's text, as `TmdbSetupControllerTest.tmdbSection` does) rather than a word other sections render.
+- A test that needs a bean to be absent does not fit the slice: build the controller with a standalone MockMvc, as
+  `ContentPlayWithoutPinsTest` does.
 
 ## Running tests
 
