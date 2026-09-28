@@ -65,6 +65,20 @@ public final class WorkflowStore {
         return Optional.ofNullable(snapshot.definitions.get(id));
     }
 
+    /**
+     * Reads the definitions from the secrets again; this store otherwise reads them only when it is created. Exists
+     * for the shared test context, which removes every secret between test classes.
+     */
+    public void reload() {
+        writes.lock();
+        try {
+            snapshot = load();
+        } finally {
+            writes.unlock();
+        }
+        changed();
+    }
+
     public WorkflowDefinition create(WorkflowDraft draft, String password, String confirmation,
                                      HttpServletRequest request) {
         WorkflowDefinition created;

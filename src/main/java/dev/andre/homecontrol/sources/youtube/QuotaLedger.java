@@ -111,6 +111,22 @@ public class QuotaLedger {
                 Collections.unmodifiableMap(new LinkedHashMap<>(calls)), resetsAt());
     }
 
+    /**
+     * Forgets today's usage and deletes its file. Exists for the shared test context, which reuses one application
+     * for many test classes.
+     */
+    public synchronized void reset() {
+        day = today();
+        units = 0;
+        searches = 0;
+        calls.clear();
+        try {
+            Files.deleteIfExists(file);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not delete " + file, e);
+        }
+    }
+
     YouTubeException exhaustedException() {
         return new YouTubeException(YouTubeException.Kind.QUOTA_EXHAUSTED, "YouTube's daily API quota is used up ("
                 + Math.min(units, dailyUnits) + " of " + dailyUnits + " units). Rails refresh again "
