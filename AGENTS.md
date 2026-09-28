@@ -24,7 +24,7 @@ Rules for everyone who changes this repository, people and coding agents alike. 
 - **State is JSON under `/data`, written atomically.** Secrets are encrypted at rest and never reach the browser.
 - **Existing installs upgrade in place.** A change to a `/data` format migrates the old format when it reads it.
 - **Device adapters and content sources are modules that can be switched off**, with
-  `home-control.<module>.enabled`. Android TV, the adapter the app started with, is the one that is always on.
+  `home-control.<module>.enabled` (`config.Module` lists them). Bluetooth is off by default, the rest are on.
 - **Some names never change:**
   - configuration under `shield.*` and `SHIELD_KEYSTORE_PASSWORD` keeps working;
   - the CasaOS app id stays `dev.andre.shield-remote`;

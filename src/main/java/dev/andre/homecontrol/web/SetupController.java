@@ -1,17 +1,18 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.CodePairing;
+import dev.andre.homecontrol.core.CodePairingOutcome;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.PromptPairing;
 import dev.andre.homecontrol.core.PromptPairingResult;
 import dev.andre.homecontrol.device.DeviceManager;
-import dev.andre.homecontrol.adapters.androidtv.PairingService;
-import dev.andre.homecontrol.adapters.androidtv.PairingOutcome;
+import dev.andre.homecontrol.playback.DeepLinkTestProperties;
 import dev.andre.homecontrol.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -37,33 +38,35 @@ public class SetupController {
     private static final String SETUP_VIEW = "setup";
     private static final String ERROR_ATTRIBUTE = "error";
 
-    private final PairingService pairing;
+    private final ObjectProvider<CodePairing> codePairings;
     private final DeviceManager devices;
     private final List<PromptPairing> promptPairings;
 
     private final Duration deepLinkTestTimeout;
 
     /**
+     * {@code codePairings}: Android TV's, absent when that module is switched off.
      * {@code promptPairings}: one per enabled smart-TV module; empty when none is.
-     * {@code deepLinkTestTimeout}: shown next to the "Test deep link" button.
+     * {@code deepLinkTest}: its timeout is shown next to the "Test deep link" button.
      */
-    public SetupController(PairingService pairing, DeviceManager devices, List<PromptPairing> promptPairings,
-                           @Value("${home-control.deep-link-test.timeout:10s}") Duration deepLinkTestTimeout) {
-        this.pairing = pairing;
+    public SetupController(ObjectProvider<CodePairing> codePairings, DeviceManager devices,
+                           List<PromptPairing> promptPairings, DeepLinkTestProperties deepLinkTest) {
+        this.codePairings = codePairings;
         this.devices = devices;
         this.promptPairings = List.copyOf(promptPairings);
-        this.deepLinkTestTimeout = deepLinkTestTimeout;
+        this.deepLinkTestTimeout = deepLinkTest.timeout();
     }
 
     @GetMapping("/setup")
     public String setup(Model model) {
-        populateSetupModel(model, pairing.inProgress());
+        populateSetupModel(model, codePairing().map(CodePairing::inProgress).orElse(false));
         return SETUP_VIEW;
     }
 
     @PostMapping("/setup/pair")
     public String pair(@RequestParam String host, @RequestParam(required = false) String name,
                        Model model) {
+        CodePairing pairing = requireCodePairing();
         String address = host.trim();
         if (!Hosts.isValid(address)) {
             return notAHost(model);
@@ -84,7 +87,8 @@ public class SetupController {
 
     @PostMapping("/setup/code")
     public String code(@RequestParam String code, Model model) {
-        PairingOutcome result;
+        CodePairing pairing = requireCodePairing();
+        CodePairingOutcome result;
         try {
             result = pairing.submit(code);
         } catch (StorageException e) {
@@ -94,12 +98,12 @@ public class SetupController {
         }
 
         switch (result) {
-            case PairingOutcome.Paired() -> {
+            case CodePairingOutcome.Paired() -> {
                 return "redirect:/";
             }
-            case PairingOutcome.WrongCode() -> model.addAttribute(ERROR_ATTRIBUTE,
+            case CodePairingOutcome.WrongCode() -> model.addAttribute(ERROR_ATTRIBUTE,
                     "That code was not accepted. The device will show a new one — start again.");
-            case PairingOutcome.Failed(var reason) -> model.addAttribute(ERROR_ATTRIBUTE, reason);
+            case CodePairingOutcome.Failed(var reason) -> model.addAttribute(ERROR_ATTRIBUTE, reason);
         }
 
         populateSetupModel(model, false);
@@ -145,7 +149,17 @@ public class SetupController {
         return refusable(model, () -> devices.setWakeOnLanMac(id, mac));
     }
 
+    private Optional<CodePairing> codePairing() {
+        return Optional.ofNullable(codePairings.getIfAvailable());
+    }
+
+    private CodePairing requireCodePairing() {
+        return codePairing().orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Android TV is switched off"));
+    }
+
     private void populateSetupModel(Model model, boolean awaitingCode) {
+        model.addAttribute("codePairing", codePairing().isPresent());
         model.addAttribute("awaitingCode", awaitingCode);
         model.addAttribute("discovered", devices.pairable());
         model.addAttribute("addable", devices.addable());

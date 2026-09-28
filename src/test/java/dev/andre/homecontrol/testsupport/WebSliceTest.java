@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.testsupport;
 
-import dev.andre.homecontrol.adapters.androidtv.PairingService;
 import dev.andre.homecontrol.adapters.bluetooth.BluetoothHostChecks;
 import dev.andre.homecontrol.adapters.bluetooth.BluetoothPairingService;
 import dev.andre.homecontrol.adapters.bluetooth.BluetoothProperties;
@@ -9,9 +8,11 @@ import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.SearchService;
 import dev.andre.homecontrol.content.SourcePreferencesService;
 import dev.andre.homecontrol.content.StoredRailPreferences;
+import dev.andre.homecontrol.core.CodePairing;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.SourcePreferences;
 import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.playback.DeepLinkTestProperties;
 import dev.andre.homecontrol.playback.DeepLinkTestService;
 import dev.andre.homecontrol.playback.PlaybackService;
 import dev.andre.homecontrol.security.LoginRateLimiter;
@@ -66,7 +67,7 @@ public abstract class WebSliceTest {
     @MockitoBean
     protected DeviceManager devices;
     @MockitoBean
-    protected PairingService pairing;
+    protected CodePairing pairing;
     @MockitoBean
     protected BluetoothPairingService bluetoothPairing;
     @MockitoBean
@@ -175,6 +176,12 @@ public abstract class WebSliceTest {
             return new YouTubeProperties(true, URI.create("http://oauth.test"), URI.create("http://api.test"),
                     URI.create("http://lounge.test"), URI.create("http://thumbs.test"), 2, 5, 10000, 20, 30, 30, 5,
                     Duration.ofHours(24), 20, Duration.ofMinutes(60), Duration.ofMinutes(15), Duration.ofHours(6));
+        }
+
+        @Bean
+        DeepLinkTestProperties deepLinkTestProperties() {
+            return new DeepLinkTestProperties(URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ"),
+                    Duration.ofSeconds(10));
         }
 
         @Bean

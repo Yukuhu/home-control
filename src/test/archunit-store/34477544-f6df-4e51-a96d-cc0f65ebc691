@@ -28,18 +28,6 @@ Cycle detected: Slice adapters -> \
     - Method <dev.andre.homecontrol.device.JsonFileDeviceRegistry.validateDevice(dev.andre.homecontrol.core.Device, int)> calls method <dev.andre.homecontrol.adapters.cast.CastSettings.of(dev.andre.homecontrol.core.Device)> in (JsonFileDeviceRegistry.java:156)
 Cycle detected: Slice adapters -> \
                 Slice web -> \
-                Slice adapters\
-  1. Dependencies of Slice adapters\
-    - Class <dev.andre.homecontrol.adapters.bluetooth.BluetoothSetupAdvice> has annotation member of type <dev.andre.homecontrol.web.SetupController> in (BluetoothSetupAdvice.java:0)\
-  2. Dependencies of Slice web\
-    - Constructor <dev.andre.homecontrol.web.SetupController.<init>(dev.andre.homecontrol.adapters.androidtv.PairingService, dev.andre.homecontrol.device.DeviceManager, java.util.List, java.time.Duration)> has parameter of type <dev.andre.homecontrol.adapters.androidtv.PairingService> in (SetupController.java:0)\
-    - Field <dev.andre.homecontrol.web.SetupController.pairing> has type <dev.andre.homecontrol.adapters.androidtv.PairingService> in (SetupController.java:0)\
-    - Method <dev.andre.homecontrol.web.SetupController.setup(org.springframework.ui.Model)> calls method <dev.andre.homecontrol.adapters.androidtv.PairingService.inProgress()> in (SetupController.java:59)\
-    - Method <dev.andre.homecontrol.web.SetupController.pair(java.lang.String, java.lang.String, org.springframework.ui.Model)> calls method <dev.andre.homecontrol.adapters.androidtv.PairingService.begin(java.lang.String, java.lang.String)> in (SetupController.java:67)\
-    - Method <dev.andre.homecontrol.web.SetupController.code(java.lang.String, org.springframework.ui.Model)> calls method <dev.andre.homecontrol.adapters.androidtv.PairingService.submit(java.lang.String)> in (SetupController.java:84)\
-    - Method <dev.andre.homecontrol.web.SetupController.code(java.lang.String, org.springframework.ui.Model)> calls method <dev.andre.homecontrol.adapters.androidtv.PairingOutcome$Failed.reason()> in (SetupController.java:97)
-Cycle detected: Slice adapters -> \
-                Slice web -> \
                 Slice device -> \
                 Slice adapters\
   1. Dependencies of Slice adapters\

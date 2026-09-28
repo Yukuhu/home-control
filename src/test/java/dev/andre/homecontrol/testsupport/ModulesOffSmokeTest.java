@@ -1,6 +1,8 @@
 package dev.andre.homecontrol.testsupport;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvAdapter;
+import dev.andre.homecontrol.adapters.androidtv.PairingService;
+import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.adapters.bluetooth.BluetoothSpeakerAdapter;
 import dev.andre.homecontrol.adapters.cast.CastAdapter;
 import dev.andre.homecontrol.adapters.sonos.SonosAdapter;
@@ -24,9 +26,9 @@ class ModulesOffSmokeTest extends ModulesOffTest {
 
     @Test
     void theApplicationStartsWithEveryModuleOff() {
-        assertThat(context.getBeanNamesForType(AndroidTvAdapter.class)).hasSize(1);
-        assertThat(List.of(JellyfinClient.class, YouTubeSetupService.class, TmdbContentSource.class,
-                PinnedShortcuts.class, SportsContentSource.class, WorkflowStore.class, CastAdapter.class,
+        assertThat(List.of(AndroidTvAdapter.class, PairingService.class, CertificateStore.class, JellyfinClient.class,
+                YouTubeSetupService.class, TmdbContentSource.class, PinnedShortcuts.class, SportsContentSource.class,
+                WorkflowStore.class, CastAdapter.class,
                 WebOsAdapter.class, TizenAdapter.class, UpnpAdapter.class, SonosAdapter.class,
                 BluetoothSpeakerAdapter.class))
                 .isNotEmpty()

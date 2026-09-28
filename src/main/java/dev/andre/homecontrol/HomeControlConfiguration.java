@@ -1,6 +1,5 @@
 package dev.andre.homecontrol;
 
-import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.config.HomeControlProperties;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.content.ContentSource;
@@ -17,7 +16,6 @@ import dev.andre.homecontrol.core.playback.YouTubeLoungeStrategy;
 import dev.andre.homecontrol.core.playback.WorkflowCastStrategy;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.discovery.MdnsBrowser;
-import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.playback.DeepLinkTestProperties;
@@ -52,12 +50,6 @@ public class HomeControlConfiguration {
     @Bean
     public MdnsBrowser mdnsBrowser(HomeControlProperties properties) {
         return new MdnsBrowser(properties.discovery().enabled());
-    }
-
-    @Bean
-    public CertificateStore certificateStore(DataDirectory data, AndroidTvProperties properties) {
-        return new CertificateStore(data.resolve(DataDirectory.KEYSTORE),
-                properties.keystorePassword().toCharArray());
     }
 
     @Bean
