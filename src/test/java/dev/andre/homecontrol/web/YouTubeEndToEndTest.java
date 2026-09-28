@@ -9,22 +9,19 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.sources.youtube.FakeGoogleServer;
 import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRouteExecutor;
-import org.junit.jupiter.api.AfterAll;
+import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.testsupport.SharedFakes;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.CookieManager;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -32,12 +29,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -53,9 +47,8 @@ import static org.awaitility.Awaitility.await;
  * Cast-only device → an explicit Lounge failure → disconnect, checking at every step that no
  * secret ever reaches a browser response or a log line.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ExtendWith(OutputCaptureExtension.class)
-class YouTubeEndToEndTest {
+class YouTubeEndToEndTest extends FullAppTest {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
@@ -63,14 +56,10 @@ class YouTubeEndToEndTest {
     private static final List<String> SECRETS = List.of("GOCSPX-fixtureClientSecret", "1//0gFixture", "ya29.",
             "AH-1Ng2m", "AGdO5p8Fixture", "8A3F2E1D0C9B8A77", "fixture-gsessionid");
 
-    static final FakeGoogleServer GOOGLE;
+    static final FakeGoogleServer GOOGLE = SharedFakes.google();
 
-    static {
-        try {
-            GOOGLE = new FakeGoogleServer();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    @BeforeAll
+    static void routes() {
         GOOGLE.oauthApproves().youtubeLibrary().thumbnails();
         GOOGLE.respond("GET", "/youtube/v3/search", FakeGoogleServer.Canned.fixture(200, "search-videos.json"));
         // A poll interval of 5s (the fixture's default) would make the device-flow poll take too
@@ -78,40 +67,6 @@ class YouTubeEndToEndTest {
         // win, so this overrides the one oauthApproves() just registered.
         String fastDeviceCode = FakeGoogleServer.fixture("oauth-device-code.json").replace("\"interval\": 5", "\"interval\": 1");
         GOOGLE.respond("POST", "/oauth/device/code", FakeGoogleServer.Canned.json(200, fastDeviceCode));
-    }
-
-    static Path dataDir;
-
-    @AfterAll
-    static void closeFakeGoogleAndTempDir() throws IOException {
-        GOOGLE.close();
-        if (dataDir != null) {
-            deleteRecursively(dataDir);
-        }
-    }
-
-    private static void deleteRecursively(Path root) throws IOException {
-        if (!Files.exists(root)) {
-            return;
-        }
-        try (var paths = Files.walk(root)) {
-            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
-                Files.deleteIfExists(path);
-            }
-        }
-    }
-
-    @DynamicPropertySource
-    static void isolatedAndFastAgainstTheFake(DynamicPropertyRegistry registry) throws IOException {
-        dataDir = Files.createTempDirectory("youtube-e2e");
-        registry.add("shield.data-dir", dataDir::toString);
-        registry.add("home-control.youtube.oauth-base-url", () -> GOOGLE.base() + "/oauth");
-        registry.add("home-control.youtube.api-base-url", () -> GOOGLE.base() + "/youtube/v3");
-        registry.add("home-control.youtube.lounge-base-url", () -> GOOGLE.base() + "/lounge");
-        registry.add("home-control.youtube.thumbnail-base-url", () -> GOOGLE.base() + "/thumbs");
-        registry.add("home-control.content.rails.scheduler-enabled", () -> "false");
-        registry.add("home-control.cast.command-timeout-seconds", () -> "3");
-        registry.add("home-control.cast.load-timeout-seconds", () -> "5");
     }
 
     @LocalServerPort
