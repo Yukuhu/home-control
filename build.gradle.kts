@@ -1,7 +1,9 @@
-// Raises commons-lang3 on the build classpath above the version the Spring Boot plugin drags in;
-// gradle/libs.versions.toml says why. A plugin's transitive dependencies can only be constrained here.
+// Raises commons-lang3 and Jackson on the build classpath above the versions the Spring Boot plugin
+// drags in; gradle/libs.versions.toml says why. A plugin's transitive dependencies can only be
+// constrained here.
 buildscript {
     dependencies {
+        classpath(platform(libs.jackson.bom))
         constraints {
             classpath(libs.commons.lang3)
         }
