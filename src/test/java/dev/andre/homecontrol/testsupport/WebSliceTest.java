@@ -31,6 +31,7 @@ import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
 import dev.andre.homecontrol.sources.tmdb.TmdbSetupService;
 import dev.andre.homecontrol.sources.workflows.WorkflowStore;
 import dev.andre.homecontrol.sources.workflows.WorkflowTestService;
+import dev.andre.homecontrol.sources.youtube.YouTubeAuthorizationService;
 import dev.andre.homecontrol.sources.youtube.YouTubeHttp;
 import dev.andre.homecontrol.sources.youtube.YouTubeProperties;
 import dev.andre.homecontrol.sources.youtube.YouTubeSettings;
@@ -134,6 +135,8 @@ public abstract class WebSliceTest {
         given(sportsZones.chosen()).willReturn(true);
         given(sourcePreferences.current()).willReturn(SourcePreferences.defaults("de-DE", "DE"));
         given(youTubeSetup.settings()).willReturn(YouTubeSettings.EMPTY);
+        given(youTubeSetup.authorizationStatus()).willReturn(
+                new YouTubeAuthorizationService.Status(YouTubeAuthorizationService.State.IDLE, null, null, null, null));
         promptPairing.reset();
     }
 
