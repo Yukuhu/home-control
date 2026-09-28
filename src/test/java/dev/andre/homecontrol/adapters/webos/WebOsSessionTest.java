@@ -46,7 +46,7 @@ class WebOsSessionTest {
      */
     private static final WebOsTimings TIMINGS = new WebOsTimings(Duration.ofMillis(50), Duration.ofMillis(100),
             Duration.ZERO, Duration.ofSeconds(30), Duration.ofSeconds(2));
-    /** As TIMINGS, but a liveness check every 200 ms, for the liveness tests. */
+    /** As TIMINGS, but a liveness check every 200 ms, for the liveness tests and startedWithLivenessCheck(). */
     private static final WebOsTimings LIVENESS = new WebOsTimings(Duration.ofMillis(50), Duration.ofMillis(100),
             Duration.ZERO, Duration.ofMillis(200), Duration.ofSeconds(1));
 
@@ -89,16 +89,32 @@ class WebOsSessionTest {
     }
 
     private WebOsSession session(Map<String, String> settings, Consumer<DeviceState> listener) throws IOException {
+        return session(settings, listener, TIMINGS);
+    }
+
+    private WebOsSession session(Map<String, String> settings, Consumer<DeviceState> listener, WebOsTimings timings)
+            throws IOException {
         Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1", Map.of("webos", settings), Instant.now());
         registry.save(device);
         WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 2, 2, 1, 2, 0);
-        session = new WebOsSession(device, properties, TIMINGS, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
+        session = new WebOsSession(device, properties, timings, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
                 learned(), new WakeOnLan(receiver.address()), listener, () -> { });
         return session;
     }
 
     private WebOsSession started() throws IOException {
         WebOsSession started = session(Map.of("clientKey", FakeSsapServer.CLIENT_KEY));
+        started.start();
+        return started;
+    }
+
+    /**
+     * For tests in which the TV drops the connection: the fake drops it right after a frame, and when that end of
+     * stream arrives while the JDK WebSocket still hands the frame to the listener, the JDK loses it (neither onClose
+     * nor onError runs). Then only the liveness check notices the dead connection, as it would with a real TV.
+     */
+    private WebOsSession startedWithLivenessCheck() throws IOException {
+        WebOsSession started = session(Map.of("clientKey", FakeSsapServer.CLIENT_KEY), states, LIVENESS);
         started.start();
         return started;
     }
@@ -231,7 +247,7 @@ class WebOsSessionTest {
 
     @Test
     void powerWhileOffWakesTheTvAndReconnects() throws Exception {
-        started();
+        startedWithLivenessCheck();
         connected();
         await().atMost(Duration.ofSeconds(5)).until(() -> storedSetting("macAddress") != null);
         tv.refuseConnections(true);
@@ -309,7 +325,7 @@ class WebOsSessionTest {
 
     @Test
     void listsAndSwitchesInputs() throws Exception {
-        started();
+        startedWithLivenessCheck();
         connected();
 
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertThat(session.inputs())
@@ -343,7 +359,7 @@ class WebOsSessionTest {
 
     @Test
     void reconnectsAfterTheTvDropsTheConnection() throws Exception {
-        started();
+        startedWithLivenessCheck();
         connected();
         // CONNECTED precedes the initial subscriptions and requests. MAC learning is last;
         // wait for setup to finish so dropping the socket tests an established session.
@@ -358,6 +374,21 @@ class WebOsSessionTest {
         assertThat(connections).isGreaterThan(initialConnections);
         session.reconnectNow();
         await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).until(() -> tv.connections() == connections);
+    }
+
+    @Test
+    void aResetConnectionIsNoticedWithoutTheLivenessCheck() throws Exception {
+        started();
+        connected();
+        // MAC learning is the last setup request: after it, the TV resets an established, idle session.
+        await().atMost(Duration.ofSeconds(5)).until(() -> storedSetting("macAddress") != null);
+        int initialConnections = tv.connections();
+
+        tv.resetConnections();
+
+        // TIMINGS checks liveness every 30 s, so noticing the reset in time takes the connection's own close report.
+        states.awaitStatus(DeviceStatus.DISCONNECTED, Duration.ofSeconds(5));
+        await().atMost(Duration.ofSeconds(5)).until(() -> tv.connections() > initialConnections);
     }
 
     @Test

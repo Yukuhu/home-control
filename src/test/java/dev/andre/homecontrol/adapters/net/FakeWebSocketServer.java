@@ -96,6 +96,16 @@ public final class FakeWebSocketServer implements AutoCloseable {
                 // Already gone.
             }
         }
+
+        /** Closes the socket with a reset (RST) instead of an orderly FIN. */
+        public void reset() {
+            try {
+                socket.setSoLinger(true, 0);
+            } catch (IOException _) {
+                // Already gone; closing anyway.
+            }
+            close();
+        }
     }
 
     private static final String GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
@@ -145,6 +155,15 @@ public final class FakeWebSocketServer implements AutoCloseable {
 
     public void dropAll() {
         open.forEach(Connection::close);
+        open.clear();
+    }
+
+    /**
+     * As {@link #dropAll()}, but with a reset (RST) instead of a FIN. The JDK WebSocket reports a reset even while its
+     * listener still handles a frame; an end of stream that arrives then, it loses.
+     */
+    public void resetAll() {
+        open.forEach(Connection::reset);
         open.clear();
     }
 

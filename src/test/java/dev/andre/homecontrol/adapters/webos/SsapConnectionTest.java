@@ -234,7 +234,10 @@ class SsapConnectionTest {
                 properties(server.port(), FakeWebSocketServer.closedPort(), 2), reasons::add);
         connection.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
 
-        server.dropConnections();
+        // A reset, not a FIN: register() returns while the JDK WebSocket may still hand the registration to the
+        // listener, and the JDK loses an end of stream that arrives then (see
+        // WebOsSessionTest.startedWithLivenessCheck).
+        server.resetConnections();
 
         assertThat(reasons.poll(5, TimeUnit.SECONDS)).isNotNull();
         assertThat(reasons.poll(500, TimeUnit.MILLISECONDS)).isNull();

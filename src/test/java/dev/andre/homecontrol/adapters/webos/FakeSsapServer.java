@@ -102,6 +102,11 @@ public class FakeSsapServer implements AutoCloseable {
         server.dropAll();
     }
 
+    /** As {@link #dropConnections()}, but with a reset (RST): the client notices it even while handling a frame. */
+    public void resetConnections() {
+        server.resetAll();
+    }
+
     /** The next request or subscribe message for {@code uri}, skipping others; null after 5 s. */
     public JsonNode nextRequest(String uri) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);

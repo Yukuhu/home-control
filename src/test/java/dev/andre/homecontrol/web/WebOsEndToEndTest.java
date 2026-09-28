@@ -87,6 +87,10 @@ class WebOsEndToEndTest {
         registry.add("home-control.webos.secure-port", WebOsEndToEndTest::closedPort);
         registry.add("home-control.webos.reconnect-max-delay-seconds", () -> "2");
         registry.add("home-control.webos.wake-grace-seconds", () -> "0");
+        // Step 8 drops the connection right after step 7's frames. When the JDK WebSocket loses that end of stream
+        // (see WebOsSessionTest.startedWithLivenessCheck), the liveness check notices within three seconds.
+        registry.add("home-control.webos.liveness-interval-seconds", () -> "1");
+        registry.add("home-control.webos.request-timeout-seconds", () -> "2");
         registry.add("home-control.tizen.enabled", () -> "false");
         registry.add("home-control.wake-on-lan.broadcast-address", () -> "127.0.0.1");
         registry.add("home-control.wake-on-lan.port", WOL::port);
