@@ -34,7 +34,18 @@ public final class FakeTheSportsDbServer implements AutoCloseable {
     private final FakeHttpServer server;
 
     public FakeTheSportsDbServer() throws IOException {
-        server = FakeHttpServer.start().fallback(request -> KEYS.contains(keyAndEndpoint(request.path())[0])
+        server = FakeHttpServer.start();
+        defaults();
+    }
+
+    /** Forgets every route, request and delay, and restores the fresh fake, for a fake shared across test classes. */
+    public void reset() {
+        server.reset();
+        defaults();
+    }
+
+    private void defaults() {
+        server.fallback(request -> KEYS.contains(keyAndEndpoint(request.path())[0])
                 ? json(404, "{}".getBytes(StandardCharsets.UTF_8))
                 : json(400, fixtureBytes("invalid-key.json")));
         byDefault("lookupleague.php", fixtureBytes("lookupleague-unknown.json"));
