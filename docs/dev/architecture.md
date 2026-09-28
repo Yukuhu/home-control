@@ -103,7 +103,7 @@ The roadmap's measures, updated by each workstream that moves them.
 | Summed test-class time | 495 s (one JVM) | 340 s (one JVM), 642 s (four JVMs) |
 | `test` task wall time | not measured | 3 min 26 s (four JVMs, 4 CPUs) |
 | Spring context starts per test run | 67 (one JVM) | 70 (four JVMs) |
-| CI "Build and test" job time | about 9 min | 5 min 13 s |
+| CI "Build and test" job time | about 9 min | 3 min 45 s |
 | Wall-clock upper-bound assertions | 9 | 1 |
 | Copies of `MutableClock` | 5, one of them nested in `SsdpDiscoveryTest` | 1 |
 
