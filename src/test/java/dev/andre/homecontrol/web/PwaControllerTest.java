@@ -1,8 +1,8 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,8 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(PwaController.class)
-class PwaControllerTest {
+class PwaControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
