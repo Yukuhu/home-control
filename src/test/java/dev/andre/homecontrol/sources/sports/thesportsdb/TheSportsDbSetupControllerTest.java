@@ -120,7 +120,7 @@ class TheSportsDbSetupControllerTest extends WebSliceTest {
                 .contains("5 events · updated 16:00")
                 .contains("Could not refresh: TheSportsDB is limiting requests; try again in a minute")
                 .contains("action=\"/setup/sources/sports/competitions/4331/remove\"")
-                .contains("name=\"key\"").contains("type=\"password\"")
+                .contains("type=\"password\" name=\"key\"")
                 .contains("Data from <a href=\"https://www.thesportsdb.com\"")
                 .doesNotContain("9876543210")
                 .contains("id=\"sports-providers\"")

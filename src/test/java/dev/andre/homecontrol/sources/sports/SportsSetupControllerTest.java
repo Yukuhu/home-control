@@ -132,9 +132,10 @@ class SportsSetupControllerTest extends WebSliceTest {
                 .contains("1 repeating event uses rules Home Control shows only once")
                 .contains("Could not refresh: nas.local answered HTTP 500")
                 .contains("action=\"/setup/sources/sports/calendars/c-3f9a1c2b7d4e/remove\"")
-                .contains("name=\"url\"").contains("value=\"Europe/Berlin\"")
-                .doesNotContain("token-abc123").doesNotContain("https://calendar")
-                .contains("name=\"loginPassword\"");
+                .contains("value=\"Europe/Berlin\"")
+                .doesNotContain("token-abc123").doesNotContain("https://calendar");
+        // The pinned, Jellyfin, TMDB and YouTube sections render the same fields.
+        assertThat(section(body, "sports")).contains("name=\"url\"").contains("name=\"loginPassword\"");
 
         given(login.loginRequired()).willReturn(true);
         String body2 = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();

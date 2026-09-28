@@ -89,19 +89,12 @@ class TmdbSetupControllerTest extends WebSliceTest {
         verify(tmdbSetup).disconnect();
     }
 
-    /** The TMDB section of the setup page, which the shared web slice renders among every other module's section. */
-    private static String tmdbSection(String page) {
-        int start = page.indexOf("id=\"tmdb\"");
-        assertThat(start).as("the TMDB section").isNotNegative();
-        return page.substring(start, page.indexOf("</section>", start));
-    }
-
     @Test
     void theSetupPageShowsTheSection() throws Exception {
         String page = mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        assertThat(tmdbSection(page)).contains("name=\"credential\"", "type=\"password\"", "loginPassword",
+        assertThat(section(page, "tmdb")).contains("name=\"credential\"", "type=\"password\"", "loginPassword",
                 "This product uses the TMDB API but is not endorsed or certified by TMDB.");
 
         given(tmdbSetup.settings()).willReturn(java.util.Optional.of(new TmdbSettings(TmdbCredential.Kind.BEARER,
@@ -109,7 +102,7 @@ class TmdbSetupControllerTest extends WebSliceTest {
         given(login.loginRequired()).willReturn(true);
 
         String body = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
-        assertThat(tmdbSection(body)).contains("Connected (read access token)").contains("Disconnect");
+        assertThat(section(body, "tmdb")).contains("Connected (read access token)").contains("Disconnect");
         assertThat(body).doesNotContain("loginPassword")
                 .doesNotContain(FakeTmdbServer.READ_TOKEN).doesNotContain(FakeTmdbServer.API_KEY);
     }

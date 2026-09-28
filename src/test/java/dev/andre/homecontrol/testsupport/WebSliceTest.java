@@ -140,6 +140,20 @@ public abstract class WebSliceTest {
         promptPairing.reset();
     }
 
+    /**
+     * The section with this element id on a page the slice rendered. Every {@code /setup} render carries every
+     * module's section, so a check on the setup page reads its own section: a word or a form field that another
+     * section also renders would otherwise pass for the wrong reason.
+     */
+    protected static String section(String page, String id) {
+        int start = page.indexOf("id=\"" + id + "\"");
+        if (start < 0) {
+            throw new AssertionError("No element with id \"" + id + "\" on the page");
+        }
+        int end = page.indexOf("</section>", start);
+        return page.substring(start, end < 0 ? page.length() : end);
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     static class SliceBeans {
 

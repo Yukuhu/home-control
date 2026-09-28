@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-import static org.hamcrest.Matchers.allOf;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -103,16 +103,11 @@ class PinnedSetupControllerTest extends WebSliceTest {
     void theSetupPageListsPins() throws Exception {
         given(pins.all()).willReturn(List.of(pin("p-aaaaaaaaaaaa", "A title"), pin("p-bbbbbbbbbbbb", "B title")));
 
-        mockMvc.perform(get("/setup"))
+        String page = mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(allOf(
-                        containsString("id=\"pinned\""),
-                        containsString("A title"),
-                        containsString("B title"),
-                        containsString("https://example.org/p-aaaaaaaaaaaa"),
-                        containsString("action=\"/setup/sources/pinned/p-aaaaaaaaaaaa/move\""),
-                        containsString("name=\"url\""),
-                        containsString("type=\"url\""))));
+                .andReturn().getResponse().getContentAsString();
+        assertThat(section(page, "pinned")).contains("A title", "B title", "https://example.org/p-aaaaaaaaaaaa",
+                "action=\"/setup/sources/pinned/p-aaaaaaaaaaaa/move\"", "name=\"url\"", "type=\"url\"");
 
         given(pins.all()).willReturn(List.of());
         mockMvc.perform(get("/setup"))

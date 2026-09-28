@@ -59,8 +59,9 @@ class SetupControllerTest extends WebSliceTest {
         mockMvc.perform(post("/setup/pair").param("host", "192.168.1.50"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("setup"))
-                .andExpect(content().string(containsString("/data")))
-                .andExpect(content().string(containsString("bind-mounted and writable")));
+                // The whole message: the sports section's </datalist> alone contains "/data".
+                .andExpect(content().string(containsString(
+                        "Shield data directory is not writable: /data; check that /data is bind-mounted and writable")));
     }
 
     @Test
