@@ -10,10 +10,10 @@ class CastTimingsTest {
 
     @Test
     void fromTakesTheConfiguredSeconds() {
-        CastProperties properties = new CastProperties(true, 5, 15, 1, 60, 5, 20, 5);
+        CastProperties properties = new CastProperties(true, 5, 17, 2, 63, 7, 23, 9);
 
-        assertThat(CastTimings.from(properties)).isEqualTo(new CastTimings(Duration.ofSeconds(5), Duration.ofSeconds(15),
-                Duration.ofSeconds(1), Duration.ofSeconds(60), Duration.ofSeconds(5), Duration.ofSeconds(20),
-                Duration.ofSeconds(5), Duration.ofMillis(750)));
+        assertThat(CastTimings.from(properties)).isEqualTo(new CastTimings(Duration.ofSeconds(5), Duration.ofSeconds(17),
+                Duration.ofSeconds(2), Duration.ofSeconds(63), Duration.ofSeconds(7), Duration.ofSeconds(23),
+                Duration.ofSeconds(9), Duration.ofMillis(750)));
     }
 }

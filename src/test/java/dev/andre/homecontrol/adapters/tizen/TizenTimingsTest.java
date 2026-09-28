@@ -10,9 +10,9 @@ class TizenTimingsTest {
 
     @Test
     void fromTakesTheConfiguredSecondsAndCapsTheHandshakeBackoffAtFiveMinutes() {
-        TizenProperties properties = new TizenProperties(true, 8002, 8001, 8080, "Home Control", 3, 5, 30, 5, 3);
+        TizenProperties properties = new TizenProperties(true, 8002, 8001, 8080, "Home Control", 4, 6, 30, 7, 2);
 
-        assertThat(TizenTimings.from(properties)).isEqualTo(new TizenTimings(Duration.ofSeconds(5), Duration.ofSeconds(3),
-                Duration.ofSeconds(5), Duration.ofMinutes(5)));
+        assertThat(TizenTimings.from(properties)).isEqualTo(new TizenTimings(Duration.ofSeconds(7), Duration.ofSeconds(2),
+                Duration.ofSeconds(6), Duration.ofMinutes(5)));
     }
 }

@@ -124,8 +124,11 @@ class WorkflowHttpClientTest {
             server.block("/slow", afterHeaders, entered, release);
             var result = callers.submit(() -> catchThrowable(() -> client.fetch(request(server.url("/slow")))));
             assertThat(entered.await(2, TimeUnit.SECONDS)).isTrue();
+            // The caller's own deadline, the worker's Apache response timeout, and the worker's check() all race to
+            // end the call first, so any of their three messages proves the deadline won before the body was released.
             assertThat(result.get(3, TimeUnit.SECONDS)).isInstanceOf(WorkflowException.class)
-                    .hasMessageContaining("request timed out");
+                    .satisfies(e -> assertThat(e.getMessage()).containsAnyOf("Fetch JSON: request timed out",
+                            "Fetch JSON: request failed", "Fetch JSON: request cancelled or timed out"));
         } finally { release.countDown(); }
     }
 
