@@ -3,11 +3,11 @@ package dev.andre.homecontrol;
 import dev.andre.homecontrol.adapters.tizen.TizenAdapter;
 import dev.andre.homecontrol.adapters.webos.WebOsAdapter;
 import dev.andre.homecontrol.core.PromptPairing;
+import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 
@@ -21,8 +21,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-class HomeControlApplicationTest {
+class HomeControlApplicationTest extends FullAppTest {
 
     /** The modules a user can switch off; the modules-off tests switch all of them off at once. */
     private static final Set<String> SWITCHABLE = Set.of("jellyfin", "youtube", "tmdb", "pinned", "sports", "workflows",

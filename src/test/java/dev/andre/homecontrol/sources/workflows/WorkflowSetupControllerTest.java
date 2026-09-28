@@ -2,13 +2,13 @@ package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
+import dev.andre.homecontrol.testsupport.FullAppTest;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.validation.BindingResult;
@@ -291,18 +291,10 @@ class WorkflowSetupControllerTest extends WebSliceTest {
     }
 }
 
-@org.springframework.boot.test.context.SpringBootTest(properties = "home-control.content.rails.scheduler-enabled=false")
-@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
-class WorkflowSetupAuthenticationTest {
+class WorkflowSetupAuthenticationTest extends FullAppTest {
     @Autowired MockMvc mvc;
     @Autowired WorkflowStore store;
     @Autowired LoginService login;
-    @MockitoBean WorkflowHttpClient http;
-    @org.springframework.test.context.DynamicPropertySource
-    static void data(org.springframework.test.context.DynamicPropertyRegistry registry) throws java.io.IOException {
-        String directory = java.nio.file.Files.createTempDirectory("workflow-editor-login").toString();
-        registry.add("shield.data-dir", () -> directory);
-    }
 
     @Test void firstSaveEstablishesRealSessionAndExistingLoginGatesAllEditorActions() throws Exception {
         String password = "fixture-only-password";
@@ -325,7 +317,7 @@ class WorkflowSetupAuthenticationTest {
             mvc.perform(post(location + suffix).param("expectedRevision", "1"))
                     .andExpect(status().isUnauthorized());
         }
-        verifyNoInteractions(http);
+        verifyNoInteractions(workflowHttp);
     }
 
     private MockHttpServletRequestBuilder firstSave() {
