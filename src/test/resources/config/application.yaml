@@ -1,12 +1,16 @@
 # Test overrides only. Spring Boot loads src/main/resources/application.yaml as in production and this file
 # (classpath:/config/ wins over classpath:/) on top of it, so tests bind the real configuration and change only
-# what a test run must not do: discover the LAN, reach real upstream APIs, wait out production timeouts, or
-# refresh rails on a schedule.
+# what a test run must not do: discover the LAN, reach real upstream APIs, wait out production timeouts, refresh
+# rails on a schedule, or share files with another test JVM.
 shield:
-  data-dir: build/test-data
+  # One directory per test JVM: Gradle sets org.gradle.test.worker in each, and outside Gradle it is 0.
+  data-dir: build/test-data/${org.gradle.test.worker:0}
   discovery-enabled: false
 
 home-control:
+  bluetooth:
+    # mpv's socket directory, one per test JVM. It stays under java.io.tmpdir: a Unix socket path must be short.
+    runtime-dir: ${java.io.tmpdir}/home-control-bluetooth-${org.gradle.test.worker:0}
   ssdp:
     enabled: false
   security:

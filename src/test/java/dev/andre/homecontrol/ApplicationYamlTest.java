@@ -44,7 +44,11 @@ class ApplicationYamlTest {
     void theTestOverridesWin() {
         runner.run(context -> {
             Environment environment = context.getEnvironment();
-            assertThat(environment.getProperty("shield.data-dir")).isEqualTo("build/test-data");
+            // Gradle sets org.gradle.test.worker in every test JVM; outside Gradle the configuration falls back to 0.
+            String fork = System.getProperty("org.gradle.test.worker", "0");
+            assertThat(environment.getProperty("shield.data-dir")).isEqualTo("build/test-data/" + fork);
+            assertThat(environment.getProperty("home-control.bluetooth.runtime-dir"))
+                    .isEqualTo(System.getProperty("java.io.tmpdir") + "/home-control-bluetooth-" + fork);
             assertThat(environment.getProperty("shield.discovery-enabled")).isEqualTo("false");
             assertThat(environment.getProperty("home-control.ssdp.enabled")).isEqualTo("false");
             assertThat(environment.getProperty("home-control.content.rails.scheduler-enabled")).isEqualTo("false");
