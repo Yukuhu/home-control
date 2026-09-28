@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
+import dev.andre.homecontrol.core.CodePairingOutcome;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
@@ -60,9 +61,9 @@ class PairingServiceTest {
     void pairsAndHandsTheDeviceToTheSessionManager() throws Exception {
         service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
 
-        PairingOutcome result = service.submit(fakeDevice.awaitDisplayedCode());
+        CodePairingOutcome result = service.submit(fakeDevice.awaitDisplayedCode());
 
-        assertThat(result).isInstanceOf(PairingOutcome.Paired.class);
+        assertThat(result).isInstanceOf(CodePairingOutcome.Paired.class);
         verify(sessions).adopt(org.mockito.ArgumentMatchers.argThat(device ->
                 device.name().equals("Living Room Shield")
                         && device.host().equals("127.0.0.1")
@@ -76,9 +77,9 @@ class PairingServiceTest {
         String displayed = fakeDevice.awaitDisplayedCode();
         int wrongCheckByte = (Integer.parseInt(displayed.substring(0, 2), 16) + 1) & 0xFF;
 
-        PairingOutcome result = service.submit("%02X".formatted(wrongCheckByte) + displayed.substring(2));
+        CodePairingOutcome result = service.submit("%02X".formatted(wrongCheckByte) + displayed.substring(2));
 
-        assertThat(result).isInstanceOf(PairingOutcome.WrongCode.class);
+        assertThat(result).isInstanceOf(CodePairingOutcome.WrongCode.class);
         assertThat(service.inProgress())
                 .as("the device shows a new code, so the flow must restart")
                 .isFalse();
@@ -86,7 +87,7 @@ class PairingServiceTest {
 
     @Test
     void reportsWhenNoPairingIsInFlight() {
-        assertThat(service.submit("70B2C3")).isInstanceOf(PairingOutcome.Failed.class);
+        assertThat(service.submit("70B2C3")).isInstanceOf(CodePairingOutcome.Failed.class);
     }
 
     @Test
@@ -116,9 +117,9 @@ class PairingServiceTest {
         ClientCertificate orphaned = certificates.loadOrCreate("127-0-0-1");
 
         service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
-        PairingOutcome result = service.submit(fakeDevice.awaitDisplayedCode());
+        CodePairingOutcome result = service.submit(fakeDevice.awaitDisplayedCode());
 
-        assertThat(result).isInstanceOf(PairingOutcome.Paired.class);
+        assertThat(result).isInstanceOf(CodePairingOutcome.Paired.class);
         assertThat(certificates.load("127-0-0-1")).get()
                 .extracting(ClientCertificate::certificate)
                 .isEqualTo(orphaned.certificate());
@@ -148,18 +149,18 @@ class PairingServiceTest {
         }).when(sessions).adopt(any());
         service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
         String code = fakeDevice.awaitDisplayedCode();
-        CompletableFuture<PairingOutcome> first = CompletableFuture.supplyAsync(() -> service.submit(code));
+        CompletableFuture<CodePairingOutcome> first = CompletableFuture.supplyAsync(() -> service.submit(code));
         assertThat(adopting.await(5, TimeUnit.SECONDS)).isTrue();
 
         try (FakePairingServer secondDevice = new FakePairingServer()) {
             service.begin("127.0.0.1", secondDevice.port(), "Bedroom Shield");
             release.countDown();
-            assertThat(first.get(5, TimeUnit.SECONDS)).isInstanceOf(PairingOutcome.Paired.class);
+            assertThat(first.get(5, TimeUnit.SECONDS)).isInstanceOf(CodePairingOutcome.Paired.class);
 
             assertThat(service.inProgress())
                     .as("the first attempt ending late must not cancel the attempt that replaced it")
                     .isTrue();
-            assertThat(service.submit(secondDevice.awaitDisplayedCode())).isInstanceOf(PairingOutcome.Paired.class);
+            assertThat(service.submit(secondDevice.awaitDisplayedCode())).isInstanceOf(CodePairingOutcome.Paired.class);
         }
     }
 

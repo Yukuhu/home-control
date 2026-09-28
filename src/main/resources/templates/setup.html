@@ -125,7 +125,7 @@
             <p class="hint">A receiver at the same address as a paired TV is added to that TV instead of appearing twice.</p>
         </section>
 
-        <details class="manual-device">
+        <details class="manual-device" th:if="${codePairing}">
         <summary>Add an Android TV by address</summary>
         <p class="hint">Find the IP address in your TV's network settings.</p>
         <form method="post" th:action="@{/setup/pair}">

@@ -4,8 +4,6 @@ import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.discovery.MdnsBrowser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 import java.net.InetAddress;
 import java.util.List;
@@ -20,7 +18,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Multicast does not cross a Docker bridge network, so the UI always offers manual
  * host entry alongside whatever this finds (spec §7).
  */
-@Service
 public class MdnsDiscovery implements AutoCloseable {
 
     public static final String SERVICE_TYPE = "_androidtvremote2._tcp.local.";
@@ -33,7 +30,6 @@ public class MdnsDiscovery implements AutoCloseable {
     private final boolean ownsBrowser;
 
     /** Spring starts and closes the shared browser; this only registers the service type. */
-    @Autowired
     public MdnsDiscovery(MdnsBrowser browser) {
         this(browser, false);
     }

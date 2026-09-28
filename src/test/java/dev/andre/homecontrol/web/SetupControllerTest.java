@@ -1,8 +1,8 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
-import dev.andre.homecontrol.adapters.androidtv.PairingOutcome;
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.CodePairingOutcome;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DiscoveredDevice;
@@ -110,7 +110,7 @@ class SetupControllerTest extends WebSliceTest {
 
     @Test
     void theRightPairingCodeFinishesOnTheDashboard() throws Exception {
-        given(pairing.submit("A1B2C3")).willReturn(new PairingOutcome.Paired());
+        given(pairing.submit("A1B2C3")).willReturn(new CodePairingOutcome.Paired());
 
         mockMvc.perform(post("/setup/code").param("code", "A1B2C3"))
                 .andExpect(status().is3xxRedirection())
@@ -119,7 +119,7 @@ class SetupControllerTest extends WebSliceTest {
 
     @Test
     void aWrongPairingCodeAsksToStartAgain() throws Exception {
-        given(pairing.submit("ZZZZZZ")).willReturn(new PairingOutcome.WrongCode());
+        given(pairing.submit("ZZZZZZ")).willReturn(new CodePairingOutcome.WrongCode());
 
         mockMvc.perform(post("/setup/code").param("code", "ZZZZZZ"))
                 .andExpect(status().isOk())
@@ -132,7 +132,7 @@ class SetupControllerTest extends WebSliceTest {
 
     @Test
     void aFailedPairingShowsItsReason() throws Exception {
-        given(pairing.submit("A1B2C3")).willReturn(new PairingOutcome.Failed("The TV closed the connection"));
+        given(pairing.submit("A1B2C3")).willReturn(new CodePairingOutcome.Failed("The TV closed the connection"));
 
         mockMvc.perform(post("/setup/code").param("code", "A1B2C3"))
                 .andExpect(status().isOk())

@@ -13,7 +13,6 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import jakarta.annotation.PostConstruct;
-import org.springframework.stereotype.Component;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -22,7 +21,6 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /** Android TV Remote v2: the Shield and every other Android TV / Google TV box. */
-@Component
 public class AndroidTvAdapter implements DeviceAdapter {
 
     public static final String ADAPTER_ID = AndroidTvSettings.ADAPTER_ID;

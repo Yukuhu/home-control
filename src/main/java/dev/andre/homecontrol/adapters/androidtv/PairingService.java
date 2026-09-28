@@ -4,11 +4,12 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.PairingResult;
 import dev.andre.homecontrol.adapters.androidtv.protocol.PairingSession;
+import dev.andre.homecontrol.core.CodePairing;
+import dev.andre.homecontrol.core.CodePairingOutcome;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.storage.DataDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -21,8 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>A failed attempt always ends the session: the device shows a brand new code next
  * time, so there is nothing to retry into (spec §5.2).
  */
-@Service
-public class PairingService {
+public class PairingService implements CodePairing {
 
     /** The pairing port. The command channel is {@link AndroidTvSettings#DEFAULT_PORT}. */
     public static final int PAIRING_PORT = 6467;
@@ -50,6 +50,7 @@ public class PairingService {
         this.dataDirectory = dataDirectory;
     }
 
+    @Override
     public void begin(String host, String name) throws IOException {
         begin(host, PAIRING_PORT, name);
     }
@@ -75,19 +76,21 @@ public class PairingService {
         close(attempt.getAndSet(new Attempt(starting, credential, host, resolvedName, deviceId)));
     }
 
+    @Override
     public boolean inProgress() {
         return attempt.get() != null;
     }
 
     /**
-     * Reports in {@link PairingOutcome}, not the protocol-level {@link PairingResult}: the
+     * Reports in {@link CodePairingOutcome}, not the protocol-level {@link PairingResult}: the
      * web layer must not import {@code adapters.androidtv.protocol} (global constraint), so
      * this is where the internal handshake result is translated into the public outcome.
      */
-    public PairingOutcome submit(String code) {
+    @Override
+    public CodePairingOutcome submit(String code) {
         Attempt current = attempt.get();
         if (current == null) {
-            return new PairingOutcome.Failed("No pairing is in progress; start again from the device list");
+            return new CodePairingOutcome.Failed("No pairing is in progress; start again from the device list");
         }
 
         try {
@@ -103,10 +106,10 @@ public class PairingService {
                             ClientCertificate.fingerprintOf(serverCertificate),
                             Instant.now()));
                     log.info("Paired with {} at {}", current.name(), current.host());
-                    yield new PairingOutcome.Paired();
+                    yield new CodePairingOutcome.Paired();
                 }
-                case PairingResult.WrongCode _ -> new PairingOutcome.WrongCode();
-                case PairingResult.Failed(var reason) -> new PairingOutcome.Failed(reason);
+                case PairingResult.WrongCode _ -> new CodePairingOutcome.WrongCode();
+                case PairingResult.Failed(var reason) -> new CodePairingOutcome.Failed(reason);
             };
         } finally {
             // The device shows a brand new code next time whatever happened here, so the
