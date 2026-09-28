@@ -22,7 +22,7 @@ COPY --from=build /src/build/libs/*.jar app.jar
 ARG RUN_AS=1000:1000
 RUN mkdir -p /data && chown "$RUN_AS" /data
 VOLUME /data
-ENV SHIELD_DATA_DIR=/data
+ENV HOME_CONTROL_DATA_DIR=/data
 EXPOSE 8080
 USER ${RUN_AS}
-ENTRYPOINT ["java", "-jar", "/app/app.jar", "--shield.data-dir=/data"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar", "--home-control.data-dir=/data"]

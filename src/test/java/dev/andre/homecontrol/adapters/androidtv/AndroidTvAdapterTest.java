@@ -11,7 +11,9 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.playback.ServiceLinks;
+import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.StorageException;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -32,7 +34,7 @@ class AndroidTvAdapterTest {
     Path dir;
 
     private AndroidTvProperties properties() {
-        return new AndroidTvProperties(dir, "shield", false, 10, 1, 4);
+        return new AndroidTvProperties(true, "shield", Duration.ofSeconds(10), Duration.ofSeconds(1), Duration.ofSeconds(4));
     }
 
     private AndroidTvAdapter adapter(CertificateStore certificates) {
@@ -43,7 +45,7 @@ class AndroidTvAdapterTest {
     void reportsTheForegroundAppLive() {
         Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", 6466, null, Instant.now());
 
-        assertThat(adapter(new CertificateStore(properties().keystoreFile(), "shield".toCharArray()))
+        assertThat(adapter(new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray()))
                 .foregroundAppReporting(device))
                 .isEqualTo(dev.andre.homecontrol.core.ForegroundAppReporting.LIVE);
     }
@@ -52,7 +54,7 @@ class AndroidTvAdapterTest {
     void declaresRemoteKeysPowerVolumeAndAppLink() {
         Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", 6466, null, Instant.now());
 
-        assertThat(adapter(new CertificateStore(properties().keystoreFile(), "shield".toCharArray()))
+        assertThat(adapter(new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray()))
                 .capabilities(device))
                 .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME,
                         Capability.APP_LINK);
@@ -61,7 +63,7 @@ class AndroidTvAdapterTest {
     @Test
     void withoutACredentialTheHandleIsUnpairedAndNoCredentialIsCreated() throws Exception {
         try (FakeRemoteServer remote = new FakeRemoteServer()) {
-            CertificateStore certificates = new CertificateStore(properties().keystoreFile(), "shield".toCharArray());
+            CertificateStore certificates = new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray());
             Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", remote.port(), null, Instant.now());
             List<DeviceState> seen = new CopyOnWriteArrayList<>();
 
@@ -74,14 +76,14 @@ class AndroidTvAdapterTest {
             }
             assertThat(seen).extracting(DeviceState::status).containsExactly(DeviceStatus.UNPAIRED);
             assertThat(remote.connections()).isZero();
-            assertThat(Files.exists(properties().keystoreFile())).isFalse();
+            assertThat(Files.exists(dir.resolve(DataDirectory.KEYSTORE))).isFalse();
         }
     }
 
     @Test
     void executesAKeyPressOnceConnected() throws Exception {
         try (FakeRemoteServer remote = new FakeRemoteServer()) {
-            CertificateStore certificates = new CertificateStore(properties().keystoreFile(), "shield".toCharArray());
+            CertificateStore certificates = new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray());
             certificates.loadOrCreate("shield");
             Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", remote.port(), null, Instant.now());
 
@@ -98,7 +100,7 @@ class AndroidTvAdapterTest {
     @Test
     void opensAnAppLinkOnceConnected() throws Exception {
         try (FakeRemoteServer remote = new FakeRemoteServer()) {
-            CertificateStore certificates = new CertificateStore(properties().keystoreFile(), "shield".toCharArray());
+            CertificateStore certificates = new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray());
             certificates.loadOrCreate("shield");
             Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", remote.port(), null, Instant.now());
 
@@ -115,7 +117,7 @@ class AndroidTvAdapterTest {
     @Test
     void sendsCanonicalServiceLinksVerbatim() throws Exception {
         try (FakeRemoteServer remote = new FakeRemoteServer()) {
-            CertificateStore certificates = new CertificateStore(properties().keystoreFile(), "shield".toCharArray());
+            CertificateStore certificates = new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray());
             certificates.loadOrCreate("shield");
             Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", remote.port(), null, Instant.now());
 
@@ -135,18 +137,18 @@ class AndroidTvAdapterTest {
 
     @Test
     void anUnreadableKeystoreFailsAtAdapterStart() {
-        new CertificateStore(properties().keystoreFile(), "correct".toCharArray()).loadOrCreate("x");
-        AndroidTvAdapter adapter = adapter(new CertificateStore(properties().keystoreFile(), "wrong".toCharArray()));
+        new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "correct".toCharArray()).loadOrCreate("x");
+        AndroidTvAdapter adapter = adapter(new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "wrong".toCharArray()));
 
         assertThatThrownBy(adapter::verifyCredentialStore)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining("password")
-                .hasMessageContaining(properties().keystoreFile().toString());
+                .hasMessageContaining(dir.resolve(DataDirectory.KEYSTORE).toString());
     }
 
     @Test
     void forgetDeletesOnlyThatDevicesCredential() {
-        CertificateStore certificates = new CertificateStore(properties().keystoreFile(), "shield".toCharArray());
+        CertificateStore certificates = new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray());
         certificates.loadOrCreate("forgotten");
         certificates.loadOrCreate("kept");
         Device device = AndroidTvSettings.device("forgotten", "Shield", "127.0.0.1", 6466, null, Instant.now());

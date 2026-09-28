@@ -74,7 +74,7 @@ class TizenEndToEndTest {
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        registry.add("shield.data-dir", DATA::toString);
+        registry.add("home-control.data-dir", DATA::toString);
         registry.add("home-control.ssdp.enabled", () -> "true");
         registry.add("home-control.ssdp.multicast-address", () -> "127.0.0.1");
         registry.add("home-control.ssdp.port", SSDP::port);

@@ -31,7 +31,7 @@ class EventStreamShutdownEndToEndTest {
     void closingTheApplicationEndsAnOpenEventStreamInsteadOfWaitingForIt() throws Exception {
         String dataDir = Files.createTempDirectory("shield-sse-shutdown").toString();
         ConfigurableApplicationContext app = new SpringApplicationBuilder(HomeControlApplication.class)
-                .run("--server.port=0", "--shield.data-dir=" + dataDir);
+                .run("--server.port=0", "--home-control.data-dir=" + dataDir);
         HttpClient http = HttpClient.newHttpClient();
         EventStreamReader events = null;
         try {

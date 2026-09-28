@@ -34,7 +34,7 @@ public abstract class FullAppTest {
     @DynamicPropertySource
     static void sharedApplication(DynamicPropertyRegistry registry) throws IOException {
         dataDir = Files.createTempDirectory("full-app");
-        registry.add("shield.data-dir", dataDir::toString);
+        registry.add("home-control.data-dir", dataDir::toString);
         registry.add("home-control.security.allowed-hosts", () -> "tv.example.org, *.home.example.net");
         registry.add("home-control.cast.command-timeout-seconds", () -> "3");
         registry.add("home-control.cast.load-timeout-seconds", () -> "5");

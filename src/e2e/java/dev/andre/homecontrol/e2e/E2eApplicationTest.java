@@ -40,7 +40,7 @@ public abstract class E2eApplicationTest {
     @DynamicPropertySource
     static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
         String dir = Files.createTempDirectory("home-control-e2e").toString();
-        registry.add("shield.data-dir", () -> dir);
+        registry.add("home-control.data-dir", () -> dir);
     }
 
     @LocalServerPort

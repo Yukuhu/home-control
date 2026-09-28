@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.sources.sports;
 
-import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.content.SourcePreferencesService;
 import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.security.LoginService;
@@ -9,6 +8,7 @@ import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarUrlPolicy;
 import dev.andre.homecontrol.sources.sports.calendar.SportsCalendars;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
+import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,8 +27,8 @@ import java.time.Clock;
 public class SportsConfiguration {
 
     @Bean
-    public JsonFileSportsStore jsonFileSportsStore(AndroidTvProperties androidTvProperties) {
-        return new JsonFileSportsStore(androidTvProperties.dataDir().resolve("sports.json"));
+    public JsonFileSportsStore jsonFileSportsStore(DataDirectory data) {
+        return new JsonFileSportsStore(data.resolve(DataDirectory.SPORTS));
     }
 
     @Bean

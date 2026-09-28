@@ -41,7 +41,13 @@ public final class LegacyPropertyNames implements EnvironmentPostProcessor, Orde
     }
 
     /** Every renamed key; docs/user/configuration.md lists them. */
-    static final List<Rename> RENAMES = List.of();
+    static final List<Rename> RENAMES = List.of(
+            Rename.of("shield.data-dir", "home-control.data-dir"),
+            Rename.of("shield.discovery-enabled", "home-control.discovery.enabled"),
+            Rename.of("shield.keystore-password", "home-control.androidtv.keystore-password"),
+            Rename.seconds("shield.stale-timeout-seconds", "home-control.androidtv.stale-timeout"),
+            Rename.seconds("shield.reconnect-initial-delay-seconds", "home-control.androidtv.reconnect-initial-delay"),
+            Rename.seconds("shield.reconnect-max-delay-seconds", "home-control.androidtv.reconnect-max-delay"));
 
     private final Log log;
 

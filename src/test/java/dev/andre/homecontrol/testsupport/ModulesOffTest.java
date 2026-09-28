@@ -38,7 +38,7 @@ public abstract class ModulesOffTest {
     @DynamicPropertySource
     static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
         dataDir = Files.createTempDirectory("modules-off");
-        registry.add("shield.data-dir", dataDir::toString);
+        registry.add("home-control.data-dir", dataDir::toString);
     }
 
     /** The context's data directory, into which a switched-off module writes nothing. */

@@ -8,6 +8,7 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.RefusingPairingServer;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.StorageException;
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,9 +44,9 @@ class PairingServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         fakeDevice = new FakePairingServer();
-        AndroidTvProperties properties = new AndroidTvProperties(dir, "shield", false, 10, 1, 4);
+        AndroidTvProperties properties = new AndroidTvProperties(true, "shield", Duration.ofSeconds(10), Duration.ofSeconds(1), Duration.ofSeconds(4));
         sessions = mock(DeviceManager.class);
-        certificates = new CertificateStore(properties.keystoreFile(), "shield".toCharArray());
+        certificates = new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray());
         service = new PairingService(certificates, sessions, new DataDirectory(dir));
     }
 

@@ -35,7 +35,7 @@ class SportsModuleSwitchTest {
         @DynamicPropertySource
         static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
             dataDir = Files.createTempDirectory("sports-module-switch-tsdb-off");
-            registry.add("shield.data-dir", () -> dataDir.toString());
+            registry.add("home-control.data-dir", () -> dataDir.toString());
         }
 
         @Autowired
