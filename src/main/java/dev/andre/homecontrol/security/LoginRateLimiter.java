@@ -87,6 +87,13 @@ public class LoginRateLimiter {
         allFailures.addLast(now);
     }
 
+    /** Forgets every failure. Exists for the shared test context, which reuses one application for many test classes. */
+    public synchronized void reset() {
+        failuresByAddress.clear();
+        allFailures.clear();
+        lastSweep = Instant.MIN;
+    }
+
     /** Clears the address; its last attempt (the successful reservation) also stops counting in total. */
     public synchronized void succeeded(String address) {
         Deque<Instant> failures = failuresByAddress.remove(address);

@@ -170,4 +170,20 @@ class QuotaLedgerTest {
         assertThat(ledger.usage().units()).isZero();
         assertThat(ledger.usage().day()).hasToString("2026-09-16");
     }
+
+    @Test
+    void resetForgetsTheDaysUsageAndItsFile() {
+        QuotaLedger ledger = new QuotaLedger(file, clock, 10000, 20);
+        ledger.charge(QuotaLedger.Call.SEARCH_LIST);
+        assertThat(file).exists();
+
+        ledger.reset();
+
+        QuotaLedger.Usage usage = ledger.usage();
+        assertThat(usage.units()).isZero();
+        assertThat(usage.searches()).isZero();
+        assertThat(usage.calls()).isEmpty();
+        assertThat(file).doesNotExist();
+        assertThat(new QuotaLedger(file, clock, 10000, 20).usage().units()).isZero();
+    }
 }

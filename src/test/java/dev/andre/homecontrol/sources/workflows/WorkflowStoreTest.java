@@ -301,4 +301,17 @@ class WorkflowStoreTest {
             dispatch.get(5, TimeUnit.SECONDS);
         }
     }
+
+    @Test void reloadReadsTheDefinitionsAgainAfterTheSecretsWereRemoved() {
+        WorkflowDefinition saved = first();
+        login.removeSecrets(secrets.names());
+        assertThat(workflows.all()).containsExactly(saved);
+        int eventCount = events.size();
+
+        workflows.reload();
+
+        assertThat(workflows.all()).isEmpty();
+        assertThat(workflows.problems()).isEmpty();
+        assertThat(events).hasSize(eventCount + 1).last().isEqualTo(new ContentChangedEvent("workflows"));
+    }
 }

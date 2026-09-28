@@ -146,4 +146,21 @@ class LoginRateLimiterTest {
         assertThat(limiter.reserve("10.0.2.2")).isEmpty();
         assertThat(limiter.blockedFor("10.9.9.9")).isPresent();
     }
+
+    @Test
+    void resetForgetsEveryFailure() {
+        for (int i = 0; i < 5; i++) {
+            limiter.failed("10.0.0.2");
+        }
+        for (int i = 0; i < 50; i++) {
+            limiter.failed("10.0.1." + i);
+        }
+        assertThat(limiter.blockedFor("10.0.0.2")).isPresent();
+        assertThat(limiter.blockedFor("10.0.2.1")).isPresent();
+
+        limiter.reset();
+
+        assertThat(limiter.blockedFor("10.0.0.2")).isEmpty();
+        assertThat(limiter.blockedFor("10.0.2.1")).isEmpty();
+    }
 }
