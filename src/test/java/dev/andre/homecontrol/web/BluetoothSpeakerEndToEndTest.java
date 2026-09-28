@@ -85,7 +85,7 @@ class BluetoothSpeakerEndToEndTest {
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        registry.add("shield.data-dir", () -> ROOT.resolve("data").toString());
+        registry.add("home-control.data-dir", () -> ROOT.resolve("data").toString());
         registry.add("home-control.ssdp.enabled", () -> "false");
         registry.add("home-control.bluetooth.enabled", () -> "true");
         registry.add("home-control.bluetooth.dbus-address", () -> "unix:path=" + ROOT.resolve("system_bus_socket"));

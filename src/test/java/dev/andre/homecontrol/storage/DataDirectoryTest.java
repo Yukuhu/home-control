@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -119,6 +120,18 @@ class DataDirectoryTest {
         assertThatThrownBy(new DataDirectory(blocked)::verifyUsable)
                 .isInstanceOf(UnusableDataDirectoryException.class)
                 .hasMessageContaining(blocked.toString());
+    }
+
+    @Test
+    void resolvesItsFilesInsideItself() {
+        DataDirectory data = new DataDirectory(dir);
+
+        assertThat(data.path()).isEqualTo(dir);
+        assertThat(data.resolve(DataDirectory.SECRETS)).isEqualTo(dir.resolve("secrets.json"));
+        assertThat(List.of(DataDirectory.KEYSTORE, DataDirectory.DEVICES, DataDirectory.SECRETS,
+                DataDirectory.SECRET_KEY, DataDirectory.SOURCES, DataDirectory.SPORTS, DataDirectory.PINNED,
+                DataDirectory.YOUTUBE_QUOTA)).containsExactly("keystore.p12", "devices.json", "secrets.json",
+                "secret.key", "sources.json", "sports.json", "pinned.json", "youtube-quota.json");
     }
 
     private static boolean runsAsRoot() {

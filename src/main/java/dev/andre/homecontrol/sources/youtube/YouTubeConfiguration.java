@@ -1,9 +1,9 @@
 package dev.andre.homecontrol.sources.youtube;
 
-import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.beans.factory.ObjectProvider;
@@ -51,8 +51,8 @@ public class YouTubeConfiguration {
     }
 
     @Bean
-    public QuotaLedger youTubeQuotaLedger(AndroidTvProperties storage, YouTubeProperties properties, Clock clock) {
-        return new QuotaLedger(storage.dataDir().resolve("youtube-quota.json"), clock, properties.dailyQuotaUnits(),
+    public QuotaLedger youTubeQuotaLedger(DataDirectory data, YouTubeProperties properties, Clock clock) {
+        return new QuotaLedger(data.resolve(DataDirectory.YOUTUBE_QUOTA), clock, properties.dailyQuotaUnits(),
                 properties.searchesPerDay());
     }
 

@@ -112,4 +112,12 @@ class LegacyPropertyNamesTest {
         assertThat(sources.size()).isEqualTo(before);
         verify(log, never()).warn(anyString());
     }
+
+    @Test
+    void theProductionTableRenamesTheShieldKeys() {
+        assertThat(LegacyPropertyNames.RENAMES).extracting(LegacyPropertyNames.Rename::oldName)
+                .contains("shield.data-dir", "shield.discovery-enabled", "shield.keystore-password",
+                        "shield.stale-timeout-seconds", "shield.reconnect-initial-delay-seconds",
+                        "shield.reconnect-max-delay-seconds");
+    }
 }

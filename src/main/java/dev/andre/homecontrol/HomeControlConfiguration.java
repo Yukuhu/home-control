@@ -1,6 +1,7 @@
 package dev.andre.homecontrol;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
+import dev.andre.homecontrol.config.HomeControlProperties;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.ContentSources;
@@ -32,8 +33,8 @@ import java.util.List;
 public class HomeControlConfiguration {
 
     @Bean
-    public DeviceRegistry deviceRegistry(AndroidTvProperties properties) {
-        return new JsonFileDeviceRegistry(properties.devicesFile());
+    public DeviceRegistry deviceRegistry(DataDirectory data) {
+        return new JsonFileDeviceRegistry(data.resolve(DataDirectory.DEVICES));
     }
 
     @Bean
@@ -49,26 +50,26 @@ public class HomeControlConfiguration {
 
     /** The one mDNS browser every adapter's discovery shares (spec §7). */
     @Bean
-    public MdnsBrowser mdnsBrowser(AndroidTvProperties properties) {
-        return new MdnsBrowser(properties.discoveryEnabled());
+    public MdnsBrowser mdnsBrowser(HomeControlProperties properties) {
+        return new MdnsBrowser(properties.discovery().enabled());
     }
 
     @Bean
-    public CertificateStore certificateStore(AndroidTvProperties properties) {
-        return new CertificateStore(properties.keystoreFile(),
+    public CertificateStore certificateStore(DataDirectory data, AndroidTvProperties properties) {
+        return new CertificateStore(data.resolve(DataDirectory.KEYSTORE),
                 properties.keystorePassword().toCharArray());
     }
 
     @Bean
-    public DataDirectory dataDirectory(AndroidTvProperties properties) {
+    public DataDirectory dataDirectory(HomeControlProperties properties) {
         DataDirectory directory = new DataDirectory(properties.dataDir());
         directory.verifyUsable();
         return directory;
     }
 
     @Bean
-    public JsonFileSourceSettings sourceSettings(AndroidTvProperties properties) {
-        return new JsonFileSourceSettings(properties.dataDir().resolve("sources.json"));
+    public JsonFileSourceSettings sourceSettings(DataDirectory data) {
+        return new JsonFileSourceSettings(data.resolve(DataDirectory.SOURCES));
     }
 
     /** Every content source found in the context, in bean order (spec §5.2, §7). */

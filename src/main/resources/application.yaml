@@ -19,16 +19,18 @@ spring:
         cachecontrol:
           no-cache: true
 
-shield:
-  data-dir: ./data
-  keystore-password: ${SHIELD_KEYSTORE_PASSWORD:shield}
-  discovery-enabled: true
-  # The device pings when idle; commands postpone pings. Count traffic in both directions.
-  stale-timeout-seconds: 10
-  reconnect-initial-delay-seconds: 1
-  reconnect-max-delay-seconds: 60
-
 home-control:
+  data-dir: ./data
+  discovery:
+    enabled: true
+  androidtv:
+    enabled: true
+    # SHIELD_KEYSTORE_PASSWORD, the old name, still sets it.
+    keystore-password: shield
+    # The device pings when idle; commands postpone pings. Count traffic in both directions.
+    stale-timeout: 10s
+    reconnect-initial-delay: 1s
+    reconnect-max-delay: 60s
   ssdp:
     # One shared listener for smart TVs (and later DLNA/Sonos). Needs host networking.
     enabled: true

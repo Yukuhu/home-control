@@ -52,7 +52,7 @@ class SetupControllerTest extends WebSliceTest {
     @Test
     void showsAnActionableStorageErrorBeforePairing() throws Exception {
         willThrow(new StorageException(
-                "Shield data directory is not writable: /data; check that /data is bind-mounted and writable",
+                "Data directory is not writable: /data; check that /data is bind-mounted and writable",
                 new AccessDeniedException("/data")))
                 .given(pairing).begin("192.168.1.50", null);
 
@@ -61,7 +61,7 @@ class SetupControllerTest extends WebSliceTest {
                 .andExpect(view().name("setup"))
                 // The whole message: the sports section's </datalist> alone contains "/data".
                 .andExpect(content().string(containsString(
-                        "Shield data directory is not writable: /data; check that /data is bind-mounted and writable")));
+                        "Data directory is not writable: /data; check that /data is bind-mounted and writable")));
     }
 
     @Test

@@ -54,7 +54,7 @@ class WorkflowEndToEndTest {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) throws IOException {
         String directory = Files.createTempDirectory("workflow-web-e2e").toString();
-        registry.add("shield.data-dir", () -> directory);
+        registry.add("home-control.data-dir", () -> directory);
         registry.add("home-control.workflows.allow-loopback", () -> "true");
         registry.add("home-control.ssdp.enabled", () -> "false");
     }

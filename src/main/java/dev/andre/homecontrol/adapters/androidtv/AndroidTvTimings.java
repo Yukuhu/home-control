@@ -9,8 +9,7 @@ import java.time.Duration;
 record AndroidTvTimings(Duration staleTimeout, Duration reconnectInitialDelay, Duration reconnectMaxDelay) {
 
     static AndroidTvTimings from(AndroidTvProperties properties) {
-        return new AndroidTvTimings(Duration.ofSeconds(properties.staleTimeoutSeconds()),
-                Duration.ofSeconds(properties.reconnectInitialDelaySeconds()),
-                Duration.ofSeconds(properties.reconnectMaxDelaySeconds()));
+        return new AndroidTvTimings(properties.staleTimeout(), properties.reconnectInitialDelay(),
+                properties.reconnectMaxDelay());
     }
 }

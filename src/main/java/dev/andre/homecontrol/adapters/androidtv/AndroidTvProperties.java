@@ -1,23 +1,17 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.convert.DurationUnit;
 
-import java.nio.file.Path;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 
-@ConfigurationProperties("shield")
-public record AndroidTvProperties(Path dataDir,
-                               String keystorePassword,
-                               boolean discoveryEnabled,
-                               int staleTimeoutSeconds,
-                               int reconnectInitialDelaySeconds,
-                               int reconnectMaxDelaySeconds) {
-
-    public Path keystoreFile() {
-        return dataDir.resolve("keystore.p12");
-    }
-
-    public Path devicesFile() {
-        return dataDir.resolve("devices.json");
-    }
-
+/** {@code home-control.androidtv.*}: the keystore password and the connection's waits. */
+@ConfigurationProperties("home-control.androidtv")
+public record AndroidTvProperties(@DefaultValue("true") boolean enabled,
+                                  @DefaultValue("shield") String keystorePassword,
+                                  @DefaultValue("10s") @DurationUnit(ChronoUnit.SECONDS) Duration staleTimeout,
+                                  @DefaultValue("1s") @DurationUnit(ChronoUnit.SECONDS) Duration reconnectInitialDelay,
+                                  @DefaultValue("60s") @DurationUnit(ChronoUnit.SECONDS) Duration reconnectMaxDelay) {
 }

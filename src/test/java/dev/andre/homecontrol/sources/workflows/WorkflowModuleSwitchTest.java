@@ -146,7 +146,7 @@ class WorkflowOnlySetupTest {
     @org.springframework.test.context.DynamicPropertySource
     static void data(org.springframework.test.context.DynamicPropertyRegistry registry) throws java.io.IOException {
         String directory = java.nio.file.Files.createTempDirectory("workflow-editor-only").toString();
-        registry.add("shield.data-dir", () -> directory);
+        registry.add("home-control.data-dir", () -> directory);
     }
     @Test void workflowSummaryRemainsVisibleAsTheOnlySourceModule() throws Exception {
         String html = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/setup"))

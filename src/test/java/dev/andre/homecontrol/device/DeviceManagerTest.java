@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvAdapter;
+import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.testsupport.TestCredentials;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
@@ -31,6 +32,7 @@ import dev.andre.homecontrol.core.SpeakerTopology;
 import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.WakeOnLanAdapter;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.ApplicationEventPublisher;
@@ -69,11 +71,11 @@ class DeviceManagerTest {
     private final ApplicationEventPublisher publisher = published::add;
 
     private AndroidTvProperties properties() {
-        return new AndroidTvProperties(dir, "shield", false, 10, 1, 4);
+        return new AndroidTvProperties(true, "shield", Duration.ofSeconds(10), Duration.ofSeconds(1), Duration.ofSeconds(4));
     }
 
     private CertificateStore certificates() {
-        return new CertificateStore(properties().keystoreFile(), "shield".toCharArray());
+        return new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray());
     }
 
     private DeviceManager manager(DeviceRegistry registry, CertificateStore certificates) {

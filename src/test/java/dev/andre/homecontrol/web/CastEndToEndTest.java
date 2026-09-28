@@ -48,7 +48,7 @@ class CastEndToEndTest {
     @DynamicPropertySource
     static void fastCastAndAnIsolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
         String dataDir = Files.createTempDirectory("cast-e2e").toString();
-        registry.add("shield.data-dir", () -> dataDir);
+        registry.add("home-control.data-dir", () -> dataDir);
         registry.add("home-control.cast.heartbeat-interval-seconds", () -> "1");
         registry.add("home-control.cast.stale-timeout-seconds", () -> "3");
         registry.add("home-control.cast.reconnect-max-delay-seconds", () -> "2");

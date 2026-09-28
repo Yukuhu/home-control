@@ -7,7 +7,17 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+/** The one place that knows the application's files under {@code /data}. */
 public final class DataDirectory {
+
+    public static final String KEYSTORE = "keystore.p12";
+    public static final String DEVICES = "devices.json";
+    public static final String SECRETS = "secrets.json";
+    public static final String SECRET_KEY = "secret.key";
+    public static final String SOURCES = "sources.json";
+    public static final String SPORTS = "sports.json";
+    public static final String PINNED = "pinned.json";
+    public static final String YOUTUBE_QUOTA = "youtube-quota.json";
 
     private final Path path;
 
@@ -15,14 +25,23 @@ public final class DataDirectory {
         this.path = path;
     }
 
+    public Path path() {
+        return path;
+    }
+
+    /** A file in this directory, named by one of this class's constants. */
+    public Path resolve(String name) {
+        return path.resolve(name);
+    }
+
     public void verifyWritable() {
         try {
             Files.createDirectories(path);
-            Path probe = Files.createTempFile(path, ".shield-write-check-", ".tmp");
+            Path probe = Files.createTempFile(path, ".write-check-", ".tmp");
             Files.delete(probe);
         } catch (IOException e) {
             throw new StorageException(
-                    "Shield data directory is not writable: " + path
+                    "Data directory is not writable: " + path
                             + "; check that /data is bind-mounted and writable",
                     e);
         }
