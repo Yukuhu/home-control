@@ -61,7 +61,7 @@ class SharedWebSliceTest extends WebSliceTest {
                 RailController.class, SearchController.class, SetupController.class, SourcesSetupAdvice.class,
                 SourcesSetupController.class, StateController.class);
 
-        assertThat(webLayer).allSatisfy(type ->
+        assertThat(webLayer).isNotEmpty().allSatisfy(type ->
                 assertThat(context.getBeanNamesForType(type)).as(type.getSimpleName()).hasSize(1));
     }
 }

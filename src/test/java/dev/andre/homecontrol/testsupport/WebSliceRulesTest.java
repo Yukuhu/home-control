@@ -12,6 +12,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.BeanOverride;
 
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -55,11 +56,16 @@ class WebSliceRulesTest {
         return false;
     }
 
+    private static final DescribedPredicate<JavaClass> A_WEB_MVC_TEST = DescribedPredicate.describe(
+            "a @WebMvcTest, directly, through a composed annotation or by inheritance",
+            type -> Stream.concat(Stream.of(type), type.getAllRawSuperclasses().stream())
+                    .anyMatch(each -> each.isAnnotatedWith(WebMvcTest.class) || each.isMetaAnnotatedWith(WebMvcTest.class)));
+
     @Test
     void onlyTheSharedSliceIsAWebMvcTest() {
         // BluetoothSetupOffTest needs the Bluetooth module off; Phase 1.3d-2 moves it into the modules-off context.
-        classes().that().areAnnotatedWith(WebMvcTest.class)
-                .should().be(WebSliceTest.class).orShould().haveSimpleName("BluetoothSetupOffTest")
+        classes().that(A_WEB_MVC_TEST)
+                .should().beAssignableTo(WebSliceTest.class).orShould().haveSimpleName("BluetoothSetupOffTest")
                 .check(TESTS);
     }
 
