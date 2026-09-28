@@ -39,9 +39,10 @@ When this page was written, the unit, slice, end-to-end and architecture tests n
 - Waiting for something asynchronous uses Awaitility (`await().atMost(...)`), never `Thread.sleep`. A fake may
   sleep to model a slow peer, with `@SuppressWarnings("java:S2925")` and a one-line reason.
 - Device sessions take their waits as a `*Timings` record of `Duration`s (`CastTimings`, `TizenTimings`, …), built
-  from the `*Properties` in production. Tests pass 50–500 ms; a "nothing happens" check (`await().during(...)`)
-  covers at least five of the intervals it watches. Tests assert outcomes (the exception, its message, the order of
-  events), never an upper bound on elapsed time.
+  from the `*Properties` in production. Tests pass 50–500 ms for the intervals and backoffs they wait through, and keep
+  whole seconds for timeouts that must not fire; a "nothing happens" check (`await().during(...)`) covers at least five
+  of the intervals it watches. Tests assert outcomes (the exception, its message, the order of events), never an upper
+  bound on elapsed time unless that time is the behaviour under test (`EventStreamShutdownEndToEndTest`).
 
 ## Test configuration
 
