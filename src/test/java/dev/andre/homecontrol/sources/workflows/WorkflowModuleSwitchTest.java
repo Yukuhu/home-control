@@ -9,6 +9,7 @@ import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.SecretStore;
+import dev.andre.homecontrol.testsupport.ModulesOffTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.ApplicationEventPublisher;
@@ -118,32 +119,22 @@ class WorkflowModuleSwitchTest {
     }
 }
 
-@org.springframework.boot.test.context.SpringBootTest(properties = "home-control.workflows.enabled=false")
-@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
-class WorkflowDisabledSetupTest {
-    @org.springframework.beans.factory.annotation.Autowired org.springframework.test.web.servlet.MockMvc mvc;
-    @org.springframework.beans.factory.annotation.Autowired org.springframework.context.ApplicationContext context;
-    static java.nio.file.Path directory;
-    @org.springframework.test.context.DynamicPropertySource
-    static void data(org.springframework.test.context.DynamicPropertyRegistry registry) throws java.io.IOException {
-        directory = java.nio.file.Files.createTempDirectory("workflow-editor-disabled");
-        registry.add("shield.data-dir", directory::toString);
-    }
+class WorkflowDisabledSetupTest extends ModulesOffTest {
     @Test void noEditorAdviceServiceOrRoutesExistWhenModuleIsDisabled() throws Exception {
         assertThat(context.getBeanNamesForType(WorkflowSetupController.class)).isEmpty();
         assertThat(context.getBeanNamesForType(WorkflowSetupAdvice.class)).isEmpty();
         assertThat(context.getBeanNamesForType(WorkflowTestService.class)).isEmpty();
-        var html = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/setup"))
+        var html = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/setup"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertThat(html).doesNotContain("id=\"workflows\"", "/setup/workflows/new");
-        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/setup/workflows/new"))
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/setup/workflows/new"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
         for (String suffix : List.of("", "/test", "/remove", "/enabled", "/remove-invalid")) {
-            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/setup/workflows/w-0123456789ab" + suffix))
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/setup/workflows/w-0123456789ab" + suffix))
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
         }
-        assertThat(java.nio.file.Files.exists(directory.resolve("secrets.json"))).isFalse();
+        assertThat(java.nio.file.Files.exists(dataDir().resolve("secrets.json"))).isFalse();
     }
 }
 
