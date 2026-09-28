@@ -41,7 +41,7 @@ class CastConnectionTest {
     @BeforeEach
     void connect() throws Exception {
         receiver = new FakeCastReceiver();
-        connection = CastConnection.open("127.0.0.1", receiver.port(), Duration.ofSeconds(1), Duration.ofSeconds(3), listener);
+        connection = CastConnection.open("127.0.0.1", receiver.port(), Duration.ofMillis(200), Duration.ofSeconds(1), listener);
     }
 
     @AfterEach
@@ -134,7 +134,7 @@ class CastConnectionTest {
             unused = probe.getLocalPort();
         }
 
-        assertThatThrownBy(() -> CastConnection.open("127.0.0.1", unused, Duration.ofSeconds(1), Duration.ofSeconds(3), listener))
+        assertThatThrownBy(() -> CastConnection.open("127.0.0.1", unused, Duration.ofMillis(200), Duration.ofSeconds(1), listener))
                 .isInstanceOf(IOException.class);
     }
 
