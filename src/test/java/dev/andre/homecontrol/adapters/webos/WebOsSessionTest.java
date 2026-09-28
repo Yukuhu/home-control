@@ -40,7 +40,10 @@ import static org.awaitility.Awaitility.await;
 
 class WebOsSessionTest {
 
-    /** Backoff 50–100 ms, no wake grace, liveness every 30 s (off for most tests), register within 2 s. */
+    /**
+     * Backoff 50–100 ms, no wake grace, liveness every 30 s (off for most tests), a 2 s pairing-prompt wait that
+     * connect() never actually uses (it only ever registers with a stored key).
+     */
     private static final WebOsTimings TIMINGS = new WebOsTimings(Duration.ofMillis(50), Duration.ofMillis(100),
             Duration.ZERO, Duration.ofSeconds(30), Duration.ofSeconds(2));
     /** As TIMINGS, but a liveness check every 200 ms, for the liveness tests. */

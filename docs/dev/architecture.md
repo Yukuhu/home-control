@@ -104,14 +104,14 @@ The roadmap's measures, updated by each workstream that moves them.
 | `test` task wall time | not measured | 3 min 19 s (four JVMs, 4 CPUs) |
 | Spring context starts per test run | 67 (one JVM) | 70 (four JVMs) |
 | CI "Build and test" job time | about 9 min | 5 min 13 s |
-| Wall-clock upper-bound assertions | 9 | 0 |
+| Wall-clock upper-bound assertions | 9 | 1 |
 | Copies of `MutableClock` | 5, one of them nested in `SsdpDiscoveryTest` | 1 |
 
 Since #117 the unit tests run in up to four JVMs at once. Summed class time and context starts count all of them, and
 a class takes longer while it shares the CPUs, so compare runs with the same number of JVMs.
 
-`EventStreamShutdownEndToEndTest` keeps its bound, because the elapsed time of closing the application is the
-behaviour it tests.
+The nine counted at the baseline are now outcome assertions. `EventStreamShutdownEndToEndTest`, added since, keeps
+its bound, because the elapsed time of closing the application is the behaviour it tests.
 
 `YouTubeEndToEndTest` takes about 13 s: 4.7 s of Spring context start, 3.2 s of certificate generation and a real Cast
 connect before its first request, and 4.7 s for the rest of the journey, about 2–3 s of it OAuth polling at the

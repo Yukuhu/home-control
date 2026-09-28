@@ -109,7 +109,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
 
     /**
      * SSAP has no heartbeat and the JDK WebSocket does not ping, so a TV that lost power without
-     * closing TCP would stay CONNECTED forever. A cheap request every {@code livenessIntervalSeconds}
+     * closing TCP would stay CONNECTED forever. A cheap request every {@link WebOsTimings#livenessInterval()}
      * settles it: any answer (even an error) proves the TV is there; silence past the request
      * timeout means the connection is gone. Runs on the scheduler thread, so it never races
      * {@link #connect} or {@link #lost}.

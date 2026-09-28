@@ -22,8 +22,9 @@ When this page was written, the unit, slice, end-to-end and architecture tests n
 - A failure's details: `grep -A20 '<failure' build/test-results/test/*.xml`.
 - The unit tests run in up to four JVMs at once, and Gradle reuses the results of tasks whose inputs did not change,
   so a test that passed and was not touched is not run again.
-- Every test method has a 60 s timeout (`src/test/resources/junit-platform.properties`), off while a debugger is
-  attached. A test that needs longer declares `@Timeout`.
+- Every test and lifecycle method has a 60 s timeout (`src/test/resources/junit-platform.properties`), off while a
+  debugger is attached. A test that needs longer declares `@Timeout` on the method, or on the class for its test
+  methods; a long `@BeforeAll` or `@BeforeEach` needs its own.
 
 ## Fakes and fixtures
 
