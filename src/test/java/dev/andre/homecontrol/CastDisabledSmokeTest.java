@@ -5,17 +5,11 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.testsupport.ModulesOffTest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.ApplicationContext;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.time.Instant;
 import java.util.Map;
 
@@ -32,24 +26,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * regress an Android TV-only box — including one whose {@code devices.json} still carries a
  * {@code cast} entry from before it was switched off.
  */
-@SpringBootTest(properties = "home-control.cast.enabled=false")
-@AutoConfigureMockMvc
-class CastDisabledSmokeTest {
-
-    @DynamicPropertySource
-    static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
-        String dataDir = Files.createTempDirectory("cast-disabled-smoke-test").toString();
-        registry.add("shield.data-dir", () -> dataDir);
-    }
-
-    @Autowired
-    ApplicationContext context;
+class CastDisabledSmokeTest extends ModulesOffTest {
 
     @Autowired
     DeviceManager devices;
 
-    @Autowired
-    MockMvc mockMvc;
+    /** The modules-off context is shared: a device adopted here would stay for the next test class. */
+    @AfterEach
+    void forgetTheDevice() {
+        devices.forget("shield-c");
+    }
 
     @Test
     void theCastAdapterIsNotWiredUp() {
