@@ -47,7 +47,7 @@ class SsdpDiscoveryTest {
         http.start();
         clock = new MutableClock(Instant.parse("2026-09-16T12:00:00Z"), ZoneOffset.UTC);
         discovery = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
-                clock, HttpClient.newHttpClient());
+                new SsdpTimings(Duration.ofMillis(200)), clock, HttpClient.newHttpClient());
         discovery.start();
     }
 
@@ -219,7 +219,7 @@ class SsdpDiscoveryTest {
             disabled.watch(LG_TARGET);
 
             assertThat(disabled.listenPort()).isEqualTo(-1);
-            await().during(Duration.ofMillis(1500)).atMost(Duration.ofSeconds(3)).untilAsserted(() ->
+            await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted(() ->
                     assertThat(responder.searches()).isZero());
         }
     }
@@ -302,7 +302,8 @@ class SsdpDiscoveryTest {
         });
         responder.answer(LG_TARGET, FakeSsdpResponder.fixture("lg-search-response.txt", "127.0.0.1", httpPort()));
 
-        try (SsdpDiscovery real = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1))) {
+        try (SsdpDiscovery real = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+                new SsdpTimings(Duration.ofMillis(200)))) {
             real.start();
             real.watch(LG_TARGET);
 

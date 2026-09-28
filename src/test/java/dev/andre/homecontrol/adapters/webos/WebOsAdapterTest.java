@@ -16,6 +16,7 @@ import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
+import dev.andre.homecontrol.discovery.ssdp.SsdpTimings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -130,7 +131,8 @@ class WebOsAdapterTest {
         try (FakeSsdpResponder responder = new FakeSsdpResponder()) {
             responder.answer(WebOsAdapter.SEARCH_TARGET,
                     FakeSsdpResponder.fixture("lg-search-response.txt", "127.0.0.1", http.getAddress().getPort()));
-            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1));
+            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+                    new SsdpTimings(Duration.ofMillis(200)));
             ssdp.start();
             WebOsAdapter adapter = adapter(ssdp, properties(1));
 
@@ -150,7 +152,8 @@ class WebOsAdapterTest {
         try (FakeSsdpResponder responder = new FakeSsdpResponder()) {
             responder.answer(WebOsAdapter.SEARCH_TARGET,
                     FakeSsdpResponder.fixture("lg-search-response.txt", "127.0.0.1", FakeWebSocketServer.closedPort()));
-            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1));
+            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+                    new SsdpTimings(Duration.ofMillis(200)));
             ssdp.start();
             WebOsAdapter adapter = adapter(ssdp, properties(1));
 

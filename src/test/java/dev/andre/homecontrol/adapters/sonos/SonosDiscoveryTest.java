@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
+import dev.andre.homecontrol.discovery.ssdp.SsdpTimings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,8 @@ class SonosDiscoveryTest {
         // The announcement comes from the living room's own address, as a real player's does.
         responder = new FakeSsdpResponder(InetAddress.getByName("127.0.0.2"));
         responder.answer(SonosDiscovery.SEARCH_TARGET, living.searchResponse());
-        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.2", responder.port(), 0, 1, 1));
+        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.2", responder.port(), 0, 1, 1),
+                new SsdpTimings(Duration.ofMillis(200)));
         discovery = new SonosDiscovery(ssdp, new SonosProperties(true, 1, 1, 0, 1, 1, 1, 2), events::add);
     }
 
@@ -161,7 +163,7 @@ class SonosDiscoveryTest {
         search();
 
         await().atMost(Duration.ofSeconds(5)).until(() -> responder.searches() >= 1);
-        await().during(Duration.ofMillis(2500)).atMost(Duration.ofSeconds(4)).untilAsserted(() -> {
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             assertThat(discovery.devices()).isEmpty();
             assertThat(kitchen.calls()).isEmpty();
             assertThat(living.calls()).isEmpty();

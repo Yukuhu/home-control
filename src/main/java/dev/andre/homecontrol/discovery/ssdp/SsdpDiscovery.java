@@ -43,6 +43,7 @@ public class SsdpDiscovery implements AutoCloseable {
     private static final String USER_AGENT = DeviceFetch.USER_AGENT;
 
     private final SsdpProperties properties;
+    private final SsdpTimings timings;
     private final Clock clock;
     private final HttpClient http;
     private final Set<String> watched = ConcurrentHashMap.newKeySet();
@@ -61,13 +62,18 @@ public class SsdpDiscovery implements AutoCloseable {
     private volatile ScheduledExecutorService scheduler;
 
     public SsdpDiscovery(SsdpProperties properties) {
+        this(properties, SsdpTimings.from(properties));
+    }
+
+    public SsdpDiscovery(SsdpProperties properties, SsdpTimings timings) {
         // Embedded UPnP servers reject the "Upgrade: h2c" header the JDK sends by default; never follow redirects.
-        this(properties, Clock.systemUTC(), HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+        this(properties, timings, Clock.systemUTC(), HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
                 .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(3)).build());
     }
 
-    SsdpDiscovery(SsdpProperties properties, Clock clock, HttpClient http) {
+    SsdpDiscovery(SsdpProperties properties, SsdpTimings timings, Clock clock, HttpClient http) {
         this.properties = properties;
+        this.timings = timings;
         this.clock = clock;
         this.http = http;
     }
@@ -98,7 +104,7 @@ public class SsdpDiscovery implements AutoCloseable {
             log.warn("Not listening for SSDP announcements ({}); periodic searches still run", e.getMessage());
         }
         scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().name("ssdp-search").factory());
-        scheduler.scheduleWithFixedDelay(this::searchAll, 0, properties.searchIntervalSeconds(), TimeUnit.SECONDS);
+        scheduler.scheduleWithFixedDelay(this::searchAll, 0, timings.searchInterval().toMillis(), TimeUnit.MILLISECONDS);
     }
 
     /** Start looking for {@code searchTarget}; searches for it at once if discovery is running. */
