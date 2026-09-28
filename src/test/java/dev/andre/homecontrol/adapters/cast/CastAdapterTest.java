@@ -77,7 +77,8 @@ class CastAdapterTest {
         try (FakeCastReceiver receiver = new FakeCastReceiver();
              DeviceHandle handle = adapter.connect(CastSessionTest.device(receiver.port()), state -> { })) {
             await().until(() -> handle.state().connected());
-            assertThat(receiver.virtualConnections()).contains("receiver-0");
+            // The session is connected once it has sent CONNECT; the fake reads it on its own thread.
+            await().untilAsserted(() -> assertThat(receiver.virtualConnections()).contains("receiver-0"));
         }
     }
 
