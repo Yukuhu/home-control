@@ -239,4 +239,14 @@ class YouTubeSearchTest {
         assertThat(retried).isNotEmpty();
         assertThat(fake.requests("/youtube/v3/search")).hasSize(2);
     }
+
+    @Test
+    void resetForgetsTheCachedResults() {
+        search.search("bunny", 10);
+
+        search.reset();
+
+        search.search("bunny", 10);
+        assertThat(fake.requests("/youtube/v3/search")).hasSize(2);
+    }
 }

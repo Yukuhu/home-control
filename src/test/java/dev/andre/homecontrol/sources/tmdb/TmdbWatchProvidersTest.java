@@ -113,4 +113,15 @@ class TmdbWatchProvidersTest {
         fake.respond("GET", "/3/tv/66732/watch/providers", 200, "providers-tv-66732.json");
         assertThat(providers.providers(bearer, ref, "DE")).isNotEmpty();
     }
+
+    @Test
+    void resetForgetsTheCachedProviders() {
+        TmdbMediaRef ref = new TmdbMediaRef(TmdbMediaRef.Type.TV, 66732);
+        providers.providers(bearer, ref, "DE");
+
+        providers.reset();
+
+        providers.providers(bearer, ref, "DE");
+        assertThat(fake.count("GET", "/3/tv/66732/watch/providers")).isEqualTo(2);
+    }
 }

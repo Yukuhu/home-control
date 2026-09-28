@@ -57,6 +57,11 @@ public class TmdbWatchProviders {
         }
     }
 
+    /** Forgets every cached lookup. Exists for the shared test context, which reuses one application for many test classes. */
+    public synchronized void reset() {
+        cache.clear();
+    }
+
     private synchronized JsonNode fresh(TmdbMediaRef ref) {
         Entry entry = cache.get(ref);
         if (entry == null) {

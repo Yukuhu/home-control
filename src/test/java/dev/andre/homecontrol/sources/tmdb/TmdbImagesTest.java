@@ -115,4 +115,15 @@ class TmdbImagesTest {
 
         assertThat(images.poster(bearer, path)).isNull();
     }
+
+    @Test
+    void resetForgetsTheImageConfiguration() {
+        TmdbImages images = images(properties(null));
+        images.poster(bearer, "/x.jpg");
+
+        images.reset();
+
+        images.poster(bearer, "/x.jpg");
+        assertThat(fake.count("GET", "/3/configuration")).isEqualTo(2);
+    }
 }
