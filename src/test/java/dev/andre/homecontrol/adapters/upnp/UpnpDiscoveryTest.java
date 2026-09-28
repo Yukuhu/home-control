@@ -7,6 +7,7 @@ import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
 import dev.andre.homecontrol.discovery.ssdp.SsdpService;
+import dev.andre.homecontrol.discovery.ssdp.SsdpTimings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,8 @@ class UpnpDiscoveryTest {
         responder = new FakeSsdpResponder();
         fake = new FakeUpnpRenderer();
         responder.answer(UpnpDiscovery.SEARCH_TARGET, fake.searchResponse());
-        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1));
+        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+                new SsdpTimings(Duration.ofMillis(200)));
         ssdp.start();
         discovery = new UpnpDiscovery(ssdp, events::add, true);
     }
