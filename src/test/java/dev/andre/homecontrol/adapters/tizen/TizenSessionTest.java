@@ -76,10 +76,14 @@ class TizenSessionTest {
     }
 
     private TizenSession start(Map<String, String> settings) {
+        return start(settings, TIMINGS);
+    }
+
+    private TizenSession start(Map<String, String> settings, TizenTimings timings) {
         Device device = new Device("samsung", "Samsung TV", DeviceKind.TIZEN, "127.0.0.1",
                 Map.of("tizen", settings), Instant.now());
         registry.save(device);
-        session = new TizenSession(device, TizenRestTest.properties(tv), TIMINGS, InsecureTls.httpClient(Duration.ofSeconds(2)),
+        session = new TizenSession(device, TizenRestTest.properties(tv), timings, InsecureTls.httpClient(Duration.ofSeconds(2)),
                 registry, learned(), new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         return session;
@@ -348,12 +352,18 @@ class TizenSessionTest {
     @Test
     void anUnansweredHandshakeIsTransientKeepsTheTokenAndRetriesWithBackoff() {
         tv.setAuthorization(FakeTizenServer.Authorization.IGNORE);
-        start(Map.of("paired", "true", "token", "999"));
+        // A wider poll (400 ms, so an 800 ms first backoff) than TIMINGS: with a 200 ms poll the no-backoff
+        // and with-backoff arrival times (~700 ms and ~900 ms) both land inside any window short enough to
+        // finish quickly, so the assertion below could not tell a broken backoff from a working one.
+        TizenTimings timings = new TizenTimings(Duration.ofMillis(400), Duration.ZERO, Duration.ofMillis(500),
+                TizenTimings.HANDSHAKE_BACKOFF_CAP);
+        start(Map.of("paired", "true", "token", "999"), timings);
 
         await().atMost(Duration.ofSeconds(5)).pollInterval(Duration.ofMillis(10)).until(() -> tv.connections() == 1);
-        // 500 ms request timeout plus a 400 ms backoff before the next attempt.
-        await("no retry during the request timeout and the backoff").during(Duration.ofMillis(600))
-                .atMost(Duration.ofSeconds(2)).until(() -> tv.connections() == 1);
+        // 500 ms request timeout plus an 800 ms backoff; without the backoff the retry would come at the next
+        // 400 ms poll, about 900 ms after the first connection.
+        await("no retry during the request timeout and the backoff").during(Duration.ofMillis(1100))
+                .atMost(Duration.ofSeconds(3)).until(() -> tv.connections() == 1);
         assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
         assertThat(stored("token")).isEqualTo("999");
         assertThat(stored("paired")).isEqualTo("true");
