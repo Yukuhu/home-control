@@ -217,7 +217,10 @@ class WebOsSessionTest {
     void powerWhileOnTurnsTheTvOff() throws Exception {
         started();
         connected();
-        await().atMost(Duration.ofSeconds(5)).until(() -> session.state().powerOn());
+        // The first power-state answer says Active. MAC learning comes after it, so once the MAC is stored that
+        // answer cannot land after the turnOff and switch the power back on.
+        await().atMost(Duration.ofSeconds(5)).until(() -> storedSetting("macAddress") != null);
+        assertThat(session.state().powerOn()).isTrue();
 
         session.execute(new Action.PressKey(RemoteKey.POWER));
 
