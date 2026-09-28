@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.Executors;
@@ -43,6 +44,7 @@ public class BluetoothSpeakerSession implements DeviceHandle {
     private final Device device;
     private final BluetoothSettings settings;
     private final BluetoothProperties properties;
+    private final BluetoothTimings timings;
     private final BluezClient bluez;
     private final MpvPlayer player;
     private final AudioDeviceResolver audioDevices;
@@ -62,9 +64,15 @@ public class BluetoothSpeakerSession implements DeviceHandle {
 
     public BluetoothSpeakerSession(Device device, BluetoothProperties properties, BluezClient bluez, MpvPlayer player,
                                    AudioDeviceResolver audioDevices, Consumer<DeviceState> onChange) {
+        this(device, properties, BluetoothTimings.from(properties), bluez, player, audioDevices, onChange);
+    }
+
+    BluetoothSpeakerSession(Device device, BluetoothProperties properties, BluetoothTimings timings, BluezClient bluez,
+                            MpvPlayer player, AudioDeviceResolver audioDevices, Consumer<DeviceState> onChange) {
         this.device = device;
         this.settings = BluetoothSettings.of(device);
         this.properties = properties;
+        this.timings = timings;
         this.bluez = bluez;
         this.player = player;
         this.audioDevices = audioDevices;
@@ -200,13 +208,13 @@ public class BluetoothSpeakerSession implements DeviceHandle {
                 if (nextPoll != null) {
                     nextPoll.cancel(false);
                 }
-                nextPoll = loop.schedule(this::poll, nextPollSeconds(), TimeUnit.SECONDS);
+                nextPoll = loop.schedule(this::poll, nextPollDelay().toMillis(), TimeUnit.MILLISECONDS);
             }
         }
     }
 
-    private long nextPollSeconds() {
-        return player.active() ? properties.playingPollIntervalSeconds() : properties.pollIntervalSeconds();
+    private Duration nextPollDelay() {
+        return player.active() ? timings.playingPollInterval() : timings.pollInterval();
     }
 
     private void readState() {
