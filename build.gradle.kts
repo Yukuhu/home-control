@@ -61,6 +61,8 @@ sonar {
 
 dependencies {
     implementation(platform(libs.spring.boot.dependencies))
+    // Raises Jackson above the version Spring Boot manages; gradle/libs.versions.toml says why.
+    implementation(platform(libs.jackson.bom))
     // Raises Tomcat above the version Spring Boot manages; gradle/libs.versions.toml says why.
     constraints {
         implementation(libs.tomcat.embed.core)
