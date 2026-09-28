@@ -1,28 +1,18 @@
 package dev.andre.homecontrol.sources.sports;
 
-import dev.andre.homecontrol.adapters.androidtv.PairingService;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginRequiredException;
-import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarFetchException;
-import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import dev.andre.homecontrol.sources.sports.calendar.FeedStatus;
 import dev.andre.homecontrol.sources.sports.calendar.SportsCalendars;
 import dev.andre.homecontrol.storage.StorageException;
-import dev.andre.homecontrol.web.SetupController;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.net.URI;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -42,43 +32,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({SportsSetupController.class, SetupController.class, SportsSetupAdvice.class})
-class SportsSetupControllerTest {
-
-    @TestConfiguration
-    static class Config {
-        @Bean
-        SportsProperties sportsProperties() {
-            return new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
-                    new SportsProperties.Calendar(Duration.ofHours(6), 5, 15, 5242880, 3, false),
-                    new SportsProperties.TheSportsDb(true, URI.create("https://www.thesportsdb.com/api/v1/json"),
-                            "123", Duration.ofHours(24), 5, 15, null));
-        }
-    }
+class SportsSetupControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    SportsCalendars calendars;
-
-    @MockitoBean
-    SportsSettingsService settings;
-
-    @MockitoBean
-    SportsTimeZones zones;
-
-    @MockitoBean
-    CalendarSchedule schedule;
-
-    @MockitoBean
-    LoginService login;
-
-    @MockitoBean
-    PairingService pairing;
-
-    @MockitoBean
-    DeviceManager devices;
 
     @BeforeEach
     void defaults() {
@@ -86,15 +43,15 @@ class SportsSetupControllerTest {
         given(devices.pairable()).willReturn(List.of());
         given(devices.addable()).willReturn(List.of());
         given(login.loginRequired()).willReturn(false);
-        given(settings.current()).willReturn(SportsSettings.empty());
-        given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
-        given(zones.chosen()).willReturn(true);
+        given(sportsSettings.current()).willReturn(SportsSettings.empty());
+        given(sportsZones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
+        given(sportsZones.chosen()).willReturn(true);
     }
 
     @Test
     void addingACalendarRedirectsWithAMessage() throws Exception {
         String url = "https://calendar.example.org/private/token-abc123/bl.ics";
-        given(calendars.add(any(), any())).willReturn(
+        given(sportsCalendars.add(any(), any())).willReturn(
                 new SportsSettings.CalendarEntry("c-3f9a1c2b7d4e", "Bundesliga 2026/27", "calendar.example.org", null, Instant.EPOCH));
 
         mockMvc.perform(post("/setup/sources/sports/calendars")
@@ -105,7 +62,7 @@ class SportsSetupControllerTest {
                 .andExpect(flash().attribute("sportsMessage", "Added Bundesliga 2026/27"));
 
         ArgumentCaptor<SportsCalendars.AddCalendar> captor = ArgumentCaptor.forClass(SportsCalendars.AddCalendar.class);
-        verify(calendars).add(captor.capture(), any());
+        verify(sportsCalendars).add(captor.capture(), any());
         assertThat(captor.getValue()).isEqualTo(new SportsCalendars.AddCalendar(url, "", "pw1234567890", "pw1234567890"));
     }
 
@@ -113,25 +70,25 @@ class SportsSetupControllerTest {
     void errorsBecomeFlashErrorsWithoutTheLink() throws Exception {
         String url = "https://calendar.example.org/private/token-abc123/bl.ics";
 
-        willThrow(new IllegalArgumentException("Use an http, https or webcal link")).given(calendars).add(any(), any());
+        willThrow(new IllegalArgumentException("Use an http, https or webcal link")).given(sportsCalendars).add(any(), any());
         mockMvc.perform(post("/setup/sources/sports/calendars").param("url", url))
                 .andExpect(flash().attribute("sportsError", "Use an http, https or webcal link"))
                 .andExpect(flash().attribute("sportsForm", java.util.Map.of("label", "")));
 
         willThrow(new CalendarFetchException(CalendarFetchException.Kind.NOT_FOUND, "calendar.example.org has no calendar at that link"))
-                .given(calendars).add(any(), any());
+                .given(sportsCalendars).add(any(), any());
         mockMvc.perform(post("/setup/sources/sports/calendars").param("url", url))
                 .andExpect(flash().attribute("sportsError", "calendar.example.org has no calendar at that link"));
 
-        willThrow(new PasswordRejectedException("The two passwords do not match")).given(calendars).add(any(), any());
+        willThrow(new PasswordRejectedException("The two passwords do not match")).given(sportsCalendars).add(any(), any());
         mockMvc.perform(post("/setup/sources/sports/calendars").param("url", url))
                 .andExpect(flash().attribute("sportsError", "The two passwords do not match"));
 
-        willThrow(new LoginRequiredException()).given(calendars).add(any(), any());
+        willThrow(new LoginRequiredException()).given(sportsCalendars).add(any(), any());
         mockMvc.perform(post("/setup/sources/sports/calendars").param("url", url))
                 .andExpect(flash().attribute("sportsError", "Log in again to change sources"));
 
-        willThrow(new StorageException("disk full", null)).given(calendars).add(any(), any());
+        willThrow(new StorageException("disk full", null)).given(sportsCalendars).add(any(), any());
         var result = mockMvc.perform(post("/setup/sources/sports/calendars").param("url", url))
                 .andExpect(flash().attribute("sportsError", "Could not save sports settings"))
                 .andReturn();
@@ -140,7 +97,7 @@ class SportsSetupControllerTest {
 
     @Test
     void removeAndTimeZone() throws Exception {
-        given(calendars.remove("c-3f9a1c2b7d4e")).willReturn(
+        given(sportsCalendars.remove("c-3f9a1c2b7d4e")).willReturn(
                 new SportsSettings.CalendarEntry("c-3f9a1c2b7d4e", "Bundesliga 2026/27", "calendar.example.org", null, Instant.EPOCH));
 
         mockMvc.perform(post("/setup/sources/sports/calendars/c-3f9a1c2b7d4e/remove"))
@@ -148,7 +105,7 @@ class SportsSetupControllerTest {
 
         mockMvc.perform(post("/setup/sources/sports/time-zone").param("timeZone", "Europe/London"))
                 .andExpect(flash().attribute("sportsMessage", "Times are shown in Europe/London"));
-        verify(settings).update(any());
+        verify(sportsSettings).update(any());
 
         mockMvc.perform(post("/setup/sources/sports/time-zone").param("timeZone", ""))
                 .andExpect(flash().attribute("sportsMessage", "Times are shown in Europe/Berlin (default)"));
@@ -159,12 +116,12 @@ class SportsSetupControllerTest {
 
     @Test
     void theSetupPageListsCalendars() throws Exception {
-        given(settings.current()).willReturn(SportsSettings.empty().withTimeZone("Europe/Berlin").withCalendars(List.of(
+        given(sportsSettings.current()).willReturn(SportsSettings.empty().withTimeZone("Europe/Berlin").withCalendars(List.of(
                 new SportsSettings.CalendarEntry("c-3f9a1c2b7d4e", "Bundesliga 2026/27", "calendar.example.org", null, Instant.EPOCH),
                 new SportsSettings.CalendarEntry("c-00000000000a", "Weekly sport", "nas.local", null, Instant.EPOCH))));
-        given(schedule.status("c-3f9a1c2b7d4e")).willReturn(Optional.of(
+        given(calendarSchedule.status("c-3f9a1c2b7d4e")).willReturn(Optional.of(
                 new FeedStatus(Instant.parse("2026-09-19T14:02:00Z"), 23, null, 1, 0, 0)));
-        given(schedule.status("c-00000000000a")).willReturn(Optional.of(
+        given(calendarSchedule.status("c-00000000000a")).willReturn(Optional.of(
                 new FeedStatus(null, 0, "nas.local answered HTTP 500", 0, 0, 0)));
 
         String body = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
@@ -186,8 +143,8 @@ class SportsSetupControllerTest {
 
     @Test
     void utcWarning() throws Exception {
-        given(zones.effective()).willReturn(ZoneId.of("UTC"));
-        given(zones.chosen()).willReturn(false);
+        given(sportsZones.effective()).willReturn(ZoneId.of("UTC"));
+        given(sportsZones.chosen()).willReturn(false);
 
         mockMvc.perform(get("/setup")).andExpect(content().string(
                 containsString("The server's clock is set to UTC. Choose your time zone so kick-off times are right.")));
@@ -213,7 +170,7 @@ class SportsSetupControllerTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<java.util.function.UnaryOperator<SportsSettings>> captor =
                 ArgumentCaptor.forClass(java.util.function.UnaryOperator.class);
-        verify(settings, times(1)).update(captor.capture());
+        verify(sportsSettings, times(1)).update(captor.capture());
         SportsSettings result = captor.getValue().apply(fixture);
         assertThat(result.calendar("c-3f9a1c2b7d4e").orElseThrow().provider()).isEqualTo("dazn");
         assertThat(result.competition("4331").orElseThrow().provider()).isNull();
@@ -223,7 +180,7 @@ class SportsSetupControllerTest {
     void mappingErrorsAreFlashed() throws Exception {
         SportsSettings fixture = SportsSettings.empty().withCompetitions(List.of(
                 new SportsSettings.CompetitionEntry("4331", "German Bundesliga", "Soccer", "Germany", null, null, Instant.EPOCH)));
-        given(settings.update(any())).willAnswer(invocation -> {
+        given(sportsSettings.update(any())).willAnswer(invocation -> {
             java.util.function.UnaryOperator<SportsSettings> op = invocation.getArgument(0);
             return op.apply(fixture);
         });
@@ -234,7 +191,7 @@ class SportsSetupControllerTest {
 
     @Test
     void theSetupPageLabelsTheMappingAsTheUsersSetting() throws Exception {
-        given(settings.current()).willReturn(SportsSettings.empty().withCalendars(List.of(
+        given(sportsSettings.current()).willReturn(SportsSettings.empty().withCalendars(List.of(
                 new SportsSettings.CalendarEntry("c-3f9a1c2b7d4e", "Bundesliga 2026/27", "calendar.example.org", "dazn", Instant.EPOCH))));
 
         String body = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
@@ -253,7 +210,7 @@ class SportsSetupControllerTest {
 
     @Test
     void noCompetitionsNoMappingForm() throws Exception {
-        given(settings.current()).willReturn(SportsSettings.empty());
+        given(sportsSettings.current()).willReturn(SportsSettings.empty());
 
         String body = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
 

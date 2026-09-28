@@ -1,9 +1,8 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.FlashMap;
 
@@ -22,17 +21,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(JellyfinSetupController.class)
-class JellyfinSetupControllerTest {
+class JellyfinSetupControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    JellyfinSetupService setup;
-
-    @MockitoBean
-    dev.andre.homecontrol.device.DeviceManager devices;
 
     @Test
     void savesPlayerOnlyForAKnownAndroidTvAndRejectsUnknownPlayers() throws Exception {
@@ -41,16 +33,16 @@ class JellyfinSetupControllerTest {
         given(devices.device("shield")).willReturn(java.util.Optional.of(shield));
         var settings = new JellyfinSettings(URI.create("http://nas:8096"), URI.create("http://nas:8096"),
                 "server", "nas", "10.11.2", "user", "andre", JellyfinSettings.AuthMode.PASSWORD, "hc", "F007D354", Map.of());
-        given(setup.settings()).willReturn(java.util.Optional.of(settings));
+        given(jellyfinSetup.settings()).willReturn(java.util.Optional.of(settings));
         mockMvc.perform(post("/setup/sources/jellyfin/players").param("device", "shield").param("player", "vlc"))
                 .andExpect(redirectedUrl("/setup")).andExpect(flash().attribute("jellyfinMessage", "Player preference saved"));
-        verify(setup).save(settings.withPlayer("shield", JellyfinSettings.Player.VLC));
-        org.mockito.Mockito.clearInvocations(setup);
+        verify(jellyfinSetup).save(settings.withPlayer("shield", JellyfinSettings.Player.VLC));
+        org.mockito.Mockito.clearInvocations(jellyfinSetup);
         mockMvc.perform(post("/setup/sources/jellyfin/players").param("device", "shield").param("player", "unknown"))
                 .andExpect(flash().attributeExists("jellyfinError"));
         mockMvc.perform(post("/setup/sources/jellyfin/players").param("device", "missing").param("player", "vlc"))
                 .andExpect(flash().attributeExists("jellyfinError"));
-        verify(setup, never()).save(any());
+        verify(jellyfinSetup, never()).save(any());
     }
 
     @Test
@@ -58,7 +50,7 @@ class JellyfinSetupControllerTest {
         JellyfinSettings connected = new JellyfinSettings(URI.create("http://nas:8096"), URI.create("http://nas:8096"),
                 "server-1", "nas", "10.11.2", "user-1", "andre", JellyfinSettings.AuthMode.PASSWORD,
                 "dev-1", "F007D354", Map.of());
-        given(setup.connect(any(), any())).willReturn(connected);
+        given(jellyfinSetup.connect(any(), any())).willReturn(connected);
 
         mockMvc.perform(post("/setup/sources/jellyfin")
                         .param("serverUrl", "http://nas:8096")
@@ -73,7 +65,7 @@ class JellyfinSetupControllerTest {
 
         org.mockito.ArgumentCaptor<JellyfinSetupService.ConnectRequest> captor =
                 org.mockito.ArgumentCaptor.forClass(JellyfinSetupService.ConnectRequest.class);
-        verify(setup).connect(captor.capture(), any());
+        verify(jellyfinSetup).connect(captor.capture(), any());
         assertThat(captor.getValue().mode()).isEqualTo(JellyfinSettings.AuthMode.PASSWORD);
 
         mockMvc.perform(post("/setup/sources/jellyfin")
@@ -83,14 +75,14 @@ class JellyfinSetupControllerTest {
                         .param("apiKey", "key-1")
                         .param("loginPassword", "household pw 1")
                         .param("loginPasswordConfirmation", "household pw 1"));
-        verify(setup, times(2)).connect(captor.capture(), any());
+        verify(jellyfinSetup, times(2)).connect(captor.capture(), any());
         assertThat(captor.getValue().mode()).isEqualTo(JellyfinSettings.AuthMode.API_KEY);
     }
 
     @Test
     void aFailureKeepsTheNonSecretFieldsButNeverThePasswordOrKey() throws Exception {
         willThrow(new JellyfinException(JellyfinException.Kind.UNAUTHORIZED, "Jellyfin rejected the user name or password"))
-                .given(setup).connect(any(), any());
+                .given(jellyfinSetup).connect(any(), any());
 
         FlashMap flashMap = mockMvc.perform(post("/setup/sources/jellyfin")
                         .param("serverUrl", "http://nas:8096")
@@ -118,7 +110,7 @@ class JellyfinSetupControllerTest {
 
     @Test
     void testAndDisconnectReportTheirOutcome() throws Exception {
-        given(setup.check()).willReturn("Connected to nas as andre");
+        given(jellyfinSetup.check()).willReturn("Connected to nas as andre");
 
         mockMvc.perform(post("/setup/sources/jellyfin/test"))
                 .andExpect(status().is3xxRedirection())
@@ -126,7 +118,7 @@ class JellyfinSetupControllerTest {
                 .andExpect(flash().attribute("jellyfinMessage", "Connected to nas as andre"));
 
         willThrow(new JellyfinException(JellyfinException.Kind.UNREACHABLE, "Could not reach Jellyfin"))
-                .given(setup).check();
+                .given(jellyfinSetup).check();
 
         mockMvc.perform(post("/setup/sources/jellyfin/test"))
                 .andExpect(flash().attribute("jellyfinError", "Could not reach Jellyfin"));
@@ -136,7 +128,7 @@ class JellyfinSetupControllerTest {
                 .andExpect(redirectedUrl("/setup"))
                 .andExpect(flash().attribute("jellyfinMessage", "Jellyfin disconnected"));
 
-        verify(setup).disconnect();
+        verify(jellyfinSetup).disconnect();
     }
 
     @Test
@@ -147,6 +139,6 @@ class JellyfinSetupControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/setup"));
 
-        verify(setup).link("jf-1", "shield");
+        verify(jellyfinSetup).link("jf-1", "shield");
     }
 }
