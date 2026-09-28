@@ -20,36 +20,39 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 /**
- * Keeps every web-layer test on the one shared context of {@link WebSliceTest}. An allow-list: a test class that
- * extends it, and every class nested in one, carries no Spring annotation at all (a property source, a profile,
- * {@code @DirtiesContext}, an {@code @Import} or {@code @AutoConfigure…}, a class-level bean override) and declares
- * no bean override and no dynamic property; any of those would give it a context of its own.
+ * Keeps every test that extends a shared-context base ({@link WebSliceTest}, {@link ModulesOffTest}) on that base's
+ * one context. An allow-list: such a test class, and every class nested in one, carries no Spring annotation at all (a
+ * property source, a profile, {@code @DirtiesContext}, an {@code @Import} or {@code @AutoConfigure…}, a class-level
+ * bean override) and declares no bean override and no dynamic property; any of those would give it a context of its
+ * own.
  */
-class WebSliceRulesTest {
+class SharedContextRulesTest {
 
     private static final JavaClasses TESTS = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.ONLY_INCLUDE_TESTS)
             .importPackages("dev.andre.homecontrol");
 
-    private static final DescribedPredicate<JavaClass> A_SLICE_TEST = DescribedPredicate.describe(
-            "a subclass of WebSliceTest", WebSliceRulesTest::isASliceTest);
+    private static final DescribedPredicate<JavaClass> A_SHARED_CONTEXT_TEST = DescribedPredicate.describe(
+            "a subclass of WebSliceTest or ModulesOffTest", SharedContextRulesTest::isASharedContextTest);
 
-    private static final DescribedPredicate<JavaClass> INSIDE_A_SLICE_TEST = DescribedPredicate.describe(
-            "nested in a subclass of WebSliceTest", WebSliceRulesTest::isInsideASliceTest);
+    private static final DescribedPredicate<JavaClass> INSIDE_A_SHARED_CONTEXT_TEST = DescribedPredicate.describe(
+            "nested in a subclass of WebSliceTest or ModulesOffTest", SharedContextRulesTest::isInsideASharedContextTest);
 
-    private static final DescribedPredicate<JavaClass> A_SLICE_TEST_OR_INSIDE_ONE = DescribedPredicate.describe(
-            "a subclass of WebSliceTest or nested in one", type -> isASliceTest(type) || isInsideASliceTest(type));
+    private static final DescribedPredicate<JavaClass> A_SHARED_CONTEXT_TEST_OR_INSIDE_ONE = DescribedPredicate.describe(
+            "a subclass of WebSliceTest or ModulesOffTest or nested in one",
+            type -> isASharedContextTest(type) || isInsideASharedContextTest(type));
 
     private static final DescribedPredicate<JavaAnnotation<?>> A_SPRING_ANNOTATION = DescribedPredicate.describe(
             "a Spring annotation", annotation -> annotation.getRawType().getPackageName().startsWith("org.springframework"));
 
-    private static boolean isASliceTest(JavaClass type) {
-        return type.isAssignableTo(WebSliceTest.class) && !type.isEquivalentTo(WebSliceTest.class);
+    private static boolean isASharedContextTest(JavaClass type) {
+        return (type.isAssignableTo(WebSliceTest.class) && !type.isEquivalentTo(WebSliceTest.class))
+                || (type.isAssignableTo(ModulesOffTest.class) && !type.isEquivalentTo(ModulesOffTest.class));
     }
 
-    private static boolean isInsideASliceTest(JavaClass type) {
+    private static boolean isInsideASharedContextTest(JavaClass type) {
         for (Optional<JavaClass> outer = type.getEnclosingClass(); outer.isPresent(); outer = outer.get().getEnclosingClass()) {
-            if (isASliceTest(outer.get())) {
+            if (isASharedContextTest(outer.get())) {
                 return true;
             }
         }
@@ -63,39 +66,36 @@ class WebSliceRulesTest {
 
     @Test
     void onlyTheSharedSliceIsAWebMvcTest() {
-        // BluetoothSetupOffTest needs the Bluetooth module off; Phase 1.3d-2 moves it into the modules-off context.
-        classes().that(A_WEB_MVC_TEST)
-                .should().beAssignableTo(WebSliceTest.class).orShould().haveSimpleName("BluetoothSetupOffTest")
-                .check(TESTS);
+        classes().that(A_WEB_MVC_TEST).should().beAssignableTo(WebSliceTest.class).check(TESTS);
     }
 
     @Test
-    void sliceTestsCarryNoSpringAnnotation() {
-        noClasses().that(A_SLICE_TEST)
+    void sharedContextTestsCarryNoSpringAnnotation() {
+        noClasses().that(A_SHARED_CONTEXT_TEST)
                 .should().beAnnotatedWith(A_SPRING_ANNOTATION).orShould().beMetaAnnotatedWith(A_SPRING_ANNOTATION)
                 .allowEmptyShould(true)
                 .check(TESTS);
     }
 
     @Test
-    void classesNestedInSliceTestsCarryNoSpringAnnotation() {
-        noClasses().that(INSIDE_A_SLICE_TEST)
+    void classesNestedInSharedContextTestsCarryNoSpringAnnotation() {
+        noClasses().that(INSIDE_A_SHARED_CONTEXT_TEST)
                 .should().beAnnotatedWith(A_SPRING_ANNOTATION).orShould().beMetaAnnotatedWith(A_SPRING_ANNOTATION)
                 .allowEmptyShould(true)
                 .check(TESTS);
     }
 
     @Test
-    void sliceTestsDeclareNoBeanOverride() {
-        noFields().that().areDeclaredInClassesThat(A_SLICE_TEST_OR_INSIDE_ONE)
+    void sharedContextTestsDeclareNoBeanOverride() {
+        noFields().that().areDeclaredInClassesThat(A_SHARED_CONTEXT_TEST_OR_INSIDE_ONE)
                 .should().beMetaAnnotatedWith(BeanOverride.class)
                 .allowEmptyShould(true)
                 .check(TESTS);
     }
 
     @Test
-    void sliceTestsRegisterNoProperties() {
-        noMethods().that().areDeclaredInClassesThat(A_SLICE_TEST_OR_INSIDE_ONE)
+    void sharedContextTestsRegisterNoProperties() {
+        noMethods().that().areDeclaredInClassesThat(A_SHARED_CONTEXT_TEST_OR_INSIDE_ONE)
                 .should().beAnnotatedWith(DynamicPropertySource.class)
                 .allowEmptyShould(true)
                 .check(TESTS);

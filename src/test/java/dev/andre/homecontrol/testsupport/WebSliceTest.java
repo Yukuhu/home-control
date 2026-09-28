@@ -55,7 +55,7 @@ import static org.mockito.BDDMockito.given;
  * The one web-layer test context: {@code @WebMvcTest} over every controller and controller advice, with every
  * collaborator they need declared here once. A test class extends it and declares no beans of its own (no
  * {@code @MockitoBean}, {@code @Import} or nested {@code @TestConfiguration}): anything that differs between classes
- * gives them separate contexts, which {@code WebSliceRulesTest} forbids. Mockito resets the mocks after each test;
+ * gives them separate contexts, which {@code SharedContextRulesTest} forbids. Mockito resets the mocks after each test;
  * {@link #stubSafeDefaults()} then answers the calls every {@code /setup} render makes, which Mockito would answer
  * with {@code null}.
  */

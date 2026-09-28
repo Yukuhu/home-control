@@ -18,11 +18,11 @@ When this page was written, the unit, slice, end-to-end and architecture tests n
 
 A web-layer test extends `testsupport.WebSliceTest`. That class is one `@WebMvcTest` over every controller and
 controller advice, with every collaborator declared once as a `@MockitoBean`, so the web tests share one Spring
-context per test JVM. `BluetoothSetupOffTest`, which needs the Bluetooth module off, keeps its own for now.
+context per test JVM.
 - A test class stubs the base's mocks (`devices`, `pairing`, `sources`, …) and adds nothing to the context: it and its
   nested classes carry no Spring annotation (no `@Import`, property source, profile, `@DirtiesContext` or
   `@AutoConfigure…`), no bean-override field such as `@MockitoBean`, and no `@DynamicPropertySource`. Any of those
-  would give it a context of its own, and `WebSliceRulesTest` fails.
+  would give it a context of its own, and `SharedContextRulesTest` fails.
 - A controller that needs a new collaborator gets it as a `@MockitoBean` in `WebSliceTest`. If every `/setup` render
   calls it and Mockito's `null` would break the page, `stubSafeDefaults()` gives it a safe value.
 - Every `/setup` render carries every module's section, so a check on the setup page reads its own section with
@@ -30,6 +30,14 @@ context per test JVM. `BluetoothSetupOffTest`, which needs the Bluetooth module 
   renders would otherwise pass for the wrong reason.
 - A test that needs a bean to be absent does not fit the slice: build the controller with a standalone MockMvc, as
   `ContentPlayWithoutPinsTest` does.
+
+## Module switches
+
+A test that checks a module switched off extends `testsupport.ModulesOffTest`: one application context with every
+module that can be switched off switched off (Android TV cannot be), shared by all such tests. It checks that its
+module leaves no bean, setup section, route or file behind (`dataDir()`), and `ModulesOffSmokeTest` that the
+application starts that way. The same rules as for web slices apply (`SharedContextRulesTest`). A test of another
+combination, such as sports on with TheSportsDB off, keeps a `@SpringBootTest` of its own.
 
 ## Running tests
 
