@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 
 import java.net.ServerSocket;
 import java.net.URI;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -36,16 +35,15 @@ class AndroidTvSessionTest {
     private FakeRemoteServer fakeDevice;
     private AndroidTvSession session;
 
-    private static final AndroidTvProperties PROPERTIES = new AndroidTvProperties(
-            Path.of("./build/test-data"), "shield", false, 10, 1, 4);
-
-    /** A flat 1s retry ramp, so tests that need several attempts do not take a minute. */
-    private static final AndroidTvProperties FAST_RETRY = new AndroidTvProperties(
-            Path.of("./build/test-data"), "shield", false, 10, 1, 1);
-
-    /** As {@link #FAST_RETRY}, but with the 1s stale timeout a stalled handshake needs. */
-    private static final AndroidTvProperties SHORT_TIMEOUT = new AndroidTvProperties(
-            Path.of("./build/test-data"), "shield", false, 1, 1, 1);
+    /** A 10 s stale timeout, longer than any test; backoff 50–200 ms. */
+    private static final AndroidTvTimings TIMINGS =
+            new AndroidTvTimings(Duration.ofSeconds(10), Duration.ofMillis(50), Duration.ofMillis(200));
+    /** A flat 50 ms retry ramp, so tests that need several attempts take well under a second. */
+    private static final AndroidTvTimings FAST_RETRY =
+            new AndroidTvTimings(Duration.ofSeconds(10), Duration.ofMillis(50), Duration.ofMillis(50));
+    /** A 1 s stale timeout for the stalled-handshake test, retrying like FAST_RETRY. */
+    private static final AndroidTvTimings SHORT_TIMEOUT =
+            new AndroidTvTimings(Duration.ofSeconds(1), Duration.ofMillis(50), Duration.ofMillis(50));
 
     @BeforeEach
     void startSession() throws Exception {
@@ -54,8 +52,8 @@ class AndroidTvSessionTest {
         Device device = AndroidTvSettings.device("shield-1", "Test Shield", "127.0.0.1", fakeDevice.port(),
                 null, Instant.now());
         session = new AndroidTvSession(device, ClientCertificate.generate("shield-remote"),
-                PROPERTIES, state -> {
-        });
+                TIMINGS, state -> {
+        }, null);
     }
 
     @AfterEach
@@ -219,8 +217,8 @@ class AndroidTvSessionTest {
                 "0000000000000000000000000000000000000000000000000000000000000000", Instant.now());
 
         try (AndroidTvSession pinned = new AndroidTvSession(impostor,
-                ClientCertificate.generate("shield-remote"), PROPERTIES, state -> {
-        })) {
+                ClientCertificate.generate("shield-remote"), TIMINGS, state -> {
+        }, null)) {
             pinned.start();
 
             await().until(() -> pinned.state().status() == DeviceStatus.UNPAIRED);
@@ -272,7 +270,7 @@ class AndroidTvSessionTest {
                     } else if (state.status() == DeviceStatus.UNPAIRED) {
                         everUnpaired.set(true);
                     }
-                })) {
+                }, null)) {
             dead.start();
 
             // Comfortably more attempts than the ambiguous-verdict latch threshold, so a
@@ -305,7 +303,7 @@ class AndroidTvSessionTest {
                         attempts.incrementAndGet();
                     }
                     throw new IllegalStateException("a wedged subscriber");
-                })) {
+                }, null)) {
             wedged.start();
 
             await().atMost(Duration.ofSeconds(20)).until(() -> attempts.get() >= 3);
@@ -320,14 +318,14 @@ class AndroidTvSessionTest {
         CountDownLatch nextCallback = new CountDownLatch(1);
 
         try (AndroidTvSession failing = new AndroidTvSession(device,
-                ClientCertificate.generate("shield-remote"), PROPERTIES, state -> {
+                ClientCertificate.generate("shield-remote"), TIMINGS, state -> {
                     if (state.powerOn()) {
                         nextCallback.countDown();
                     } else if (state.status() == DeviceStatus.CONNECTING) {
                         connecting.countDown();
                         throw new LinkageError("a subscriber cannot load its dependency");
                     }
-                })) {
+                }, null)) {
             failing.start();
             assertThat(connecting.await(5, TimeUnit.SECONDS)).isTrue();
 
@@ -434,10 +432,10 @@ class AndroidTvSessionTest {
         return sessionWith(FAST_RETRY);
     }
 
-    private AndroidTvSession sessionWith(AndroidTvProperties properties) {
+    private AndroidTvSession sessionWith(AndroidTvTimings timings) {
         return new AndroidTvSession(
                 AndroidTvSettings.device("shield-1", "Test Shield", "127.0.0.1", fakeDevice.port(), null, Instant.now()),
-                ClientCertificate.generate("shield-remote"), properties, state -> {
-        });
+                ClientCertificate.generate("shield-remote"), timings, state -> {
+        }, null);
     }
 }
