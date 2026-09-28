@@ -41,6 +41,7 @@ import static org.awaitility.Awaitility.await;
 class BluetoothSpeakerSessionTest {
 
     private static final Duration WAIT = Duration.ofSeconds(5);
+    private static final BluetoothTimings TIMINGS = new BluetoothTimings(Duration.ofMillis(100), Duration.ofMillis(100));
     private static final Action.PlayMedia PLAY = new Action.PlayMedia(
             URI.create("http://127.0.0.1:9/music/song.mp3?ApiKey=secret-key"), "audio/mpeg", "Bunny Song", "The Rabbits");
 
@@ -84,7 +85,7 @@ class BluetoothSpeakerSessionTest {
                 Duration.ofSeconds(props.commandTimeoutSeconds()));
         AudioDeviceResolver resolver = new AudioDeviceResolver(launcher, props.audioDeviceTemplate(),
                 Duration.ofSeconds(props.playerStartTimeoutSeconds()));
-        session = new BluetoothSpeakerSession(device, props, bluez, player, resolver, listener);
+        session = new BluetoothSpeakerSession(device, props, TIMINGS, bluez, player, resolver, listener);
         session.start();
         return session;
     }
@@ -376,10 +377,13 @@ class BluetoothSpeakerSessionTest {
     @Test
     void aSlowBluezDoesNotPileUpPolls() {
         bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
-        bluez.delay("device", Duration.ofSeconds(2));
-        start(properties.withTimings(1, 1, 5, 5, 2));
+        bluez.delay("device", Duration.ofMillis(240));
+        start(properties);
 
-        await().pollDelay(Duration.ofSeconds(5)).atMost(Duration.ofSeconds(6))
+        // A 240 ms read against a 100 ms poll interval: a session that waits for each poll to finish before
+        // scheduling the next reads BlueZ 3 times in the first second; one that piles polls up instead (racing the
+        // next poll against the current read) reads 5+ times, so 4 tells the two apart with margin either way.
+        await().pollDelay(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2))
                 .untilAsserted(() -> assertThat(bluez.reads()).isLessThanOrEqualTo(4));
     }
 
