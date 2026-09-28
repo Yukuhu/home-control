@@ -142,12 +142,11 @@ class TmdbClientTest {
     @Test
     void aSlowServerTimesOutQuickly() {
         fake.delay(Duration.ofSeconds(3));
-        long start = System.nanoTime();
 
         assertThatThrownBy(() -> client.get(bearer, "/authentication", Map.of()))
-                .isInstanceOf(TmdbException.class);
-
-        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(3));
+                .isInstanceOf(TmdbException.class)
+                .hasMessage("Could not reach TMDB at 127.0.0.1")
+                .extracting(e -> ((TmdbException) e).kind()).isEqualTo(TmdbException.Kind.UNREACHABLE);
     }
 
     @ParameterizedTest

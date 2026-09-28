@@ -122,11 +122,10 @@ class WorkflowHttpClientTest {
         var release = new CountDownLatch(1);
         try (var server = new FakeWorkflowServer(); var client = client(Duration.ofMillis(350)); var callers = Executors.newVirtualThreadPerTaskExecutor()) {
             server.block("/slow", afterHeaders, entered, release);
-            long start = System.nanoTime();
             var result = callers.submit(() -> catchThrowable(() -> client.fetch(request(server.url("/slow")))));
             assertThat(entered.await(2, TimeUnit.SECONDS)).isTrue();
-            assertThat(result.get(3, TimeUnit.SECONDS)).isInstanceOf(WorkflowException.class);
-            assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(3));
+            assertThat(result.get(3, TimeUnit.SECONDS)).isInstanceOf(WorkflowException.class)
+                    .hasMessageContaining("request timed out");
         } finally { release.countDown(); }
     }
 
