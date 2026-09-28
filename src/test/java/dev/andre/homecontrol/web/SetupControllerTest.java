@@ -2,18 +2,15 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
 import dev.andre.homecontrol.adapters.androidtv.PairingOutcome;
-import dev.andre.homecontrol.adapters.androidtv.PairingService;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DiscoveredDevice;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.storage.StorageException;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
@@ -40,17 +37,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-@WebMvcTest(SetupController.class)
-class SetupControllerTest {
+class SetupControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    PairingService pairing;
-
-    @MockitoBean
-    DeviceManager devices;
 
     @BeforeEach
     void noDevicesUnlessATestSaysOtherwise() {

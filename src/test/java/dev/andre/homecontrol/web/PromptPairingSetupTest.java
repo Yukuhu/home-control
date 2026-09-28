@@ -1,20 +1,13 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.adapters.androidtv.PairingService;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DiscoveredDevice;
-import dev.andre.homecontrol.core.PromptPairing;
 import dev.andre.homecontrol.core.PromptPairingResult;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -35,57 +28,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(SetupController.class)
-@Import(PromptPairingSetupTest.StubPairingConfiguration.class)
-class PromptPairingSetupTest {
-
-    static final class StubPairing implements PromptPairing {
-        volatile PromptPairingResult next;
-        volatile String host;
-        volatile String name;
-
-        @Override
-        public String adapterId() {
-            return "webos";
-        }
-
-        @Override
-        public String displayName() {
-            return "LG webOS TV";
-        }
-
-        @Override
-        public String instructions() {
-            return "Accept the request on the TV.";
-        }
-
-        @Override
-        public PromptPairingResult pair(String host, String name) {
-            this.host = host;
-            this.name = name;
-            return next;
-        }
-    }
-
-    @TestConfiguration
-    static class StubPairingConfiguration {
-        @Bean
-        StubPairing stubPairing() {
-            return new StubPairing();
-        }
-    }
+class PromptPairingSetupTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @Autowired
-    StubPairing pairing;
-
-    @MockitoBean
-    PairingService androidTvPairing;
-
-    @MockitoBean
-    DeviceManager devices;
 
     private static Device tv(String id) {
         return new Device(id, "LG", DeviceKind.WEBOS, "192.168.1.60", Map.of("webos", Map.of()), Instant.now());
@@ -132,19 +78,19 @@ class PromptPairingSetupTest {
 
     @Test
     void pairingRedirectsToTheNewDevice() throws Exception {
-        pairing.next = new PromptPairingResult.Paired(tv("tv"));
+        promptPairing.willAnswer(new PromptPairingResult.Paired(tv("tv")));
 
         mockMvc.perform(post("/setup/prompt-pair").param("adapter", "webos").param("host", "192.168.1.60").param("name", "LG"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/?device=tv"));
 
-        assertThat(pairing.host).isEqualTo("192.168.1.60");
-        assertThat(pairing.name).isEqualTo("LG");
+        assertThat(promptPairing.host()).isEqualTo("192.168.1.60");
+        assertThat(promptPairing.name()).isEqualTo("LG");
     }
 
     @Test
     void aDeclinedPairingShowsTheReason() throws Exception {
-        pairing.next = new PromptPairingResult.Declined("The TV declined the pairing request");
+        promptPairing.willAnswer(new PromptPairingResult.Declined("The TV declined the pairing request"));
 
         mockMvc.perform(post("/setup/prompt-pair").param("adapter", "webos").param("host", "192.168.1.60"))
                 .andExpect(status().isOk())
@@ -153,7 +99,7 @@ class PromptPairingSetupTest {
 
     @Test
     void aFailedPairingShowsTheReason() throws Exception {
-        pairing.next = new PromptPairingResult.Failed("Could not reach an LG webOS TV at 10.0.0.9: refused");
+        promptPairing.willAnswer(new PromptPairingResult.Failed("Could not reach an LG webOS TV at 10.0.0.9: refused"));
 
         mockMvc.perform(post("/setup/prompt-pair").param("adapter", "webos").param("host", "10.0.0.9"))
                 .andExpect(status().isOk())
