@@ -24,6 +24,8 @@ public class GoogleOAuthClient {
     public static final String SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
     public static final String DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
     static final URI DEFAULT_VERIFICATION_URL = URI.create("https://www.google.com/device");
+    /** Google may ask for a shorter interval than this; polling faster than once a second earns slow_down answers. */
+    static final Duration MINIMUM_POLL_INTERVAL = Duration.ofSeconds(1);
 
     public record DeviceCode(String deviceCode, String userCode, URI verificationUrl, Instant expiresAt, Duration interval) {
         @Override
@@ -66,11 +68,17 @@ public class GoogleOAuthClient {
     private final YouTubeHttp http;
     private final URI base;
     private final Clock clock;
+    private final Duration minimumPollInterval;
 
     public GoogleOAuthClient(YouTubeHttp http, URI oauthBaseUrl, Clock clock) {
+        this(http, oauthBaseUrl, clock, MINIMUM_POLL_INTERVAL);
+    }
+
+    GoogleOAuthClient(YouTubeHttp http, URI oauthBaseUrl, Clock clock, Duration minimumPollInterval) {
         this.http = http;
         this.base = oauthBaseUrl;
         this.clock = clock;
+        this.minimumPollInterval = minimumPollInterval;
     }
 
     public DeviceCode requestDeviceCode(String clientId) {
@@ -91,7 +99,11 @@ public class GoogleOAuthClient {
         return new DeviceCode(deviceCode, userCode,
                 url.isBlank() ? DEFAULT_VERIFICATION_URL : URI.create(url),
                 clock.instant().plusSeconds(json.path("expires_in").asLong(1800)),
-                Duration.ofSeconds(Math.max(1, json.path("interval").asLong(5))));
+                atLeast(Duration.ofSeconds(json.path("interval").asLong(5)), minimumPollInterval));
+    }
+
+    private static Duration atLeast(Duration value, Duration floor) {
+        return value.compareTo(floor) < 0 ? floor : value;
     }
 
     public URI authorizationUrl(String clientId, URI redirectUri, String state, String challenge) {

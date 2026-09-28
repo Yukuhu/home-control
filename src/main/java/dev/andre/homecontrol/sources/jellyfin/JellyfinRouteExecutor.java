@@ -25,7 +25,10 @@ import org.slf4j.LoggerFactory;
 public class JellyfinRouteExecutor implements RouteExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(JellyfinRouteExecutor.class);
-    private static final long RETRY_NANOS = Duration.ofSeconds(2).toNanos();
+    /** How long a sent wake or launch gets before it is sent again. */
+    static final Duration RETRY = Duration.ofSeconds(2);
+    /** The longest single pause while waiting for the Jellyfin session. */
+    static final Duration PAUSE_STEP = Duration.ofMillis(250);
     private static final String REMOTE_CONNECTION = "remote connection";
     private static final String PACKAGE = "org.jellyfin.androidtv";
     // Remote v2 package launch, also used by androidtvremote2's send_launch_app_command.
@@ -33,14 +36,23 @@ public class JellyfinRouteExecutor implements RouteExecutor {
     private final JellyfinSessions sessions;
     private final DeviceManager devices;
     private final Duration startupTimeout;
+    private final long retryNanos;
+    private final Duration pauseStep;
 
     public JellyfinRouteExecutor(JellyfinSessions sessions, DeviceManager devices, Duration startupTimeout) {
+        this(sessions, devices, startupTimeout, RETRY, PAUSE_STEP);
+    }
+
+    JellyfinRouteExecutor(JellyfinSessions sessions, DeviceManager devices, Duration startupTimeout,
+                          Duration retry, Duration pauseStep) {
         if (startupTimeout.isNegative() || startupTimeout.isZero()) {
             throw new IllegalArgumentException("Jellyfin startup timeout must be positive");
         }
         this.sessions = sessions;
         this.devices = devices;
         this.startupTimeout = startupTimeout;
+        this.retryNanos = retry.toNanos();
+        this.pauseStep = pauseStep;
     }
 
     @Override
@@ -147,7 +159,7 @@ public class JellyfinRouteExecutor implements RouteExecutor {
         if (System.nanoTime() >= progress.nextCommand) {
             log.info("Sending WAKEUP for Jellyfin on {}", device.id());
             devices.execute(device.id(), new Action.PressKey(RemoteKey.WAKEUP));
-            progress.nextCommand = System.nanoTime() + RETRY_NANOS;
+            progress.nextCommand = System.nanoTime() + retryNanos;
         }
     }
 
@@ -158,7 +170,7 @@ public class JellyfinRouteExecutor implements RouteExecutor {
         if (System.nanoTime() >= progress.nextCommand) {
             log.info("Sending Jellyfin app launch on {} via {}", device.id(), APP_LINK);
             devices.execute(device.id(), new Action.OpenAppLink(APP_LINK));
-            progress.nextCommand = System.nanoTime() + RETRY_NANOS;
+            progress.nextCommand = System.nanoTime() + retryNanos;
         }
     }
 
@@ -204,11 +216,11 @@ public class JellyfinRouteExecutor implements RouteExecutor {
         }
     }
 
-    private static void pause(long deadline) {
+    private void pause(long deadline) {
         try {
             long remaining = deadline - System.nanoTime();
             if (remaining > 0) {
-                Thread.sleep(Duration.ofNanos(Math.min(remaining, Duration.ofMillis(250).toNanos())));
+                Thread.sleep(Duration.ofNanos(Math.min(remaining, pauseStep.toNanos())));
             }
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();

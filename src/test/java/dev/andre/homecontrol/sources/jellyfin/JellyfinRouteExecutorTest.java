@@ -31,7 +31,10 @@ class JellyfinRouteExecutorTest {
 
     private final JellyfinSessions sessions = mock(JellyfinSessions.class);
     private final DeviceManager devices = mock(DeviceManager.class);
-    private final JellyfinRouteExecutor executor = new JellyfinRouteExecutor(sessions, devices, Duration.ofSeconds(1));
+    // Retry (1 s) intentionally outlasts the startup timeout (500 ms), as RETRY (2 s) outlasted the old 1 s timeout:
+    // aLaunchThatNeverReachesJellyfinCannotUseAnOldSession relies on a single launch attempt before giving up.
+    private final JellyfinRouteExecutor executor = new JellyfinRouteExecutor(sessions, devices, Duration.ofMillis(500),
+            Duration.ofSeconds(1), Duration.ofMillis(10));
     private final Device shield = new Device("shield", "Shield", DeviceKind.ANDROID_TV, "10.0.0.5",
             Map.of("androidtv", Map.of()), Instant.now());
     private final Device browser = new Device("browser", "Browser", DeviceKind.CAST, "10.0.0.6",
@@ -45,6 +48,12 @@ class JellyfinRouteExecutorTest {
 
     private static JellyfinSession session(String id) {
         return new JellyfinSession(id, "jf-shield", "Shield", "Android TV", "10.0.0.5", Instant.now(), true);
+    }
+
+    @Test
+    void productionWaitsAreTwoSecondsBetweenCommandsAndAQuarterSecondPerStep() {
+        assertThat(JellyfinRouteExecutor.RETRY).isEqualTo(Duration.ofSeconds(2));
+        assertThat(JellyfinRouteExecutor.PAUSE_STEP).isEqualTo(Duration.ofMillis(250));
     }
 
     @Test
@@ -182,7 +191,8 @@ class JellyfinRouteExecutorTest {
         given(devices.state("shield")).willAnswer(_ -> state.get());
         doNothing().doAnswer(_ -> { state.set(ready()); return null; }).when(devices).execute("shield", LAUNCH);
         given(sessions.sessionFor(shield)).willReturn(Optional.of(session("fresh")));
-        var startup = new JellyfinRouteExecutor(sessions, devices, Duration.ofSeconds(4));
+        var startup = new JellyfinRouteExecutor(sessions, devices, Duration.ofSeconds(4),
+                Duration.ofMillis(100), Duration.ofMillis(10));
 
         startup.execute(new Route.JellyfinApp("item-1", 0), shield);
 
@@ -252,7 +262,8 @@ class JellyfinRouteExecutorTest {
             }
             return Optional.of(session("late"));
         });
-        var bounded = new JellyfinRouteExecutor(sessions, devices, Duration.ofMillis(100));
+        var bounded = new JellyfinRouteExecutor(sessions, devices, Duration.ofMillis(100),
+                Duration.ofMillis(100), Duration.ofMillis(10));
         Route route = new Route.JellyfinApp("item-1", 0);
 
         try {

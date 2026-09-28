@@ -180,6 +180,20 @@ class GoogleOAuthClientTest {
     }
 
     @Test
+    void theReportedPollIntervalNeverGoesBelowTheFloor() throws IOException {
+        start();
+        String immediate = FakeGoogleServer.fixture("oauth-device-code.json").replace("\"interval\": 5", "\"interval\": 0");
+        fake.respond("POST", "/oauth/device/code", FakeGoogleServer.Canned.json(200, immediate));
+
+        assertThat(client.requestDeviceCode("cid").interval()).isEqualTo(GoogleOAuthClient.MINIMUM_POLL_INTERVAL);
+
+        GoogleOAuthClient fast = new GoogleOAuthClient(new YouTubeHttp(fake.properties()), URI.create(fake.base() + "/oauth"),
+                MutableClock.at(Instant.parse("2026-09-16T10:00:00Z")), Duration.ofMillis(10));
+        assertThat(fast.requestDeviceCode("cid").interval()).isEqualTo(Duration.ofMillis(10));
+        assertThat(GoogleOAuthClient.MINIMUM_POLL_INTERVAL).isEqualTo(Duration.ofSeconds(1));
+    }
+
+    @Test
     void grantedToStringIsRedacted() throws IOException {
         start();
         fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
