@@ -2,11 +2,10 @@ package dev.andre.homecontrol.sources.youtube;
 
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.FlashMap;
 
@@ -28,14 +27,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(YouTubeSetupController.class)
-class YouTubeSetupControllerTest {
+class YouTubeSetupControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    YouTubeSetupService setup;
 
     @Test
     void connectRedirectsWithTheCodeHint() throws Exception {
@@ -50,7 +45,7 @@ class YouTubeSetupControllerTest {
 
         ArgumentCaptor<YouTubeSetupService.ConnectRequest> captor =
                 ArgumentCaptor.forClass(YouTubeSetupService.ConnectRequest.class);
-        verify(setup).connect(captor.capture(), any());
+        verify(youTubeSetup).connect(captor.capture(), any());
         assertThat(captor.getValue().clientId()).isEqualTo("123456789012-abc123def456.apps.googleusercontent.com");
         assertThat(captor.getValue().clientSecret()).isEqualTo("GOCSPX-abc");
         assertThat(captor.getValue().loginPassword()).isEqualTo("pw-1234567890");
@@ -60,7 +55,7 @@ class YouTubeSetupControllerTest {
     @Test
     void aFailureKeepsOnlyTheClientId() throws Exception {
         willThrow(new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Enter the client secret"))
-                .given(setup).connect(any(), any());
+                .given(youTubeSetup).connect(any(), any());
 
         FlashMap flashMap = mockMvc.perform(post("/setup/sources/youtube/connect")
                         .param("clientId", "123456789012-abc123def456.apps.googleusercontent.com")
@@ -81,11 +76,11 @@ class YouTubeSetupControllerTest {
     @Test
     void passwordAndLoginProblemsAreShown() throws Exception {
         willThrow(new PasswordRejectedException("The two passwords do not match"))
-                .given(setup).connect(any(), any());
+                .given(youTubeSetup).connect(any(), any());
         mockMvc.perform(post("/setup/sources/youtube/connect").param("clientId", "x"))
                 .andExpect(flash().attribute("youtubeError", "The two passwords do not match"));
 
-        willThrow(new LoginRequiredException()).given(setup).connect(any(), any());
+        willThrow(new LoginRequiredException()).given(youTubeSetup).connect(any(), any());
         mockMvc.perform(post("/setup/sources/youtube/connect").param("clientId", "x"))
                 .andExpect(flash().attribute("youtubeError", "Log in first"));
     }
@@ -96,28 +91,28 @@ class YouTubeSetupControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/setup#youtube"))
                 .andExpect(flash().attribute("youtubeMessage", "Enter the code on your phone"));
-        verify(setup).authorize();
+        verify(youTubeSetup).authorize();
 
         mockMvc.perform(post("/setup/sources/youtube/cancel"))
                 .andExpect(flash().attribute("youtubeMessage", "Cancelled"));
-        verify(setup).cancel();
+        verify(youTubeSetup).cancel();
 
-        given(setup.check()).willReturn("Google accepted the saved authorization");
+        given(youTubeSetup.check()).willReturn("Google accepted the saved authorization");
         mockMvc.perform(post("/setup/sources/youtube/test"))
                 .andExpect(flash().attribute("youtubeMessage", "Google accepted the saved authorization"));
 
         mockMvc.perform(post("/setup/sources/youtube/disconnect"))
                 .andExpect(flash().attribute("youtubeMessage", "YouTube disconnected"));
-        verify(setup).disconnect();
+        verify(youTubeSetup).disconnect();
 
-        willThrow(new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Could not reach Google")).given(setup).authorize();
+        willThrow(new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Could not reach Google")).given(youTubeSetup).authorize();
         mockMvc.perform(post("/setup/sources/youtube/authorize"))
                 .andExpect(flash().attribute("youtubeError", "Could not reach Google"));
     }
 
     @Test
     void theAuthorizationFragmentPollsWhilePending() throws Exception {
-        given(setup.authorizationStatus()).willReturn(new YouTubeAuthorizationService.Status(
+        given(youTubeSetup.authorizationStatus()).willReturn(new YouTubeAuthorizationService.Status(
                 YouTubeAuthorizationService.State.PENDING, "GQVQ-JKEC", URI.create("https://www.google.com/device"),
                 Instant.parse("2026-09-16T10:30:00Z"), null));
 
@@ -131,7 +126,7 @@ class YouTubeSetupControllerTest {
 
     @Test
     void loadChooseAndWatchLaterEndpoints() throws Exception {
-        given(setup.loadPlaylists()).willReturn(List.of(
+        given(youTubeSetup.loadPlaylists()).willReturn(List.of(
                 new YouTubePlaylists.PlaylistSummary("PLa", "Kids science", 17),
                 new YouTubePlaylists.PlaylistSummary("PLb", "Watch this evening", 2)));
 
@@ -139,30 +134,30 @@ class YouTubeSetupControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/setup#youtube"))
                 .andExpect(flash().attribute("youtubeMessage", "Found 2 playlists"));
-        verify(setup).loadPlaylists();
+        verify(youTubeSetup).loadPlaylists();
 
         mockMvc.perform(post("/setup/sources/youtube/playlists").param("playlist", "A", "B"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(flash().attribute("youtubeMessage", "Playlists saved"));
-        verify(setup).choosePlaylists(List.of("A", "B"));
+        verify(youTubeSetup).choosePlaylists(List.of("A", "B"));
 
         mockMvc.perform(post("/setup/sources/youtube/playlists"))
                 .andExpect(flash().attribute("youtubeMessage", "Playlists saved"));
-        verify(setup).choosePlaylists(List.of());
+        verify(youTubeSetup).choosePlaylists(List.of());
 
         mockMvc.perform(post("/setup/sources/youtube/watch-later").param("enabled", "true"))
                 .andExpect(flash().attribute("youtubeMessage", "Watch Later shown"));
-        verify(setup).setWatchLater(true);
+        verify(youTubeSetup).setWatchLater(true);
 
         willThrow(new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Choose at most 20 playlists"))
-                .given(setup).choosePlaylists(any());
+                .given(youTubeSetup).choosePlaylists(any());
         mockMvc.perform(post("/setup/sources/youtube/playlists").param("playlist", "A"))
                 .andExpect(flash().attribute("youtubeError", "Choose at most 20 playlists"));
     }
 
     @Test
     void theAuthorizationFragmentRefreshesOnceConnected() throws Exception {
-        given(setup.authorizationStatus()).willReturn(new YouTubeAuthorizationService.Status(
+        given(youTubeSetup.authorizationStatus()).willReturn(new YouTubeAuthorizationService.Status(
                 YouTubeAuthorizationService.State.CONNECTED, null, null, null, "YouTube connected"));
 
         mockMvc.perform(get("/setup/sources/youtube/authorization"))
@@ -173,20 +168,20 @@ class YouTubeSetupControllerTest {
 
     @Test
     void loungeEndpoint() throws Exception {
-        given(setup.setLounge("kitchen", true)).willReturn("Kitchen");
-        given(setup.setLounge("kitchen", false)).willReturn("Kitchen");
+        given(youTubeSetup.setLounge("kitchen", true)).willReturn("Kitchen");
+        given(youTubeSetup.setLounge("kitchen", false)).willReturn("Kitchen");
 
         mockMvc.perform(post("/setup/sources/youtube/lounge").param("device", "kitchen").param("enabled", "true"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/setup#youtube"))
                 .andExpect(flash().attribute("youtubeMessage", "YouTube Cast switched on for Kitchen"));
-        verify(setup).setLounge("kitchen", true);
+        verify(youTubeSetup).setLounge("kitchen", true);
 
         mockMvc.perform(post("/setup/sources/youtube/lounge").param("device", "kitchen").param("enabled", "false"))
                 .andExpect(flash().attribute("youtubeMessage", "YouTube Cast switched off for Kitchen"));
 
         willThrow(new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Only Cast devices can use YouTube Cast"))
-                .given(setup).setLounge("living", true);
+                .given(youTubeSetup).setLounge("living", true);
         mockMvc.perform(post("/setup/sources/youtube/lounge").param("device", "living").param("enabled", "true"))
                 .andExpect(redirectedUrl("/setup#youtube"))
                 .andExpect(flash().attribute("youtubeError", "Only Cast devices can use YouTube Cast"));

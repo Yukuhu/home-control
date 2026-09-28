@@ -1,33 +1,17 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
-import dev.andre.homecontrol.adapters.androidtv.PairingService;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginRequiredException;
-import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
-import dev.andre.homecontrol.sources.sports.SportsProperties;
-import dev.andre.homecontrol.sources.sports.SportsSetupController;
-import dev.andre.homecontrol.sources.sports.SportsSetupAdvice;
 import dev.andre.homecontrol.sources.sports.SportsSettings;
-import dev.andre.homecontrol.sources.sports.SportsSettingsService;
-import dev.andre.homecontrol.sources.sports.SportsTimeZones;
-import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import dev.andre.homecontrol.sources.sports.calendar.FeedStatus;
-import dev.andre.homecontrol.sources.sports.calendar.SportsCalendars;
 import dev.andre.homecontrol.storage.StorageException;
-import dev.andre.homecontrol.web.SetupController;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.net.URI;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -44,49 +28,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({TheSportsDbSetupController.class, SportsSetupController.class, SetupController.class, SportsSetupAdvice.class})
-class TheSportsDbSetupControllerTest {
-
-    @TestConfiguration
-    static class Config {
-        @Bean
-        SportsProperties sportsProperties() {
-            return new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
-                    new SportsProperties.Calendar(Duration.ofHours(6), 5, 15, 5242880, 3, false),
-                    new SportsProperties.TheSportsDb(true, URI.create("https://www.thesportsdb.com/api/v1/json"),
-                            "123", Duration.ofHours(24), 5, 15, null));
-        }
-    }
+class TheSportsDbSetupControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    SportsCalendars calendars;
-
-    @MockitoBean
-    SportsSettingsService settings;
-
-    @MockitoBean
-    SportsTimeZones zones;
-
-    @MockitoBean
-    CalendarSchedule schedule;
-
-    @MockitoBean
-    LoginService login;
-
-    @MockitoBean
-    SportsCompetitions competitions;
-
-    @MockitoBean
-    TheSportsDbSchedule tsdbSchedule;
-
-    @MockitoBean
-    PairingService pairing;
-
-    @MockitoBean
-    DeviceManager devices;
 
     @BeforeEach
     void defaults() {
@@ -94,38 +39,38 @@ class TheSportsDbSetupControllerTest {
         given(devices.pairable()).willReturn(List.of());
         given(devices.addable()).willReturn(List.of());
         given(login.loginRequired()).willReturn(false);
-        given(settings.current()).willReturn(SportsSettings.empty());
-        given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
-        given(zones.chosen()).willReturn(true);
+        given(sportsSettings.current()).willReturn(SportsSettings.empty());
+        given(sportsZones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
+        given(sportsZones.chosen()).willReturn(true);
     }
 
     @Test
     void addAndRemove() throws Exception {
-        given(competitions.add("4331")).willReturn(
+        given(sportsCompetitions.add("4331")).willReturn(
                 new SportsSettings.CompetitionEntry("4331", "German Bundesliga", "Soccer", "Germany", null, null, Instant.EPOCH));
         mockMvc.perform(post("/setup/sources/sports/competitions").param("leagueId", "4331"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(flash().attribute("sportsMessage", "Added German Bundesliga"));
 
-        given(competitions.remove("4331")).willReturn(
+        given(sportsCompetitions.remove("4331")).willReturn(
                 new SportsSettings.CompetitionEntry("4331", "German Bundesliga", "Soccer", "Germany", null, null, Instant.EPOCH));
         mockMvc.perform(post("/setup/sources/sports/competitions/4331/remove"))
                 .andExpect(flash().attribute("sportsMessage", "Removed German Bundesliga"));
 
         doThrow(new IllegalArgumentException("TheSportsDB has no competition 999"))
-                .when(competitions).add("999");
+                .when(sportsCompetitions).add("999");
         mockMvc.perform(post("/setup/sources/sports/competitions").param("leagueId", "999"))
                 .andExpect(flash().attribute("sportsError", "TheSportsDB has no competition 999"));
     }
 
     @Test
     void searchFlashesResults() throws Exception {
-        given(competitions.search("Germany", "Soccer")).willReturn(List.of(
+        given(sportsCompetitions.search("Germany", "Soccer")).willReturn(List.of(
                 new League("4485", "DFB-Pokal", "Soccer", "Germany", null),
                 new League("4399", "German 2. Bundesliga", "Soccer", "Germany", null),
                 new League("4331", "German Bundesliga", "Soccer", "Germany", null),
                 new League("5891", "German Oberliga Baden-Württemberg", "Soccer", "Germany", null)));
-        given(settings.current()).willReturn(SportsSettings.empty().withCompetitions(List.of(
+        given(sportsSettings.current()).willReturn(SportsSettings.empty().withCompetitions(List.of(
                 new SportsSettings.CompetitionEntry("4331", "German Bundesliga", "Soccer", "Germany", null, null, Instant.EPOCH))));
 
         var result = mockMvc.perform(post("/setup/sources/sports/thesportsdb/search")
@@ -148,7 +93,7 @@ class TheSportsDbSetupControllerTest {
                 .andExpect(flash().attribute("sportsMessage", "Using your TheSportsDB key"));
 
         ArgumentCaptor<SportsCompetitions.PersonalKey> captor = ArgumentCaptor.forClass(SportsCompetitions.PersonalKey.class);
-        verify(competitions).usePersonalKey(captor.capture(), any());
+        verify(sportsCompetitions).usePersonalKey(captor.capture(), any());
         assertThat(captor.getValue()).isEqualTo(new SportsCompetitions.PersonalKey("9876543210", "household password", "household password"));
 
         var result = mockMvc.perform(post("/setup/sources/sports/thesportsdb/key").param("key", "9876543210")).andReturn();
@@ -160,11 +105,11 @@ class TheSportsDbSetupControllerTest {
 
     @Test
     void theSetupPageShowsTheSportsDb() throws Exception {
-        given(settings.current()).willReturn(SportsSettings.empty().withCompetitions(List.of(
+        given(sportsSettings.current()).willReturn(SportsSettings.empty().withCompetitions(List.of(
                 new SportsSettings.CompetitionEntry("4331", "German Bundesliga", "Soccer", "Germany", null, null, Instant.EPOCH),
                 new SportsSettings.CompetitionEntry("4328", "English Premier League", "Soccer", "England", null, null, Instant.EPOCH))));
-        given(tsdbSchedule.status("4331")).willReturn(Optional.of(new FeedStatus(Instant.parse("2026-09-19T14:00:00Z"), 5, null, 0, 0, 0)));
-        given(tsdbSchedule.status("4328")).willReturn(Optional.of(
+        given(theSportsDbSchedule.status("4331")).willReturn(Optional.of(new FeedStatus(Instant.parse("2026-09-19T14:00:00Z"), 5, null, 0, 0, 0)));
+        given(theSportsDbSchedule.status("4328")).willReturn(Optional.of(
                 new FeedStatus(null, 0, "TheSportsDB is limiting requests; try again in a minute", 0, 0, 0)));
 
         String body = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
@@ -188,11 +133,11 @@ class TheSportsDbSetupControllerTest {
     @Test
     void storageFailuresShowOneMessageWithoutFileDetails() throws Exception {
         StorageException disk = new StorageException("Could not write /data/sports.json", new java.io.IOException("disk full"));
-        doThrow(disk).when(competitions).add("4331");
-        doThrow(disk).when(competitions).remove("4331");
-        doThrow(disk).when(competitions).search("Germany", "Soccer");
-        doThrow(disk).when(competitions).usePersonalKey(any(), any());
-        doThrow(disk).when(competitions).useFreeKey();
+        doThrow(disk).when(sportsCompetitions).add("4331");
+        doThrow(disk).when(sportsCompetitions).remove("4331");
+        doThrow(disk).when(sportsCompetitions).search("Germany", "Soccer");
+        doThrow(disk).when(sportsCompetitions).usePersonalKey(any(), any());
+        doThrow(disk).when(sportsCompetitions).useFreeKey();
 
         for (var request : List.of(
                 post("/setup/sources/sports/competitions").param("leagueId", "4331"),
@@ -212,13 +157,13 @@ class TheSportsDbSetupControllerTest {
         doThrow(new LoginRequiredException())
                 .doThrow(new PasswordRejectedException("The two passwords do not match"))
                 .doThrow(new TheSportsDbException(TheSportsDbException.Kind.UNAUTHORIZED, "TheSportsDB did not accept that key"))
-                .when(competitions).usePersonalKey(any(), any());
+                .when(sportsCompetitions).usePersonalKey(any(), any());
         doThrow(new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "TheSportsDB is unreachable"))
-                .when(competitions).search("Germany", "Soccer");
-        doThrow(new IllegalArgumentException("Choose a country or a sport")).when(competitions).search(null, null);
-        doThrow(new IllegalArgumentException("Competition 999 is not added")).when(competitions).remove("999");
+                .when(sportsCompetitions).search("Germany", "Soccer");
+        doThrow(new IllegalArgumentException("Choose a country or a sport")).when(sportsCompetitions).search(null, null);
+        doThrow(new IllegalArgumentException("Competition 999 is not added")).when(sportsCompetitions).remove("999");
         doThrow(new TheSportsDbException(TheSportsDbException.Kind.RATE_LIMITED, "TheSportsDB is busy; try again later"))
-                .when(competitions).add("4331");
+                .when(sportsCompetitions).add("4331");
 
         for (String expected : List.of("Log in again to change sources", "The two passwords do not match",
                 "TheSportsDB did not accept that key")) {

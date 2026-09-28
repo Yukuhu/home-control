@@ -1,17 +1,11 @@
 package dev.andre.homecontrol.sources.pinned;
 
-import dev.andre.homecontrol.adapters.androidtv.PairingService;
 import dev.andre.homecontrol.core.playback.ContentKind;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.storage.StorageException;
-import dev.andre.homecontrol.web.SetupController;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.net.URI;
@@ -33,28 +27,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({PinnedSetupController.class, SetupController.class, PinnedSetupAdvice.class})
-class PinnedSetupControllerTest {
-
-    @TestConfiguration
-    static class Config {
-        @Bean
-        PinnedProperties pinnedProperties() {
-            return new PinnedProperties(true, 200);
-        }
-    }
+class PinnedSetupControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    PinnedShortcuts pins;
-
-    @MockitoBean
-    PairingService pairing;
-
-    @MockitoBean
-    DeviceManager devices;
 
     @BeforeEach
     void defaults() {

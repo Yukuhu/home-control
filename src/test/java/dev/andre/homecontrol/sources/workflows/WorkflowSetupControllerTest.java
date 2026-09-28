@@ -1,16 +1,13 @@
 package dev.andre.homecontrol.sources.workflows;
 
-import dev.andre.homecontrol.adapters.androidtv.PairingService;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
-import dev.andre.homecontrol.web.SetupController;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -25,22 +22,16 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest({WorkflowSetupController.class, WorkflowSetupAdvice.class, SetupController.class})
-class WorkflowSetupControllerTest {
+class WorkflowSetupControllerTest extends WebSliceTest {
     @Autowired MockMvc mvc;
-    @MockitoBean WorkflowStore store;
-    @MockitoBean WorkflowTestService testService;
-    @MockitoBean LoginService login;
-    @MockitoBean PairingService pairing;
-    @MockitoBean DeviceManager devices;
     final String id = "w-0123456789ab";
     WorkflowDefinition saved;
 
     @BeforeEach void setup() {
         saved = new WorkflowDefinition(1, id, 3, WorkflowFixtures.single(URI.create("https://api.example/saved-secret")));
-        when(store.find(id)).thenReturn(Optional.of(saved));
-        when(store.all()).thenReturn(List.of(saved));
-        when(store.problems()).thenReturn(Map.of());
+        when(workflowStore.find(id)).thenReturn(Optional.of(saved));
+        when(workflowStore.all()).thenReturn(List.of(saved));
+        when(workflowStore.problems()).thenReturn(Map.of());
         when(login.loginRequired()).thenReturn(true);
         when(login.isAuthenticated(any(jakarta.servlet.http.HttpServletRequest.class))).thenReturn(true);
         when(devices.devices()).thenReturn(List.of());
@@ -55,22 +46,22 @@ class WorkflowSetupControllerTest {
 
     @ParameterizedTest @ValueSource(booleans = {false, true})
     void setupIncludesModeEditAndSavedRevisionTestWithoutFetching(boolean generated) throws Exception {
-        if (generated) when(store.all()).thenReturn(List.of(new WorkflowDefinition(1, id, 3, WorkflowFixtures.generated())));
+        if (generated) when(workflowStore.all()).thenReturn(List.of(new WorkflowDefinition(1, id, 3, WorkflowFixtures.generated())));
         String html = mvc.perform(get("/setup")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         assertThat(html).contains(generated ? "Generated tiles" : "Single tile", ">Edit</a>", "/setup/workflows/" + id + "/test", "Fetches fresh data", "without playback")
                 .containsPattern("(?s)action=\"/setup/workflows/" + id + "/test\".*?name=\"expectedRevision\" value=\"3\"");
-        verifyNoInteractions(testService);
+        verifyNoInteractions(workflowTests);
     }
 
     @Test void explicitlyUncheckedSensitivityOverridesNewRowDefault() throws Exception {
-        when(store.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
+        when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
         mvc.perform(validPost().param("urlMode", "KEEP").param("headersMode", "KEEP").param("templateMode", "REPLACE")
                         .param("template", "https://media.example/?token={Token}")
                         .param("variables[0].name", "Token").param("variables[0].scope", "ROOT")
                         .param("variables[0].pointer", "/token").param("_variables[0].sensitive", "on"))
                 .andExpect(status().is3xxRedirection());
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
-        verify(store).update(eq(id), eq(3L), captor.capture(), any());
+        verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
         assertThat(captor.getValue().variables().getFirst().sensitive()).isFalse();
     }
 
@@ -81,22 +72,22 @@ class WorkflowSetupControllerTest {
         assertThat(result.getResponse().getContentAsString()).contains("Keep saved URL", "Keep saved template")
                 .doesNotContain("saved-secret", "api.example", "token={C}");
         assertThat(result.getModelAndView().getModel().values()).noneMatch(WorkflowDefinition.class::isInstance);
-        verifyNoInteractions(testService);
+        verifyNoInteractions(workflowTests);
     }
 
     @Test void keepAndReplaceAreExplicitAndRowsRetainOrder() throws Exception {
-        when(store.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
+        when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
         mvc.perform(validPost().param("urlMode", "KEEP").param("templateMode", "KEEP").param("headersMode", "KEEP")
                         .param("variables[0].name", "C").param("variables[0].scope", "ROOT").param("variables[0].pointer", "/token")
                         .param("variables[0].sensitive", "true").param("_variables[0].sensitive", "on")
                         .param("variables[1].name", "A").param("variables[1].scope", "ROOT").param("variables[1].pointer", "/id"))
                 .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/setup/workflows/" + id));
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
-        verify(store).update(eq(id), eq(3L), captor.capture(), any());
+        verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
         assertThat(captor.getValue().fetch()).isEqualTo(saved.draft().fetch());
         assertThat(captor.getValue().cast().template()).isEqualTo(saved.draft().cast().template());
         assertThat(captor.getValue().variables()).extracting(WorkflowDraft.Variable::name).containsExactly("C", "A");
-        verifyNoInteractions(testService);
+        verifyNoInteractions(workflowTests);
     }
 
     @ParameterizedTest @ValueSource(strings = {"variables[999999].name", "variables[32].name", "headers[16].value",
@@ -108,7 +99,7 @@ class WorkflowSetupControllerTest {
                         .param("loginPasswordConfirmation", "private-confirmation"))
                 .andExpect(status().isOk()).andReturn();
         assertSafeError(result);
-        verify(store, never()).update(anyString(), anyLong(), any(), any());
+        verify(workflowStore, never()).update(anyString(), anyLong(), any(), any());
     }
 
     @Test void conversionErrorsRebuildBindingResultAndPreserveNonsecretDraft() throws Exception {
@@ -124,7 +115,7 @@ class WorkflowSetupControllerTest {
     @Test void firstSavePasswordFailureScrubsValues() throws Exception {
         when(login.loginRequired()).thenReturn(false);
         mvc.perform(get("/setup/workflows/new")).andExpect(content().string(org.hamcrest.Matchers.containsString("loginPasswordConfirmation")));
-        when(store.create(any(), any(), any(), any())).thenThrow(new PasswordRejectedException("The two passwords do not match"));
+        when(workflowStore.create(any(), any(), any(), any())).thenThrow(new PasswordRejectedException("The two passwords do not match"));
         var request = post("/setup/workflows").param("name", "Draft").param("mode", "SINGLE").param("kind", "VIDEO")
                 .param("title", "Draft title").param("urlMode", "REPLACE").param("url", "https://private-url/x")
                 .param("templateMode", "REPLACE").param("template", "https://private-template/x")
@@ -146,15 +137,15 @@ class WorkflowSetupControllerTest {
     }
 
     @Test void corruptBlankAndDotIdsAreReachableOnlyThroughCanonicalRecoveryTokens() throws Exception {
-        when(store.problems()).thenReturn(Map.of("", "Stored definition cannot be loaded", ".", "Stored definition cannot be loaded", "..", "Stored definition cannot be loaded"));
+        when(workflowStore.problems()).thenReturn(Map.of("", "Stored definition cannot be loaded", ".", "Stored definition cannot be loaded", "..", "Stored definition cannot be loaded"));
         String html = mvc.perform(get("/setup")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         assertThat(html).contains("/setup/workflows/invalid-/remove-invalid", "/setup/workflows/invalid-Lg/remove-invalid", "/setup/workflows/invalid-Li4/remove-invalid");
         for (String token : List.of("invalid-", "invalid-Lg", "invalid-Li4")) {
             mvc.perform(post("/setup/workflows/" + token + "/remove-invalid")).andExpect(status().is3xxRedirection());
         }
-        verify(store).removeInvalid(eq(""), any());
-        verify(store).removeInvalid(eq("."), any());
-        verify(store).removeInvalid(eq(".."), any());
+        verify(workflowStore).removeInvalid(eq(""), any());
+        verify(workflowStore).removeInvalid(eq("."), any());
+        verify(workflowStore).removeInvalid(eq(".."), any());
         mvc.perform(post("/setup/workflows/invalid-Lg==/remove-invalid")).andExpect(status().isBadRequest());
         mvc.perform(post("/setup/workflows/invalid-Lh/remove-invalid")).andExpect(status().isBadRequest());
     }
@@ -164,31 +155,31 @@ class WorkflowSetupControllerTest {
         var result = mvc.perform(validPost().with(request -> { request.setParameter("expectedRevision", "2"); return request; }).param("url", "https://private-url/x"))
                 .andExpect(status().isConflict()).andReturn();
         assertSafeError(result);
-        verifyNoInteractions(testService);
+        verifyNoInteractions(workflowTests);
     }
 
     @Test void testUsesSavedRevisionAndSafeResultOnly() throws Exception {
-        when(testService.test(eq(id), eq(3L), any())).thenReturn(new WorkflowTestService.Result(List.of(), 0, List.of(), List.of()));
+        when(workflowTests.test(eq(id), eq(3L), any())).thenReturn(new WorkflowTestService.Result(List.of(), 0, List.of(), List.of()));
         mvc.perform(post("/setup/workflows/" + id + "/test").param("expectedRevision", "3"))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"));
-        verify(testService).test(eq(id), eq(3L), any());
+        verify(workflowTests).test(eq(id), eq(3L), any());
     }
 
     @Test void replacesCredentialsAndClearsHeadersOnlyWhenExplicitlySelected() throws Exception {
-        when(store.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
+        when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
         mvc.perform(validPost().param("urlMode", "REPLACE").param("url", "https://new.example/source")
                         .param("templateMode", "REPLACE").param("template", "https://media.example/new")
                         .param("headersMode", "REPLACE"))
                 .andExpect(status().is3xxRedirection());
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
-        verify(store).update(eq(id), eq(3L), captor.capture(), any());
+        verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
         assertThat(captor.getValue().fetch().url()).isEqualTo("https://new.example/source");
         assertThat(captor.getValue().fetch().headers()).isEmpty();
         assertThat(captor.getValue().cast().template()).isEqualTo("https://media.example/new");
     }
 
     @Test void storageFailureAndUnauthorizedSaveNeverReturnSecrets() throws Exception {
-        when(store.update(eq(id), eq(3L), any(), any())).thenThrow(new IllegalStateException("private-marker"));
+        when(workflowStore.update(eq(id), eq(3L), any(), any())).thenThrow(new IllegalStateException("private-marker"));
         var result = mvc.perform(validPost().param("urlMode", "REPLACE").param("url", "https://private-url/x")
                         .param("templateMode", "REPLACE").param("template", "https://private-template/x"))
                 .andExpect(status().isOk()).andReturn();
@@ -200,7 +191,7 @@ class WorkflowSetupControllerTest {
     }
 
     @Test void legitimateUncheckedMarkersAndOptionalRootSelectionAreBound() throws Exception {
-        when(store.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
+        when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
         mvc.perform(validPost().with(request -> {
                     request.removeParameter("enabled"); request.setParameter("mode", "GENERATED"); return request;
                 }).param("arrayPointer", "/items").param("idPointer", "/id").param("titlePointer", "/title")
@@ -211,7 +202,7 @@ class WorkflowSetupControllerTest {
                 .param("template", "https://media.example/{A}"))
                 .andExpect(status().is3xxRedirection());
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
-        verify(store).update(eq(id), eq(3L), captor.capture(), any());
+        verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
         assertThat(captor.getValue().enabled()).isFalse();
         assertThat(captor.getValue().listing().subtitlePointer()).isEmpty();
         assertThat(captor.getValue().listing().artworkPointer()).isNull();
@@ -219,7 +210,7 @@ class WorkflowSetupControllerTest {
     }
 
     @Test void requestHeadersCannotSupplyAnOmittedAllowedCheckbox() throws Exception {
-        when(store.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
+        when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
 
         mvc.perform(validPost().with(request -> {
                     request.removeParameter("enabled");
@@ -229,7 +220,7 @@ class WorkflowSetupControllerTest {
                 .andExpect(status().is3xxRedirection());
 
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
-        verify(store).update(eq(id), eq(3L), captor.capture(), any());
+        verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
         assertThat(captor.getValue().enabled()).isFalse();
     }
 
@@ -238,30 +229,30 @@ class WorkflowSetupControllerTest {
         var result = mvc.perform(post("/setup/workflows").param("urlMode", "KEEP"))
                 .andExpect(status().isOk()).andReturn();
         assertSafeError(result);
-        verify(store, never()).create(any(), any(), any(), any());
+        verify(workflowStore, never()).create(any(), any(), any(), any());
     }
 
     @Test void normalInvalidIdAndUnknownRecoveryTokensCannotRemoveOtherKeys() throws Exception {
-        when(store.problems()).thenReturn(Map.of(id, "Stored definition cannot be loaded"));
+        when(workflowStore.problems()).thenReturn(Map.of(id, "Stored definition cannot be loaded"));
         mvc.perform(post("/setup/workflows/" + id + "/remove-invalid")).andExpect(status().is3xxRedirection());
-        verify(store).removeInvalid(eq(id), any());
+        verify(workflowStore).removeInvalid(eq(id), any());
         for (String token : List.of("invalid-Lg", "invalid-!", "invalid-dy0wMTIzNDU2Nzg5YWI")) {
             mvc.perform(post("/setup/workflows/" + token + "/remove-invalid")).andExpect(status().isBadRequest());
         }
-        verify(store, times(1)).removeInvalid(anyString(), any());
+        verify(workflowStore, times(1)).removeInvalid(anyString(), any());
     }
 
     @Test void enableAndRemoveUseExpectedRevisionAndRequestAuthentication() throws Exception {
         mvc.perform(post("/setup/workflows/" + id + "/enabled").param("expectedRevision", "3").param("enabled", "false"))
                 .andExpect(status().is3xxRedirection());
-        verify(store).setEnabled(eq(id), eq(3L), eq(false), any());
+        verify(workflowStore).setEnabled(eq(id), eq(3L), eq(false), any());
         mvc.perform(post("/setup/workflows/" + id + "/remove").param("expectedRevision", "3"))
                 .andExpect(status().is3xxRedirection());
-        verify(store).remove(eq(id), eq(3L), any());
+        verify(workflowStore).remove(eq(id), eq(3L), any());
         when(login.loginRequired()).thenReturn(false);
         when(login.isAuthenticated(any(jakarta.servlet.http.HttpServletRequest.class))).thenReturn(false);
         mvc.perform(post("/setup/workflows/" + id + "/remove-invalid")).andExpect(status().isUnauthorized());
-        verify(store, never()).removeInvalid(anyString(), any());
+        verify(workflowStore, never()).removeInvalid(anyString(), any());
     }
 
     @Test void invalidSourceUrlReturnsLinkedFieldErrorAndConcurrentRevisionFailureIsConflict() throws Exception {
@@ -271,7 +262,7 @@ class WorkflowSetupControllerTest {
         var binding = (BindingResult) result.getModelAndView().getModel().get(BindingResult.MODEL_KEY_PREFIX + "workflowForm");
         assertThat(binding.hasFieldErrors("url")).isTrue();
         assertThat(result.getResponse().getContentAsString()).contains("href=\"#workflow-url\"");
-        when(store.update(eq(id), eq(3L), any(), any())).thenThrow(
+        when(workflowStore.update(eq(id), eq(3L), any(), any())).thenThrow(
                 new WorkflowException(WorkflowException.Stage.WORKFLOW, "Workflow changed; reopen this item"));
         var concurrent = mvc.perform(validPost().param("templateMode", "REPLACE").param("template", "https://media.example/x"))
                 .andExpect(status().isConflict()).andReturn();

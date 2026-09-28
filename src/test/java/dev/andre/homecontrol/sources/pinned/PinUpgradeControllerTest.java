@@ -2,10 +2,9 @@ package dev.andre.homecontrol.sources.pinned;
 
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.storage.StorageException;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.net.URI;
@@ -19,14 +18,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(PinUpgradeController.class)
-class PinUpgradeControllerTest {
+class PinUpgradeControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    PinnedShortcuts pins;
 
     @Test
     void pinsAndAnswersJson() throws Exception {
