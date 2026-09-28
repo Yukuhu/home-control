@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvAdapter;
+import dev.andre.homecontrol.testsupport.TestCredentials;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
 import dev.andre.homecontrol.adapters.androidtv.MdnsDiscovery;
@@ -90,8 +91,8 @@ class DeviceManagerTest {
             registry.save(AndroidTvSettings.device("bedroom", "Bedroom", "127.0.0.1", bedroom.port(), null,
                     Instant.parse("2026-09-02T10:00:00Z")));
             CertificateStore certificates = certificates();
-            certificates.loadOrCreate("living");
-            certificates.loadOrCreate("bedroom");
+            certificates.save("living", TestCredentials.clientCertificate());
+            certificates.save("bedroom", TestCredentials.clientCertificate());
 
             try (DeviceManager manager = manager(registry, certificates)) {
                 manager.start();
@@ -114,8 +115,8 @@ class DeviceManagerTest {
             registry.save(AndroidTvSettings.device("living", "Living Room", "127.0.0.1", living.port(), null, Instant.now()));
             registry.save(AndroidTvSettings.device("bedroom", "Bedroom", "127.0.0.1", bedroom.port(), null, Instant.now()));
             CertificateStore certificates = certificates();
-            certificates.loadOrCreate("living");
-            certificates.loadOrCreate("bedroom");
+            certificates.save("living", TestCredentials.clientCertificate());
+            certificates.save("bedroom", TestCredentials.clientCertificate());
 
             try (DeviceManager manager = manager(registry, certificates)) {
                 manager.start();
@@ -140,7 +141,7 @@ class DeviceManagerTest {
                     + "\"host\":\"127.0.0.1\",\"port\":" + remote.port() + ","
                     + "\"certificateFingerprint\":null,\"lastSeen\":\"2026-08-29T18:00:00Z\"}]");
             CertificateStore certificates = certificates();
-            certificates.loadOrCreate("127-0-0-1");
+            certificates.save("127-0-0-1", TestCredentials.clientCertificate());
 
             try (DeviceManager manager = manager(new JsonFileDeviceRegistry(file), certificates)) {
                 manager.start();
@@ -178,8 +179,8 @@ class DeviceManagerTest {
             DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
             registry.save(AndroidTvSettings.device("gone", "Gone", "127.0.0.1", remote.port(), null, Instant.now()));
             CertificateStore certificates = certificates();
-            certificates.loadOrCreate("gone");
-            certificates.loadOrCreate("kept");
+            certificates.save("gone", TestCredentials.clientCertificate());
+            certificates.save("kept", TestCredentials.clientCertificate());
 
             try (DeviceManager manager = manager(registry, certificates)) {
                 manager.start();
