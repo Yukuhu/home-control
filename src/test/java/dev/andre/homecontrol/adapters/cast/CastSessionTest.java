@@ -39,8 +39,13 @@ import static org.awaitility.Awaitility.await;
 
 class CastSessionTest {
 
-    /** heartbeat 1 s, stale 3 s, backoff 1–2 s, command 2 s, load 5 s, media poll 1 s. */
-    static final CastProperties PROPERTIES = new CastProperties(true, 1, 3, 1, 2, 2, 5, 1);
+    /**
+     * Heartbeat 200 ms, stale 1 s, backoff 50–100 ms, command 1 s, load 5 s, media poll 100 ms, custom-message
+     * window 200 ms.
+     */
+    static final CastTimings TIMINGS = new CastTimings(Duration.ofMillis(200), Duration.ofSeconds(1),
+            Duration.ofMillis(50), Duration.ofMillis(100), Duration.ofSeconds(1), Duration.ofSeconds(5),
+            Duration.ofMillis(100), Duration.ofMillis(200));
 
     private final RecordingStateListener seen = new RecordingStateListener();
     private FakeCastReceiver receiver;
@@ -65,7 +70,7 @@ class CastSessionTest {
     }
 
     private CastSession start(int port) {
-        session = new CastSession(device(port), PROPERTIES, seen);
+        session = new CastSession(device(port), TIMINGS, seen);
         session.start();
         return session;
     }
@@ -158,7 +163,7 @@ class CastSessionTest {
         Device tv = new Device("10-0-0-5", "Living Room TV", DeviceKind.ANDROID_TV, "192.0.2.1",
                 Map.of("androidtv", Map.of("port", "6466"),
                         "cast", Map.of("host", "127.0.0.1", "port", String.valueOf(receiver.port()))), Instant.now());
-        session = new CastSession(tv, PROPERTIES, seen);
+        session = new CastSession(tv, TIMINGS, seen);
         session.start();
 
         awaitStatus();
@@ -172,8 +177,8 @@ class CastSessionTest {
         session.close();
         int published = seen.all().size();
 
-        // Longer than the 1–2 s reconnect backoff.
-        await().during(Duration.ofMillis(2_500)).atMost(Duration.ofSeconds(4)).untilAsserted(() -> {
+        // Five times the 50–100 ms reconnect backoff.
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             assertThat(seen.all()).hasSize(published);
             assertThat(receiver.connections()).isEqualTo(1);
         });
@@ -597,7 +602,7 @@ class CastSessionTest {
 
     @Test
     void aDisconnectedSessionIsOffline() {
-        session = new CastSession(device(receiver.port()), PROPERTIES, seen);
+        session = new CastSession(device(receiver.port()), TIMINGS, seen);
 
         assertThatThrownBy(() -> session.query(MDX_STATUS)).isInstanceOf(DeviceOfflineException.class);
     }

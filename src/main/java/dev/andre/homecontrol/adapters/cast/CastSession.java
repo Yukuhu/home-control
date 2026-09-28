@@ -7,6 +7,7 @@ import dev.andre.homecontrol.adapters.cast.protocol.CastPayloads;
 import dev.andre.homecontrol.adapters.cast.protocol.CastTimeoutException;
 import dev.andre.homecontrol.adapters.cast.protocol.MediaStatus;
 import dev.andre.homecontrol.adapters.cast.protocol.ReceiverStatus;
+import dev.andre.homecontrol.adapters.net.Backoff;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.CastAppQuery;
@@ -58,7 +59,7 @@ public class CastSession implements DeviceHandle {
 
     private final Device device;
     private final CastSettings settings;
-    private final CastProperties properties;
+    private final CastTimings timings;
     private final Consumer<DeviceState> onChange;
     private final ScheduledExecutorService scheduler;
 
@@ -81,11 +82,15 @@ public class CastSession implements DeviceHandle {
     private volatile boolean closed;
 
     public CastSession(Device device, CastProperties properties, Consumer<DeviceState> onChange) {
+        this(device, CastTimings.from(properties), onChange);
+    }
+
+    CastSession(Device device, CastTimings timings, Consumer<DeviceState> onChange) {
         this.device = device;
         this.settings = CastSettings.of(device);
-        this.properties = properties;
+        this.timings = timings;
         this.onChange = onChange;
-        this.backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
+        this.backoff = timings.reconnectInitialDelay();
         this.scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "cast-session-" + device.id());
             thread.setDaemon(true);
@@ -95,8 +100,8 @@ public class CastSession implements DeviceHandle {
 
     public void start() {
         scheduler.execute(this::connect);
-        long interval = properties.mediaStatusIntervalSeconds();
-        scheduler.scheduleWithFixedDelay(this::pollMediaPosition, interval, interval, TimeUnit.SECONDS);
+        long interval = timings.mediaStatusInterval().toMillis();
+        scheduler.scheduleWithFixedDelay(this::pollMediaPosition, interval, interval, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -167,8 +172,6 @@ public class CastSession implements DeviceHandle {
     }
 
     private static final Set<String> CUSTOM_ERROR_TYPES = Set.of("error", "connectionerror", "playbackerror");
-    /** Receivers validate a custom request synchronously; media loading continues after we return. */
-    private static final Duration CUSTOM_MESSAGE_ERROR_WINDOW = Duration.ofMillis(750);
 
     /** Launch the app unless it runs, wait until it speaks {@code namespace}, connect, send; a quick error reply fails. */
     private void customMessage(String appId, String namespace, Map<String, Object> message) {
@@ -191,7 +194,7 @@ public class CastSession implements DeviceHandle {
             }, "send the request to " + describe(app));
             CastIncoming error;
             try {
-                error = rejection.await(CUSTOM_MESSAGE_ERROR_WINDOW);
+                error = rejection.await(timings.customMessageErrorWindow());
             } catch (CastTimeoutException _) {
                 return; // no rejection: the receiver took the request
             } catch (IOException _) {
@@ -314,11 +317,11 @@ public class CastSession implements DeviceHandle {
     }
 
     private Duration commandTimeout() {
-        return Duration.ofSeconds(properties.commandTimeoutSeconds());
+        return timings.commandTimeout();
     }
 
     private Duration loadTimeout() {
-        return Duration.ofSeconds(properties.loadTimeoutSeconds());
+        return timings.loadTimeout();
     }
 
     private void connect() {
@@ -330,8 +333,8 @@ public class CastSession implements DeviceHandle {
         CastConnection opened = null;
         try {
             opened = CastConnection.open(settings.host(), settings.port(),
-                    Duration.ofSeconds(properties.heartbeatIntervalSeconds()),
-                    Duration.ofSeconds(properties.staleTimeoutSeconds()),
+                    timings.heartbeatInterval(),
+                    timings.staleTimeout(),
                     new Link(attempt));
             opened.send(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus()); // the reply arrives via Link
             connection = opened;
@@ -343,7 +346,7 @@ public class CastSession implements DeviceHandle {
                 connection = null;
                 return;
             }
-            backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
+            backoff = timings.reconnectInitialDelay();
             update(state.withStatus(DeviceStatus.CONNECTED));
         } catch (IOException e) {
             if (opened != null) {
@@ -384,9 +387,9 @@ public class CastSession implements DeviceHandle {
             return;
         }
         Duration delay = backoff;
-        backoff = Duration.ofSeconds(Math.min(backoff.toSeconds() * 2, properties.reconnectMaxDelaySeconds()));
+        backoff = Backoff.next(backoff, timings.reconnectMaxDelay());
         try {
-            scheduler.schedule(this::connect, delay.toSeconds(), TimeUnit.SECONDS);
+            scheduler.schedule(this::connect, delay.toMillis(), TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException _) {
             // Closing.
         }

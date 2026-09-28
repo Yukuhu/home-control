@@ -17,8 +17,11 @@ import static org.awaitility.Awaitility.await;
 
 class CastAdapterTest {
 
+    /** heartbeat 1 s, stale 3 s, backoff 1–2 s, command 2 s, load 5 s, media poll 1 s. */
+    private static final CastProperties PROPERTIES = new CastProperties(true, 1, 3, 1, 2, 2, 5, 1);
+
     private final CastAdapter adapter = new CastAdapter(new CastDiscovery(new MdnsBrowser(false), event -> { }),
-            CastSessionTest.PROPERTIES);
+            PROPERTIES);
 
     @Test
     void isThePairingFreeCastAdapter() {
