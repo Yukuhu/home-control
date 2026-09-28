@@ -26,4 +26,9 @@ public class KnownVideos {
     public synchronized Optional<YouTubeVideo> find(String id) {
         return Optional.ofNullable(videos.get(id));
     }
+
+    /** Forgets every video. Exists for the shared test context, which reuses one application for many test classes. */
+    public synchronized void reset() {
+        videos.clear();
+    }
 }

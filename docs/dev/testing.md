@@ -44,8 +44,9 @@ combination, such as sports on with TheSportsDB off, keeps a `@SpringBootTest` o
 
 A test of the whole application extends `testsupport.FullAppTest`: one context per test JVM with every module on, a
 real port and MockMvc. After every class, `FullAppReset` returns the application to a fresh install: no devices, no
-login or secrets, no sports settings, pins or workflows, an unused YouTube quota, no rate limit, fresh rails and
-settings files, and the shared web-API fakes (`SharedFakes`: TMDB, Google, TheSportsDB) reset.
+login or secrets, no sports settings, pins or workflows, an unused YouTube quota, no rate limit, no pending pairing,
+fresh rails and settings files, empty caches of TMDB, YouTube and TheSportsDB answers, and the shared web-API fakes
+(`SharedFakes`: TMDB, Google, TheSportsDB) reset.
 
 - A test that sets up state it cannot leave for the next class relies on that reset; a test class that needs a fresh
   install after every test calls `FullAppReset.reset(context)` in `@AfterEach`, as `LoginGatingTest` does.

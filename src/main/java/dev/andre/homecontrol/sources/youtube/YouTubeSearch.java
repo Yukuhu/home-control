@@ -111,6 +111,13 @@ public class YouTubeSearch {
         }
     }
 
+    /** Forgets every cached result. Exists for the shared test context, which reuses one application for many test classes. */
+    public void reset() {
+        synchronized (cache) {
+            cache.clear();
+        }
+    }
+
     private Optional<List<YouTubeVideo>> cached(String key, int wanted) {
         synchronized (cache) {
             Cached entry = cache.get(key);

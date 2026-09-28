@@ -53,6 +53,14 @@ public class TmdbImages {
         return URI.create(base.base() + base.size() + posterPath);
     }
 
+    /**
+     * Forgets the image configuration, so the next poster reads it again. Exists for the shared test context, which
+     * reuses one application for many test classes.
+     */
+    public void reset() {
+        cached = null;
+    }
+
     private Base base(TmdbCredential credential) {
         Base current = cached;
         Instant now = clock.instant();
