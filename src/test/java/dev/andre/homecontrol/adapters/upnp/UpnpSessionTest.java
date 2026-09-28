@@ -39,7 +39,9 @@ class UpnpSessionTest {
 
     private static final Duration WAIT = Duration.ofSeconds(5);
 
-    private final UpnpProperties properties = new UpnpProperties(true, 1, 1, 1, 1, 1, 2);
+    /** Poll 100 ms idle and playing, command 1 s, reconnect 50–200 ms. */
+    private final UpnpTimings timings = new UpnpTimings(Duration.ofMillis(100), Duration.ofMillis(100),
+            Duration.ofSeconds(1), Duration.ofMillis(50), Duration.ofMillis(200));
     private final RecordingStateListener states = new RecordingStateListener();
     private final List<AutoCloseable> closeables = new CopyOnWriteArrayList<>();
     private FakeUpnpRenderer fake;
@@ -67,7 +69,7 @@ class UpnpSessionTest {
     }
 
     private UpnpSession start(Device device, Function<String, Optional<URI>> locator, Consumer<DeviceState> onChange) {
-        UpnpSession started = track(new UpnpSession(device, properties, SoapClient.httpClient(Duration.ofSeconds(1)),
+        UpnpSession started = track(new UpnpSession(device, timings, SoapClient.httpClient(Duration.ofSeconds(1)),
                 locator, onChange, () -> { }));
         started.start();
         return started;
@@ -191,7 +193,7 @@ class UpnpSessionTest {
         Device named = withLocation(fake.device("named"), "http://localhost:" + fake.port() + "/description.xml");
         UpnpSession byName = start(named, udn -> Optional.empty());
 
-        await().during(Duration.ofMillis(1500)).atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
             assertThat(byName.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
             assertThat(fake.requestedPaths()).isEmpty();
@@ -213,7 +215,7 @@ class UpnpSessionTest {
         session = start(redirecting.device("redirecting"), udn -> Optional.empty());
 
         await().atMost(WAIT).until(() -> !redirecting.requestedPaths().isEmpty());
-        await().during(Duration.ofMillis(1500)).atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
             assertThat(victim.calls()).isEmpty();
             assertThat(victim.requestedPaths()).isEmpty();
@@ -261,7 +263,9 @@ class UpnpSessionTest {
 
     @Test
     void pollsFasterWhilePlaying() {
-        session = track(new UpnpSession(fake.device("kitchen"), new UpnpProperties(true, 1, 30, 1, 1, 1, 2),
+        session = track(new UpnpSession(fake.device("kitchen"),
+                new UpnpTimings(Duration.ofMillis(100), Duration.ofSeconds(30), Duration.ofSeconds(1),
+                        Duration.ofMillis(50), Duration.ofMillis(200)),
                 SoapClient.httpClient(Duration.ofSeconds(1)), udn -> Optional.empty(), states, () -> { }));
         session.start();
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
@@ -292,7 +296,7 @@ class UpnpSessionTest {
         startConnected();
 
         fake.answerRaw("GetVolume", 200, "not xml");
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4))
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2))
                 .until(() -> session.state().status() == DeviceStatus.CONNECTED);
 
         fake.answerRaw("Pause", 200, "<x/>");
@@ -322,7 +326,7 @@ class UpnpSessionTest {
                         "<controlURL>http://192.0.2.1:1/upnp/control/AVTransport1</controlURL>"));
         session = start(fake.device("kitchen"), udn -> Optional.empty());
 
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4))
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2))
                 .until(() -> session.state().status() != DeviceStatus.CONNECTED);
         assertThat(fake.calls("SetAVTransportURI")).isEmpty();
         assertThat(fake.calls()).isEmpty();
@@ -333,7 +337,7 @@ class UpnpSessionTest {
         fake.overrideDescription("<html>");
         session = start(fake.device("kitchen"), udn -> Optional.empty());
 
-        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3))
+        await().during(Duration.ofMillis(700)).atMost(Duration.ofSeconds(2))
                 .until(() -> session.state().status() != DeviceStatus.CONNECTED);
 
         fake.overrideDescription(null);
@@ -384,7 +388,9 @@ class UpnpSessionTest {
     @Test
     void aFirstReadingThatFailsLeavesTheRendererOffline() {
         fake.fail("GetTransportInfo", 501, "Action Failed", 1);
-        session = track(new UpnpSession(fake.device("kitchen"), new UpnpProperties(true, 1, 1, 1, 1, 30, 60),
+        session = track(new UpnpSession(fake.device("kitchen"),
+                new UpnpTimings(Duration.ofMillis(100), Duration.ofMillis(100), Duration.ofSeconds(1),
+                        Duration.ofSeconds(30), Duration.ofSeconds(60)),
                 SoapClient.httpClient(Duration.ofSeconds(1)), udn -> Optional.empty(), states, () -> { }));
         session.start();
         await().atMost(WAIT).until(() -> fake.calls("GetTransportInfo").size() == 1);
@@ -428,7 +434,7 @@ class UpnpSessionTest {
         Device kitchen = withLocation(fake.device("kitchen"), "http://127.0.0.1:9/description.xml");
         session = start(kitchen, udn -> Optional.of(impostor.location()));
 
-        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3))
+        await().during(Duration.ofMillis(700)).atMost(Duration.ofSeconds(2))
                 .until(() -> session.state().status() != DeviceStatus.CONNECTED);
         assertThat(impostor.requestedPaths()).isEmpty();
         assertThat(impostor.calls()).isEmpty();
@@ -440,7 +446,7 @@ class UpnpSessionTest {
                 .replace(FakeUpnpRenderer.UDN, "uuid:00000000-0000-0000-0000-000000000bad"));
         session = start(fake.device("kitchen"), udn -> Optional.empty());
 
-        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3))
+        await().during(Duration.ofMillis(700)).atMost(Duration.ofSeconds(2))
                 .until(() -> session.state().status() != DeviceStatus.CONNECTED);
         assertThat(fake.calls()).isEmpty();
     }
@@ -454,7 +460,7 @@ class UpnpSessionTest {
 
         // A call already on the wire may still land shortly after; nothing may be sent later.
         long lastAllowed = closedAt + Duration.ofMillis(300).toNanos();
-        await().during(Duration.ofMillis(2800)).atMost(Duration.ofSeconds(4)).untilAsserted(() ->
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted(() ->
                 assertThat(fake.calls()).allSatisfy(call -> assertThat(call.receivedNanos()).isLessThan(lastAllowed)));
     }
 }

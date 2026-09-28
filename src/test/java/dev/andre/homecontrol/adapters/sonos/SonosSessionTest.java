@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -34,7 +35,9 @@ class SonosSessionTest {
 
     private static final Duration WAIT = Duration.ofSeconds(5);
 
-    private final SonosProperties properties = new SonosProperties(true, 1, 1, 1, 1, 1, 1, 2);
+    /** Poll 100 ms idle and playing, topology every 1 s, command 1 s, reconnect 50–200 ms. */
+    private final SonosTimings timings = new SonosTimings(Duration.ofMillis(100), Duration.ofMillis(100),
+            Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofMillis(50), Duration.ofMillis(200));
     private final FakeSonosHousehold household = new FakeSonosHousehold();
     private final RecordingStateListener states = new RecordingStateListener();
     private final List<SonosSession> sessions = new CopyOnWriteArrayList<>();
@@ -60,8 +63,8 @@ class SonosSessionTest {
     }
 
     private SonosSession connected(FakeSonosPlayer player, Consumer<DeviceState> onChange) {
-        SonosSession session = new SonosSession(player.device("sonos-" + player.uuid()), properties,
-                SoapClient.httpClient(Duration.ofSeconds(1)), onChange, () -> { });
+        SonosSession session = new SonosSession(player.device("sonos-" + player.uuid()), timings,
+                SoapClient.httpClient(Duration.ofSeconds(1)), onChange, () -> { }, Clock.systemUTC());
         sessions.add(session);
         session.start();
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
@@ -224,8 +227,10 @@ class SonosSessionTest {
 
     @Test
     void aStaleCoordinatorIsLookedUpAgainWhenTheSpeakerSaysItIsNotOne() {
-        SonosSession session = new SonosSession(kitchen.device("sonos-" + KITCHEN), new SonosProperties(true, 1, 1, 3600, 1, 1, 1, 2),
-                SoapClient.httpClient(Duration.ofSeconds(1)), states, () -> { });
+        SonosSession session = new SonosSession(kitchen.device("sonos-" + KITCHEN),
+                new SonosTimings(Duration.ofMillis(100), Duration.ofMillis(100), Duration.ofHours(1),
+                        Duration.ofSeconds(1), Duration.ofMillis(50), Duration.ofMillis(200)),
+                SoapClient.httpClient(Duration.ofSeconds(1)), states, () -> { }, Clock.systemUTC());
         sessions.add(session);
         session.start();
         await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
