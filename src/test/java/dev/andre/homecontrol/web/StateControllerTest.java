@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.RailSnapshot;
 import dev.andre.homecontrol.content.RailStatus;
 import dev.andre.homecontrol.core.DeviceState;
@@ -8,11 +7,9 @@ import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -29,20 +26,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(StateController.class)
-class StateControllerTest {
+class StateControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    DeviceManager devices;
-
-    @MockitoBean
-    DeviceStateBroadcaster broadcaster;
-
-    @MockitoBean
-    RailCache rails;
 
     @Test
     void aNewSubscriberGetsOneStateEventPerDevice() throws Exception {

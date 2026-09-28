@@ -10,7 +10,6 @@ import dev.andre.homecontrol.content.SearchService;
 import dev.andre.homecontrol.content.SourcePreferencesService;
 import dev.andre.homecontrol.content.StoredRailPreferences;
 import dev.andre.homecontrol.core.content.ContentSources;
-import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.content.SourcePreferences;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.DeepLinkTestService;
@@ -77,10 +76,9 @@ public abstract class WebSliceTest {
     protected JellyfinClient jellyfinClient;
     @MockitoBean
     protected JellyfinSetupService jellyfinSetup;
+    /** Also the slice's {@code PinnedLinks}, as in production. */
     @MockitoBean
     protected PinnedShortcuts pins;
-    @MockitoBean
-    protected PinnedLinks pinnedLinks;
     @MockitoBean
     protected SportsCalendars sportsCalendars;
     @MockitoBean

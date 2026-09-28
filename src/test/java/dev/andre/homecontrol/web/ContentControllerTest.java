@@ -1,21 +1,17 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.RailSnapshot;
 import dev.andre.homecontrol.content.RailStatus;
 import dev.andre.homecontrol.content.SearchOutcome;
-import dev.andre.homecontrol.content.SearchService;
 import dev.andre.homecontrol.core.content.ContentSource;
-import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.net.URI;
@@ -36,20 +32,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ContentController.class)
-class ContentControllerTest {
+class ContentControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    ContentSources sources;
-
-    @MockitoBean
-    RailCache rails;
-
-    @MockitoBean
-    SearchService searchService;
 
     private static ContentSource jellyfin(boolean available, boolean searchable, List<RailDescriptor> rails) {
         return new ContentSource() {
@@ -226,7 +212,7 @@ class ContentControllerTest {
         ContentSource jellyfin = searchableMock("jellyfin", "Jellyfin");
         ContentItem item = new ContentItem("item-1", "jellyfin", ContentKind.MOVIE, "Big Buck Bunny", null, null, List.of());
         SearchOutcome outcome = new SearchOutcome("bunny", List.of(new SearchOutcome.Hits(jellyfin, List.of(item))), List.of());
-        given(searchService.search("bunny", 20)).willReturn(outcome);
+        given(search.search("bunny", 20)).willReturn(outcome);
 
         String body = mockMvc.perform(get("/search").param("q", "bunny"))
                 .andExpect(status().isOk())
@@ -236,7 +222,7 @@ class ContentControllerTest {
                 .andExpect(jsonPath("$.results[0].items[0].title").value("Big Buck Bunny"))
                 .andReturn().getResponse().getContentAsString();
 
-        verify(searchService).search("bunny", 20);
+        verify(search).search("bunny", 20);
         org.assertj.core.api.Assertions.assertThat(body).doesNotContain("playables");
     }
 
@@ -247,7 +233,7 @@ class ContentControllerTest {
         ContentSource tmdb = searchableMock("tmdb", "TMDB");
         SearchOutcome outcome = new SearchOutcome("bunny", List.of(new SearchOutcome.Hits(jellyfin, List.of(item))),
                 List.of(new SearchOutcome.Failure(tmdb, "TMDB is unreachable")));
-        given(searchService.search("bunny", 20)).willReturn(outcome);
+        given(search.search("bunny", 20)).willReturn(outcome);
 
         mockMvc.perform(get("/search").param("q", "bunny"))
                 .andExpect(status().isOk())
@@ -273,14 +259,14 @@ class ContentControllerTest {
 
     @Test
     void clampsTheLimit() throws Exception {
-        given(searchService.search("bunny", 50)).willReturn(new SearchOutcome("bunny", List.of(), List.of()));
-        given(searchService.search("bunny", 1)).willReturn(new SearchOutcome("bunny", List.of(), List.of()));
+        given(search.search("bunny", 50)).willReturn(new SearchOutcome("bunny", List.of(), List.of()));
+        given(search.search("bunny", 1)).willReturn(new SearchOutcome("bunny", List.of(), List.of()));
 
         mockMvc.perform(get("/search").param("q", "bunny").param("limit", "500")).andExpect(status().isOk());
-        verify(searchService).search("bunny", 50);
+        verify(search).search("bunny", 50);
 
         mockMvc.perform(get("/search").param("q", "bunny").param("limit", "0")).andExpect(status().isOk());
-        verify(searchService).search("bunny", 1);
+        verify(search).search("bunny", 1);
     }
 
     @Test
@@ -288,15 +274,15 @@ class ContentControllerTest {
         ContentSource youtube = searchableMock("youtube", "YouTube");
         ContentItem item = new ContentItem("item-1", "youtube", ContentKind.VIDEO, "Bunny", null, null, List.of());
         SearchOutcome outcome = new SearchOutcome("star", List.of(new SearchOutcome.Hits(youtube, List.of(item))), List.of());
-        given(searchService.searchSource("youtube", "star", 20)).willReturn(outcome);
+        given(search.searchSource("youtube", "star", 20)).willReturn(outcome);
 
         mockMvc.perform(post("/search").param("q", "star").param("source", "youtube"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.results[0].sourceId").value("youtube"));
 
-        verify(searchService).searchSource("youtube", "star", 20);
+        verify(search).searchSource("youtube", "star", 20);
 
-        given(searchService.searchSource("nope", "star", 20))
+        given(search.searchSource("nope", "star", 20))
                 .willThrow(new IllegalArgumentException("No searchable source nope"));
         mockMvc.perform(post("/search").param("q", "star").param("source", "nope"))
                 .andExpect(status().isNotFound())
@@ -307,12 +293,12 @@ class ContentControllerTest {
     void onDemandSourceSearchIsNoLongerAGet() throws Exception {
         // A GET must not be able to spend a source's quota; only the POST mapping accepts `source`,
         // so a `source` param on a GET is simply ignored and falls through to the unified search.
-        given(searchService.search("star", 20)).willReturn(new SearchOutcome("star", List.of(), List.of()));
+        given(search.search("star", 20)).willReturn(new SearchOutcome("star", List.of(), List.of()));
 
         mockMvc.perform(get("/search").param("q", "star").param("source", "youtube"))
                 .andExpect(status().isOk());
 
-        verify(searchService, never()).searchSource(any(), any(), anyInt());
-        verify(searchService).search("star", 20);
+        verify(search, never()).searchSource(any(), any(), anyInt());
+        verify(search).search("star", 20);
     }
 }

@@ -3,14 +3,10 @@ package dev.andre.homecontrol.web;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.content.ContentSource;
-import dev.andre.homecontrol.core.content.ContentSources;
-import dev.andre.homecontrol.device.DeviceManager;
-import dev.andre.homecontrol.playback.PlaybackService;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -27,20 +23,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** The JSON endpoints answer an unknown device, source or item, or bad skips, with the same plain text as the others. */
-@WebMvcTest(ContentPlayController.class)
-class ContentPlayErrorBodiesTest {
+class ContentPlayErrorBodiesTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    DeviceManager devices;
-
-    @MockitoBean
-    ContentSources sources;
-
-    @MockitoBean
-    PlaybackService playback;
 
     private final Device living = new Device("living", "Living Room", DeviceKind.ANDROID_TV, "10.0.0.5",
             Map.of("androidtv", Map.of()), Instant.now());
