@@ -40,6 +40,13 @@ import static org.awaitility.Awaitility.await;
 
 class WebOsSessionTest {
 
+    /** Backoff 50–100 ms, no wake grace, liveness every 30 s (off for most tests), register within 2 s. */
+    private static final WebOsTimings TIMINGS = new WebOsTimings(Duration.ofMillis(50), Duration.ofMillis(100),
+            Duration.ZERO, Duration.ofSeconds(30), Duration.ofSeconds(2));
+    /** As TIMINGS, but a liveness check every 200 ms, for the liveness tests. */
+    private static final WebOsTimings LIVENESS = new WebOsTimings(Duration.ofMillis(50), Duration.ofMillis(100),
+            Duration.ZERO, Duration.ofMillis(200), Duration.ofSeconds(1));
+
     @TempDir
     Path dir;
 
@@ -82,7 +89,7 @@ class WebOsSessionTest {
         Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1", Map.of("webos", settings), Instant.now());
         registry.save(device);
         WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 2, 2, 1, 2, 0);
-        session = new WebOsSession(device, properties, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
+        session = new WebOsSession(device, properties, TIMINGS, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
                 learned(), new WakeOnLan(receiver.address()), listener, () -> { });
         return session;
     }
@@ -319,7 +326,7 @@ class WebOsSessionTest {
 
         awaitStatus(DeviceStatus.UNPAIRED);
 
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4)).until(() -> tv.registrations() == 1);
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).until(() -> tv.registrations() == 1);
     }
 
     @Test
@@ -328,7 +335,7 @@ class WebOsSessionTest {
 
         awaitStatus(DeviceStatus.UNPAIRED);
 
-        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).until(() -> tv.connections() == 0);
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).until(() -> tv.connections() == 0);
     }
 
     @Test
@@ -369,7 +376,7 @@ class WebOsSessionTest {
                 Map.of("webos", Map.of("clientKey", FakeSsapServer.CLIENT_KEY)), Instant.now());
         registry.save(device);
         WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 1, 2, 1, 2, 0, 1);
-        session = new WebOsSession(device, properties, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
+        session = new WebOsSession(device, properties, LIVENESS, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
                 learned(), new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         connected();
@@ -389,7 +396,7 @@ class WebOsSessionTest {
                 Map.of("webos", Map.of("clientKey", FakeSsapServer.CLIENT_KEY)), Instant.now());
         registry.save(device);
         WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 1, 2, 1, 2, 0, 1);
-        session = new WebOsSession(device, properties, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
+        session = new WebOsSession(device, properties, LIVENESS, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
                 learned(), new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         connected();
@@ -397,7 +404,7 @@ class WebOsSessionTest {
 
         assertThat(tv.nextRequest(SsapUris.SYSTEM_INFO)).isNotNull();
 
-        // Two more liveness checks (1 s interval, 1 s timeout) come and go.
+        // Two more liveness checks (200 ms interval, 1 s request timeout) come and go.
         await().during(Duration.ofMillis(2500)).atMost(Duration.ofSeconds(4)).untilAsserted(() -> {
             assertThat(tv.connections()).isEqualTo(connections);
             assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
@@ -413,7 +420,7 @@ class WebOsSessionTest {
         states.clear();
         tv.dropConnections();
 
-        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).until(() -> states.all().isEmpty());
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).until(() -> states.all().isEmpty());
     }
 
     @Test

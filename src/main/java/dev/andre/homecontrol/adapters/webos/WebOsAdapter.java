@@ -87,8 +87,8 @@ public class WebOsAdapter implements WakeOnLanAdapter {
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange, LearnedSettings learned) {
         AtomicReference<WebOsSession> self = new AtomicReference<>();
-        WebOsSession session = new WebOsSession(device, properties, http, registry, learned, wakeOnLan, onChange,
-                () -> sessions.remove(device.id(), self.get()));
+        WebOsSession session = new WebOsSession(device, properties, WebOsTimings.from(properties), http, registry, learned,
+                wakeOnLan, onChange, () -> sessions.remove(device.id(), self.get()));
         self.set(session);
         sessions.put(device.id(), session);
         session.start();

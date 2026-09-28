@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.webos;
 
+import dev.andre.homecontrol.adapters.net.Backoff;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
@@ -56,6 +57,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
 
     private final Device device;
     private final WebOsProperties properties;
+    private final WebOsTimings timings;
     private final HttpClient http;
     private final DeviceRegistry registry;
     private final LearnedSettings learned;
@@ -77,12 +79,13 @@ public class WebOsSession implements DeviceHandle, InputListing {
     private Duration backoff;                   // scheduler thread only
     private ScheduledFuture<?> pendingConnect;  // scheduler thread only
 
-    // Package-private, built only by WebOsAdapter: eight distinct collaborator types, nothing to group.
+    // Package-private, built only by WebOsAdapter: nine distinct collaborator types, nothing to group.
     @SuppressWarnings("java:S107")
-    WebOsSession(Device device, WebOsProperties properties, HttpClient http, DeviceRegistry registry,
+    WebOsSession(Device device, WebOsProperties properties, WebOsTimings timings, HttpClient http, DeviceRegistry registry,
                  LearnedSettings learned, WakeOnLan wakeOnLan, Consumer<DeviceState> onChange, Runnable onClose) {
         this.device = device;
         this.properties = properties;
+        this.timings = timings;
         this.http = http;
         this.registry = registry;
         this.learned = learned;
@@ -96,9 +99,9 @@ public class WebOsSession implements DeviceHandle, InputListing {
 
     void start() {
         onScheduler(this::connect);
-        long interval = properties.livenessIntervalSeconds();
+        long interval = timings.livenessInterval().toMillis();
         try {
-            scheduler.scheduleWithFixedDelay(this::checkLiveness, interval, interval, TimeUnit.SECONDS);
+            scheduler.scheduleWithFixedDelay(this::checkLiveness, interval, interval, TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException _) {
             // Closed before it started.
         }
@@ -251,7 +254,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
         onScheduler(() -> {
             cancelPendingConnect();
             backoff = initialBackoff();
-            pendingConnect = scheduler.schedule(this::connect, properties.wakeGraceSeconds(), TimeUnit.SECONDS);
+            pendingConnect = scheduler.schedule(this::connect, timings.wakeGrace().toMillis(), TimeUnit.MILLISECONDS);
         });
     }
 
@@ -272,7 +275,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
             opened = SsapConnection.open(http, device.host(), properties,
                     reason -> onScheduler(() -> lost(attempt.get(), reason)));
             attempt.set(opened);
-            String key = opened.register(clientKey, Duration.ofSeconds(properties.requestTimeoutSeconds()));
+            String key = opened.register(clientKey, timings.registerTimeout());
             connection.set(opened);
             if (closed) {
                 // close() ran while registering and may have missed this connection.
@@ -363,7 +366,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
             return;
         }
         Duration delay = backoff;
-        backoff = Duration.ofSeconds(Math.clamp(backoff.toSeconds() * 2, 1, properties.reconnectMaxDelaySeconds()));
+        backoff = Backoff.next(backoff, timings.reconnectMaxDelay());
         try {
             pendingConnect = scheduler.schedule(this::connect, delay.toMillis(), TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException _) {
@@ -429,7 +432,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
     }
 
     private Duration initialBackoff() {
-        return Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
+        return timings.reconnectInitialDelay();
     }
 
     private static void closeQuietly(SsapConnection opened) {
