@@ -100,9 +100,9 @@ The roadmap's measures, updated by each workstream that moves them.
 | --- | --- | --- |
 | Frozen ArchUnit violations | 89 | 89 |
 | Largest class | 813 lines (`DeviceManager`) | 813 lines (`DeviceManager`) |
-| Summed test-class time | 495 s (one JVM) | 340 s (one JVM), 642 s (four JVMs) |
-| `test` task wall time | not measured | 3 min 26 s (four JVMs, 4 CPUs) |
-| Spring context starts per test run | 67 (one JVM) | 43 (four JVMs: 20, 9, 8, 6) |
+| Summed test-class time | 495 s (one JVM) | 320 s (one JVM), 569 s (four JVMs) |
+| `test` task wall time | not measured | 3 min 27 s (four JVMs, 4 CPUs) |
+| Spring context starts per test run | 67 (one JVM) | 22 (four JVMs: 8, 6, 4, 4) |
 | CI "Build and test" job time | about 9 min | 3 min 45 s |
 | Wall-clock upper-bound assertions | 9 | 1 |
 | Copies of `MutableClock` | 5, one of them nested in `SsdpDiscoveryTest` | 1 |
@@ -110,9 +110,16 @@ The roadmap's measures, updated by each workstream that moves them.
 Since #117 the unit tests run in up to four JVMs at once. Summed class time and context starts count all of them, and
 a class takes longer while it shares the CPUs, so compare runs with the same number of JVMs.
 
+Context starts are Spring Boot's `Started …` log lines in the test results, nested test classes included. The 43
+recorded before Phase 1.3d-3 left out two nested ones. Each JVM now starts one web slice, one modules-off context and
+one full-application context. The rest are the nine tests listed in `SharedContextRulesTest.OWN_CONTEXT` and
+`BluetoothClassLoadingTest`, which starts the application in a JVM of its own. The `test` task's wall time did not fall
+with the context starts.
+
 The nine counted at the baseline are now outcome assertions. `EventStreamShutdownEndToEndTest`, added since, keeps
 its bound, because the elapsed time of closing the application is the behaviour it tests.
 
-`YouTubeEndToEndTest` takes about 13 s: 4.7 s of Spring context start, 3.2 s of certificate generation and a real Cast
+`YouTubeEndToEndTest` took about 13 s: 4.7 s of Spring context start, 3.2 s of certificate generation and a real Cast
 connect before its first request, and 4.7 s for the rest of the journey, about 2–3 s of it OAuth polling at the
-production floor of one poll a second. Phase 1.3d's shared context removes the first.
+production floor of one poll a second. Since Phase 1.3d-3 it shares the full-application context and takes 3.6 s in a
+one-JVM run.

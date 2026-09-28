@@ -8,7 +8,7 @@ How the test suites are built and how to run them.
 | --- | --- | --- |
 | Unit tests | Plain JUnit 5 with AssertJ, Mockito and Awaitility. Most device and source tests drive the real client against an in-process fake that speaks the real protocol over a socket. | `src/test/java`, next to the code |
 | Web slices | One shared `@WebMvcTest` context over every controller, with their collaborators mocked: test classes extend `WebSliceTest`. | `src/test/java/.../web`, and next to each content source's own controllers |
-| End to end | `@SpringBootTest` with the whole application and fake devices or services, over MockMvc or real HTTP. | classes named `*EndToEndTest` |
+| End to end | The whole application with fake devices or services, over MockMvc or real HTTP: one shared `FullAppTest` context, reset after every class; a few keep their own. | classes named `*EndToEndTest` |
 | Browser tests | Playwright driving the dashboard in Chromium, Firefox and WebKit. | `src/e2e/java`, see [Browser tests](#browser-tests) |
 | Architecture | ArchUnit package rules. | `ArchitectureTest`, see [Architecture](architecture.md#package-rules) |
 
@@ -37,7 +37,26 @@ A test that checks a module switched off extends `testsupport.ModulesOffTest`: o
 module that can be switched off switched off (Android TV cannot be), shared by all such tests. It checks that its
 module leaves no bean, setup section, route or file behind (`dataDir()`), and `ModulesOffSmokeTest` that the
 application starts that way. The same rules as for web slices apply (`SharedContextRulesTest`). A test of another
-combination, such as sports on with TheSportsDB off, keeps a `@SpringBootTest` of its own.
+combination, such as sports on with TheSportsDB off, keeps a `@SpringBootTest` of its own and is named in
+`SharedContextRulesTest.OWN_CONTEXT`.
+
+## Full-application tests
+
+A test of the whole application extends `testsupport.FullAppTest`: one context per test JVM with every module on, a
+real port and MockMvc. After every class, `FullAppReset` returns the application to a fresh install: no devices, no
+login or secrets, no sports settings, pins or workflows, an unused YouTube quota, no rate limit, fresh rails and
+settings files, and the shared web-API fakes (`SharedFakes`: TMDB, Google, TheSportsDB) reset.
+
+- A test that sets up state it cannot leave for the next class relies on that reset; a test class that needs a fresh
+  install after every test calls `FullAppReset.reset(context)` in `@AfterEach`, as `LoginGatingTest` does.
+- A shared fake's routes go in `@BeforeAll` or the test, never a static initializer, and a test never closes it.
+- A test that needs other beans or properties keeps a `@SpringBootTest` of its own and is named in
+  `SharedContextRulesTest.OWN_CONTEXT`, with the reason.
+- New state that outlives a test class needs a line in `FullAppReset`, using the bean's own operations; only where
+  none exists does the bean get a small reset method, documented as existing for the shared test context.
+
+Cached contexts keep running while other test classes use other contexts: `src/test/resources/spring.properties` turns
+off Spring Framework 7's pausing, because `RailCache` cannot restart after a pause.
 
 ## Running tests
 
