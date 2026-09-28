@@ -57,6 +57,11 @@ On `78f3a30`, before 1.3d-1, with four JVMs:
    - `ArchitectureTest.sourcesAreIndependent` and `adaptersAreIndependent`: no source depends on another, and no adapter depends on another.
    - The frozen store names only `pinned` and `sports` → `androidtv` as source-to-adapter dependencies, and Android TV cannot be switched off.
    - So any bean that could need a switched-off module is either always on, as `web`, `device`, `content` and `core` are, and then fails to start in this context too, or is switched off with it.
+
+   **Correction after the final review:**
+   - **The claim is wrong.** The package rules do not stop two modules meeting through beans of a shared type. YouTube's `youtubeClock` is the application's only `Clock` bean, so a sports `@Bean` that asked for a plain `Clock` would start with everything on and with everything off, but not for a user who switches only YouTube off. `PinnedLinks` (from `pinned`, taken by TMDB and sports through `ObjectProvider`) is the same kind of edge.
+   - **The store detail was incomplete too:** it also has `youtube` → `androidtv`.
+   - **The gap is closed by `HomeControlApplicationTest.noSwitchableModuleNeedsAnotherModulesBean`.** It runs in the default context and adds no context start. It walks Spring's recorded bean dependencies and fails if a bean of one switchable module needs a bean of another; an `ObjectProvider` is not recorded, so optional use stays allowed. It was shown failing on exactly the `Clock` case above.
 3. **The mixed combinations keep their own contexts.**
    - `TheSportsDbOff` checks the setup page's sports section without TheSportsDB, and a 404 route. `WorkflowOnlySetupTest` checks the page's "connections" category with workflows as its only source. Both need rendering, and their property sets conflict with each other and with "everything off".
    - At the handoff, "bean checks for mixed combinations become context runners" was assumed. The inventory shows they are page checks, so they stay as they are.
