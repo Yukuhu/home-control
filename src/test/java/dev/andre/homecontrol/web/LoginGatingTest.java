@@ -1,23 +1,18 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.testsupport.FullAppReset;
+import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.ApplicationContext;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,19 +28,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-class LoginGatingTest {
+class LoginGatingTest extends FullAppTest {
 
     static final String PASSWORD = "household password";
-    static Path dataDir;
-
-    @DynamicPropertySource
-    static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
-        dataDir = Files.createTempDirectory("login-gating");
-        registry.add("shield.data-dir", dataDir::toString);
-    }
 
     @Autowired
     MockMvc mockMvc;
@@ -53,11 +38,13 @@ class LoginGatingTest {
     @Autowired
     LoginService login;
 
-    /** Each method gets a new context (fresh rate limiter), so the files must go too. */
+    @Autowired
+    ApplicationContext context;
+
+    /** The context is shared, so every test starts from a fresh install: no login, no secrets, no rate limit. */
     @AfterEach
-    void deleteSecrets() throws IOException {
-        Files.deleteIfExists(dataDir.resolve("secrets.json"));
-        Files.deleteIfExists(dataDir.resolve("secret.key"));
+    void freshInstall() {
+        FullAppReset.reset(context);
     }
 
     private void storeAFirstSecret() {
@@ -84,8 +71,8 @@ class LoginGatingTest {
                 .andExpect(status().isNotFound());
         mockMvc.perform(post("/devices/nope/key/HOME")).andExpect(status().isNotFound());
         mockMvc.perform(get("/login")).andExpect(redirectedUrl("/"));
-        assertThat(dataDir.resolve("secrets.json")).doesNotExist();
-        assertThat(dataDir.resolve("secret.key")).doesNotExist();
+        assertThat(dataDir().resolve("secrets.json")).doesNotExist();
+        assertThat(dataDir().resolve("secret.key")).doesNotExist();
     }
 
     @Test
