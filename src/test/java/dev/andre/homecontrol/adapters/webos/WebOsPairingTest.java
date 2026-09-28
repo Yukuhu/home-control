@@ -7,6 +7,7 @@ import dev.andre.homecontrol.core.PromptPairingResult;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,8 @@ import static org.mockito.Mockito.when;
 class WebOsPairingTest {
 
     private final DeviceManager devices = mock(DeviceManager.class);
-    private final SsdpDiscovery ssdp = new SsdpDiscovery(new SsdpProperties(false, "127.0.0.1", 1900, 0, 60, 2));
+    private final SsdpDiscovery ssdp = new SsdpDiscovery(new SsdpProperties(false, "127.0.0.1", 1900, 0,
+            Duration.ofSeconds(60), 2));
     private FakeSsapServer tv;
 
     @BeforeEach
@@ -46,8 +48,11 @@ class WebOsPairingTest {
     }
 
     private WebOsPairing pairing(int port, int pairingTimeoutSeconds) throws IOException {
-        return new WebOsPairing(new WebOsProperties(true, port, FakeWebSocketServer.closedPort(), 2, 2,
-                pairingTimeoutSeconds, 1, 2, 0), ssdp, devices);
+        return new WebOsPairing(new WebOsProperties(true, port, FakeWebSocketServer.closedPort(),
+                Duration.ofSeconds(2), Duration.ofSeconds(2),
+                Duration.ofSeconds(pairingTimeoutSeconds), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                Duration.ofSeconds(0)),
+                ssdp, devices);
     }
 
     @Test

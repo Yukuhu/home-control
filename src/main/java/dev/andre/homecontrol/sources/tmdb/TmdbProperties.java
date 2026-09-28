@@ -1,8 +1,11 @@
 package dev.andre.homecontrol.sources.tmdb;
 
 import jakarta.validation.constraints.Positive;
+import java.time.temporal.ChronoUnit;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
 
 import java.net.URI;
@@ -15,8 +18,10 @@ import java.util.Map;
 public record TmdbProperties(@DefaultValue("true") boolean enabled,
                              @DefaultValue("https://api.themoviedb.org/3") URI apiBaseUrl,
                              URI imageBaseUrl,
-                             @DefaultValue("5") @Positive int connectTimeoutSeconds,
-                             @DefaultValue("10") @Positive int requestTimeoutSeconds,
+                             @DefaultValue("5s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                             Duration connectTimeout,
+                             @DefaultValue("10s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
+                             Duration requestTimeout,
                              @DefaultValue("20") @Positive int railSize,
                              @DefaultValue("40") @Positive int trendingCandidates,
                              @DefaultValue("24h") Duration providerCacheTtl,

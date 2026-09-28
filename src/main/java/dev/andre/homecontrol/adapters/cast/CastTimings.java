@@ -14,13 +14,13 @@ record CastTimings(Duration heartbeatInterval, Duration staleTimeout, Duration r
     static final Duration CUSTOM_MESSAGE_ERROR_WINDOW = Duration.ofMillis(750);
 
     static CastTimings from(CastProperties properties) {
-        return new CastTimings(Duration.ofSeconds(properties.heartbeatIntervalSeconds()),
-                Duration.ofSeconds(properties.staleTimeoutSeconds()),
-                Duration.ofSeconds(properties.reconnectInitialDelaySeconds()),
-                Duration.ofSeconds(properties.reconnectMaxDelaySeconds()),
-                Duration.ofSeconds(properties.commandTimeoutSeconds()),
-                Duration.ofSeconds(properties.loadTimeoutSeconds()),
-                Duration.ofSeconds(properties.mediaStatusIntervalSeconds()),
+        return new CastTimings(properties.heartbeatInterval(),
+                properties.staleTimeout(),
+                properties.reconnectInitialDelay(),
+                properties.reconnectMaxDelay(),
+                properties.commandTimeout(),
+                properties.loadTimeout(),
+                properties.mediaStatusInterval(),
                 CUSTOM_MESSAGE_ERROR_WINDOW);
     }
 }

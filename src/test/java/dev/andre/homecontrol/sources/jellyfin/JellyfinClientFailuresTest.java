@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +16,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** How transport failures and unusable answers are named, and how an {@link JellyfinClient.Image} compares. */
 class JellyfinClientFailuresTest {
 
-    private final JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, 2, 1, 20), "0.8.0");
+    private final JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, Duration.ofSeconds(2),
+            Duration.ofSeconds(1), 20, Duration.ofSeconds(30)), "0.8.0");
     private FakeJellyfinServer fake;
 
     @AfterEach

@@ -60,8 +60,8 @@ public class SonosDiscovery implements AutoCloseable {
         this.properties = properties;
         this.events = events;
         this.clock = clock;
-        this.soap = new SoapClient(SoapClient.httpClient(Duration.ofSeconds(properties.connectTimeoutSeconds())),
-                Duration.ofSeconds(properties.commandTimeoutSeconds()));
+        this.soap = new SoapClient(SoapClient.httpClient(properties.connectTimeout()),
+                properties.commandTimeout());
         ssdp.addListener(SEARCH_TARGET, service -> submit(() -> seen(service)));
     }
 
@@ -80,7 +80,7 @@ public class SonosDiscovery implements AutoCloseable {
         String household = service.headers().getOrDefault("X-RINCON-HOUSEHOLD", "default");
         Instant last = refreshedAt.getOrDefault(household, Instant.EPOCH);
         boolean known = households.getOrDefault(household, Map.of()).containsKey(uuid);
-        if (known && Duration.between(last, clock.instant()).toSeconds() < properties.topologyIntervalSeconds()) {
+        if (known && Duration.between(last, clock.instant()).compareTo(properties.topologyInterval()) < 0) {
             return;
         }
         String address = service.address();

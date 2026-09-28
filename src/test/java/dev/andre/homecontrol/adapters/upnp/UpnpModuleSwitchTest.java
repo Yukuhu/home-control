@@ -2,6 +2,7 @@ package dev.andre.homecontrol.adapters.upnp;
 
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -10,7 +11,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class UpnpModuleSwitchTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withBean(SsdpDiscovery.class, () -> new SsdpDiscovery(new SsdpProperties(false, "239.255.255.250", 1900, 1900, 60, 2)))
+            .withBean(SsdpDiscovery.class, () -> new SsdpDiscovery(new SsdpProperties(false, "239.255.255.250", 1900,
+            1900, Duration.ofSeconds(60), 2)))
             .withUserConfiguration(UpnpConfiguration.class);
 
     @Test
@@ -26,7 +28,7 @@ class UpnpModuleSwitchTest {
 
     @Test
     void aNonsensicalIntervalFailsStartup() {
-        runner.withPropertyValues("home-control.upnp.poll-interval-seconds=0")
+        runner.withPropertyValues("home-control.upnp.poll-interval=0s")
                 .run(context -> assertThat(context).hasFailed());
     }
 }

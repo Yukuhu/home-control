@@ -46,7 +46,7 @@ final class TizenRemoteConnection implements AutoCloseable {
         Channel channel = new Channel(onClosed);
         TextWebSocket socket = TextWebSocket.connect(http,
                 TizenMessages.remoteUri(host, properties.port(), properties.clientName(), token),
-                Duration.ofSeconds(properties.connectTimeoutSeconds()), channel);
+                properties.connectTimeout(), channel);
         return new TizenRemoteConnection(socket, channel);
     }
 

@@ -99,13 +99,13 @@ class BluetoothJellyfinEndToEndTest {
         registry.add("home-control.bluetooth.dbus-address", () -> "unix:path=" + ROOT.resolve("system_bus_socket"));
         registry.add("home-control.bluetooth.mpv-path", MPV::toString);
         registry.add("home-control.bluetooth.runtime-dir", () -> ROOT.resolve("run").toString());
-        registry.add("home-control.bluetooth.scan-seconds", () -> "1");
-        registry.add("home-control.bluetooth.poll-interval-seconds", () -> "1");
-        registry.add("home-control.bluetooth.playing-poll-interval-seconds", () -> "1");
-        registry.add("home-control.bluetooth.player-start-timeout-seconds", () -> "20");
-        registry.add("home-control.bluetooth.load-timeout-seconds", () -> "10");
-        registry.add("home-control.bluetooth.command-timeout-seconds", () -> "3");
-        registry.add("home-control.bluetooth.host-check-cache-seconds", () -> "1");
+        registry.add("home-control.bluetooth.scan-duration", () -> "1s");
+        registry.add("home-control.bluetooth.poll-interval", () -> "1s");
+        registry.add("home-control.bluetooth.playing-poll-interval", () -> "1s");
+        registry.add("home-control.bluetooth.player-start-timeout", () -> "20s");
+        registry.add("home-control.bluetooth.load-timeout", () -> "10s");
+        registry.add("home-control.bluetooth.command-timeout", () -> "3s");
+        registry.add("home-control.bluetooth.host-check-cache-ttl", () -> "1s");
     }
 
     @AfterAll

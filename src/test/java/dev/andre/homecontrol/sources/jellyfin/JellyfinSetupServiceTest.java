@@ -7,6 +7,7 @@ import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretKeySource;
 import dev.andre.homecontrol.storage.SecretStore;
+import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,7 +42,8 @@ class JellyfinSetupServiceTest {
                 new SecretKeySource(null, dir.resolve("secret.key"), random), random);
         loginService = new LoginService(secretStore, new Argon2PasswordHasher(random), random);
         sources = new JsonFileSourceSettings(dir.resolve("sources.json"));
-        client = new JellyfinClient(new JellyfinProperties(true, 2, 5, 20), "0.8.0");
+        client = new JellyfinClient(new JellyfinProperties(true, Duration.ofSeconds(2), Duration.ofSeconds(5), 20,
+                Duration.ofSeconds(30)), "0.8.0");
         setup = new JellyfinSetupService(client, sources, secretStore, loginService);
         fake = new FakeJellyfinServer().withConnectableServer();
     }

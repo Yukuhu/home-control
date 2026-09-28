@@ -29,7 +29,8 @@ class TheSportsDbClientBaseUrlTest {
     @Test
     void trailingSlashesOnTheBaseUrlAreDropped() {
         SportsProperties.TheSportsDb properties = new SportsProperties.TheSportsDb(
-                true, URI.create(server.apiBase() + "//"), "123", Duration.ofHours(24), 1, 2, null);
+                true, URI.create(server.apiBase() + "//"), "123", Duration.ofHours(24), Duration.ofSeconds(1),
+                Duration.ofSeconds(2), null);
 
         new TheSportsDbClient(properties).lookupLeague("123", "4331");
 

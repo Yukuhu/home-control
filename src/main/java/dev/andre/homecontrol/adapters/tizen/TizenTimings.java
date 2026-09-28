@@ -12,9 +12,9 @@ record TizenTimings(Duration pollInterval, Duration wakeGrace, Duration requestT
     static final Duration HANDSHAKE_BACKOFF_CAP = Duration.ofMinutes(5);
 
     static TizenTimings from(TizenProperties properties) {
-        return new TizenTimings(Duration.ofSeconds(properties.pollIntervalSeconds()),
-                Duration.ofSeconds(properties.wakeGraceSeconds()),
-                Duration.ofSeconds(properties.requestTimeoutSeconds()),
+        return new TizenTimings(properties.pollInterval(),
+                properties.wakeGrace(),
+                properties.requestTimeout(),
                 HANDSHAKE_BACKOFF_CAP);
     }
 }

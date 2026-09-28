@@ -33,7 +33,7 @@ public class SonosAdapter implements DeviceAdapter {
     public SonosAdapter(SonosProperties properties, SonosDiscovery discovery) {
         this.properties = properties;
         this.discovery = discovery;
-        this.http = SoapClient.httpClient(Duration.ofSeconds(properties.connectTimeoutSeconds()));
+        this.http = SoapClient.httpClient(properties.connectTimeout());
         // A player that announces itself is back: skip the backoff.
         discovery.onAlive(uuid -> sessions.values().stream()
                 .filter(session -> uuid != null && uuid.equals(session.uuid()))

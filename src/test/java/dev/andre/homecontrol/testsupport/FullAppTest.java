@@ -36,10 +36,10 @@ public abstract class FullAppTest {
         dataDir = Files.createTempDirectory("full-app");
         registry.add("home-control.data-dir", dataDir::toString);
         registry.add("home-control.security.allowed-hosts", () -> "tv.example.org, *.home.example.net");
-        registry.add("home-control.cast.command-timeout-seconds", () -> "3");
-        registry.add("home-control.cast.load-timeout-seconds", () -> "5");
-        registry.add("home-control.upnp.poll-interval-seconds", () -> "1");
-        registry.add("home-control.upnp.idle-poll-interval-seconds", () -> "1");
+        registry.add("home-control.cast.command-timeout", () -> "3s");
+        registry.add("home-control.cast.load-timeout", () -> "5s");
+        registry.add("home-control.upnp.poll-interval", () -> "1s");
+        registry.add("home-control.upnp.idle-poll-interval", () -> "1s");
         registry.add("home-control.sports.calendar.allow-loopback", () -> "true");
         registry.add("home-control.sports.thesportsdb.api-base-url", () -> SharedFakes.theSportsDb().apiBase().toString());
         registry.add("home-control.tmdb.api-base-url", () -> SharedFakes.tmdb().apiBase().toString());

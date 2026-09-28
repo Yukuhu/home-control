@@ -79,14 +79,14 @@ class TizenEndToEndTest {
         registry.add("home-control.ssdp.multicast-address", () -> "127.0.0.1");
         registry.add("home-control.ssdp.port", SSDP::port);
         registry.add("home-control.ssdp.listen-port", () -> "0");
-        registry.add("home-control.ssdp.search-interval-seconds", () -> "1");
+        registry.add("home-control.ssdp.search-interval", () -> "1s");
         registry.add("home-control.webos.enabled", () -> "false");
         registry.add("home-control.tizen.port", TV::port);
         registry.add("home-control.tizen.rest-port", TV::httpPort);
         registry.add("home-control.tizen.dial-port", TV::httpPort);
-        registry.add("home-control.tizen.poll-interval-seconds", () -> "1");
-        registry.add("home-control.tizen.wake-grace-seconds", () -> "0");
-        registry.add("home-control.tizen.pairing-timeout-seconds", () -> "5");
+        registry.add("home-control.tizen.poll-interval", () -> "1s");
+        registry.add("home-control.tizen.wake-grace", () -> "0s");
+        registry.add("home-control.tizen.pairing-timeout", () -> "5s");
         registry.add("home-control.wake-on-lan.broadcast-address", () -> "127.0.0.1");
         registry.add("home-control.wake-on-lan.port", WOL::port);
         registry.add("home-control.deep-link-test.timeout", () -> "5s");

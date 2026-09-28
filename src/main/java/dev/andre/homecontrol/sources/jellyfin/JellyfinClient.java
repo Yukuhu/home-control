@@ -61,7 +61,7 @@ public class JellyfinClient {
         this.version = version;
         this.http = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NEVER) // a redirect would replay the Authorization header
-                .connectTimeout(Duration.ofSeconds(properties.connectTimeoutSeconds()))
+                .connectTimeout(properties.connectTimeout())
                 .build();
     }
 
@@ -192,7 +192,7 @@ public class JellyfinClient {
         }
         HttpRequest request = HttpRequest.newBuilder(
                         URI.create(serverUrl + "/Items/" + id(itemId) + "/Images/" + type + queryString(query)))
-                .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
+                .timeout(properties.requestTimeout())
                 .header("Accept", "image/*")
                 .GET()
                 .build();
@@ -226,7 +226,7 @@ public class JellyfinClient {
 
     private HttpRequest.Builder request(URI serverUrl, String path, Map<String, String> query, String deviceId, String token) {
         return HttpRequest.newBuilder(URI.create(serverUrl + path + queryString(query)))
-                .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
+                .timeout(properties.requestTimeout())
                 .header("Accept", APPLICATION_JSON)
                 .header("Authorization", authorization(deviceId, token));
     }
@@ -247,7 +247,7 @@ public class JellyfinClient {
     private HttpResponse<byte[]> exchange(URI serverUrl, HttpRequest request, int maxBytes) {
         try {
             return http.send(request,
-                    BoundedBody.handler(maxBytes, Duration.ofSeconds(properties.requestTimeoutSeconds())));
+                    BoundedBody.handler(maxBytes, properties.requestTimeout()));
         } catch (HttpConnectTimeoutException _) {
             throw unreachable(serverUrl, "connection timed out");
         } catch (HttpTimeoutException _) {

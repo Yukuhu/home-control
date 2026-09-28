@@ -166,15 +166,17 @@ public abstract class WebSliceTest {
         @Bean
         SportsProperties sportsProperties() {
             return new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
-                    new SportsProperties.Calendar(Duration.ofHours(6), 5, 15, 5242880, 3, false),
+                    new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(5), Duration.ofSeconds(15),
+                    5242880, 3, false),
                     new SportsProperties.TheSportsDb(true, URI.create("https://www.thesportsdb.com/api/v1/json"),
-                            "123", Duration.ofHours(24), 5, 15, null));
+                            "123", Duration.ofHours(24), Duration.ofSeconds(5), Duration.ofSeconds(15), null));
         }
 
         @Bean
         YouTubeProperties youTubeProperties() {
             return new YouTubeProperties(true, URI.create("http://oauth.test"), URI.create("http://api.test"),
-                    URI.create("http://lounge.test"), URI.create("http://thumbs.test"), 2, 5, 10000, 20, 30, 30, 5,
+                    URI.create("http://lounge.test"), URI.create("http://thumbs.test"), Duration.ofSeconds(2),
+                    Duration.ofSeconds(5), 10000, 20, 30, 30, 5,
                     Duration.ofHours(24), 20, Duration.ofMinutes(60), Duration.ofMinutes(15), Duration.ofHours(6));
         }
 

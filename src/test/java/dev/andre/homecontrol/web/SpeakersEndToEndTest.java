@@ -87,16 +87,16 @@ class SpeakersEndToEndTest {
         registry.add("home-control.ssdp.multicast-address", () -> "127.0.0.1");
         registry.add("home-control.ssdp.port", SSDP::port);
         registry.add("home-control.ssdp.listen-port", () -> "0");
-        registry.add("home-control.ssdp.search-interval-seconds", () -> "1");
+        registry.add("home-control.ssdp.search-interval", () -> "1s");
         registry.add("home-control.webos.enabled", () -> "false");
         registry.add("home-control.tizen.enabled", () -> "false");
-        registry.add("home-control.upnp.poll-interval-seconds", () -> "1");
-        registry.add("home-control.upnp.idle-poll-interval-seconds", () -> "1");
-        registry.add("home-control.upnp.reconnect-initial-delay-seconds", () -> "30");
-        registry.add("home-control.upnp.reconnect-max-delay-seconds", () -> "60");
-        registry.add("home-control.sonos.poll-interval-seconds", () -> "1");
-        registry.add("home-control.sonos.idle-poll-interval-seconds", () -> "1");
-        registry.add("home-control.sonos.topology-interval-seconds", () -> "1");
+        registry.add("home-control.upnp.poll-interval", () -> "1s");
+        registry.add("home-control.upnp.idle-poll-interval", () -> "1s");
+        registry.add("home-control.upnp.reconnect-initial-delay", () -> "30s");
+        registry.add("home-control.upnp.reconnect-max-delay", () -> "60s");
+        registry.add("home-control.sonos.poll-interval", () -> "1s");
+        registry.add("home-control.sonos.idle-poll-interval", () -> "1s");
+        registry.add("home-control.sonos.topology-interval", () -> "1s");
     }
 
     @AfterAll

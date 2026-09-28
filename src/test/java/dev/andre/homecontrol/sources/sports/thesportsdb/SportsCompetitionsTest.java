@@ -52,8 +52,10 @@ class SportsCompetitionsTest {
         http = mock(HttpServletRequest.class);
 
         SportsProperties properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
-                new SportsProperties.Calendar(Duration.ofHours(6), 1, 2, 5242880, 3, true),
-                new SportsProperties.TheSportsDb(true, server.apiBase(), "123", Duration.ofHours(24), 1, 2, null));
+                new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                5242880, 3, true),
+                new SportsProperties.TheSportsDb(true, server.apiBase(), "123", Duration.ofHours(24),
+                Duration.ofSeconds(1), Duration.ofSeconds(2), null));
 
         TheSportsDbClient client = new TheSportsDbClient(properties.theSportsDb());
         TheSportsDbKeys keys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), properties);
@@ -100,8 +102,10 @@ class SportsCompetitionsTest {
     @Test
     void maxCompetitionsIsEnforced() {
         SportsProperties limited = new SportsProperties(true, "", 30, 10, 1, Duration.ofMinutes(120),
-                new SportsProperties.Calendar(Duration.ofHours(6), 1, 2, 5242880, 3, true),
-                new SportsProperties.TheSportsDb(true, server.apiBase(), "123", Duration.ofHours(24), 1, 2, null));
+                new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                5242880, 3, true),
+                new SportsProperties.TheSportsDb(true, server.apiBase(), "123", Duration.ofHours(24),
+                Duration.ofSeconds(1), Duration.ofSeconds(2), null));
         TheSportsDbClient client = new TheSportsDbClient(limited.theSportsDb());
         TheSportsDbKeys keys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), limited);
         SportsCompetitions limitedCompetitions = new SportsCompetitions(settingsService, client, keys, schedule, login,

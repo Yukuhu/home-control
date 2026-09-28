@@ -26,7 +26,8 @@ class CalendarFetcherTest {
     @BeforeEach
     void start() throws IOException {
         server = new FakeCalendarServer();
-        properties = new SportsProperties.Calendar(Duration.ofHours(6), 1, 2, 2 * 1024 * 1024, 3, false);
+        properties = new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                2 * 1024 * 1024, 3, false);
         fetcher = new CalendarFetcher(properties, new CalendarUrlPolicy(true));
     }
 

@@ -26,7 +26,9 @@ class SsapConnectionTest {
     private SsapConnection connection;
 
     static WebOsProperties properties(int port, int securePort, int pairingTimeoutSeconds) {
-        return new WebOsProperties(true, port, securePort, 2, 2, pairingTimeoutSeconds, 1, 2, 0);
+        return new WebOsProperties(true, port, securePort, Duration.ofSeconds(2), Duration.ofSeconds(2),
+                Duration.ofSeconds(pairingTimeoutSeconds), Duration.ofSeconds(1), Duration.ofSeconds(2),
+                Duration.ofSeconds(0));
     }
 
     @BeforeEach
@@ -68,7 +70,8 @@ class SsapConnectionTest {
 
     @Test
     void aStoredKeyRegistersWithoutAPrompt() throws IOException {
-        assertThat(open().register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1))).isEqualTo(FakeSsapServer.CLIENT_KEY);
+        assertThat(open().register(FakeSsapServer.CLIENT_KEY,
+                Duration.ofSeconds(1))).isEqualTo(FakeSsapServer.CLIENT_KEY);
     }
 
     @Test

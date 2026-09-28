@@ -16,8 +16,10 @@ class BluetoothTimingsTest {
         assertThat(BluetoothTimings.from(BluetoothProperties.defaults()))
                 .isEqualTo(new BluetoothTimings(Duration.ofSeconds(5), Duration.ofSeconds(1)));
 
-        var properties = new BluetoothProperties(true, BluetoothProperties.DEFAULT_DBUS_ADDRESS, "hci0", 11, 46, 6, 2,
-                true, "mpv", null, "", 51, 7, 16, 4, 31);
+        var properties = new BluetoothProperties(true, BluetoothProperties.DEFAULT_DBUS_ADDRESS, "hci0",
+                Duration.ofSeconds(11), Duration.ofSeconds(46), Duration.ofSeconds(6), Duration.ofSeconds(2),
+                true, "mpv", null, "", 51, Duration.ofSeconds(7), Duration.ofSeconds(16), Duration.ofSeconds(4),
+                Duration.ofSeconds(31));
         assertThat(BluetoothTimings.from(properties))
                 .isEqualTo(new BluetoothTimings(Duration.ofSeconds(6), Duration.ofSeconds(2)));
     }

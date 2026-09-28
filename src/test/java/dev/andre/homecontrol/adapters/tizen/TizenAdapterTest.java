@@ -64,8 +64,9 @@ class TizenAdapterTest {
     }
 
     private TizenProperties properties(int pollIntervalSeconds) {
-        return new TizenProperties(true, tv.port(), tv.httpPort(), tv.httpPort(), "Home Control", 2, 2, 2,
-                pollIntervalSeconds, 0);
+        return new TizenProperties(true, tv.port(), tv.httpPort(), tv.httpPort(), "Home Control",
+                Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2),
+                Duration.ofSeconds(pollIntervalSeconds), Duration.ofSeconds(0));
     }
 
     private TizenAdapter adapter(SsdpDiscovery discovery, TizenProperties properties) {
@@ -73,7 +74,7 @@ class TizenAdapterTest {
     }
 
     private static SsdpDiscovery notStarted() {
-        return new SsdpDiscovery(new SsdpProperties(false, "127.0.0.1", 1900, 0, 60, 2));
+        return new SsdpDiscovery(new SsdpProperties(false, "127.0.0.1", 1900, 0, Duration.ofSeconds(60), 2));
     }
 
     private Device device() {
@@ -115,7 +116,8 @@ class TizenAdapterTest {
         try (FakeSsdpResponder responder = new FakeSsdpResponder()) {
             responder.answer(TizenAdapter.SEARCH_TARGET,
                     FakeSsdpResponder.fixture("samsung-search-response.txt", "127.0.0.1", http.getAddress().getPort()));
-            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0,
+                    Duration.ofSeconds(1), 1),
                     new SsdpTimings(Duration.ofMillis(200)));
             ssdp.start();
             TizenAdapter adapter = adapter(ssdp, properties(1));
@@ -132,7 +134,8 @@ class TizenAdapterTest {
         try (FakeSsdpResponder responder = new FakeSsdpResponder()) {
             responder.answer(TizenAdapter.SEARCH_TARGET,
                     FakeSsdpResponder.fixture("samsung-search-response.txt", "127.0.0.1", FakeWebSocketServer.closedPort()));
-            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0,
+                    Duration.ofSeconds(1), 1),
                     new SsdpTimings(Duration.ofMillis(200)));
             ssdp.start();
             TizenAdapter adapter = adapter(ssdp, properties(1));
@@ -144,7 +147,8 @@ class TizenAdapterTest {
 
     @Test
     void anSsdpAnnouncementTriggersAnImmediatePoll() throws Exception {
-        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", FakeWebSocketServer.closedPort(), 0, 60, 1));
+        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", FakeWebSocketServer.closedPort(), 0,
+                Duration.ofSeconds(60), 1));
         ssdp.start();
         TizenAdapter adapter = adapter(ssdp, properties(30));
         tv.setPowerState("standby");

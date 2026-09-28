@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -25,16 +26,16 @@ class TmdbPropertiesTest {
 
     @Test
     void aNonPositiveConnectTimeoutFailsAtStartup() {
-        runner.withPropertyValues("home-control.tmdb.connect-timeout-seconds=0")
+        runner.withPropertyValues("home-control.tmdb.connect-timeout=0s")
                 .run(context -> assertThat(context).hasFailed()
-                        .getFailure().rootCause().hasMessageContaining("connectTimeoutSeconds"));
+                        .getFailure().rootCause().hasMessageContaining("connectTimeout"));
     }
 
     @Test
     void aNonPositiveRequestTimeoutFailsAtStartup() {
-        runner.withPropertyValues("home-control.tmdb.request-timeout-seconds=-1")
+        runner.withPropertyValues("home-control.tmdb.request-timeout=-1s")
                 .run(context -> assertThat(context).hasFailed()
-                        .getFailure().rootCause().hasMessageContaining("requestTimeoutSeconds"));
+                        .getFailure().rootCause().hasMessageContaining("requestTimeout"));
     }
 
     @Test
@@ -49,5 +50,12 @@ class TmdbPropertiesTest {
         runner.withPropertyValues("home-control.tmdb.trending-candidates=0")
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().rootCause().hasMessageContaining("trendingCandidates"));
+    }
+
+    @Test
+    void aBareNumberMeansSeconds() {
+        runner.withPropertyValues("home-control.tmdb.request-timeout=12")
+                .run(context -> assertThat(context.getBean(TmdbProperties.class).requestTimeout())
+                        .isEqualTo(Duration.ofSeconds(12)));
     }
 }

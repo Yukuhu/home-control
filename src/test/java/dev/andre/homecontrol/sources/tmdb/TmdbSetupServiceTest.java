@@ -47,7 +47,8 @@ class TmdbSetupServiceTest {
         loginService = new LoginService(secretStore, new Argon2PasswordHasher(random), random);
         sources = new JsonFileSourceSettings(dir.resolve("sources.json"));
         fake = new FakeTmdbServer().withStandardResponses();
-        TmdbProperties properties = new TmdbProperties(true, fake.apiBase(), null, 1, 2, 20, 40,
+        TmdbProperties properties = new TmdbProperties(true, fake.apiBase(), null, Duration.ofSeconds(1),
+                Duration.ofSeconds(2), 20, 40,
                 Duration.ofHours(24), Duration.ofHours(24), null);
         client = new TmdbClient(properties);
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);

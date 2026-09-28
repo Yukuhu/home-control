@@ -67,8 +67,9 @@ class WebOsAdapterTest {
     }
 
     private WebOsProperties properties(int reconnectInitialDelaySeconds) throws IOException {
-        return new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), 2, 2, 2,
-                reconnectInitialDelaySeconds, Math.max(2, reconnectInitialDelaySeconds), 0);
+        return new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(), Duration.ofSeconds(2),
+                Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(reconnectInitialDelaySeconds),
+                Duration.ofSeconds(Math.max(2, reconnectInitialDelaySeconds)), Duration.ofSeconds(0));
     }
 
     private WebOsAdapter adapter(SsdpDiscovery discovery, WebOsProperties properties) {
@@ -76,7 +77,7 @@ class WebOsAdapterTest {
     }
 
     private static SsdpDiscovery notStarted() {
-        return new SsdpDiscovery(new SsdpProperties(false, "127.0.0.1", 1900, 0, 60, 2));
+        return new SsdpDiscovery(new SsdpProperties(false, "127.0.0.1", 1900, 0, Duration.ofSeconds(60), 2));
     }
 
     private Device device() {
@@ -131,7 +132,8 @@ class WebOsAdapterTest {
         try (FakeSsdpResponder responder = new FakeSsdpResponder()) {
             responder.answer(WebOsAdapter.SEARCH_TARGET,
                     FakeSsdpResponder.fixture("lg-search-response.txt", "127.0.0.1", http.getAddress().getPort()));
-            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0,
+                    Duration.ofSeconds(1), 1),
                     new SsdpTimings(Duration.ofMillis(200)));
             ssdp.start();
             WebOsAdapter adapter = adapter(ssdp, properties(1));
@@ -152,7 +154,8 @@ class WebOsAdapterTest {
         try (FakeSsdpResponder responder = new FakeSsdpResponder()) {
             responder.answer(WebOsAdapter.SEARCH_TARGET,
                     FakeSsdpResponder.fixture("lg-search-response.txt", "127.0.0.1", FakeWebSocketServer.closedPort()));
-            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0, 1, 1),
+            ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", responder.port(), 0,
+                    Duration.ofSeconds(1), 1),
                     new SsdpTimings(Duration.ofMillis(200)));
             ssdp.start();
             WebOsAdapter adapter = adapter(ssdp, properties(1));
@@ -164,7 +167,8 @@ class WebOsAdapterTest {
 
     @Test
     void anSsdpAnnouncementFromItsTvReconnectsAtOnce() throws Exception {
-        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", FakeWebSocketServer.closedPort(), 0, 60, 1));
+        ssdp = new SsdpDiscovery(new SsdpProperties(true, "127.0.0.1", FakeWebSocketServer.closedPort(), 0,
+                Duration.ofSeconds(60), 1));
         ssdp.start();
         WebOsAdapter adapter = adapter(ssdp, properties(30));
         tv.refuseConnections(true);

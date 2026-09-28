@@ -10,7 +10,7 @@ class SsdpTimingsTest {
 
     @Test
     void fromTakesTheConfiguredSeconds() {
-        SsdpProperties properties = new SsdpProperties(true, "239.255.255.250", 1900, 1900, 60, 2);
+        SsdpProperties properties = new SsdpProperties(true, "239.255.255.250", 1900, 1900, Duration.ofSeconds(60), 2);
 
         assertThat(SsdpTimings.from(properties)).isEqualTo(new SsdpTimings(Duration.ofSeconds(60)));
     }

@@ -33,7 +33,7 @@ public class UpnpAdapter implements DeviceAdapter {
     public UpnpAdapter(UpnpProperties properties, UpnpDiscovery discovery) {
         this.properties = properties;
         this.discovery = discovery;
-        this.http = SoapClient.httpClient(Duration.ofSeconds(properties.connectTimeoutSeconds()));
+        this.http = SoapClient.httpClient(properties.connectTimeout());
         // A renderer that announces itself is back: skip the backoff.
         discovery.onAlive(udn -> sessions.values().stream()
                 .filter(session -> udn != null && udn.equalsIgnoreCase(session.udn()))

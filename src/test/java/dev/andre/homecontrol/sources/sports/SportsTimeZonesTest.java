@@ -17,9 +17,10 @@ class SportsTimeZonesTest {
 
     private static SportsProperties properties(String timeZone) {
         return new SportsProperties(true, timeZone, 30, 10, 10, Duration.ofMinutes(120),
-                new SportsProperties.Calendar(Duration.ofHours(6), 5, 15, 5242880, 3, false),
+                new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(5), Duration.ofSeconds(15),
+                5242880, 3, false),
                 new SportsProperties.TheSportsDb(true, URI.create("http://127.0.0.1:9/api/v1/json"), "123",
-                        Duration.ofHours(24), 1, 2, null));
+                        Duration.ofHours(24), Duration.ofSeconds(1), Duration.ofSeconds(2), null));
     }
 
     @Test

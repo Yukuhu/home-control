@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.cast;
 
 import dev.andre.homecontrol.discovery.MdnsBrowser;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -16,27 +17,37 @@ class CastPropertiesTest {
     @Test
     void theDefaultsAreValid() {
         runner.run(context -> assertThat(context).hasNotFailed()
-                .getBean(CastProperties.class).extracting(CastProperties::staleTimeoutSeconds).isEqualTo(15));
+                .getBean(CastProperties.class).extracting(CastProperties::staleTimeout)
+                .isEqualTo(Duration.ofSeconds(15)));
     }
 
     @Test
     void aNonPositiveDurationFailsAtStartup() {
-        runner.withPropertyValues("home-control.cast.command-timeout-seconds=0")
+        runner.withPropertyValues("home-control.cast.command-timeout=0s")
                 .run(context -> assertThat(context).hasFailed()
-                        .getFailure().rootCause().hasMessageContaining("commandTimeoutSeconds"));
+                        .getFailure().rootCause().hasMessageContaining("commandTimeout"));
     }
 
     @Test
     void aStaleTimeoutNotAboveTheHeartbeatIntervalFailsAtStartup() {
-        runner.withPropertyValues("home-control.cast.heartbeat-interval-seconds=15")
+        runner.withPropertyValues("home-control.cast.heartbeat-interval=15s")
                 .run(context -> assertThat(context).hasFailed()
-                        .getFailure().rootCause().hasMessageContaining("stale-timeout-seconds"));
+                        .getFailure().rootCause().hasMessageContaining("stale-timeout"));
     }
 
     @Test
     void theRecordItselfRejectsAStaleTimeoutNotAboveTheHeartbeat() {
-        assertThatThrownBy(() -> new CastProperties(true, 5, 5, 1, 60, 5, 20, 5))
+        assertThatThrownBy(() -> new CastProperties(true, Duration.ofSeconds(5), Duration.ofSeconds(5),
+                Duration.ofSeconds(1), Duration.ofSeconds(60), Duration.ofSeconds(5), Duration.ofSeconds(20),
+                Duration.ofSeconds(5)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must be greater than");
+    }
+
+    @Test
+    void aBareNumberMeansSeconds() {
+        runner.withPropertyValues("home-control.cast.stale-timeout=20")
+                .run(context -> assertThat(context.getBean(CastProperties.class).staleTimeout())
+                        .isEqualTo(Duration.ofSeconds(20)));
     }
 }

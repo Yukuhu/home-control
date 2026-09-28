@@ -14,10 +14,10 @@ record WebOsTimings(Duration reconnectInitialDelay, Duration reconnectMaxDelay, 
                     Duration livenessInterval, Duration registerTimeout) {
 
     static WebOsTimings from(WebOsProperties properties) {
-        return new WebOsTimings(Duration.ofSeconds(properties.reconnectInitialDelaySeconds()),
-                Duration.ofSeconds(properties.reconnectMaxDelaySeconds()),
-                Duration.ofSeconds(properties.wakeGraceSeconds()),
-                Duration.ofSeconds(properties.livenessIntervalSeconds()),
-                Duration.ofSeconds(properties.requestTimeoutSeconds()));
+        return new WebOsTimings(properties.reconnectInitialDelay(),
+                properties.reconnectMaxDelay(),
+                properties.wakeGrace(),
+                properties.livenessInterval(),
+                properties.requestTimeout());
     }
 }

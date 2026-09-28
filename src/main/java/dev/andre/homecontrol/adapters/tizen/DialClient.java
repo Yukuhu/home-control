@@ -22,7 +22,7 @@ final class DialClient {
     void launch(String host, String app, String body) throws IOException {
         String authority = Hosts.authority(host);
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://" + authority + ":" + properties.dialPort() + "/ws/apps/" + app))
-                .timeout(Duration.ofSeconds(properties.requestTimeoutSeconds()))
+                .timeout(properties.requestTimeout())
                 .header("Content-Type", "text/plain; charset=utf-8")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();

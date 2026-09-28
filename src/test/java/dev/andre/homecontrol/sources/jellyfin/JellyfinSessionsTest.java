@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +23,8 @@ class JellyfinSessionsTest {
 
     private static final String ITEM_ID = "3f2a1b2c3d4e5f60718293a4b5c6d7e8";
 
-    private final JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, 2, 5, 20));
+    private final JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, Duration.ofSeconds(2),
+            Duration.ofSeconds(5), 20, Duration.ofSeconds(30)));
     private final JellyfinSetupService setup = mock(JellyfinSetupService.class);
     private final JellyfinSessions sessions = new JellyfinSessions(client, setup, JellyfinSessions::resolve);
     private FakeJellyfinServer fake;

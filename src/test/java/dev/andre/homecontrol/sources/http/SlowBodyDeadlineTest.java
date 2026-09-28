@@ -49,7 +49,8 @@ class SlowBodyDeadlineTest {
 
     @Test
     void tmdb() {
-        TmdbClient client = new TmdbClient(new TmdbProperties(true, server.url("/3"), null, 1, 1, 20, 40,
+        TmdbClient client = new TmdbClient(new TmdbProperties(true, server.url("/3"), null, Duration.ofSeconds(1),
+                Duration.ofSeconds(1), 20, 40,
                 Duration.ofHours(24), Duration.ofHours(24), null));
         TmdbCredential key = TmdbCredential.parse("0123456789abcdef0123456789abcdef");
 
@@ -62,7 +63,8 @@ class SlowBodyDeadlineTest {
     @Test
     void theSportsDb() {
         TheSportsDbClient client = new TheSportsDbClient(new SportsProperties.TheSportsDb(true,
-                server.url("/api/v1/json"), "123", Duration.ofHours(24), 1, 1, null));
+                server.url("/api/v1/json"), "123", Duration.ofHours(24), Duration.ofSeconds(1),
+                Duration.ofSeconds(1), null));
         Map<String, String> league = Map.of("id", "4331");
 
         assertThatThrownBy(() -> client.get("123", "eventsnextleague.php", league))
@@ -74,7 +76,8 @@ class SlowBodyDeadlineTest {
 
     @Test
     void jellyfin() {
-        JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, 1, 1, 20));
+        JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, Duration.ofSeconds(1),
+                Duration.ofSeconds(1), 20, Duration.ofSeconds(30)));
         JellyfinConnection connection = new JellyfinConnection(server.url(""), "tok", "dev", "user");
         URI serverUrl = server.url("");
 
@@ -91,7 +94,8 @@ class SlowBodyDeadlineTest {
     @Test
     void youtube() {
         URI base = server.url("");
-        YouTubeHttp http = new YouTubeHttp(new YouTubeProperties(true, base, base, base, base, 1, 1, 10000, 20, 30,
+        YouTubeHttp http = new YouTubeHttp(new YouTubeProperties(true, base, base, base, base, Duration.ofSeconds(1),
+                Duration.ofSeconds(1), 10000, 20, 30,
                 30, 5, Duration.ofHours(24), 20, Duration.ofMinutes(60), Duration.ofMinutes(15), Duration.ofHours(6)));
         URI subscriptions = server.url("/youtube/v3/subscriptions");
 
@@ -106,7 +110,8 @@ class SlowBodyDeadlineTest {
     void calendars() {
         URI calendar = server.url("/cal.ics");
         try (CalendarFetcher fetcher = new CalendarFetcher(
-                new SportsProperties.Calendar(Duration.ofHours(6), 1, 1, 5 * 1024 * 1024, 3, true),
+                new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(1),
+                5 * 1024 * 1024, 3, true),
                 new CalendarUrlPolicy(true))) {
             assertThatThrownBy(() -> fetcher.fetch(calendar))
                     .isInstanceOf(CalendarFetchException.class)

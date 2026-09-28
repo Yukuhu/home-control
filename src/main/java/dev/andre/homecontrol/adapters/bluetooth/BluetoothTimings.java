@@ -9,7 +9,7 @@ import java.time.Duration;
 record BluetoothTimings(Duration pollInterval, Duration playingPollInterval) {
 
     static BluetoothTimings from(BluetoothProperties properties) {
-        return new BluetoothTimings(Duration.ofSeconds(properties.pollIntervalSeconds()),
-                Duration.ofSeconds(properties.playingPollIntervalSeconds()));
+        return new BluetoothTimings(properties.pollInterval(),
+                properties.playingPollInterval());
     }
 }

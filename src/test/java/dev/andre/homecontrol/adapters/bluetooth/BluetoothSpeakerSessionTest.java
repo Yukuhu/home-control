@@ -50,7 +50,9 @@ class BluetoothSpeakerSessionTest {
 
     private final FakeBluezClient bluez = new FakeBluezClient();
     private final InProcessMpvLauncher launcher = new InProcessMpvLauncher();
-    private final BluetoothProperties properties = BluetoothProperties.defaults().withTimings(1, 1, 5, 5, 2);
+    private final BluetoothProperties properties = BluetoothProperties.defaults()
+            .withTimings(Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(5), Duration.ofSeconds(5),
+                    Duration.ofSeconds(2));
     private final RecordingStateListener states = new RecordingStateListener();
     private Device device;
     private BluetoothSpeakerSession session;
@@ -81,10 +83,10 @@ class BluetoothSpeakerSessionTest {
                                           Consumer<dev.andre.homecontrol.core.DeviceState> listener) {
         // Mirrors BluetoothSpeakerAdapter.connect()'s wiring, so a test can widen a timeout via withTimings(...).
         MpvPlayer player = new MpvPlayer(launcher, MpvPlayer.socketFor(runtime, device.id()),
-                Duration.ofSeconds(props.playerStartTimeoutSeconds()), Duration.ofSeconds(props.loadTimeoutSeconds()),
-                Duration.ofSeconds(props.commandTimeoutSeconds()));
+                props.playerStartTimeout(), props.loadTimeout(),
+                props.commandTimeout());
         AudioDeviceResolver resolver = new AudioDeviceResolver(launcher, props.audioDeviceTemplate(),
-                Duration.ofSeconds(props.playerStartTimeoutSeconds()));
+                props.playerStartTimeout());
         session = new BluetoothSpeakerSession(device, props, TIMINGS, bluez, player, resolver, listener);
         session.start();
         return session;
@@ -393,7 +395,8 @@ class BluetoothSpeakerSessionTest {
         // A generous command timeout: five concurrent full play cycles (each stopping the previous
         // mpv and starting a new one) create real scheduling pressure: a tight IPC timeout under that
         // load throws IOException out of MpvPlayer.status(), which (correctly) stops a healthy player.
-        start(properties.withTimings(1, 1, 5, 5, 5));
+        start(properties.withTimings(Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(5),
+                Duration.ofSeconds(5), Duration.ofSeconds(5)));
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
 
         List<Throwable> failures = new CopyOnWriteArrayList<>();

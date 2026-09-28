@@ -7,10 +7,10 @@ record UpnpTimings(Duration pollInterval, Duration idlePollInterval, Duration co
                    Duration reconnectInitialDelay, Duration reconnectMaxDelay) {
 
     static UpnpTimings from(UpnpProperties properties) {
-        return new UpnpTimings(Duration.ofSeconds(properties.pollIntervalSeconds()),
-                Duration.ofSeconds(properties.idlePollIntervalSeconds()),
-                Duration.ofSeconds(properties.commandTimeoutSeconds()),
-                Duration.ofSeconds(properties.reconnectInitialDelaySeconds()),
-                Duration.ofSeconds(properties.reconnectMaxDelaySeconds()));
+        return new UpnpTimings(properties.pollInterval(),
+                properties.idlePollInterval(),
+                properties.commandTimeout(),
+                properties.reconnectInitialDelay(),
+                properties.reconnectMaxDelay());
     }
 }

@@ -47,7 +47,7 @@ public class CalendarFetcher implements AutoCloseable {
         this.properties = properties;
         this.policy = policy;
         this.http = VettedHttpClients.create(policy::addresses, MAX_CONNECTIONS,
-                Duration.ofSeconds(properties.connectTimeoutSeconds()));
+                properties.connectTimeout());
     }
 
     public String fetch(URI url) {
@@ -73,7 +73,7 @@ public class CalendarFetcher implements AutoCloseable {
         }
         // A clear answer before any connection; the connection itself is vetted again by the same policy.
         policy.checkAddress(target);
-        Timeout timeout = Timeout.ofSeconds(properties.requestTimeoutSeconds());
+        Timeout timeout = Timeout.ofMilliseconds(properties.requestTimeout().toMillis());
         HttpGet request = new HttpGet(target);
         request.setConfig(RequestConfig.custom()
                 .setAuthenticationEnabled(false)
@@ -85,7 +85,7 @@ public class CalendarFetcher implements AutoCloseable {
         request.setHeader("User-Agent", "HomeControl");
         // The response timeout bounds each read, not the whole body: a server that trickles its calendar would
         // hold the refresh. Cancelling at the deadline closes the connection mid-read.
-        CompletableFuture.delayedExecutor(properties.requestTimeoutSeconds(), TimeUnit.SECONDS).execute(request::cancel);
+        CompletableFuture.delayedExecutor(properties.requestTimeout().toMillis(), TimeUnit.MILLISECONDS).execute(request::cancel);
         CloseableHttpResponse response = null;
         try {
             response = CloseableHttpResponse.adapt(http.executeOpen(null, request, null));

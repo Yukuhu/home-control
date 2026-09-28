@@ -3,9 +3,12 @@ package dev.andre.homecontrol.adapters.bluetooth;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Positive;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
 
 import java.nio.file.Path;
@@ -23,19 +26,19 @@ public record BluetoothProperties(
         @DefaultValue("false") boolean enabled,
         @DefaultValue(DEFAULT_DBUS_ADDRESS) @NotBlank String dbusAddress,
         String adapter,
-        @DefaultValue("10") @Positive int scanSeconds,
-        @DefaultValue("45") @Positive int bluezTimeoutSeconds,
-        @DefaultValue("5") @Positive int pollIntervalSeconds,
-        @DefaultValue("1") @Positive int playingPollIntervalSeconds,
+        @DefaultValue("10s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1) Duration scanDuration,
+        @DefaultValue("45s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1) Duration bluezTimeout,
+        @DefaultValue("5s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1) Duration pollInterval,
+        @DefaultValue("1s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1) Duration playingPollInterval,
         @DefaultValue("true") boolean autoConnect,
         @DefaultValue("mpv") @NotBlank String mpvPath,
         Path runtimeDir,
         String audioDeviceTemplate,
         @DefaultValue("50") @Min(1) @Max(100) int defaultVolume,
-        @DefaultValue("5") @Positive int playerStartTimeoutSeconds,
-        @DefaultValue("15") @Positive int loadTimeoutSeconds,
-        @DefaultValue("3") @Positive int commandTimeoutSeconds,
-        @DefaultValue("30") @Positive int hostCheckCacheSeconds) {
+        @DefaultValue("5s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1) Duration playerStartTimeout,
+        @DefaultValue("15s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1) Duration loadTimeout,
+        @DefaultValue("3s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1) Duration commandTimeout,
+        @DefaultValue("30s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1) Duration hostCheckCacheTtl) {
 
     public static final String DEFAULT_DBUS_ADDRESS = "unix:path=/run/dbus/system_bus_socket";
 
@@ -47,8 +50,9 @@ public record BluetoothProperties(
     }
 
     public static BluetoothProperties defaults() {
-        return new BluetoothProperties(false, DEFAULT_DBUS_ADDRESS, "", 10, 45, 5, 1, true, "mpv", DEFAULT_RUNTIME_DIR,
-                "", 50, 5, 15, 3, 30);
+        return new BluetoothProperties(false, DEFAULT_DBUS_ADDRESS, "", Duration.ofSeconds(10), Duration.ofSeconds(45),
+                Duration.ofSeconds(5), Duration.ofSeconds(1), true, "mpv", DEFAULT_RUNTIME_DIR, "", 50,
+                Duration.ofSeconds(5), Duration.ofSeconds(15), Duration.ofSeconds(3), Duration.ofSeconds(30));
     }
 
     /** {@code runtimeDir} defaults to {@code <java.io.tmpdir>/home-control-bluetooth}; not expressible as a static default. */
@@ -71,50 +75,51 @@ public record BluetoothProperties(
     }
 
     public BluetoothProperties withDbusAddress(String value) {
-        return new BluetoothProperties(enabled, value, adapter, scanSeconds, bluezTimeoutSeconds, pollIntervalSeconds,
-                playingPollIntervalSeconds, autoConnect, mpvPath, runtimeDir, audioDeviceTemplate, defaultVolume,
-                playerStartTimeoutSeconds, loadTimeoutSeconds, commandTimeoutSeconds, hostCheckCacheSeconds);
+        return new BluetoothProperties(enabled, value, adapter, scanDuration, bluezTimeout, pollInterval,
+                playingPollInterval, autoConnect, mpvPath, runtimeDir, audioDeviceTemplate, defaultVolume,
+                playerStartTimeout, loadTimeout, commandTimeout, hostCheckCacheTtl);
     }
 
     public BluetoothProperties withAdapter(String value) {
-        return new BluetoothProperties(enabled, dbusAddress, value, scanSeconds, bluezTimeoutSeconds, pollIntervalSeconds,
-                playingPollIntervalSeconds, autoConnect, mpvPath, runtimeDir, audioDeviceTemplate, defaultVolume,
-                playerStartTimeoutSeconds, loadTimeoutSeconds, commandTimeoutSeconds, hostCheckCacheSeconds);
+        return new BluetoothProperties(enabled, dbusAddress, value, scanDuration, bluezTimeout, pollInterval,
+                playingPollInterval, autoConnect, mpvPath, runtimeDir, audioDeviceTemplate, defaultVolume,
+                playerStartTimeout, loadTimeout, commandTimeout, hostCheckCacheTtl);
     }
 
-    public BluetoothProperties withScanSeconds(int value) {
-        return new BluetoothProperties(enabled, dbusAddress, adapter, value, bluezTimeoutSeconds, pollIntervalSeconds,
-                playingPollIntervalSeconds, autoConnect, mpvPath, runtimeDir, audioDeviceTemplate, defaultVolume,
-                playerStartTimeoutSeconds, loadTimeoutSeconds, commandTimeoutSeconds, hostCheckCacheSeconds);
+    public BluetoothProperties withScanDuration(Duration value) {
+        return new BluetoothProperties(enabled, dbusAddress, adapter, value, bluezTimeout, pollInterval,
+                playingPollInterval, autoConnect, mpvPath, runtimeDir, audioDeviceTemplate, defaultVolume,
+                playerStartTimeout, loadTimeout, commandTimeout, hostCheckCacheTtl);
     }
 
     public BluetoothProperties withAutoConnect(boolean value) {
-        return new BluetoothProperties(enabled, dbusAddress, adapter, scanSeconds, bluezTimeoutSeconds, pollIntervalSeconds,
-                playingPollIntervalSeconds, value, mpvPath, runtimeDir, audioDeviceTemplate, defaultVolume,
-                playerStartTimeoutSeconds, loadTimeoutSeconds, commandTimeoutSeconds, hostCheckCacheSeconds);
+        return new BluetoothProperties(enabled, dbusAddress, adapter, scanDuration, bluezTimeout, pollInterval,
+                playingPollInterval, value, mpvPath, runtimeDir, audioDeviceTemplate, defaultVolume,
+                playerStartTimeout, loadTimeout, commandTimeout, hostCheckCacheTtl);
     }
 
     public BluetoothProperties withMpvPath(String value) {
-        return new BluetoothProperties(enabled, dbusAddress, adapter, scanSeconds, bluezTimeoutSeconds, pollIntervalSeconds,
-                playingPollIntervalSeconds, autoConnect, value, runtimeDir, audioDeviceTemplate, defaultVolume,
-                playerStartTimeoutSeconds, loadTimeoutSeconds, commandTimeoutSeconds, hostCheckCacheSeconds);
+        return new BluetoothProperties(enabled, dbusAddress, adapter, scanDuration, bluezTimeout, pollInterval,
+                playingPollInterval, autoConnect, value, runtimeDir, audioDeviceTemplate, defaultVolume,
+                playerStartTimeout, loadTimeout, commandTimeout, hostCheckCacheTtl);
     }
 
     public BluetoothProperties withRuntimeDir(Path value) {
-        return new BluetoothProperties(enabled, dbusAddress, adapter, scanSeconds, bluezTimeoutSeconds, pollIntervalSeconds,
-                playingPollIntervalSeconds, autoConnect, mpvPath, value, audioDeviceTemplate, defaultVolume,
-                playerStartTimeoutSeconds, loadTimeoutSeconds, commandTimeoutSeconds, hostCheckCacheSeconds);
+        return new BluetoothProperties(enabled, dbusAddress, adapter, scanDuration, bluezTimeout, pollInterval,
+                playingPollInterval, autoConnect, mpvPath, value, audioDeviceTemplate, defaultVolume,
+                playerStartTimeout, loadTimeout, commandTimeout, hostCheckCacheTtl);
     }
 
     public BluetoothProperties withAudioDeviceTemplate(String value) {
-        return new BluetoothProperties(enabled, dbusAddress, adapter, scanSeconds, bluezTimeoutSeconds, pollIntervalSeconds,
-                playingPollIntervalSeconds, autoConnect, mpvPath, runtimeDir, value, defaultVolume,
-                playerStartTimeoutSeconds, loadTimeoutSeconds, commandTimeoutSeconds, hostCheckCacheSeconds);
+        return new BluetoothProperties(enabled, dbusAddress, adapter, scanDuration, bluezTimeout, pollInterval,
+                playingPollInterval, autoConnect, mpvPath, runtimeDir, value, defaultVolume,
+                playerStartTimeout, loadTimeout, commandTimeout, hostCheckCacheTtl);
     }
 
-    public BluetoothProperties withTimings(int poll, int playingPoll, int playerStart, int load, int command) {
-        return new BluetoothProperties(enabled, dbusAddress, adapter, scanSeconds, bluezTimeoutSeconds, poll,
+    public BluetoothProperties withTimings(Duration poll, Duration playingPoll, Duration playerStart, Duration load,
+                                           Duration command) {
+        return new BluetoothProperties(enabled, dbusAddress, adapter, scanDuration, bluezTimeout, poll,
                 playingPoll, autoConnect, mpvPath, runtimeDir, audioDeviceTemplate, defaultVolume,
-                playerStart, load, command, hostCheckCacheSeconds);
+                playerStart, load, command, hostCheckCacheTtl);
     }
 }
