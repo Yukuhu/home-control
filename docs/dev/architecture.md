@@ -100,7 +100,7 @@ The roadmap's measures, updated by each workstream that moves them.
 | --- | --- | --- |
 | Frozen ArchUnit violations | 89 | 89 |
 | Largest class | 813 lines (`DeviceManager`) | 813 lines (`DeviceManager`) |
-| Summed test-class time | 495 s (one JVM) | 637 s (four JVMs) |
+| Summed test-class time | 495 s (one JVM) | 340 s (one JVM), 637 s (four JVMs) |
 | `test` task wall time | not measured | 3 min 19 s (four JVMs, 4 CPUs) |
 | Spring context starts per test run | 67 (one JVM) | 70 (four JVMs) |
 | CI "Build and test" job time | about 9 min | 5 min 13 s |
@@ -114,5 +114,5 @@ a class takes longer while it shares the CPUs, so compare runs with the same num
 behaviour it tests.
 
 `YouTubeEndToEndTest` takes about 13 s: 4.7 s of Spring context start, 3.2 s of certificate generation and a real Cast
-connect before its first request, and 4.7 s of OAuth polling at the production floor of one poll a second. Phase 1.3d's
-shared context removes the first.
+connect before its first request, and 4.7 s for the rest of the journey, about 2–3 s of it OAuth polling at the
+production floor of one poll a second. Phase 1.3d's shared context removes the first.
