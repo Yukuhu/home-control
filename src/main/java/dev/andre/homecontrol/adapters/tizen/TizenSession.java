@@ -50,10 +50,10 @@ import java.util.function.UnaryOperator;
 public class TizenSession implements DeviceHandle {
 
     private static final Logger log = LoggerFactory.getLogger(TizenSession.class);
-    private static final Duration MAX_HANDSHAKE_BACKOFF = Duration.ofMinutes(5);
 
     private final Device device;
     private final TizenProperties properties;
+    private final TizenTimings timings;
     private final HttpClient http;
     private final TizenRest rest;
     private final DialClient dial;
@@ -75,12 +75,13 @@ public class TizenSession implements DeviceHandle {
     private Duration handshakeBackoff;  // scheduler thread only; null while no handshake went unanswered
     private long connectNotBefore;      // scheduler thread only; System.nanoTime()
 
-    // Package-private, built only by TizenAdapter: eight distinct collaborator types, nothing to group.
+    // Package-private, built only by TizenAdapter: nine distinct collaborator types, nothing to group.
     @SuppressWarnings("java:S107")
-    TizenSession(Device device, TizenProperties properties, HttpClient http, DeviceRegistry registry,
+    TizenSession(Device device, TizenProperties properties, TizenTimings timings, HttpClient http, DeviceRegistry registry,
                  LearnedSettings learned, WakeOnLan wakeOnLan, Consumer<DeviceState> onChange, Runnable onClose) {
         this.device = device;
         this.properties = properties;
+        this.timings = timings;
         this.http = http;
         this.rest = new TizenRest(http, properties);
         this.dial = new DialClient(http, properties);
@@ -95,7 +96,7 @@ public class TizenSession implements DeviceHandle {
 
     void start() {
         try {
-            scheduler.scheduleWithFixedDelay(this::poll, 0, properties.pollIntervalSeconds(), TimeUnit.SECONDS);
+            scheduler.scheduleWithFixedDelay(this::poll, 0, timings.pollInterval().toMillis(), TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException _) {
             // Closed before it started.
         }
@@ -211,7 +212,7 @@ public class TizenSession implements DeviceHandle {
             throw new DeviceOfflineException("Could not send the Wake-on-LAN packet: " + e.getMessage());
         }
         try {
-            scheduler.schedule(this::poll, properties.wakeGraceSeconds(), TimeUnit.SECONDS);
+            scheduler.schedule(this::poll, timings.wakeGrace().toMillis(), TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException _) {
             // Closed meanwhile.
         }
@@ -257,8 +258,7 @@ public class TizenSession implements DeviceHandle {
             opened = TizenRemoteConnection.open(http, device.host(), properties, settings.token(),
                     reason -> onScheduler(() -> lost(attempt.get(), reason)));
             attempt.set(opened);
-            TizenRemoteConnection.Authorization answer =
-                    opened.awaitAuthorization(Duration.ofSeconds(properties.requestTimeoutSeconds()));
+            TizenRemoteConnection.Authorization answer = opened.awaitAuthorization(timings.requestTimeout());
             if (answer == TizenRemoteConnection.Authorization.CONNECTED) {
                 handshakeBackoff = null;
                 connectNotBefore = 0;
@@ -278,8 +278,8 @@ public class TizenSession implements DeviceHandle {
                 // A slow-booting TV, or a forgotten token putting the Allow prompt on screen: never unpair
                 // for silence. Keep the token and back off so a real prompt does not reappear every poll.
                 Duration delay = nextHandshakeBackoff();
-                log.info("{} did not answer the connection within {} seconds; retrying in {} seconds",
-                        device.name(), properties.requestTimeoutSeconds(), delay.toSeconds());
+                log.info("{} did not answer the connection within {} ms; retrying in {} ms",
+                        device.name(), timings.requestTimeout().toMillis(), delay.toMillis());
                 update(s -> s.withStatus(DeviceStatus.DISCONNECTED).withCurrentApp(null));
                 return false;
             }
@@ -298,12 +298,12 @@ public class TizenSession implements DeviceHandle {
         }
     }
 
-    /** Doubles from two poll intervals up to {@link #MAX_HANDSHAKE_BACKOFF}; the next connect waits that long. */
+    /** Doubles from two poll intervals up to the handshake-backoff cap; the next connect waits that long. */
     private Duration nextHandshakeBackoff() {
-        Duration first = Duration.ofSeconds(2L * properties.pollIntervalSeconds());
+        Duration first = timings.pollInterval().multipliedBy(2);
         handshakeBackoff = handshakeBackoff == null ? first : handshakeBackoff.multipliedBy(2);
-        if (handshakeBackoff.compareTo(MAX_HANDSHAKE_BACKOFF) > 0) {
-            handshakeBackoff = MAX_HANDSHAKE_BACKOFF;
+        if (handshakeBackoff.compareTo(timings.handshakeBackoffCap()) > 0) {
+            handshakeBackoff = timings.handshakeBackoffCap();
         }
         connectNotBefore = System.nanoTime() + handshakeBackoff.toNanos();
         return handshakeBackoff;
