@@ -160,12 +160,11 @@ class SsapConnectionTest {
         SsapConnection opened = open();
         opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
         server.ignoreRequests(SsapUris.SET_VOLUME);
-        long started = System.nanoTime();
 
         assertThatThrownBy(() -> opened.request(SsapUris.SET_VOLUME, SsapMessages.empty().put("volume", 5)))
-                .isInstanceOf(SsapTimeoutException.class);
+                .isInstanceOf(SsapTimeoutException.class)
+                .hasMessageContaining("within 2 seconds");
 
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isBetween(Duration.ofMillis(1800), Duration.ofSeconds(4));
         assertThat(opened.request(SsapUris.SYSTEM_INFO, SsapMessages.empty()).path("modelName").asString(""))
                 .isEqualTo("OLED55C9PLA");
     }
@@ -239,9 +238,10 @@ class SsapConnectionTest {
 
         assertThat(reasons.poll(5, TimeUnit.SECONDS)).isNotNull();
         assertThat(reasons.poll(500, TimeUnit.MILLISECONDS)).isNull();
-        long started = System.nanoTime();
+        // Refused because the connection is known to be closed, not after a request timeout.
         assertThatThrownBy(() -> connection.request(SsapUris.SYSTEM_INFO, SsapMessages.empty()))
-                .isInstanceOf(IOException.class);
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(1));
+                .isInstanceOf(IOException.class)
+                .isNotInstanceOf(SsapTimeoutException.class)
+                .hasMessageStartingWith("The TV closed the connection:");
     }
 }

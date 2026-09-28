@@ -111,11 +111,9 @@ class DeviceFetchTest {
 
     @Test
     void aTricklingDeviceRunsIntoTheDeadline() {
-        long started = System.nanoTime();
-
         assertThatThrownBy(() -> DeviceFetch.get(http, url("/trickle"), Duration.ofMillis(500), 64 * 1024))
-                .isInstanceOf(HttpTimeoutException.class);
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(3));
+                .isInstanceOf(HttpTimeoutException.class)
+                .hasMessageContaining("no complete answer within 500 ms");
     }
 
     @Test

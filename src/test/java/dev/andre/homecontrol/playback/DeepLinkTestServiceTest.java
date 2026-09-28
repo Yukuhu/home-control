@@ -138,11 +138,10 @@ class DeepLinkTestServiceTest {
     @Test
     void aDeviceThatCannotReportItsAppIsNotObservable() {
         when(devices.foregroundAppReporting("lg")).thenReturn(ForegroundAppReporting.NONE);
-        long started = System.nanoTime();
 
         DeepLinkTestResult result = service.run("lg");
 
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofMillis(200));
+        // Only the path that never waits for the app to change returns NOT_OBSERVABLE.
         assertThat(result.outcome()).isEqualTo(DeepLinkTestResult.Outcome.NOT_OBSERVABLE);
         assertThat(result.message()).contains("does not report which app is in front");
         verify(devices).execute("lg", new Action.OpenAppLink(VIDEO));

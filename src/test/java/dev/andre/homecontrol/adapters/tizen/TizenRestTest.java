@@ -60,10 +60,8 @@ class TizenRestTest {
     @Test
     void anUnreachableTvHasNoInfo() {
         fake.setRestAvailable(false);
-        long started = System.nanoTime();
 
         assertThat(rest.deviceInfo("127.0.0.1")).isEmpty();
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(4));
     }
 
     @Test

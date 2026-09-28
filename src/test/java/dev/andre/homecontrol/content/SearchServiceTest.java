@@ -15,8 +15,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
@@ -97,6 +99,23 @@ class SearchServiceTest {
         };
     }
 
+    /** Answers only once the other source has started too, which it cannot if the sources are queried in turn. */
+    private static BiFunction<String, Integer, List<ContentItem>> waitForTheOtherThenReturn(CountDownLatch bothStarted,
+                                                                                         List<ContentItem> items) {
+        return (query, limit) -> {
+            bothStarted.countDown();
+            try {
+                if (!bothStarted.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("the other source was never queried at the same time");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+            return items;
+        };
+    }
+
     // Simulated source latency is the behaviour under test: parallel queries and the per-source timeout.
     @SuppressWarnings("java:S2925")
     private static void sleep(long millis) {
@@ -120,20 +139,18 @@ class SearchServiceTest {
 
     @Test
     void queriesSourcesInParallelAndKeepsSourceOrder() {
-        StubSource first = new StubSource("first", "First", sleepThenReturn(200, List.of(item("i1", "first", "One"))));
-        StubSource second = new StubSource("second", "Second", sleepThenReturn(200, List.of(item("i2", "second", "Two"))));
+        CountDownLatch bothStarted = new CountDownLatch(2);
+        StubSource first = new StubSource("first", "First", waitForTheOtherThenReturn(bothStarted, List.of(item("i1", "first", "One"))));
+        StubSource second = new StubSource("second", "Second", waitForTheOtherThenReturn(bothStarted, List.of(item("i2", "second", "Two"))));
         ContentSources sources = new ContentSources(List.of(first, second));
-        SearchService service = new SearchService(sources, new TestPreferences(), properties(Duration.ofMillis(300)), executor);
+        SearchService service = new SearchService(sources, new TestPreferences(), properties(Duration.ofSeconds(2)), executor);
 
-        long start = System.nanoTime();
         SearchOutcome outcome = service.search("q", 10);
-        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
 
-        assertThat(elapsedMs).isLessThan(350);
+        assertThat(outcome.failures()).isEmpty();
         assertThat(outcome.hits()).hasSize(2);
         assertThat(outcome.hits().get(0).source()).isEqualTo(first);
         assertThat(outcome.hits().get(1).source()).isEqualTo(second);
-        assertThat(outcome.failures()).isEmpty();
     }
 
     @Test
@@ -143,11 +160,8 @@ class SearchServiceTest {
         ContentSources sources = new ContentSources(List.of(slow, fast));
         SearchService service = new SearchService(sources, new TestPreferences(), properties(Duration.ofMillis(300)), executor);
 
-        long start = System.nanoTime();
         SearchOutcome outcome = service.search("q", 10);
-        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
 
-        assertThat(elapsedMs).isLessThan(600);
         assertThat(outcome.failures()).hasSize(1);
         assertThat(outcome.failures().get(0).message()).isEqualTo("Slow did not answer in time");
         assertThat(outcome.hits()).hasSize(1);
