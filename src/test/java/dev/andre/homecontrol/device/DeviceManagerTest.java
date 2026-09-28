@@ -156,6 +156,22 @@ class DeviceManagerTest {
         }
     }
 
+    /** Cast switched off: an Android TV box whose devices.json still carries a cast entry keeps its own controls. */
+    @Test
+    void anEntryForAnAdapterThatIsSwitchedOffAddsNothing() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        registry.save(new Device("shield-c", "Shield C", DeviceKind.ANDROID_TV, "127.0.0.1",
+                Map.of("androidtv", Map.of(), "cast", Map.of("port", "8009")), Instant.now()));
+
+        try (DeviceManager manager = manager(registry, certificates())) {
+            manager.start();
+
+            assertThat(manager.capabilities("shield-c"))
+                    .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME,
+                            Capability.APP_LINK);
+        }
+    }
+
     @Test
     void anUnknownDeviceIsNotFoundAndAnUnsupportedActionIsRejected() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
