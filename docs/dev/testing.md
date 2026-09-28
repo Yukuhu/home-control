@@ -46,9 +46,10 @@ When this page was written, the unit, slice, end-to-end and architecture tests n
   bound on elapsed time unless that time is the behaviour under test (`EventStreamShutdownEndToEndTest`).
 - A test never shares a file or a fixed port with another test JVM: files go in `@TempDir` or
   `Files.createTempDirectory`, and servers bind port 0.
-- The JDK's WebSocket client loses an orderly close (FIN) that arrives while its listener still handles a frame. A
-  test that drops a WebSocket connection either lets the session's liveness check notice it
-  (`WebOsSessionTest.startedWithLivenessCheck`) or drops with a reset (`FakeWebSocketServer.resetAll()`).
+- On a plain `ws://` connection, the JDK's WebSocket client loses an orderly close (FIN) that arrives while its
+  listener still handles a frame; over TLS the close is reported. A test that drops a plain WebSocket connection
+  either lets the session's liveness check notice it (`WebOsSessionTest.startedWithLivenessCheck`) or drops with a
+  reset (`FakeWebSocketServer.resetAll()`).
 
 ## Test configuration
 

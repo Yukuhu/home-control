@@ -160,7 +160,7 @@ public final class FakeWebSocketServer implements AutoCloseable {
 
     /**
      * As {@link #dropAll()}, but with a reset (RST) instead of a FIN. The JDK WebSocket reports a reset even while its
-     * listener still handles a frame; an end of stream that arrives then, it loses.
+     * listener still handles a frame; an end of stream that arrives then on a plain connection, it loses.
      */
     public void resetAll() {
         open.forEach(Connection::reset);
