@@ -12,6 +12,7 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
 import dev.andre.homecontrol.adapters.androidtv.protocol.TlsSockets;
+import dev.andre.homecontrol.adapters.net.Backoff;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.RedactedUris;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteListener;
@@ -56,7 +57,7 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
 
     private final Device device;
     private final AndroidTvSettings settings;
-    private final AndroidTvProperties properties;
+    private final AndroidTvTimings timings;
     private final Consumer<DeviceState> onChange;
     private final ScheduledExecutorService scheduler;
     private final ConnectionOpener opener;
@@ -80,7 +81,7 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
 
     public AndroidTvSession(Device device, ClientCertificate credential,
                          AndroidTvProperties properties, Consumer<DeviceState> onChange) {
-        this(device, credential, properties, onChange, null);
+        this(device, credential, AndroidTvTimings.from(properties), onChange, null);
     }
 
     @FunctionalInterface
@@ -89,17 +90,17 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     }
 
     AndroidTvSession(Device device, ClientCertificate credential,
-                     AndroidTvProperties properties, Consumer<DeviceState> onChange,
+                     AndroidTvTimings timings, Consumer<DeviceState> onChange,
                      ConnectionOpener opener) {
         this.device = device;
         this.settings = AndroidTvSettings.of(device);
-        this.properties = properties;
+        this.timings = timings;
         this.onChange = onChange;
         this.opener = opener == null
                 ? listener -> RemoteConnection.connect(device.host(), settings.port(), credential,
-                        properties.staleTimeoutSeconds() * 1000, listener, settings.certificateFingerprint())
+                        Math.toIntExact(timings.staleTimeout().toMillis()), listener, settings.certificateFingerprint())
                 : opener;
-        this.backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
+        this.backoff = timings.reconnectInitialDelay();
         this.scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "shield-session-" + device.id());
             thread.setDaemon(true);
@@ -244,7 +245,7 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         if (connection == null || state.status() != DeviceStatus.CONNECTING) {
             return;
         }
-        backoff = Duration.ofSeconds(properties.reconnectInitialDelaySeconds());
+        backoff = timings.reconnectInitialDelay();
         forgetAmbiguousVerdicts();
         update(state.withStatus(DeviceStatus.CONNECTED));
     }
@@ -289,9 +290,8 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
             return;
         }
         Duration delay = backoff;
-        backoff = Duration.ofSeconds(Math.min(
-                backoff.toSeconds() * 2, properties.reconnectMaxDelaySeconds()));
-        scheduler.schedule(this::connect, delay.toSeconds(), TimeUnit.SECONDS);
+        backoff = Backoff.next(backoff, timings.reconnectMaxDelay());
+        scheduler.schedule(this::connect, delay.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     /*
