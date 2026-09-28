@@ -6,19 +6,15 @@ import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.testsupport.EventStreamReader;
+import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -33,16 +29,7 @@ import static org.awaitility.Awaitility.await;
  * the Spring event publisher, the broadcaster's own fan-out thread and a real HTTP client on
  * {@code /events} — the one path where the protocol layer's threading meets the web layer's.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class DeviceStateStreamEndToEndTest {
-
-    @DynamicPropertySource
-    static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
-        // A directory of its own, so no keystore or devices.json left by another run
-        // brings up a session for some other device alongside this test's.
-        String dataDir = Files.createTempDirectory("shield-sse-e2e").toString();
-        registry.add("shield.data-dir", () -> dataDir);
-    }
+class DeviceStateStreamEndToEndTest extends FullAppTest {
 
     @LocalServerPort
     int port;

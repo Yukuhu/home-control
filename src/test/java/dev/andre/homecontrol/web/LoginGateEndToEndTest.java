@@ -2,22 +2,18 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.SecretStore;
+import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -30,16 +26,9 @@ import static org.awaitility.Awaitility.await;
  * {@code /app.css} are open, whatever the container decodes or strips, and a state stream ends
  * when its browser logs out.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class LoginGateEndToEndTest {
+class LoginGateEndToEndTest extends FullAppTest {
 
     static final String PASSWORD = "household password";
-
-    @DynamicPropertySource
-    static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
-        String dataDir = Files.createTempDirectory("login-gate-e2e").toString();
-        registry.add("shield.data-dir", () -> dataDir);
-    }
 
     @LocalServerPort
     int port;

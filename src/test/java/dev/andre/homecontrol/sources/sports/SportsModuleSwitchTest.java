@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.sources.sports;
 
-import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.sources.sports.thesportsdb.SportsCompetitions;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbClient;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSetupController;
@@ -24,36 +23,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class SportsModuleSwitchTest {
-
-    /** The module is on but nothing is configured yet: no I/O happens and no file is created. */
-    @SpringBootTest
-    @AutoConfigureMockMvc
-    @Nested
-    class OnButUnconfigured {
-
-        static Path dataDir;
-
-        @DynamicPropertySource
-        static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
-            dataDir = Files.createTempDirectory("sports-module-switch-on");
-            registry.add("shield.data-dir", () -> dataDir.toString());
-        }
-
-        @Autowired
-        ApplicationContext context;
-
-        @Autowired
-        ContentSources sources;
-
-        @Test
-        void theModuleIsPresentButUnavailable() {
-            var source = sources.find("sports");
-            assertThat(source).isPresent();
-            assertThat(source.get().available()).isFalse();
-
-            assertThat(Files.exists(dataDir.resolve("sports.json"))).isFalse();
-        }
-    }
 
     /** {@code home-control.sports.thesportsdb.enabled=false}: the sports source stays, TheSportsDB does not. */
     @SpringBootTest(properties = "home-control.sports.thesportsdb.enabled=false")

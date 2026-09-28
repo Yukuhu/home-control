@@ -1,13 +1,10 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -17,7 +14,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,15 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The cross-origin check through the real servlet container, whose path handling ({@code ;params},
  * percent-decoding) differs from MockMvc's: no spelling of a path may reach a controller cross-site.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class CrossOriginEndToEndTest {
-
-    @DynamicPropertySource
-    static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
-        String dataDir = Files.createTempDirectory("cross-origin-e2e").toString();
-        registry.add("shield.data-dir", () -> dataDir);
-        registry.add("home-control.security.allowed-hosts", () -> "tv.example.org, *.home.example.net");
-    }
+class CrossOriginEndToEndTest extends FullAppTest {
 
     @LocalServerPort
     int port;

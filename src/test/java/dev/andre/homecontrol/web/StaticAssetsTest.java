@@ -1,15 +1,9 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.io.IOException;
-import java.nio.file.Files;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
@@ -18,17 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-class StaticAssetsTest {
-
-    @DynamicPropertySource
-    static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
-        // A directory of its own, so a stale devices.json or keystore left by another run
-        // never starts a session while this test is only checking static assets.
-        String dataDir = Files.createTempDirectory("static-assets-test").toString();
-        registry.add("shield.data-dir", () -> dataDir);
-    }
+class StaticAssetsTest extends FullAppTest {
 
     @Autowired
     MockMvc mockMvc;
