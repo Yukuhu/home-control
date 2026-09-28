@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.sources.sports;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
@@ -8,7 +10,6 @@ import dev.andre.homecontrol.storage.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,7 +22,7 @@ import java.util.Map;
 
 /** Adds/removes calendars and sets the household time zone from the setup page; always redirects back to it. */
 @Controller
-@ConditionalOnProperty(name = "home-control.sports.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.SPORTS)
 public class SportsSetupController {
 
     private static final String MESSAGE = "sportsMessage";

@@ -1,11 +1,12 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import dev.andre.homecontrol.sources.sports.SportsSettingsService;
 import dev.andre.homecontrol.sources.sports.SportsTimeZones;
 import dev.andre.homecontrol.storage.SecretStore;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -14,8 +15,7 @@ import java.time.Clock;
 /** The TheSportsDB module. Either {@code home-control.sports.enabled=false} or
  * {@code home-control.sports.thesportsdb.enabled=false} removes all of it. */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(name = {"home-control.sports.enabled", "home-control.sports.thesportsdb.enabled"},
-        havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.THESPORTSDB)
 public class TheSportsDbConfiguration {
 
     @Bean

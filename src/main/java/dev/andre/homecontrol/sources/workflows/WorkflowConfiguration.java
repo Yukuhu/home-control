@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.sources.workflows;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.RailPreferences;
 import dev.andre.homecontrol.core.content.ContentChangedEvent;
@@ -7,7 +9,6 @@ import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -20,7 +21,7 @@ import java.security.SecureRandom;
 
 /** The complete workflow runtime disappears when its server module is disabled. */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(name = "home-control.workflows.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.WORKFLOWS)
 @EnableConfigurationProperties(WorkflowProperties.class)
 public class WorkflowConfiguration {
     @Bean public WorkflowCodec workflowCodec() { return new WorkflowCodec(); }

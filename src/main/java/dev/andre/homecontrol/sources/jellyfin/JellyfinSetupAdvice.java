@@ -1,10 +1,11 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
@@ -14,7 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @ControllerAdvice(assignableTypes = SetupController.class)
-@ConditionalOnProperty(name = "home-control.jellyfin.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.JELLYFIN)
 public class JellyfinSetupAdvice {
 
     private static final String PASSWORD = "password";

@@ -1,9 +1,10 @@
 package dev.andre.homecontrol.sources.pinned;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.storage.DataDirectory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -14,7 +15,7 @@ import java.time.Clock;
 
 /** The pinned-shortcuts module. {@code home-control.pinned.enabled=false} removes all of it. */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(name = "home-control.pinned.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.PINNED)
 @EnableConfigurationProperties(PinnedProperties.class)
 public class PinnedConfiguration {
 

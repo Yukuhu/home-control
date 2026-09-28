@@ -1,15 +1,16 @@
 package dev.andre.homecontrol.sources.pinned;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 import java.util.List;
 
 @ControllerAdvice(assignableTypes = SetupController.class)
-@ConditionalOnProperty(name = "home-control.pinned.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.PINNED)
 public class PinnedSetupAdvice {
 
     public record PinView(String id, String title, String subtitle, String url, boolean first, boolean last) {

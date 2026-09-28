@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.testsupport;
 
+import dev.andre.homecontrol.config.Module;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -13,16 +14,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * The one application context with every module that can be switched off switched off; Android TV, which cannot,
- * stays. A module-switch test extends it and adds nothing to the context (no Spring annotation, bean override or
- * dynamic property; {@code SharedContextRulesTest} checks it). It proves that its module leaves no bean, setup section,
- * route or file behind, and the application still starts without it.
+ * The one application context with every module in {@link Module} switched off. A module-switch test extends it and
+ * adds nothing to the context (no Spring annotation, bean override or dynamic property; {@code SharedContextRulesTest}
+ * checks it). It proves that its module leaves no bean, setup section, route or file behind, and the application still
+ * starts without it.
  */
-@SpringBootTest(properties = {"home-control.jellyfin.enabled=false", "home-control.youtube.enabled=false",
-        "home-control.tmdb.enabled=false", "home-control.pinned.enabled=false", "home-control.sports.enabled=false",
-        "home-control.workflows.enabled=false", "home-control.cast.enabled=false", "home-control.webos.enabled=false",
-        "home-control.tizen.enabled=false", "home-control.upnp.enabled=false", "home-control.sonos.enabled=false",
-        "home-control.bluetooth.enabled=false"})
+@SpringBootTest
 @AutoConfigureMockMvc
 public abstract class ModulesOffTest {
 
@@ -34,11 +31,14 @@ public abstract class ModulesOffTest {
     @Autowired
     protected MockMvc mockMvc;
 
-    /** Inherited by every subclass, so they share one cache key: one data directory per context. */
+    /** Inherited by every subclass, so they share one cache key: one data directory, and every module off. */
     @DynamicPropertySource
-    static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
+    static void everyModuleOff(DynamicPropertyRegistry registry) throws IOException {
         dataDir = Files.createTempDirectory("modules-off");
         registry.add("home-control.data-dir", dataDir::toString);
+        for (Module module : Module.values()) {
+            registry.add(module.property(), () -> "false");
+        }
     }
 
     /** The context's data directory, into which a switched-off module writes nothing. */

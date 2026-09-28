@@ -1,9 +1,10 @@
 package dev.andre.homecontrol.sources.pinned;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,7 +13,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /** Adds, renames, reorders and removes pinned shortcuts from the setup page; always a redirect back to it. */
 @Controller
-@ConditionalOnProperty(name = "home-control.pinned.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.PINNED)
 public class PinnedSetupController {
 
     private static final String MESSAGE = "pinnedMessage";

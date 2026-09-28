@@ -1,14 +1,15 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 @ControllerAdvice(assignableTypes = SetupController.class)
-@ConditionalOnProperty(name = "home-control.tmdb.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.TMDB)
 public class TmdbSetupAdvice {
 
     /** What the setup page shows about TMDB. Never holds a credential. */

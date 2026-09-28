@@ -1,8 +1,9 @@
 package dev.andre.homecontrol.adapters.bluetooth;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 
 /** The "Bluetooth speakers" section of the setup page: host checks, scan, pair, connect, forget. */
 @Controller
-@ConditionalOnProperty(prefix = "home-control.bluetooth", name = "enabled", havingValue = "true")
+@ConditionalOnModule(Module.BLUETOOTH)
 public class BluetoothSetupController {
 
     private static final String REDIRECT = "redirect:/setup#bluetooth";

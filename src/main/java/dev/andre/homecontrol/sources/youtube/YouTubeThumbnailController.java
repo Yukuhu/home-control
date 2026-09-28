@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.youtube;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +16,7 @@ import java.util.Set;
 
 /** Re-serves a video's thumbnail so the browser never talks to Google directly and never sees a token. */
 @RestController
-@ConditionalOnProperty(name = "home-control.youtube.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.YOUTUBE)
 public class YouTubeThumbnailController {
 
     private static final String LOAD_ERROR = "Could not load the thumbnail";

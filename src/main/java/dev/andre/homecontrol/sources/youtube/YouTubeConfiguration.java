@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.security.LoginService;
@@ -9,7 +11,6 @@ import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +19,7 @@ import java.time.Clock;
 
 /** The YouTube module. {@code home-control.youtube.enabled=false} removes all of it. Later tasks add beans here. */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(name = "home-control.youtube.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.YOUTUBE)
 @EnableConfigurationProperties(YouTubeProperties.class)
 public class YouTubeConfiguration {
 

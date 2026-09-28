@@ -1,9 +1,10 @@
 package dev.andre.homecontrol.sources.pinned;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +16,7 @@ import java.util.Map;
 
 /** The play sheet's "paste a link to open this title directly". */
 @RestController
-@ConditionalOnProperty(name = "home-control.pinned.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.PINNED)
 public class PinUpgradeController {
 
     private static final String MESSAGE = "message";

@@ -2,6 +2,7 @@ package dev.andre.homecontrol;
 
 import dev.andre.homecontrol.adapters.tizen.TizenAdapter;
 import dev.andre.homecontrol.adapters.webos.WebOsAdapter;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.PromptPairing;
 import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
@@ -12,20 +13,22 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class HomeControlApplicationTest extends FullAppTest {
 
-    /** The modules a user can switch off; the modules-off tests switch all of them off at once. */
-    private static final Set<String> SWITCHABLE = Set.of("jellyfin", "youtube", "tmdb", "pinned", "sports", "workflows",
-            "cast", "webos", "tizen", "upnp", "sonos", "bluetooth");
+    /** Every module a user can switch off, as its package name; the modules-off tests switch all of them off. */
+    private static final Set<String> SWITCHABLE = Arrays.stream(Module.values())
+            .filter(module -> module.parent().isEmpty()).map(Module::segment).collect(Collectors.toUnmodifiableSet());
 
     private static final Pattern MODULE_PACKAGE =
             Pattern.compile("^dev\\.andre\\.homecontrol\\.(?:sources|adapters)\\.([a-z]+)\\.");
@@ -68,8 +71,9 @@ class HomeControlApplicationTest extends FullAppTest {
             }
         }
 
-        // Every switchable module but Bluetooth, which is off by default, is on here: the check saw their beans.
-        assertThat(modulesSeen).containsAll(SWITCHABLE.stream().filter(module -> !module.equals("bluetooth")).toList());
+        // Every module that is on by default is on here: the check saw their beans.
+        assertThat(modulesSeen).containsAll(Arrays.stream(Module.values())
+                .filter(module -> module.parent().isEmpty() && module.enabledByDefault()).map(Module::segment).toList());
         assertThat(crossings).isEmpty();
     }
 

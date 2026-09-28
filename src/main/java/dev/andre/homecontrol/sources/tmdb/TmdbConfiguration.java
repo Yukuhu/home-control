@@ -1,12 +1,13 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.content.SourcePreferencesService;
 import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -16,7 +17,7 @@ import java.time.Clock;
 
 /** The TMDB module. {@code home-control.tmdb.enabled=false} removes all of it. */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(name = "home-control.tmdb.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.TMDB)
 @EnableConfigurationProperties(TmdbProperties.class)
 public class TmdbConfiguration {
 

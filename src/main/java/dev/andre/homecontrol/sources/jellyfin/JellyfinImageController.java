@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,7 +20,7 @@ import java.util.regex.Pattern;
  * token (the upstream request is anonymous, see {@link JellyfinClient#image}).
  */
 @Controller
-@ConditionalOnProperty(name = "home-control.jellyfin.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.JELLYFIN)
 public class JellyfinImageController {
 
     private static final Set<String> TYPES = Set.of("Primary", "Thumb", "Backdrop", "Logo");
