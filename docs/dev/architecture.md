@@ -100,8 +100,8 @@ The roadmap's measures, updated by each workstream that moves them.
 | --- | --- | --- |
 | Frozen ArchUnit violations | 89 | 89 |
 | Largest class | 813 lines (`DeviceManager`) | 813 lines (`DeviceManager`) |
-| Summed test-class time | 495 s (one JVM) | 340 s (one JVM), 637 s (four JVMs) |
-| `test` task wall time | not measured | 3 min 19 s (four JVMs, 4 CPUs) |
+| Summed test-class time | 495 s (one JVM) | 340 s (one JVM), 642 s (four JVMs) |
+| `test` task wall time | not measured | 3 min 26 s (four JVMs, 4 CPUs) |
 | Spring context starts per test run | 67 (one JVM) | 70 (four JVMs) |
 | CI "Build and test" job time | about 9 min | 5 min 13 s |
 | Wall-clock upper-bound assertions | 9 | 1 |
