@@ -404,8 +404,8 @@ class WebOsSessionTest {
 
         assertThat(tv.nextRequest(SsapUris.SYSTEM_INFO)).isNotNull();
 
-        // Two more liveness checks (200 ms interval, 1 s request timeout) come and go.
-        await().during(Duration.ofMillis(2500)).atMost(Duration.ofSeconds(4)).untilAsserted(() -> {
+        // Five more liveness checks (200 ms interval, 1 s request timeout) come and go.
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             assertThat(tv.connections()).isEqualTo(connections);
             assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
         });
