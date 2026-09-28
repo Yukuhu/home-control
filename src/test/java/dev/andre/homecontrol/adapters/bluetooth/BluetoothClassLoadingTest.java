@@ -2,6 +2,7 @@ package dev.andre.homecontrol.adapters.bluetooth;
 
 import dev.andre.homecontrol.ContextSmoke;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
@@ -12,6 +13,8 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Starts the real application in a fresh JVM and reads which classes it loaded. */
+// Starts a child JVM and waits up to 3 minutes for it, longer than the 60 s default of junit-platform.properties.
+@Timeout(value = 4, unit = TimeUnit.MINUTES)
 class BluetoothClassLoadingTest {
 
     @TempDir
