@@ -7,20 +7,20 @@ import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.sources.sports.calendar.FakeCalendarServer;
 import dev.andre.homecontrol.sources.sports.thesportsdb.FakeTheSportsDbServer;
 import dev.andre.homecontrol.storage.SecretStore;
+import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.testsupport.SharedFakes;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.CookieManager;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -29,7 +29,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -59,40 +58,28 @@ import static org.awaitility.Awaitility.await;
  * instead of JSON fields — the same information, in the shape the real server actually returns.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class SportsEndToEndTest {
+class SportsEndToEndTest extends FullAppTest {
 
     static final String LOGIN = "household password";
     static final String TOKEN = "token-e2e-7f3a91";
     static final String EVENT_LINK = "https://www.dazn.com/de-DE/fixture/ContentId:e2e1a2b3c4d5e6f7g8h9i0";
-    static final FakeCalendarServer CALENDARS;
-    static final FakeTheSportsDbServer SPORTSDB;
-    static Path dataDir;
+    static final FakeTheSportsDbServer SPORTSDB = SharedFakes.theSportsDb();
+    /** Per class: its URL reaches the application through the setup form, not a property. */
+    static FakeCalendarServer calendars;
 
     /** Shared with {@link #aPersonalKeyIsASecretAndGoesBackToFree()}: that test reuses this login. */
     static HttpClient sharedBrowser;
     static String calendarId;
 
-    static {
-        try {
-            CALENDARS = new FakeCalendarServer();
-            SPORTSDB = new FakeTheSportsDbServer().withStandardResponses();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    @BeforeAll
+    static void startServers() throws IOException {
+        calendars = new FakeCalendarServer();
+        SPORTSDB.withStandardResponses();
     }
 
-    @DynamicPropertySource
-    static void isolated(DynamicPropertyRegistry registry) throws IOException {
-        dataDir = Files.createTempDirectory("sports-e2e");
-        registry.add("shield.data-dir", dataDir::toString);
-        registry.add("home-control.sports.calendar.allow-loopback", () -> "true");
-        registry.add("home-control.sports.thesportsdb.api-base-url", () -> SPORTSDB.apiBase().toString());
-    }
-
-    static void stopServers() {
-        CALENDARS.close();
-        SPORTSDB.close();
+    @AfterAll
+    static void stopCalendars() {
+        calendars.close();
     }
 
     @LocalServerPort
@@ -182,7 +169,7 @@ class SportsEndToEndTest {
                 + "BEGIN:VEVENT\r\nUID:e2e-over@fixtures.example\r\nDTSTART:" + utcBasic(now.minus(Duration.ofHours(5)))
                 + "\r\nDTEND:" + utcBasic(now.minus(Duration.ofHours(3))) + "\r\nSUMMARY:Calendar Finished Match\r\nEND:VEVENT\r\n"
                 + "END:VCALENDAR\r\n";
-        CALENDARS.respond("/private/" + TOKEN + "/league.ics", 200, "text/calendar", calendarText);
+        calendars.respond("/private/" + TOKEN + "/league.ics", 200, "text/calendar", calendarText);
 
         Instant tsdbTime = now.minus(Duration.ofMinutes(20));
         LocalDate tsdbDate = LocalDate.ofInstant(tsdbTime, ZoneOffset.UTC);
@@ -211,7 +198,7 @@ class SportsEndToEndTest {
 
                 // Step 4: the calendar link is stored as a secret, so it sets the login password.
                 HttpResponse<String> addCalendar = send(browser, post("/setup/sources/sports/calendars", Map.of(
-                        "url", CALENDARS.url("/private/" + TOKEN + "/league.ics").toString(), "label", "",
+                        "url", calendars.url("/private/" + TOKEN + "/league.ics").toString(), "label", "",
                         "loginPassword", LOGIN, "loginPasswordConfirmation", LOGIN)));
                 assertThat(addCalendar.statusCode()).isEqualTo(302);
                 String setupAfterCalendar = send(browser, page("/setup")).body();
@@ -225,9 +212,9 @@ class SportsEndToEndTest {
                         .isEqualTo(302);
 
                 // Step 6: read the generated calendar id, and confirm the secret token never reaches disk in the clear.
-                JsonNode sportsJson = mapper.readTree(Files.readString(dataDir.resolve("sports.json")));
+                JsonNode sportsJson = mapper.readTree(Files.readString(dataDir().resolve("sports.json")));
                 calendarId = sportsJson.path("calendars").get(0).path("id").asString();
-                assertThat(Files.readString(dataDir.resolve("sports.json"))).doesNotContain(TOKEN).doesNotContain("/private/");
+                assertThat(Files.readString(dataDir().resolve("sports.json"))).doesNotContain(TOKEN).doesNotContain("/private/");
 
                 assertThat(send(browser, post("/setup/sources/sports/providers", Map.of(
                         "provider:calendar:" + calendarId, "dazn", "provider:thesportsdb:4331", "dazn"))).statusCode())
@@ -327,9 +314,9 @@ class SportsEndToEndTest {
                 });
 
                 // Step 14.
-                assertThat(Files.readString(dataDir.resolve("secrets.json"))).doesNotContain(TOKEN);
+                assertThat(Files.readString(dataDir().resolve("secrets.json"))).doesNotContain(TOKEN);
                 assertThat(SPORTSDB.requests("eventsday.php")).allMatch(r -> "123".equals(r.key()));
-                assertThat(CALENDARS.requests("/private/" + TOKEN + "/league.ics")).isNotEmpty();
+                assertThat(calendars.requests("/private/" + TOKEN + "/league.ics")).isNotEmpty();
 
                 // Step 15.
                 assertThat(browserBodies).noneMatch(body -> body.contains(TOKEN) || body.contains("/private/")
@@ -364,7 +351,5 @@ class SportsEndToEndTest {
         assertThat(send(browser, post("/rails/sports/live-today/refresh", Map.of())).statusCode()).isEqualTo(200);
         await().atMost(Duration.ofSeconds(10)).until(() -> SPORTSDB.count("eventsday.php") > beforeFreeKey);
         assertThat(SPORTSDB.last("eventsday.php").key()).isEqualTo("123");
-
-        stopServers();
     }
 }

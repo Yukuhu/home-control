@@ -5,21 +5,18 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.sources.tmdb.FakeTmdbServer;
-import org.junit.jupiter.api.AfterAll;
+import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.testsupport.SharedFakes;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.CookieManager;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -28,7 +25,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -49,35 +45,18 @@ import static org.awaitility.Awaitility.await;
  * checking at every step the exact app-link string the Shield receives and that no credential
  * ever reaches a browser response or the stored non-secret settings.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class StreamingLaunchersEndToEndTest {
+class StreamingLaunchersEndToEndTest extends FullAppTest {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     static final String LOGIN = "household password";
     static final String GTI = "amzn1.dv.gti.8eb3c4a1-1b2c-4d5e-9f60-718293a4b5c6";
-    static final FakeTmdbServer TMDB;
-    static Path dataDir;
+    static final FakeTmdbServer TMDB = SharedFakes.tmdb();
 
-    static {
-        try {
-            TMDB = new FakeTmdbServer().withStandardResponses();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    @DynamicPropertySource
-    static void isolated(DynamicPropertyRegistry registry) throws IOException {
-        dataDir = Files.createTempDirectory("streaming-e2e");
-        registry.add("shield.data-dir", dataDir::toString);
-        registry.add("home-control.tmdb.api-base-url", () -> TMDB.apiBase().toString());
-    }
-
-    @AfterAll
-    static void stop() {
-        TMDB.close();
+    @BeforeAll
+    static void routes() {
+        TMDB.withStandardResponses();
     }
 
     @LocalServerPort
@@ -250,7 +229,7 @@ class StreamingLaunchersEndToEndTest {
                 assertThat(TMDB.last("GET", "/3/search/multi").query()).containsEntry("language", "de-DE");
 
                 // 14. Pinned shortcuts and secrets on disk.
-                JsonNode pinnedFile = MAPPER.readTree(Files.readAllBytes(dataDir.resolve("pinned.json")));
+                JsonNode pinnedFile = MAPPER.readTree(Files.readAllBytes(dataDir().resolve("pinned.json")));
                 assertThat(pinnedFile.path("pins")).hasSize(2);
                 JsonNode strangerThingsPin = null;
                 for (JsonNode pin : pinnedFile.path("pins")) {
@@ -260,7 +239,7 @@ class StreamingLaunchersEndToEndTest {
                 }
                 assertThat(strangerThingsPin).isNotNull();
                 assertThat(strangerThingsPin.path("url").asString("")).isEqualTo("https://www.netflix.com/title/80057281");
-                String secretsText = Files.readString(dataDir.resolve("secrets.json"));
+                String secretsText = Files.readString(dataDir().resolve("secrets.json"));
                 assertThat(secretsText).doesNotContain(FakeTmdbServer.READ_TOKEN);
 
                 // 15. Nothing the browser received ever carried the credential.
