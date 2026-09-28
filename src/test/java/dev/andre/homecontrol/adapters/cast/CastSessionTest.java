@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.time.Duration;
@@ -137,6 +138,14 @@ class CastSessionTest {
 
         receiver.setVolume(0.9, false);
         receiver.resume();
+        // A receiver announces a volume change. The session may have reconnected while the receiver was still silent,
+        // which dropped that connection's status request: the announcement reaches it. Without a live connection the
+        // announcement is lost, but then the next connection asks for the status after resume() and gets an answer.
+        try {
+            receiver.pushReceiverStatus();
+        } catch (IOException _) {
+            // No sender connected at this moment.
+        }
 
         await().atMost(Duration.ofSeconds(15)).until(() -> session.state().connected() && session.state().volumeLevel() == 90);
     }
