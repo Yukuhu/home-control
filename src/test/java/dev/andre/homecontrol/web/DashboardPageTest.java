@@ -15,7 +15,6 @@ import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.content.RailSnapshot;
 import dev.andre.homecontrol.content.RailStatus;
 import dev.andre.homecontrol.core.content.RailDescriptor;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
