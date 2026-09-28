@@ -44,6 +44,11 @@ When this page was written, the unit, slice, end-to-end and architecture tests n
   whole seconds for timeouts that must not fire; a "nothing happens" check (`await().during(...)`) covers at least five
   of the intervals it watches. Tests assert outcomes (the exception, its message, the order of events), never an upper
   bound on elapsed time unless that time is the behaviour under test (`EventStreamShutdownEndToEndTest`).
+- A test never shares a file or a fixed port with another test JVM: files go in `@TempDir` or
+  `Files.createTempDirectory`, and servers bind port 0.
+- The JDK's WebSocket client loses an orderly close (FIN) that arrives while its listener still handles a frame. A
+  test that drops a WebSocket connection either lets the session's liveness check notice it
+  (`WebOsSessionTest.startedWithLivenessCheck`) or drops with a reset (`FakeWebSocketServer.resetAll()`).
 
 ## Test configuration
 
@@ -51,6 +56,10 @@ Spring tests load the production `src/main/resources/application.yaml` with `src
 on top of it. The test file holds only what a test run must change: no LAN discovery, no real upstream APIs, short
 timeouts, no scheduled rail refresh, and no secrets from the developer's environment. Add a key there only with a
 comment saying why a test run needs it.
+
+The unit tests run in up to four JVMs at once. The test file gives each its own data directory,
+`build/test-data/<worker>`, and Bluetooth runtime directory, `<java.io.tmpdir>/home-control-bluetooth-<worker>`, from
+the system property `org.gradle.test.worker`, which Gradle sets in every test JVM (outside Gradle it is 0).
 
 ## Browser tests
 
