@@ -6,13 +6,12 @@ import dev.andre.homecontrol.sources.youtube.YouTubeSettings;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupService;
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.storage.SecretStore;
-import org.junit.jupiter.api.AfterAll;
+import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.testsupport.SharedFakes;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 import java.net.CookieManager;
 import java.net.URI;
@@ -22,11 +21,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Comparator;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -34,36 +31,14 @@ import static dev.andre.homecontrol.sources.youtube.YouTubeHttp.form;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Real HTTP, sessions, filters, encrypted storage and Google token requests. Google alone is faked. */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class YouTubeBrowserOAuthTest {
-    static final FakeGoogleServer GOOGLE;
-    static final Path DATA;
-    static {
-        try {
-            GOOGLE = new FakeGoogleServer();
-            DATA = Files.createTempDirectory("youtube-browser-oauth");
-            GOOGLE.youtubeLibrary();
-            GOOGLE.respond("POST", "/oauth/token", FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
-            GOOGLE.respond("POST", "/oauth/revoke", FakeGoogleServer.Canned.json(200, "{}"));
-        } catch (Exception e) {
-            throw new ExceptionInInitializerError(e);
-        }
-    }
+class YouTubeBrowserOAuthTest extends FullAppTest {
+    static final FakeGoogleServer GOOGLE = SharedFakes.google();
 
-    @DynamicPropertySource
-    static void properties(DynamicPropertyRegistry properties) {
-        properties.add("shield.data-dir", DATA::toString);
-        properties.add("home-control.youtube.oauth-base-url", () -> GOOGLE.base() + "/oauth");
-        properties.add("home-control.youtube.api-base-url", () -> GOOGLE.base() + "/youtube/v3");
-        properties.add("home-control.content.rails.scheduler-enabled", () -> "false");
-    }
-
-    @AfterAll
-    static void cleanup() throws Exception {
-        GOOGLE.close();
-        try (var paths = Files.walk(DATA)) {
-            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
-        }
+    @BeforeAll
+    static void routes() {
+        GOOGLE.youtubeLibrary();
+        GOOGLE.respond("POST", "/oauth/token", FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
+        GOOGLE.respond("POST", "/oauth/revoke", FakeGoogleServer.Canned.json(200, "{}"));
     }
 
     @LocalServerPort int port;
@@ -143,7 +118,7 @@ class YouTubeBrowserOAuthTest {
                 .digest(exchange.get("code_verifier").getBytes(StandardCharsets.US_ASCII))))
                 .isEqualTo(auth.get("code_challenge"));
         assertThat(secrets.secret(YouTubeSettings.REFRESH_TOKEN)).contains("1//0gFixtureRefreshTokenGranted-0001");
-        assertThat(Files.readString(DATA.resolve("secrets.json"))).doesNotContain("GOCSPX", "1//0g", "ya29.");
+        assertThat(Files.readString(dataDir().resolve("secrets.json"))).doesNotContain("GOCSPX", "1//0g", "ya29.");
         assertThat(get(browser, "/setup").body()).contains("Connected as Andre at Home")
                 .doesNotContain("GOCSPX", "1//0g", "ya29.", "one-time-code");
         get(browser, callback(auth, Map.of("code", "one-time-code")));
