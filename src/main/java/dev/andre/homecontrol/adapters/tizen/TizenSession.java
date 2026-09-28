@@ -33,7 +33,7 @@ import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 /**
- * One Samsung Tizen TV. Samsung pushes no state, so a poll (every {@code pollIntervalSeconds})
+ * One Samsung Tizen TV. Samsung pushes no state, so a poll (every {@link TizenTimings#pollInterval()})
  * reads power and MAC from the REST API, (re)opens the remote channel with the stored token when
  * the TV is on, and derives the current app from the visibility of the known service apps.
  * An explicit refusal ({@code ms.channel.unauthorized}) makes the session UNPAIRED and stops it.
