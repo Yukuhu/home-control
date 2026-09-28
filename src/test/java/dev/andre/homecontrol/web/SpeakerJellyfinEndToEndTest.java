@@ -5,14 +5,11 @@ import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.sources.jellyfin.FakeJellyfinServer;
 import dev.andre.homecontrol.testsupport.EventStreamReader;
+import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
-import java.io.IOException;
 import java.net.CookieManager;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -20,8 +17,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -37,21 +32,11 @@ import static org.awaitility.Awaitility.await;
  * A Jellyfin track on a DLNA speaker through the real application: rail, route preview, the direct
  * stream with its API key on the device, now playing — and the key never reaching the browser.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class SpeakerJellyfinEndToEndTest {
+class SpeakerJellyfinEndToEndTest extends FullAppTest {
 
     static final String TRACK = "c0ffee00c0ffee00c0ffee00c0ffee01";
     static final String LOGIN = "household password";
     static final String ID = "speaker-e2e";
-
-    @DynamicPropertySource
-    static void isolated(DynamicPropertyRegistry registry) throws IOException {
-        Path dataDir = Files.createTempDirectory("speaker-jellyfin-e2e");
-        registry.add("shield.data-dir", dataDir::toString);
-        registry.add("home-control.ssdp.enabled", () -> "false");
-        registry.add("home-control.upnp.poll-interval-seconds", () -> "1");
-        registry.add("home-control.upnp.idle-poll-interval-seconds", () -> "1");
-    }
 
     @LocalServerPort
     int port;

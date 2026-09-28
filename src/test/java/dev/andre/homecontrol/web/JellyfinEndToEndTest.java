@@ -9,14 +9,11 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.sources.jellyfin.FakeJellyfinServer;
+import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
-import java.io.IOException;
 import java.net.CookieManager;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -25,7 +22,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -45,22 +41,12 @@ import static org.awaitility.Awaitility.await;
  * Jellyfin through the real application over real sockets: fake Jellyfin ↔ source ↔ resolver ↔
  * planner ↔ Android TV and Cast adapters ↔ HTTP, with the login gate in front.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class JellyfinEndToEndTest {
+class JellyfinEndToEndTest extends FullAppTest {
 
     static final String EPISODE = "3f2a9c1e7b6d4e5f8a9b0c1d2e3f4a5b";
     static final String SHIELD_SESSION = "1d2c3b4a59687f6e5d4c3b2a19081726";
     static final String SHIELD_JELLYFIN_DEVICE = "b2c4d6e8f0a1c3e5";
     static final String LOGIN = "household password";
-    static Path dataDir;
-
-    @DynamicPropertySource
-    static void isolatedAndFast(DynamicPropertyRegistry registry) throws IOException {
-        dataDir = Files.createTempDirectory("jellyfin-e2e");
-        registry.add("shield.data-dir", dataDir::toString);
-        registry.add("home-control.cast.command-timeout-seconds", () -> "3");
-        registry.add("home-control.cast.load-timeout-seconds", () -> "5");
-    }
 
     @LocalServerPort
     int port;
@@ -239,8 +225,8 @@ class JellyfinEndToEndTest {
 
                 // Nothing the browser received, and nothing in sources.json, holds the token.
                 assertThat(browserBodies).noneMatch(body -> body.contains(ACCESS_TOKEN) || body.contains("ApiKey"));
-                assertThat(Files.readString(dataDir.resolve("sources.json"))).doesNotContain(ACCESS_TOKEN);
-                assertThat(Files.readString(dataDir.resolve("secrets.json"))).doesNotContain(ACCESS_TOKEN);
+                assertThat(Files.readString(dataDir().resolve("sources.json"))).doesNotContain(ACCESS_TOKEN);
+                assertThat(Files.readString(dataDir().resolve("secrets.json"))).doesNotContain(ACCESS_TOKEN);
 
                 // Disconnecting removes the last secret: the deployment is device-only again.
                 assertThat(send(browser, post("/setup/sources/jellyfin/disconnect", Map.of())).statusCode()).isEqualTo(302);
