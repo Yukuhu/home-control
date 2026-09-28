@@ -41,7 +41,18 @@ public final class FakeGoogleServer implements AutoCloseable {
     private final FakeHttpServer server;
 
     public FakeGoogleServer() throws IOException {
-        server = FakeHttpServer.start().fallback(Response.of(404, "application/json; charset=UTF-8",
+        server = FakeHttpServer.start();
+        defaults();
+    }
+
+    /** Forgets every route, request and delay, and restores the fresh fake, for a fake shared across test classes. */
+    public void reset() {
+        server.reset();
+        defaults();
+    }
+
+    private void defaults() {
+        server.fallback(Response.of(404, "application/json; charset=UTF-8",
                 "{\"error\":{\"code\":404,\"message\":\"no fake route\",\"errors\":[]}}"));
     }
 

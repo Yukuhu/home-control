@@ -30,7 +30,18 @@ public final class FakeTmdbServer implements AutoCloseable {
     private final FakeHttpServer server;
 
     public FakeTmdbServer() throws IOException {
-        server = FakeHttpServer.start().fallback(Response.of(404, Response.JSON, fixture("not-found.json")));
+        server = FakeHttpServer.start();
+        defaults();
+    }
+
+    /** Forgets every route, request and delay, and restores the fresh fake, for a fake shared across test classes. */
+    public void reset() {
+        server.reset();
+        defaults();
+    }
+
+    private void defaults() {
+        server.fallback(Response.of(404, Response.JSON, fixture("not-found.json")));
     }
 
     public URI url() {
