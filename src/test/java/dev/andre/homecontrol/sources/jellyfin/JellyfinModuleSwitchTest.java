@@ -1,16 +1,7 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.testsupport.ModulesOffTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.ApplicationContext;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-
-import java.io.IOException;
-import java.nio.file.Files;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -21,21 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** {@code home-control.jellyfin.enabled=false}: an Android TV/Cast-only box has no Jellyfin code wired up. */
-@SpringBootTest(properties = "home-control.jellyfin.enabled=false")
-@AutoConfigureMockMvc
-class JellyfinModuleSwitchTest {
-
-    @DynamicPropertySource
-    static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
-        String dataDir = Files.createTempDirectory("jellyfin-module-switch-test").toString();
-        registry.add("shield.data-dir", () -> dataDir);
-    }
-
-    @Autowired
-    ApplicationContext context;
-
-    @Autowired
-    MockMvc mockMvc;
+class JellyfinModuleSwitchTest extends ModulesOffTest {
 
     @Test
     void theModuleCanBeSwitchedOff() throws Exception {

@@ -1,17 +1,9 @@
 package dev.andre.homecontrol.sources.tmdb;
 
 import dev.andre.homecontrol.core.content.ContentSources;
+import dev.andre.homecontrol.testsupport.ModulesOffTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.ApplicationContext;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-
-import java.io.IOException;
-import java.nio.file.Files;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -21,21 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** {@code home-control.tmdb.enabled=false}: no TMDB code is wired up. */
-@SpringBootTest(properties = "home-control.tmdb.enabled=false")
-@AutoConfigureMockMvc
-class TmdbModuleSwitchTest {
-
-    @DynamicPropertySource
-    static void isolatedDataDirectory(DynamicPropertyRegistry registry) throws IOException {
-        String dataDir = Files.createTempDirectory("tmdb-module-switch-test").toString();
-        registry.add("shield.data-dir", () -> dataDir);
-    }
-
-    @Autowired
-    ApplicationContext context;
-
-    @Autowired
-    MockMvc mockMvc;
+class TmdbModuleSwitchTest extends ModulesOffTest {
 
     @Autowired
     ContentSources sources;

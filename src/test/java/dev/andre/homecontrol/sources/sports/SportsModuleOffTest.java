@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.sources.pinned;
+package dev.andre.homecontrol.sources.sports;
 
 import dev.andre.homecontrol.testsupport.ModulesOffTest;
 import org.junit.jupiter.api.Test;
@@ -12,19 +12,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** {@code home-control.pinned.enabled=false}: no pinned-shortcuts code is wired up. */
-class PinnedModuleSwitchTest extends ModulesOffTest {
+/** {@code home-control.sports.enabled=false}: no sports code is wired up. */
+class SportsModuleOffTest extends ModulesOffTest {
 
     @Test
     void theModuleCanBeSwitchedOff() throws Exception {
-        assertThat(context.getBeanNamesForType(PinnedShortcuts.class)).isEmpty();
-        assertThat(context.getBeanNamesForType(PinnedContentSource.class)).isEmpty();
-        assertThat(context.getBeanNamesForType(PinnedSetupController.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(SportsContentSource.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(dev.andre.homecontrol.sources.sports.calendar.SportsCalendars.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(SportsSetupController.class)).isEmpty();
 
         mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString("id=\"pinned\""))));
+                .andExpect(content().string(not(containsString("id=\"sports\""))));
 
-        assertThat(Files.exists(dataDir().resolve("pinned.json"))).isFalse();
+        assertThat(Files.exists(dataDir().resolve("sports.json"))).isFalse();
     }
 }
