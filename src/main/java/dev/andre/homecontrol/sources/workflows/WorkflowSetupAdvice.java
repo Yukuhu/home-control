@@ -1,15 +1,16 @@
 package dev.andre.homecontrol.sources.workflows;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import java.util.List;
 
 @ControllerAdvice(assignableTypes = SetupController.class)
-@ConditionalOnProperty(name = "home-control.workflows.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.WORKFLOWS)
 public final class WorkflowSetupAdvice {
     public record Summary(String id, String name, WorkflowDraft.Mode mode, boolean enabled, long revision) {}
     public record Problem(String token, String message) {}

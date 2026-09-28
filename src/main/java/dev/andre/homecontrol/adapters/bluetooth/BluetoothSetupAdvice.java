@@ -1,9 +1,10 @@
 package dev.andre.homecontrol.adapters.bluetooth;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
@@ -13,7 +14,7 @@ import java.util.stream.Collectors;
 
 /** Adds the {@code bluetooth} model attribute to every {@link SetupController} response. */
 @ControllerAdvice(assignableTypes = SetupController.class)
-@ConditionalOnProperty(prefix = "home-control.bluetooth", name = "enabled", havingValue = "true")
+@ConditionalOnModule(Module.BLUETOOTH)
 public class BluetoothSetupAdvice {
 
     public record SpeakerRow(String id, String name, String address, String status, String audioDevice) {

@@ -3,8 +3,9 @@ package dev.andre.homecontrol.adapters.bluetooth;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezClient;
 import dev.andre.homecontrol.adapters.bluetooth.player.MpvLauncher;
 import dev.andre.homecontrol.adapters.bluetooth.player.ProcessMpvLauncher;
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.device.DeviceManager;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +19,7 @@ import java.time.Duration;
  * a D-Bus class.
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "home-control.bluetooth", name = "enabled", havingValue = "true")
+@ConditionalOnModule(Module.BLUETOOTH)
 @EnableConfigurationProperties(BluetoothProperties.class)
 public class BluetoothConfiguration {
 

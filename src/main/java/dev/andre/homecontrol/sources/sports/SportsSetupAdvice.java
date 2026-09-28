@@ -1,12 +1,13 @@
 package dev.andre.homecontrol.sources.sports;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import dev.andre.homecontrol.sources.sports.calendar.FeedStatus;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
 import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
@@ -18,7 +19,7 @@ import java.util.List;
 
 /** What the setup page shows about the sports source: time zone, calendar and TheSportsDB status. */
 @ControllerAdvice(assignableTypes = SetupController.class)
-@ConditionalOnProperty(name = "home-control.sports.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.SPORTS)
 public class SportsSetupAdvice {
 
     public record CalendarView(String id, String label, String host, String status, String provider) {

@@ -1,10 +1,11 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,7 +16,7 @@ import java.util.Map;
 
 /** Connects, tests and disconnects Jellyfin from the setup page; always a redirect back to it. */
 @Controller
-@ConditionalOnProperty(name = "home-control.jellyfin.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.JELLYFIN)
 public class JellyfinSetupController {
 
     private static final String MESSAGE = "jellyfinMessage";

@@ -1,10 +1,11 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,7 +18,7 @@ import java.util.Map;
 
 /** YouTube setup, including the browser OAuth redirect and callback. */
 @Controller
-@ConditionalOnProperty(name = "home-control.youtube.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.YOUTUBE)
 public class YouTubeSetupController {
 
     private static final String REDIRECT = "redirect:/setup#youtube";

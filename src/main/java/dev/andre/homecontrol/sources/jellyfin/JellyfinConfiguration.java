@@ -1,11 +1,12 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.device.DeviceManager;
 import org.springframework.beans.factory.annotation.Value;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,7 +16,7 @@ import java.time.Duration;
 
 /** The Jellyfin module. {@code home-control.jellyfin.enabled=false} removes all of it. */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(name = "home-control.jellyfin.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.JELLYFIN)
 @EnableConfigurationProperties(JellyfinProperties.class)
 public class JellyfinConfiguration {
 

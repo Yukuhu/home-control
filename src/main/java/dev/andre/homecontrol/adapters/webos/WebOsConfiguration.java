@@ -1,17 +1,18 @@
 package dev.andre.homecontrol.adapters.webos;
 
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /** The LG webOS module; {@code home-control.webos.enabled=false} removes it entirely. */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "home-control.webos", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.WEBOS)
 @EnableConfigurationProperties(WebOsProperties.class)
 public class WebOsConfiguration {
 

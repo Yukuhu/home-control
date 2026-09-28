@@ -1,9 +1,10 @@
 package dev.andre.homecontrol.sources.workflows;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +13,7 @@ import static dev.andre.homecontrol.sources.workflows.WorkflowException.Stage;
 
 /** Explicit, authenticated preview. Only the returned display strings may leave this service. */
 @Service
-@ConditionalOnProperty(name = "home-control.workflows.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.WORKFLOWS)
 public final class WorkflowTestService {
     public record StageView(String name, boolean success, String message) {}
     public record SampleView(String title, String subtitle, List<String> variables, String maskedUrl) {

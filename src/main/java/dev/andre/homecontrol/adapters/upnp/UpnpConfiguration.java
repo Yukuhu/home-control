@@ -1,7 +1,8 @@
 package dev.andre.homecontrol.adapters.upnp;
 
+import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -10,7 +11,7 @@ import org.springframework.core.env.Environment;
 
 /** The UPnP renderer module. {@code home-control.upnp.enabled=false} removes discovery and the adapter. */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "home-control.upnp", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnModule(Module.UPNP)
 @EnableConfigurationProperties(UpnpProperties.class)
 public class UpnpConfiguration {
 
