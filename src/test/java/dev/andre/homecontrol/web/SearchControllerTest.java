@@ -1,14 +1,12 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.content.SearchOutcome;
-import dev.andre.homecontrol.content.SearchService;
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -27,14 +25,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(SearchController.class)
-class SearchControllerTest {
+class SearchControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    SearchService search;
 
     private static ContentSource sourceStub(String id, String name) {
         ContentSource source = mock(ContentSource.class);

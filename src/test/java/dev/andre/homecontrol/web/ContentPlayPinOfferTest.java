@@ -3,20 +3,16 @@ package dev.andre.homecontrol.web;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.content.ContentSource;
-import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.ServiceLinks;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.PlaybackPreview;
-import dev.andre.homecontrol.playback.PlaybackService;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -30,26 +26,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** A second test class (not a nested one) so {@link ContentPlayPreviewTest} keeps running without a {@link PinnedLinks} bean. */
-@WebMvcTest(ContentPlayController.class)
-class ContentPlayPinOfferTest {
+/**
+ * The route preview's pin offer, with the pinned module's {@link PinnedLinks} (the slice's {@code pins} mock);
+ * {@link ContentPlayWithoutPinsTest} covers the preview without it.
+ */
+class ContentPlayPinOfferTest extends WebSliceTest {
 
     private static final String ITEM_ID = "tv-66732";
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    DeviceManager devices;
-
-    @MockitoBean
-    ContentSources sources;
-
-    @MockitoBean
-    PlaybackService playback;
-
-    @MockitoBean
-    PinnedLinks pinnedLinks;
 
     private final ContentSource tmdb = mock(ContentSource.class);
     private final Device living = new Device("living", "Living Room", DeviceKind.ANDROID_TV, "10.0.0.5",
@@ -59,7 +45,7 @@ class ContentPlayPinOfferTest {
         given(devices.device("living")).willReturn(Optional.of(living));
         given(sources.find("tmdb")).willReturn(Optional.of(tmdb));
         given(tmdb.item(ITEM_ID)).willReturn(Optional.of(item));
-        given(pinnedLinks.linkFor("tmdb", ITEM_ID)).willReturn(Optional.empty());
+        given(pins.linkFor("tmdb", ITEM_ID)).willReturn(Optional.empty());
     }
 
     @Test

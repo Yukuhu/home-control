@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
@@ -13,15 +12,13 @@ import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.content.ContentSource;
-import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.content.RailSnapshot;
 import dev.andre.homecontrol.content.RailStatus;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -43,20 +40,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(DashboardController.class)
-class DashboardPageTest {
+class DashboardPageTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    DeviceManager devices;
-
-    @MockitoBean
-    RailCache rails;
-
-    @MockitoBean
-    ContentSources sources;
 
     private static Device device(String id, String name, Instant lastSeen) {
         return new Device(id, name, DeviceKind.ANDROID_TV, "10.0.0." + id.length(),

@@ -6,19 +6,15 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.content.ContentSource;
-import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.Route;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.PlayAttempt;
 import dev.andre.homecontrol.playback.PlaybackPreview;
-import dev.andre.homecontrol.playback.PlaybackService;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -38,22 +34,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ContentPlayController.class)
-class ContentPlayPreviewTest {
+class ContentPlayPreviewTest extends WebSliceTest {
 
     private static final String ITEM_ID = "3f2a9c1e7b6d4e5f8a9b0c1d2e3f4a5b";
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    DeviceManager devices;
-
-    @MockitoBean
-    ContentSources sources;
-
-    @MockitoBean
-    PlaybackService playback;
 
     private final ContentSource jellyfin = mock(ContentSource.class);
     private final Device living = new Device("living", "Living Room", DeviceKind.ANDROID_TV, "10.0.0.5",
@@ -233,23 +219,6 @@ class ContentPlayPreviewTest {
                 .andReturn().getResponse().getContentAsString();
 
         org.assertj.core.api.Assertions.assertThat(body).doesNotContain("tok-123").doesNotContain("urn:x-cast");
-    }
-
-    @Test
-    void noPinWithoutThePinnedModule() throws Exception {
-        known();
-        PlayableRef.AppLink netflixHome = new PlayableRef.AppLink(
-                dev.andre.homecontrol.core.playback.ServiceLinks.appHome("netflix").orElseThrow(), "netflix");
-        ContentItem appHomeItem = new ContentItem(ITEM_ID, "tmdb", ContentKind.VIDEO, "Stranger Things", null, null,
-                List.of(netflixHome));
-        given(sources.find("tmdb")).willReturn(Optional.of(jellyfin));
-        given(jellyfin.item(ITEM_ID)).willReturn(Optional.of(appHomeItem));
-        given(playback.preview(appHomeItem, "living")).willReturn(new PlaybackPreview(living,
-                List.of(new Route.OpenAppLink(netflixHome.uri(), netflixHome.service())), null));
-
-        mockMvc.perform(get("/devices/living/route-preview").param("source", "tmdb").param("item", ITEM_ID))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.pin").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

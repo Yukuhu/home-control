@@ -9,12 +9,9 @@ import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.UnroutableException;
-import dev.andre.homecontrol.device.DeviceManager;
-import dev.andre.homecontrol.playback.PlaybackService;
+import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.net.URI;
@@ -33,17 +30,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(DeviceController.class)
-class DeviceControllerTest {
+class DeviceControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
-
-    @MockitoBean
-    DeviceManager devices;
-
-    @MockitoBean
-    PlaybackService playback;
 
     @Test
     void sendsAKeyToTheAddressedDevice() throws Exception {
