@@ -48,7 +48,7 @@ public class UpnpSession implements DeviceHandle {
 
     private final Device device;
     private final UpnpSettings settings;
-    private final UpnpProperties properties;
+    private final UpnpTimings timings;
     private final HttpClient http;
     private final RendererCommands commands;
     private final Function<String, Optional<URI>> locator;
@@ -70,17 +70,21 @@ public class UpnpSession implements DeviceHandle {
 
     public UpnpSession(Device device, UpnpProperties properties, HttpClient http,
                        Function<String, Optional<URI>> locator, Consumer<DeviceState> onChange, Runnable onClosed) {
+        this(device, UpnpTimings.from(properties), http, locator, onChange, onClosed);
+    }
+
+    UpnpSession(Device device, UpnpTimings timings, HttpClient http,
+               Function<String, Optional<URI>> locator, Consumer<DeviceState> onChange, Runnable onClosed) {
         this.device = device;
         this.settings = UpnpSettings.of(device);
-        this.properties = properties;
+        this.timings = timings;
         this.http = http;
-        this.commands = new RendererCommands(new SoapClient(http, Duration.ofSeconds(properties.commandTimeoutSeconds())), device.name());
+        this.commands = new RendererCommands(new SoapClient(http, timings.commandTimeout()), device.name());
         this.locator = locator;
         this.onChange = onChange;
         this.onClosed = onClosed;
         this.poller = new ReconnectingPoller("upnp-" + device.id(),
-                Duration.ofSeconds(properties.reconnectInitialDelaySeconds()),
-                Duration.ofSeconds(properties.reconnectMaxDelaySeconds()), new Link());
+                timings.reconnectInitialDelay(), timings.reconnectMaxDelay(), new Link());
     }
 
     public void start() {
@@ -171,7 +175,7 @@ public class UpnpSession implements DeviceHandle {
             if (location == null || !DeviceFetch.isSafeToFetch(location, device.host())) {
                 throw new IOException(device.id() + " has no description address on its own host");
             }
-            Duration timeout = Duration.ofSeconds(properties.commandTimeoutSeconds());
+            Duration timeout = timings.commandTimeout();
             DeviceDescription description;
             try {
                 description = DeviceDescriptions.parse(
@@ -297,7 +301,7 @@ public class UpnpSession implements DeviceHandle {
 
         @Override
         public Duration nextPollDelay() {
-            return Duration.ofSeconds(transport.active() ? properties.pollIntervalSeconds() : properties.idlePollIntervalSeconds());
+            return transport.active() ? timings.pollInterval() : timings.idlePollInterval();
         }
 
         @Override

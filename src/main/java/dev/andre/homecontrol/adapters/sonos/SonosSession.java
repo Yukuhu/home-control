@@ -62,7 +62,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
 
     private final Device device;
     private final SonosSettings settings;
-    private final SonosProperties properties;
+    private final SonosTimings timings;
     private final SoapClient soap;
     private final RendererCommands commands;
     private final Consumer<DeviceState> onChange;
@@ -90,22 +90,21 @@ public class SonosSession implements DeviceHandle, GroupListing {
 
     public SonosSession(Device device, SonosProperties properties, HttpClient http,
                         Consumer<DeviceState> onChange, Runnable onClosed) {
-        this(device, properties, http, onChange, onClosed, Clock.systemUTC());
+        this(device, SonosTimings.from(properties), http, onChange, onClosed, Clock.systemUTC());
     }
 
-    SonosSession(Device device, SonosProperties properties, HttpClient http,
+    SonosSession(Device device, SonosTimings timings, HttpClient http,
                  Consumer<DeviceState> onChange, Runnable onClosed, Clock clock) {
         this.device = device;
         this.settings = SonosSettings.of(device);
-        this.properties = properties;
-        this.soap = new SoapClient(http, Duration.ofSeconds(properties.commandTimeoutSeconds()));
+        this.timings = timings;
+        this.soap = new SoapClient(http, timings.commandTimeout());
         this.commands = new RendererCommands(soap, device.name());
         this.onChange = onChange;
         this.onClosed = onClosed;
         this.clock = clock;
         this.poller = new ReconnectingPoller("sonos-" + device.id(),
-                Duration.ofSeconds(properties.reconnectInitialDelaySeconds()),
-                Duration.ofSeconds(properties.reconnectMaxDelaySeconds()), new Link());
+                timings.reconnectInitialDelay(), timings.reconnectMaxDelay(), new Link());
     }
 
     public void start() {
@@ -315,7 +314,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
 
         @Override
         public void poll() throws IOException, SoapFault {
-            if (Duration.between(topologyReadAt, clock.instant()).toSeconds() >= properties.topologyIntervalSeconds()) {
+            if (Duration.between(topologyReadAt, clock.instant()).compareTo(timings.topologyInterval()) >= 0) {
                 try {
                     readTopology();
                 } catch (SoapFault fault) {
@@ -327,7 +326,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
 
         @Override
         public Duration nextPollDelay() {
-            return Duration.ofSeconds(transport.active() ? properties.pollIntervalSeconds() : properties.idlePollIntervalSeconds());
+            return transport.active() ? timings.pollInterval() : timings.idlePollInterval();
         }
 
         @Override
