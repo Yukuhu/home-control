@@ -37,6 +37,10 @@ class TizenSessionTest {
 
     private static final Map<String, String> PAIRED = Map.of("paired", "true", "token", FakeTizenServer.TOKEN);
 
+    /** Poll 200 ms (so the first handshake backoff is 400 ms), no wake grace, Allow/Deny within 500 ms. */
+    private static final TizenTimings TIMINGS =
+            new TizenTimings(Duration.ofMillis(200), Duration.ZERO, Duration.ofMillis(500), TizenTimings.HANDSHAKE_BACKOFF_CAP);
+
     @TempDir
     Path dir;
 
@@ -75,7 +79,7 @@ class TizenSessionTest {
         Device device = new Device("samsung", "Samsung TV", DeviceKind.TIZEN, "127.0.0.1",
                 Map.of("tizen", settings), Instant.now());
         registry.save(device);
-        session = new TizenSession(device, TizenRestTest.properties(tv), InsecureTls.httpClient(Duration.ofSeconds(2)),
+        session = new TizenSession(device, TizenRestTest.properties(tv), TIMINGS, InsecureTls.httpClient(Duration.ofSeconds(2)),
                 registry, learned(), new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         return session;
@@ -274,8 +278,8 @@ class TizenSessionTest {
                 "macAddress", "11:22:33:44:55:66", "macAddressManual", "true"));
         connected();
 
-        // Every poll (1 s interval) reads another MAC from the REST API.
-        await().during(Duration.ofMillis(1500)).atMost(Duration.ofSeconds(3))
+        // Every poll (200 ms interval) reads another MAC from the REST API.
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(3))
                 .until(() -> "11:22:33:44:55:66".equals(stored("macAddress")));
     }
 
@@ -338,31 +342,27 @@ class TizenSessionTest {
 
         awaitStatus(DeviceStatus.UNPAIRED);
 
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4)).until(() -> tv.connections() == 1);
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).until(() -> tv.connections() == 1);
     }
 
     @Test
     void anUnansweredHandshakeIsTransientKeepsTheTokenAndRetriesWithBackoff() {
         tv.setAuthorization(FakeTizenServer.Authorization.IGNORE);
-        long started = System.nanoTime();
         start(Map.of("paired", "true", "token", "999"));
 
-        // The first attempt waits out the 2 s request timeout; the next one is at least 2 s later.
-        await().atMost(Duration.ofSeconds(5)).until(() -> Duration.ofNanos(System.nanoTime() - started).toMillis() > 2500
-                && tv.connections() == 1);
+        await().atMost(Duration.ofSeconds(5)).pollInterval(Duration.ofMillis(10)).until(() -> tv.connections() == 1);
+        // 500 ms request timeout plus a 400 ms backoff before the next attempt.
+        await("no retry during the request timeout and the backoff").during(Duration.ofMillis(600))
+                .atMost(Duration.ofSeconds(2)).until(() -> tv.connections() == 1);
         assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
         assertThat(stored("token")).isEqualTo("999");
         assertThat(stored("paired")).isEqualTo("true");
-        long elapsedMillis = Duration.ofNanos(System.nanoTime() - started).toMillis();
-        Duration restOfWindow = Duration.ofMillis(Math.max(0, 3500 - elapsedMillis));
-        await("no retry during the backoff").during(restOfWindow).atMost(restOfWindow.plusSeconds(1))
-                .until(() -> tv.connections() == 1);
 
-        await().atMost(Duration.ofSeconds(8)).until(() -> tv.connections() >= 2);
+        await().atMost(Duration.ofSeconds(5)).until(() -> tv.connections() >= 2);
         assertThat(states.all()).noneMatch(state -> state.status() == DeviceStatus.UNPAIRED);
 
         tv.setAuthorization(FakeTizenServer.Authorization.ALLOW);
-        await().atMost(Duration.ofSeconds(15)).until(() -> session.state().status() == DeviceStatus.CONNECTED);
+        await().atMost(Duration.ofSeconds(10)).until(() -> session.state().status() == DeviceStatus.CONNECTED);
         assertThat(stored("token")).isEqualTo(FakeTizenServer.TOKEN);
     }
 
@@ -372,7 +372,7 @@ class TizenSessionTest {
 
         awaitStatus(DeviceStatus.UNPAIRED);
 
-        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).until(() -> tv.connections() == 0);
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).until(() -> tv.connections() == 0);
     }
 
     @Test
@@ -412,6 +412,6 @@ class TizenSessionTest {
         states.clear();
         tv.dropConnections();
 
-        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(4)).until(() -> states.all().isEmpty());
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).until(() -> states.all().isEmpty());
     }
 }

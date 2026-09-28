@@ -83,8 +83,8 @@ public class TizenAdapter implements WakeOnLanAdapter {
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange, LearnedSettings learned) {
         AtomicReference<TizenSession> self = new AtomicReference<>();
-        TizenSession session = new TizenSession(device, properties, http, registry, learned, wakeOnLan, onChange,
-                () -> sessions.remove(device.id(), self.get()));
+        TizenSession session = new TizenSession(device, properties, TizenTimings.from(properties), http, registry,
+                learned, wakeOnLan, onChange, () -> sessions.remove(device.id(), self.get()));
         self.set(session);
         sessions.put(device.id(), session);
         session.start();
