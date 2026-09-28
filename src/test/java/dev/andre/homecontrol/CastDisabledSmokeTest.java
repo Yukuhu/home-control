@@ -21,10 +21,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Smoke test for {@code home-control.cast.enabled=false}: the module is a home-control device
- * add-on, not a build-time flavour, so this is the guarantee that turning it off does not
- * regress an Android TV-only box — including one whose {@code devices.json} still carries a
- * {@code cast} entry from before it was switched off.
+ * Smoke test for {@code home-control.cast.enabled=false}: the module is a home-control device add-on, not a build-time
+ * flavour, so a {@code devices.json} that still carries a {@code cast} entry from before it was switched off must not
+ * bring back any Cast capability or control. That an Android TV box keeps its own controls then is
+ * {@code DeviceManagerTest.anEntryForAnAdapterThatIsSwitchedOffAddsNothing}: every module is off here, Android TV too.
  */
 class CastDisabledSmokeTest extends ModulesOffTest {
 
@@ -48,14 +48,10 @@ class CastDisabledSmokeTest extends ModulesOffTest {
                 Map.of("androidtv", Map.of(), "cast", Map.of("port", "8009")), Instant.now());
         devices.adopt(shield);
 
-        assertThat(devices.capabilities("shield-c"))
-                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.POWER,
-                        Capability.VOLUME, Capability.APP_LINK)
-                .doesNotContain(Capability.CAST_RECEIVER);
+        assertThat(devices.capabilities("shield-c")).doesNotContain(Capability.CAST_RECEIVER);
 
         mockMvc.perform(get("/").param("device", "shield-c"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("/devices/shield-c/key/HOME")))
                 .andExpect(content().string(not(containsString("<h2>Cast</h2>"))))
                 .andExpect(content().string(not(containsString("id=\"volume-shield-c\""))));
     }
