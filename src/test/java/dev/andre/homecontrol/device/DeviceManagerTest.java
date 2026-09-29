@@ -173,6 +173,14 @@ class DeviceManagerTest {
         }
     }
 
+    @Test
+    void onlyAnAdapterThatIsSwitchedOnIsEnabled() {
+        try (DeviceManager manager = manager(new JsonFileDeviceRegistry(dir.resolve("devices.json")), certificates())) {
+            assertThat(manager.adapterEnabled("androidtv")).isTrue();
+            assertThat(manager.adapterEnabled("webos")).isFalse();
+        }
+    }
+
     /** With Android TV switched off, its pairing (bound to the device id) must not move to another id or device. */
     @Test
     void anEntryOfASwitchedOffModuleIsNeitherMergedNorSplit() {

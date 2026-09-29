@@ -211,6 +211,11 @@ public class DeviceManager implements AutoCloseable {
         throw failures.reason(() -> new UnsupportedActionException(device.name() + " is not a Cast receiver"));
     }
 
+    /** Whether the adapter's module is switched on: a device's entry for it in devices.json does not say so. */
+    public boolean adapterEnabled(String adapterId) {
+        return adapters.containsKey(adapterId);
+    }
+
     /** True when the adapter is switched on and declares what {@code accepts} asks for on this device. */
     private boolean accepts(Device device, String adapterId, Predicate<Set<Capability>> accepts) {
         DeviceAdapter adapter = adapters.get(adapterId);
