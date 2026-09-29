@@ -94,15 +94,15 @@ public final class WorkflowForm {
         String media = templateMode == Replacement.KEEP ? saved.draft().cast().template() : template;
         List<Header> requestHeaders = headersMode == Replacement.KEEP ? saved.draft().calls().getFirst().headers()
                 : headers.stream().map(row -> new Header(row.name, WorkflowHeaderTemplate.literal(row.value))).toList();
-        return new WorkflowDraft(name, enabled, mode, kind, 
-                List.of(new Call("main", CallScope.SHARED, source, requestHeaders, rows(Scope.ROOT))), listing(),
+        return new WorkflowDraft(name, enabled, mode, kind,
+                List.of(new Call(WorkflowMigration.MAIN, CallScope.SHARED, source, requestHeaders, rows(Scope.ROOT))), listing(),
                 mode == Mode.SINGLE ? new Tile(title, optional(subtitle), optional(artwork)) : null,
                 new Cast(media, mimeType));
     }
 
     private Listing listing() {
         if (mode != Mode.GENERATED) return null;
-        return new Listing("main", arrayPointer, idPointer, titlePointer,
+        return new Listing(WorkflowMigration.MAIN, arrayPointer, idPointer, titlePointer,
                 includeSubtitlePointer ? new Field(subtitlePointer, null) : null,
                 includeArtworkPointer ? new Field(artworkPointer, null) : null, rows(Scope.ENTRY));
     }

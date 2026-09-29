@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import static dev.andre.homecontrol.sources.workflows.WorkflowException.Stage;
 
@@ -40,7 +42,7 @@ public final class WorkflowTestService {
         int total = 0;
         Stage active = Stage.FETCH;
         try {
-            byte[] body = http.fetch(WorkflowRunner.request(saved.draft().calls().getFirst(), java.util.Set.of(), java.util.Map.of()));
+            byte[] body = http.fetch(WorkflowRunner.request(saved.draft().calls().getFirst(), Set.of(), Map.of()));
             stages.add(ok(Stage.FETCH)); active = Stage.PARSE;
             var root = WorkflowJson.parse(body);
             stages.add(ok(Stage.PARSE)); active = Stage.SELECT;

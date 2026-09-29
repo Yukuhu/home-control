@@ -36,7 +36,7 @@ final class WorkflowMigration {
 
     static WorkflowDefinition toV2(V1Definition v1) {
         if (v1 == null || v1.draft() == null || v1.draft().fetch() == null || v1.draft().variables() == null
-                || v1.draft().fetch().headers() == null) {
+                || v1.draft().fetch().headers() == null || v1.draft().fetch().headers().contains(null)) {
             throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "definition could not be parsed");
         }
         V1Draft d = v1.draft();
