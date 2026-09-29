@@ -93,34 +93,34 @@
 <button type="button" data-remove-row="calls" aria-label="Remove call">Remove</button>
 <p class="workflow-phase" th:text="${call.phase != null and call.phase != '' ? call.phase : 'Save to see when this call runs'}">Runs at Play</p>
 </div>
-<input type="hidden" data-field="savedName" th:id="|workflow-calls-${c.index}-savedName|" th:name="|calls[${c.index}].savedName|" th:value="${call.savedName}">
+<input type="hidden" data-field="savedName" id="workflow-calls-0-savedName" th:id="|workflow-calls-${c.index}-savedName|" th:name="|calls[${c.index}].savedName|" th:value="${call.savedName}">
 <div class="workflow-field">
-<label th:for="|workflow-calls-${c.index}-name|">Call name</label>
-<input data-field="name" data-call-name type="text" maxlength="24" autocomplete="off" th:id="|workflow-calls-${c.index}-name|" th:name="|calls[${c.index}].name|" th:value="${call.name}">
+<label for="workflow-calls-0-name" th:for="|workflow-calls-${c.index}-name|">Call name</label>
+<input data-field="name" data-call-name type="text" maxlength="24" autocomplete="off" id="workflow-calls-0-name" th:id="|workflow-calls-${c.index}-name|" th:name="|calls[${c.index}].name|" th:value="${call.name}">
 </div>
 <div class="workflow-field">
-<label th:for="|workflow-calls-${c.index}-scope|">Runs</label>
-<select data-field="scope" th:id="|workflow-calls-${c.index}-scope|" th:name="|calls[${c.index}].scope|">
+<label for="workflow-calls-0-scope" th:for="|workflow-calls-${c.index}-scope|">Runs</label>
+<select data-field="scope" id="workflow-calls-0-scope" th:id="|workflow-calls-${c.index}-scope|" th:name="|calls[${c.index}].scope|">
 <option value="SHARED" th:selected="${call.scope != null and call.scope.name() == 'SHARED'}">Once</option>
 <option value="ENTRY" th:if="${workflowForm.mode != null and workflowForm.mode.name() == 'GENERATED'}" th:selected="${call.scope != null and call.scope.name() == 'ENTRY'}">Once per entry</option>
 </select>
 </div>
 <div class="workflow-field">
-<label th:for="|workflow-calls-${c.index}-urlMode|">Source URL</label>
-<select data-field="urlMode" th:id="|workflow-calls-${c.index}-urlMode|" th:name="|calls[${c.index}].urlMode|">
+<label for="workflow-calls-0-urlMode" th:for="|workflow-calls-${c.index}-urlMode|">Source URL</label>
+<select data-field="urlMode" id="workflow-calls-0-urlMode" th:id="|workflow-calls-${c.index}-urlMode|" th:name="|calls[${c.index}].urlMode|">
 <option value="KEEP" th:selected="${call.urlMode != null and call.urlMode.name() == 'KEEP'}">Keep saved URL</option>
 <option value="REPLACE" th:selected="${call.urlMode != null and call.urlMode.name() == 'REPLACE'}">Replace URL</option>
 </select>
 </div>
 <div data-replacement="urlMode">
 <div class="workflow-field">
-<label th:for="|workflow-calls-${c.index}-url|">New source URL</label>
-<input data-field="url" type="text" maxlength="8192" autocomplete="off" th:id="|workflow-calls-${c.index}-url|" th:name="|calls[${c.index}].url|" th:value="${call.url}">
+<label for="workflow-calls-0-url" th:for="|workflow-calls-${c.index}-url|">New source URL</label>
+<input data-field="url" type="text" maxlength="8192" autocomplete="off" id="workflow-calls-0-url" th:id="|workflow-calls-${c.index}-url|" th:name="|calls[${c.index}].url|" th:value="${call.url}">
 </div>
 </div>
 <div class="workflow-field">
-<label th:for="|workflow-calls-${c.index}-headersMode|">Request headers</label>
-<select data-field="headersMode" th:id="|workflow-calls-${c.index}-headersMode|" th:name="|calls[${c.index}].headersMode|">
+<label for="workflow-calls-0-headersMode" th:for="|workflow-calls-${c.index}-headersMode|">Request headers</label>
+<select data-field="headersMode" id="workflow-calls-0-headersMode" th:id="|workflow-calls-${c.index}-headersMode|" th:name="|calls[${c.index}].headersMode|">
 <option value="KEEP" th:selected="${call.headersMode != null and call.headersMode.name() == 'KEEP'}">Keep saved headers</option>
 <option value="REPLACE" th:selected="${call.headersMode != null and call.headersMode.name() == 'REPLACE'}">Replace headers</option>
 </select>
@@ -130,12 +130,12 @@
 <div data-rows="headers">
 <div class="workflow-row" data-row="headers" th:each="header, h : ${call.headers}">
 <div class="workflow-field">
-<label th:for="|workflow-calls-${c.index}-headers-${h.index}-name|">Header name</label>
-<input data-field="name" type="text" autocomplete="off" maxlength="120" th:id="|workflow-calls-${c.index}-headers-${h.index}-name|" th:name="|calls[${c.index}].headers[${h.index}].name|" th:value="${header.name}">
+<label for="workflow-calls-0-headers-0-name" th:for="|workflow-calls-${c.index}-headers-${h.index}-name|">Header name</label>
+<input data-field="name" type="text" autocomplete="off" maxlength="120" id="workflow-calls-0-headers-0-name" th:id="|workflow-calls-${c.index}-headers-${h.index}-name|" th:name="|calls[${c.index}].headers[${h.index}].name|" th:value="${header.name}">
 </div>
 <div class="workflow-field">
-<label th:for="|workflow-calls-${c.index}-headers-${h.index}-value|">New header value</label>
-<input data-field="value" type="password" autocomplete="off" maxlength="16384" th:id="|workflow-calls-${c.index}-headers-${h.index}-value|" th:name="|calls[${c.index}].headers[${h.index}].value|">
+<label for="workflow-calls-0-headers-0-value" th:for="|workflow-calls-${c.index}-headers-${h.index}-value|">New header value</label>
+<input data-field="value" type="password" autocomplete="off" maxlength="16384" id="workflow-calls-0-headers-0-value" th:id="|workflow-calls-${c.index}-headers-${h.index}-value|" th:name="|calls[${c.index}].headers[${h.index}].value|">
 </div>
 <button type="button" data-remove-row="headers" aria-label="Remove header">Remove</button>
 </div>
@@ -146,16 +146,16 @@
 <div data-rows="variables">
 <div class="workflow-row" data-row="variables" th:each="row, v : ${call.variables}">
 <div class="workflow-field">
-<label th:for="|workflow-calls-${c.index}-variables-${v.index}-name|">Variable name</label>
-<input data-field="name" type="text" autocomplete="off" maxlength="32" th:id="|workflow-calls-${c.index}-variables-${v.index}-name|" th:name="|calls[${c.index}].variables[${v.index}].name|" th:value="${row.name}">
+<label for="workflow-calls-0-variables-0-name" th:for="|workflow-calls-${c.index}-variables-${v.index}-name|">Variable name</label>
+<input data-field="name" type="text" autocomplete="off" maxlength="32" id="workflow-calls-0-variables-0-name" th:id="|workflow-calls-${c.index}-variables-${v.index}-name|" th:name="|calls[${c.index}].variables[${v.index}].name|" th:value="${row.name}">
 </div>
 <div class="workflow-field">
-<label th:for="|workflow-calls-${c.index}-variables-${v.index}-pointer|">JSON Pointer</label>
-<input data-field="pointer" type="text" autocomplete="off" maxlength="512" th:id="|workflow-calls-${c.index}-variables-${v.index}-pointer|" th:name="|calls[${c.index}].variables[${v.index}].pointer|" th:value="${row.pointer}">
+<label for="workflow-calls-0-variables-0-pointer" th:for="|workflow-calls-${c.index}-variables-${v.index}-pointer|">JSON Pointer</label>
+<input data-field="pointer" type="text" autocomplete="off" maxlength="512" id="workflow-calls-0-variables-0-pointer" th:id="|workflow-calls-${c.index}-variables-${v.index}-pointer|" th:name="|calls[${c.index}].variables[${v.index}].pointer|" th:value="${row.pointer}">
 </div>
 <div class="workflow-field">
-<label th:for="|workflow-calls-${c.index}-variables-${v.index}-sensitive|">Sensitive value</label>
-<input data-field="sensitive" type="checkbox" value="true" th:id="|workflow-calls-${c.index}-variables-${v.index}-sensitive|" th:name="|calls[${c.index}].variables[${v.index}].sensitive|" th:checked="${row.sensitive}">
+<label for="workflow-calls-0-variables-0-sensitive" th:for="|workflow-calls-${c.index}-variables-${v.index}-sensitive|">Sensitive value</label>
+<input data-field="sensitive" type="checkbox" value="true" id="workflow-calls-0-variables-0-sensitive" th:id="|workflow-calls-${c.index}-variables-${v.index}-sensitive|" th:name="|calls[${c.index}].variables[${v.index}].sensitive|" th:checked="${row.sensitive}">
 <input type="hidden" data-marker="sensitive" value="on" th:name="|_calls[${c.index}].variables[${v.index}].sensitive|">
 </div>
 <button type="button" data-remove-row="variables" aria-label="Remove value">Remove</button>
@@ -238,16 +238,16 @@
 <div data-rows="entryVariables">
 <div class="workflow-row" data-row="entryVariables" th:each="row, e : ${workflowForm.entryVariables}">
 <div class="workflow-field">
-<label th:for="|workflow-entryVariables-${e.index}-name|">Variable name</label>
-<input data-field="name" type="text" autocomplete="off" maxlength="32" th:id="|workflow-entryVariables-${e.index}-name|" th:name="|entryVariables[${e.index}].name|" th:value="${row.name}">
+<label for="workflow-entryVariables-0-name" th:for="|workflow-entryVariables-${e.index}-name|">Variable name</label>
+<input data-field="name" type="text" autocomplete="off" maxlength="32" id="workflow-entryVariables-0-name" th:id="|workflow-entryVariables-${e.index}-name|" th:name="|entryVariables[${e.index}].name|" th:value="${row.name}">
 </div>
 <div class="workflow-field">
-<label th:for="|workflow-entryVariables-${e.index}-pointer|">JSON Pointer</label>
-<input data-field="pointer" type="text" autocomplete="off" maxlength="512" th:id="|workflow-entryVariables-${e.index}-pointer|" th:name="|entryVariables[${e.index}].pointer|" th:value="${row.pointer}">
+<label for="workflow-entryVariables-0-pointer" th:for="|workflow-entryVariables-${e.index}-pointer|">JSON Pointer</label>
+<input data-field="pointer" type="text" autocomplete="off" maxlength="512" id="workflow-entryVariables-0-pointer" th:id="|workflow-entryVariables-${e.index}-pointer|" th:name="|entryVariables[${e.index}].pointer|" th:value="${row.pointer}">
 </div>
 <div class="workflow-field">
-<label th:for="|workflow-entryVariables-${e.index}-sensitive|">Sensitive value</label>
-<input data-field="sensitive" type="checkbox" value="true" th:id="|workflow-entryVariables-${e.index}-sensitive|" th:name="|entryVariables[${e.index}].sensitive|" th:checked="${row.sensitive}">
+<label for="workflow-entryVariables-0-sensitive" th:for="|workflow-entryVariables-${e.index}-sensitive|">Sensitive value</label>
+<input data-field="sensitive" type="checkbox" value="true" id="workflow-entryVariables-0-sensitive" th:id="|workflow-entryVariables-${e.index}-sensitive|" th:name="|entryVariables[${e.index}].sensitive|" th:checked="${row.sensitive}">
 <input type="hidden" data-marker="sensitive" value="on" th:name="|_entryVariables[${e.index}].sensitive|">
 </div>
 <button type="button" data-remove-row="entryVariables" aria-label="Remove entry field">Remove</button>
@@ -315,32 +315,32 @@
 </div>
 <input type="hidden" data-field="savedName" value="">
 <div class="workflow-field">
-<label>Call name</label>
-<input data-field="name" data-call-name type="text" maxlength="24" autocomplete="off">
+<label for="workflow-calls-new-name">Call name</label>
+<input id="workflow-calls-new-name" data-field="name" data-call-name type="text" maxlength="24" autocomplete="off">
 </div>
 <div class="workflow-field">
-<label>Runs</label>
-<select data-field="scope">
+<label for="workflow-calls-new-scope">Runs</label>
+<select id="workflow-calls-new-scope" data-field="scope">
 <option value="SHARED">Once</option>
 <option value="ENTRY">Once per entry</option>
 </select>
 </div>
 <div class="workflow-field">
-<label>Source URL</label>
-<select data-field="urlMode">
+<label for="workflow-calls-new-urlMode">Source URL</label>
+<select id="workflow-calls-new-urlMode" data-field="urlMode">
 <option value="KEEP">Keep saved URL</option>
 <option value="REPLACE" selected>Replace URL</option>
 </select>
 </div>
 <div data-replacement="urlMode">
 <div class="workflow-field">
-<label>New source URL</label>
-<input data-field="url" type="text" maxlength="8192" autocomplete="off">
+<label for="workflow-calls-new-url">New source URL</label>
+<input id="workflow-calls-new-url" data-field="url" type="text" maxlength="8192" autocomplete="off">
 </div>
 </div>
 <div class="workflow-field">
-<label>Request headers</label>
-<select data-field="headersMode">
+<label for="workflow-calls-new-headersMode">Request headers</label>
+<select id="workflow-calls-new-headersMode" data-field="headersMode">
 <option value="KEEP">Keep saved headers</option>
 <option value="REPLACE" selected>Replace headers</option>
 </select>
@@ -358,12 +358,12 @@
 <template id="workflow-headers-template">
 <div class="workflow-row" data-row="headers">
 <div class="workflow-field">
-<label>Header name</label>
-<input data-field="name" type="text" autocomplete="off" maxlength="120">
+<label for="workflow-headers-new-name">Header name</label>
+<input id="workflow-headers-new-name" data-field="name" type="text" autocomplete="off" maxlength="120">
 </div>
 <div class="workflow-field">
-<label>New header value</label>
-<input data-field="value" type="password" autocomplete="off" maxlength="16384">
+<label for="workflow-headers-new-value">New header value</label>
+<input id="workflow-headers-new-value" data-field="value" type="password" autocomplete="off" maxlength="16384">
 </div>
 <button type="button" data-remove-row="headers" aria-label="Remove header">Remove</button>
 </div>
@@ -371,16 +371,16 @@
 <template id="workflow-variables-template">
 <div class="workflow-row" data-row="variables">
 <div class="workflow-field">
-<label>Variable name</label>
-<input data-field="name" type="text" autocomplete="off" maxlength="32">
+<label for="workflow-variables-new-name">Variable name</label>
+<input id="workflow-variables-new-name" data-field="name" type="text" autocomplete="off" maxlength="32">
 </div>
 <div class="workflow-field">
-<label>JSON Pointer</label>
-<input data-field="pointer" type="text" autocomplete="off" maxlength="512">
+<label for="workflow-variables-new-pointer">JSON Pointer</label>
+<input id="workflow-variables-new-pointer" data-field="pointer" type="text" autocomplete="off" maxlength="512">
 </div>
 <div class="workflow-field">
-<label>Sensitive value</label>
-<input data-field="sensitive" type="checkbox" value="true" checked>
+<label for="workflow-variables-new-sensitive">Sensitive value</label>
+<input id="workflow-variables-new-sensitive" data-field="sensitive" type="checkbox" value="true" checked>
 <input type="hidden" data-marker="sensitive" value="on">
 </div>
 <button type="button" data-remove-row="variables" aria-label="Remove value">Remove</button>
@@ -389,16 +389,16 @@
 <template id="workflow-entryVariables-template">
 <div class="workflow-row" data-row="entryVariables">
 <div class="workflow-field">
-<label>Variable name</label>
-<input data-field="name" type="text" autocomplete="off" maxlength="32">
+<label for="workflow-entryVariables-new-name">Variable name</label>
+<input id="workflow-entryVariables-new-name" data-field="name" type="text" autocomplete="off" maxlength="32">
 </div>
 <div class="workflow-field">
-<label>JSON Pointer</label>
-<input data-field="pointer" type="text" autocomplete="off" maxlength="512">
+<label for="workflow-entryVariables-new-pointer">JSON Pointer</label>
+<input id="workflow-entryVariables-new-pointer" data-field="pointer" type="text" autocomplete="off" maxlength="512">
 </div>
 <div class="workflow-field">
-<label>Sensitive value</label>
-<input data-field="sensitive" type="checkbox" value="true" checked>
+<label for="workflow-entryVariables-new-sensitive">Sensitive value</label>
+<input id="workflow-entryVariables-new-sensitive" data-field="sensitive" type="checkbox" value="true" checked>
 <input type="hidden" data-marker="sensitive" value="on">
 </div>
 <button type="button" data-remove-row="entryVariables" aria-label="Remove entry field">Remove</button>
