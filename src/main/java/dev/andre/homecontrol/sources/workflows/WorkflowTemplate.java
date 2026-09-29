@@ -18,11 +18,19 @@ public final class WorkflowTemplate {
     private final List<Token> tokens;
     private final int pathStart;
     private final int queryStart;
+    private final String label;
+    private final WorkflowException.Stage stage;
 
     private record Token(String text, boolean variable, int start) {}
 
     public WorkflowTemplate(String template, Set<String> variableNames) {
-        if (template == null || template.isBlank() || template.length() > MAX_URL) fail("invalid media URL template length");
+        this(template, variableNames, "media URL", WorkflowException.Stage.BUILD);
+    }
+
+    public WorkflowTemplate(String template, Set<String> variableNames, String label, WorkflowException.Stage stage) {
+        this.label = label;
+        this.stage = stage;
+        if (template == null || template.isBlank() || template.length() > MAX_URL) fail("invalid " + label + " template length");
         this.template = template;
         this.tokens = tokenize(template, variableNames);
         int authority = template.indexOf("://");
@@ -36,20 +44,25 @@ public final class WorkflowTemplate {
         validUri(checked.toString());
     }
 
-    private static List<Token> tokenize(String template, Set<String> variableNames) {
+    /** The variable names this template uses. */
+    public Set<String> references() {
+        return tokens.stream().filter(Token::variable).map(Token::text).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    private List<Token> tokenize(String template, Set<String> variableNames) {
         List<Token> parts = new ArrayList<>();
         Matcher matcher = VARIABLE.matcher(template);
         int previous = 0;
         while (matcher.find()) {
             String literal = template.substring(previous, matcher.start());
-            if (literal.indexOf('{') >= 0 || literal.indexOf('}') >= 0) fail("invalid media URL placeholder");
+            if (literal.indexOf('{') >= 0 || literal.indexOf('}') >= 0) fail("invalid " + label + " placeholder");
             parts.add(new Token(literal, false, previous));
-            if (!variableNames.contains(matcher.group(1))) fail("unknown media URL placeholder: " + matcher.group(1));
+            if (!variableNames.contains(matcher.group(1))) fail("unknown " + label + " placeholder: " + matcher.group(1));
             parts.add(new Token(matcher.group(1), true, matcher.start()));
             previous = matcher.end();
         }
         String tail = template.substring(previous);
-        if (tail.indexOf('{') >= 0 || tail.indexOf('}') >= 0) fail("invalid media URL placeholder");
+        if (tail.indexOf('{') >= 0 || tail.indexOf('}') >= 0) fail("invalid " + label + " placeholder");
         parts.add(new Token(tail, false, previous));
         return List.copyOf(parts);
     }
@@ -59,11 +72,11 @@ public final class WorkflowTemplate {
             if (!token.variable()) continue;
             int start = token.start();
             if (queryStart < 0 || start < queryStart) {
-                if (pathStart < 0 || start < pathStart) fail("media URL placeholder must be in a path or query value");
+                if (pathStart < 0 || start < pathStart) fail(label + " placeholder must be in a path or query value");
             } else {
                 int fieldStart = Math.max(template.lastIndexOf('&', start), queryStart);
                 int equals = template.indexOf('=', fieldStart + 1);
-                if (equals < 0 || equals >= start) fail("media URL placeholder must be in a query value");
+                if (equals < 0 || equals >= start) fail(label + " placeholder must be in a query value");
             }
         }
     }
@@ -73,10 +86,10 @@ public final class WorkflowTemplate {
         for (Token token : tokens) {
             if (token.variable()) {
                 WorkflowJson.Value value = values.get(token.text());
-                if (value == null || value.text() == null) fail("unresolved media URL placeholder");
+                if (value == null || value.text() == null) fail("unresolved " + label + " placeholder");
                 built.append(encodeComponent(value.text()));
             } else built.append(token.text());
-            if (built.length() > MAX_URL) fail("expanded media URL exceeds limit");
+            if (built.length() > MAX_URL) fail("expanded " + label + " exceeds limit");
         }
         return validUri(built.toString());
     }
@@ -87,7 +100,7 @@ public final class WorkflowTemplate {
         for (Token token : tokens) {
             if (token.variable()) {
                 WorkflowJson.Value value = values.get(token.text());
-                if (value == null || value.text() == null) fail("unresolved media URL placeholder");
+                if (value == null || value.text() == null) fail("unresolved " + label + " placeholder");
                 display.append(value.sensitive() ? "•••" : encodeComponent(value.text()));
             } else {
                 previewLiteral(display, token);
@@ -134,22 +147,22 @@ public final class WorkflowTemplate {
         return encoded.toString();
     }
 
-    private static URI validUri(String raw) {
+    private URI validUri(String raw) {
         try {
             URI uri = new URI(raw);
             if (uri.getScheme() == null || !(uri.getScheme().equalsIgnoreCase("http") || uri.getScheme().equalsIgnoreCase("https"))
                     || uri.getHost() == null || uri.getHost().isBlank() || uri.getRawUserInfo() != null
-                    || uri.getRawFragment() != null) fail("invalid media URL template");
+                    || uri.getRawFragment() != null) fail("invalid " + label + " template");
             for (String segment : uri.getPath().split("/", -1)) {
-                if (segment.equals(".") || segment.equals("..")) fail("dot path segment in media URL");
+                if (segment.equals(".") || segment.equals("..")) fail("dot path segment in " + label);
             }
             return uri;
         } catch (URISyntaxException _) {
-            throw new WorkflowException(WorkflowException.Stage.BUILD, "invalid media URL template");
+            throw new WorkflowException(stage, "invalid " + label + " template");
         }
     }
 
-    private static void fail(String detail) {
-        throw new WorkflowException(WorkflowException.Stage.BUILD, detail);
+    private void fail(String detail) {
+        throw new WorkflowException(stage, detail);
     }
 }
