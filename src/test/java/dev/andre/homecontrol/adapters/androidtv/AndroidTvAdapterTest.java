@@ -5,6 +5,7 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
+import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
@@ -34,6 +35,17 @@ class AndroidTvAdapterTest {
 
     private AndroidTvProperties properties() {
         return new AndroidTvProperties(true, "shield", Duration.ofSeconds(10), Duration.ofSeconds(1), Duration.ofSeconds(4));
+    }
+
+    @Test
+    void validateRejectsAPortOutOfRange() {
+        Device device = new Device("x", "X", DeviceKind.ANDROID_TV, "10.0.0.9",
+                java.util.Map.of("androidtv", java.util.Map.of("port", "70000")), Instant.now());
+        AndroidTvAdapter adapter = adapter(new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "pw".toCharArray()));
+
+        assertThatThrownBy(() -> adapter.validate(device))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("androidtv port must be an integer between 1 and 65535");
     }
 
     private AndroidTvAdapter adapter(CertificateStore certificates) {

@@ -44,6 +44,21 @@ public interface DeviceAdapter {
     default void forget(Device device) {
     }
 
+    /**
+     * Checks this adapter's settings of a registered device at startup. Throws {@link IllegalArgumentException} with
+     * the reason when they cannot work. Default: nothing to check.
+     */
+    default void validate(Device device) {
+    }
+
+    /**
+     * Brings this adapter's settings of a registered device up to date at startup, for example by moving a credential
+     * out of the registry. The device manager saves a changed result. Must be idempotent. Default: unchanged.
+     */
+    default Device migrate(Device device) {
+        return device;
+    }
+
     /** Devices this adapter has seen on the network, paired or not. */
     List<DiscoveredDevice> discovered();
 

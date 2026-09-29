@@ -6,6 +6,8 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.storage.StorageException;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -89,7 +91,7 @@ class JsonFileDeviceRegistryTest {
         assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
-                .hasMessageContaining("permissions");
+                .hasMessageContaining("fix or delete it");
     }
 
     @Test
@@ -101,7 +103,7 @@ class JsonFileDeviceRegistryTest {
         assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
-                .hasMessageContaining("integrity");
+                .hasMessageContaining("fix or delete it");
     }
 
     @Test
@@ -121,7 +123,7 @@ class JsonFileDeviceRegistryTest {
         assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
-                .hasMessageContaining("integrity");
+                .hasMessageContaining("fix or delete it");
     }
 
     @Test
@@ -141,12 +143,14 @@ class JsonFileDeviceRegistryTest {
                     .containsEntry("certificateFingerprint", "AB:CD");
             assertThat(device.lastSeen()).isEqualTo(Instant.parse("2026-08-29T18:00:00Z"));
         });
-        String rewritten = Files.readString(file);
-        assertThat(rewritten).contains("\"kind\":\"ANDROID_TV\"").contains("\"adapters\"")
-                .doesNotContain("\"certificateFingerprint\":\"AB:CD\",\"lastSeen\"");
+        JsonNode rewritten = JsonMapper.builder().build().readTree(Files.readAllBytes(file));
+        assertThat(rewritten.path("version").asInt()).isEqualTo(3);
+        JsonNode record = rewritten.path("devices").path(0);
+        assertThat(record.path("kind").asString()).isEqualTo("ANDROID_TV");
+        assertThat(record.path("adapters").path("androidtv").path("certificateFingerprint").asString()).isEqualTo("AB:CD");
+        assertThat(record.has("certificateFingerprint")).isFalse();
 
-        // The rewritten file must be readable as v2 on its own, without going through
-        // migration again (it already has "kind", so the migration branch is skipped).
+        // The rewritten file must be readable on its own, without going through migration again.
         List<Device> reread = new JsonFileDeviceRegistry(file).findAll();
         assertThat(reread).isEqualTo(devices);
     }
@@ -177,13 +181,15 @@ class JsonFileDeviceRegistryTest {
     }
 
     @Test
-    void aVersionTwoFileIsNotBackedUp() {
+    void aVersionThreeFileIsNotBackedUp() throws Exception {
         Path file = dir.resolve("devices.json");
         new JsonFileDeviceRegistry(file).save(shield());
 
         new JsonFileDeviceRegistry(file).findAll();
 
-        assertThat(dir.resolve("devices.v1.json")).doesNotExist();
+        try (var files = Files.list(dir)) {
+            assertThat(files.map(path -> path.getFileName().toString())).containsExactly("devices.json");
+        }
     }
 
     @Test
@@ -209,48 +215,43 @@ class JsonFileDeviceRegistryTest {
         assertThatThrownBy(registry::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
-                .hasMessageContaining("integrity");
+                .hasMessageContaining("fix or delete it");
     }
 
     @Test
-    void aVersionTwoRecordWithAnInvalidAndroidTvPortIsAPathBearingStorageFailure() throws Exception {
+    void aVersionTwoFileIsWrappedIntoVersionThreeAndKeptAsABackup() throws Exception {
         Path file = dir.resolve("devices.json");
-        Files.writeString(file, """
-                [{
-                  "id": "x",
-                  "name": "X",
-                  "kind": "ANDROID_TV",
-                  "host": "10.0.0.9",
-                  "adapters": {"androidtv": {"port": "abc"}},
-                  "lastSeen": "2026-08-29T18:00:00Z"
-                }]
-                """);
+        Files.copy(Path.of("src/test/resources/fixtures/devices/devices-v2.json"), file);
+        String original = Files.readString(file);
 
-        var registry = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(registry::findAll)
-                .isInstanceOf(StorageException.class)
-                .hasMessageContaining(file.toString())
-                .hasMessageContaining("integrity");
+        List<Device> devices = new JsonFileDeviceRegistry(file).findAll();
+
+        assertThat(devices).extracting(Device::id).containsExactly("shield-1");
+        assertThat(devices.getFirst().adapterSettings("cast")).containsEntry("castId", "abc");
+        JsonNode root = JsonMapper.builder().build().readTree(Files.readAllBytes(file));
+        assertThat(root.path("version").asInt()).isEqualTo(3);
+        assertThat(root.path("devices").isArray()).isTrue();
+        assertThat(dir.resolve("devices.v2.json")).hasContent(original);
     }
 
     @Test
-    void aVersionTwoRecordWithAnInvalidCastPortIsAPathBearingStorageFailure() throws Exception {
+    void theRegistryIsReadOnceAndThenServedFromMemory() throws Exception {
         Path file = dir.resolve("devices.json");
-        Files.writeString(file, """
-                [{
-                  "id": "cast-10-0-0-9",
-                  "name": "Kitchen",
-                  "kind": "CAST",
-                  "host": "10.0.0.9",
-                  "adapters": {"cast": {"port": "70000"}},
-                  "lastSeen": "2026-08-29T18:00:00Z"
-                }]
-                """);
+        JsonFileDeviceRegistry registry = new JsonFileDeviceRegistry(file);
+        registry.save(shield());
 
-        var registry = new JsonFileDeviceRegistry(file);
-        assertThatThrownBy(registry::findAll)
+        Files.writeString(file, "not json any more");
+
+        assertThat(registry.findAll()).extracting(Device::id).containsExactly("shield-1");
+    }
+
+    @Test
+    void aNewerRegistryIsRefusedByName() throws Exception {
+        Path file = dir.resolve("devices.json");
+        Files.writeString(file, "{\"version\":4,\"devices\":[]}");
+
+        assertThatThrownBy(() -> new JsonFileDeviceRegistry(file).findAll())
                 .isInstanceOf(StorageException.class)
-                .hasMessageContaining(file.toString())
-                .hasMessageContaining("integrity");
+                .hasMessageContaining("newer Home Control");
     }
 }
