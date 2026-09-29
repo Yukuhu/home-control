@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-/** A scriptable adapter for DeviceManager tests: no network, records what it was asked to do. */
+/** A scriptable adapter for the device tests: no network, records what it was asked to do. */
 class StubAdapter implements DeviceAdapter, AdapterDiscovery {
 
     private final String id;

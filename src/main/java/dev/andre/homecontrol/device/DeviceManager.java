@@ -169,11 +169,6 @@ public class DeviceManager implements DeviceQueries, DeviceCommands, DeviceEnrol
         return parts.enrollment().split(id, adapterId);
     }
 
-    /** Kept for {@code DeviceManagerFallThroughTest}; see {@link DeviceMatching#uniqueId}. */
-    static String uniqueId(List<Device> registered, String adapterId, String host) {
-        return DeviceMatching.uniqueId(registered, adapterId, host);
-    }
-
     @Override
     @PreDestroy
     public void close() {

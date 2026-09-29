@@ -23,7 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class DeviceManagerMergeTest {
+class DevicesMergeTest {
 
     @TempDir
     Path dir;
@@ -34,17 +34,17 @@ class DeviceManagerMergeTest {
     private final StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false,
             Capability.CAST_RECEIVER, Capability.VOLUME);
     private DeviceRegistry registry;
-    private DeviceManager manager;
+    private Devices devices;
 
     @BeforeEach
     void setUp() {
         registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-        manager = new DeviceManager(registry, List.of(androidtv, cast), published::add);
+        devices = Devices.assemble(registry, List.of(androidtv, cast), published::add);
     }
 
     @AfterEach
     void tearDown() {
-        manager.close();
+        devices.close();
     }
 
     private static Device shield() {
@@ -59,9 +59,9 @@ class DeviceManagerMergeTest {
     @Test
     void aReceiverAtTheAddressOfARegisteredDeviceIsMergedIntoIt() {
         registry.save(shield());
-        manager.start();
+        devices.start();
 
-        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.5")));
+        devices.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.5")));
 
         Device merged = registry.findById("10-0-0-5").orElseThrow();
         assertThat(List.copyOf(merged.adapters().keySet())).containsExactly("androidtv", "cast");
@@ -74,7 +74,7 @@ class DeviceManagerMergeTest {
     void aReceiverWithTheSameFriendlyNameIsMergedWhenTheAddressDiffers() {
         registry.save(shield());
 
-        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("living room tv ", "10.0.0.77")));
+        devices.onDiscovered(new DeviceDiscoveredEvent(receiver("living room tv ", "10.0.0.77")));
 
         assertThat(registry.findById("10-0-0-5").orElseThrow().hasAdapter("cast")).isTrue();
     }
@@ -85,7 +85,7 @@ class DeviceManagerMergeTest {
         registry.save(new Device("10-0-0-6", "Living Room TV", DeviceKind.ANDROID_TV, "10.0.0.6",
                 Map.of("androidtv", Map.of()), Instant.EPOCH));
 
-        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("Living Room TV", "10.0.0.77")));
+        devices.onDiscovered(new DeviceDiscoveredEvent(receiver("Living Room TV", "10.0.0.77")));
 
         assertThat(registry.findAll()).noneMatch(device -> device.hasAdapter("cast"));
     }
@@ -95,27 +95,27 @@ class DeviceManagerMergeTest {
         registry.save(shield());
         cast.visible.add(receiver("Kitchen", "10.0.0.9"));
 
-        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("Kitchen", "10.0.0.9")));
+        devices.onDiscovered(new DeviceDiscoveredEvent(receiver("Kitchen", "10.0.0.9")));
 
         assertThat(registry.findAll()).hasSize(1);
-        assertThat(manager.addable()).extracting(DiscoveredDevice::name).containsExactly("Kitchen");
-        assertThat(manager.pairable()).isEmpty();
+        assertThat(devices.enrollment().addable()).extracting(DiscoveredDevice::name).containsExactly("Kitchen");
+        assertThat(devices.enrollment().pairable()).isEmpty();
     }
 
     @Test
     void addingAnUnmatchedReceiverRegistersACastDevice() {
         cast.visible.add(receiver("Kitchen", "10.0.0.9"));
 
-        Device added = manager.addDiscovered("cast", "10.0.0.9", 8009);
+        Device added = devices.enrollment().addDiscovered("cast", "10.0.0.9", 8009);
 
         assertThat(added.id()).isEqualTo("cast-10-0-0-9");
         assertThat(added.kind()).isEqualTo(DeviceKind.CAST);
         assertThat(added.name()).isEqualTo("Kitchen");
         assertThat(registry.findById("cast-10-0-0-9")).isPresent();
-        assertThat(manager.addable()).isEmpty();
-        assertThatThrownBy(() -> manager.addDiscovered("cast", "10.0.0.9", 8009))
+        assertThat(devices.enrollment().addable()).isEmpty();
+        assertThatThrownBy(() -> devices.enrollment().addDiscovered("cast", "10.0.0.9", 8009))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already added");
-        assertThatThrownBy(() -> manager.addDiscovered("cast", "10.0.0.99", 8009))
+        assertThatThrownBy(() -> devices.enrollment().addDiscovered("cast", "10.0.0.99", 8009))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("no longer visible");
     }
 
@@ -123,7 +123,7 @@ class DeviceManagerMergeTest {
     void rePairingAMergedDeviceKeepsItsCastEntry() {
         registry.save(shield().withAdapter("cast", Map.of("port", "8009")));
 
-        manager.adopt(new Device("10-0-0-5", "Living Room TV", DeviceKind.ANDROID_TV, "10.0.0.5",
+        devices.enrollment().adopt(new Device("10-0-0-5", "Living Room TV", DeviceKind.ANDROID_TV, "10.0.0.5",
                 Map.of("androidtv", Map.of("port", "6466", "certificateFingerprint", "AB")), Instant.now()));
 
         Device device = registry.findById("10-0-0-5").orElseThrow();
@@ -135,7 +135,7 @@ class DeviceManagerMergeTest {
     void adoptingAnAndroidTvAbsorbsAnUnregisteredReceiverAtTheSameAddress() {
         cast.visible.add(receiver("SHIELD", "10.0.0.5"));
 
-        manager.adopt(shield());
+        devices.enrollment().adopt(shield());
 
         assertThat(registry.findById("10-0-0-5").orElseThrow().hasAdapter("cast")).isTrue();
     }
@@ -145,10 +145,10 @@ class DeviceManagerMergeTest {
         registry.save(shield());
         registry.save(new Device("cast-10-0-0-5", "SHIELD", DeviceKind.CAST, "10.0.0.5",
                 Map.of("cast", Map.of("port", "8009")), Instant.EPOCH));
-        manager.start();
+        devices.start();
         published.clear();
 
-        Device merged = manager.merge("10-0-0-5", "cast-10-0-0-5");
+        Device merged = devices.enrollment().merge("10-0-0-5", "cast-10-0-0-5");
 
         assertThat(List.copyOf(merged.adapters().keySet())).containsExactly("androidtv", "cast");
         assertThat(registry.findById("cast-10-0-0-5")).isEmpty();
@@ -163,25 +163,25 @@ class DeviceManagerMergeTest {
         registry.save(new Device("cast-10-0-0-5", "SHIELD", DeviceKind.CAST, "10.0.0.5",
                 Map.of("cast", Map.of("port", "8009")), Instant.EPOCH));
 
-        assertThatThrownBy(() -> manager.merge("cast-10-0-0-5", "10-0-0-5"))
+        assertThatThrownBy(() -> devices.enrollment().merge("cast-10-0-0-5", "10-0-0-5"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("other way round");
         assertThat(registry.findAll()).hasSize(2);
-        assertThatThrownBy(() -> manager.merge("10-0-0-5", "10-0-0-5")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> devices.enrollment().merge("10-0-0-5", "10-0-0-5")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void splitMovesOneAdapterIntoANewDeviceThatIsNotMergedBack() {
         registry.save(shield().withAdapter("cast", Map.of("port", "8009")));
-        manager.start();
+        devices.start();
 
-        Device split = manager.split("10-0-0-5", "cast");
+        Device split = devices.enrollment().split("10-0-0-5", "cast");
 
         assertThat(split.id()).isEqualTo("cast-10-0-0-5");
         assertThat(split.name()).isEqualTo("Living Room TV (cast)");
         assertThat(split.kind()).isEqualTo(DeviceKind.CAST);
         assertThat(registry.findById("10-0-0-5").orElseThrow().hasAdapter("cast")).isFalse();
 
-        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("Living Room TV", "10.0.0.5")));
+        devices.onDiscovered(new DeviceDiscoveredEvent(receiver("Living Room TV", "10.0.0.5")));
 
         assertThat(registry.findById("10-0-0-5").orElseThrow().hasAdapter("cast")).isFalse();
     }
@@ -192,23 +192,23 @@ class DeviceManagerMergeTest {
         registry.save(new Device("cast-10-0-0-9", "Kitchen", DeviceKind.CAST, "10.0.0.9",
                 Map.of("cast", Map.of()), Instant.EPOCH));
 
-        assertThatThrownBy(() -> manager.split("10-0-0-5", "androidtv"))
+        assertThatThrownBy(() -> devices.enrollment().split("10-0-0-5", "androidtv"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cannot be split off");
-        assertThatThrownBy(() -> manager.split("cast-10-0-0-9", "cast"))
+        assertThatThrownBy(() -> devices.enrollment().split("cast-10-0-0-9", "cast"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only one connection");
     }
 
     @Test
     void stateAndEventsCarryTheComposedStateOfAllAdapters() {
         registry.save(shield().withAdapter("cast", Map.of("port", "8009")));
-        manager.start();
+        devices.start();
         published.clear();
 
         cast.handles.get("10-0-0-5").report(new DeviceState(DeviceStatus.CONNECTED, true, "Default Media Receiver",
                 40, 100, false, Instant.now()));
 
-        assertThat(manager.state("10-0-0-5").currentApp()).isEqualTo("Default Media Receiver");
-        assertThat(manager.state("10-0-0-5").volumeLevel()).isEqualTo(40);
+        assertThat(devices.queries().state("10-0-0-5").currentApp()).isEqualTo("Default Media Receiver");
+        assertThat(devices.queries().state("10-0-0-5").volumeLevel()).isEqualTo(40);
         assertThat(published).last().isInstanceOfSatisfying(DeviceStateChangedEvent.class, event -> {
             assertThat(event.deviceId()).isEqualTo("10-0-0-5");
             assertThat(event.state().currentApp()).isEqualTo("Default Media Receiver");
@@ -222,14 +222,14 @@ class DeviceManagerMergeTest {
         DiscoveredDevice elsewhere = receiver("living room tv", "10.0.0.77");
         cast.visible.add(elsewhere);
 
-        manager.onDiscovered(new DeviceDiscoveredEvent(elsewhere));
+        devices.onDiscovered(new DeviceDiscoveredEvent(elsewhere));
 
         assertThat(registry.findById("10-0-0-5").orElseThrow().adapterSettings("cast"))
                 .containsEntry("host", "10.0.0.77");
-        assertThat(manager.addable()).isEmpty();
-        assertThatThrownBy(() -> manager.addDiscovered("cast", "10.0.0.77", 8009))
+        assertThat(devices.enrollment().addable()).isEmpty();
+        assertThatThrownBy(() -> devices.enrollment().addDiscovered("cast", "10.0.0.77", 8009))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already added");
-        manager.onDiscovered(new DeviceDiscoveredEvent(elsewhere));
+        devices.onDiscovered(new DeviceDiscoveredEvent(elsewhere));
         assertThat(registry.findAll()).hasSize(1);
     }
 
@@ -237,7 +237,7 @@ class DeviceManagerMergeTest {
     void splittingAReceiverMergedFromElsewhereGivesItItsOwnAddress() {
         registry.save(shield().withAdapter("cast", Map.of("host", "10.0.0.77", "port", "8009")));
 
-        Device split = manager.split("10-0-0-5", "cast");
+        Device split = devices.enrollment().split("10-0-0-5", "cast");
 
         assertThat(split.id()).isEqualTo("cast-10-0-0-77");
         assertThat(split.host()).isEqualTo("10.0.0.77");
@@ -248,7 +248,7 @@ class DeviceManagerMergeTest {
         cast.visible.add(receiver("Living Room TV", "10.0.0.99"));
         cast.visible.add(receiver("SHIELD", "10.0.0.5"));
 
-        manager.adopt(shield());
+        devices.enrollment().adopt(shield());
 
         assertThat(registry.findById("10-0-0-5").orElseThrow().adapterSettings("cast"))
                 .containsEntry("host", "10.0.0.5");
@@ -259,7 +259,7 @@ class DeviceManagerMergeTest {
         cast.visible.add(receiver("Living Room TV", "10.0.0.98"));
         cast.visible.add(receiver("living room tv", "10.0.0.99"));
 
-        manager.adopt(shield());
+        devices.enrollment().adopt(shield());
 
         assertThat(registry.findById("10-0-0-5").orElseThrow().hasAdapter("cast"))
                 .as("two receivers share the name").isFalse();
@@ -269,7 +269,7 @@ class DeviceManagerMergeTest {
         registry.save(new Device("10-0-0-6", "Bedroom TV", DeviceKind.ANDROID_TV, "10.0.0.6",
                 Map.of("androidtv", Map.of()), Instant.EPOCH));
 
-        manager.adopt(new Device("10-0-0-7", "Bedroom TV", DeviceKind.ANDROID_TV, "10.0.0.7",
+        devices.enrollment().adopt(new Device("10-0-0-7", "Bedroom TV", DeviceKind.ANDROID_TV, "10.0.0.7",
                 Map.of("androidtv", Map.of()), Instant.EPOCH));
 
         assertThat(registry.findById("10-0-0-7").orElseThrow().hasAdapter("cast"))
@@ -278,7 +278,7 @@ class DeviceManagerMergeTest {
         cast.visible.clear();
         cast.visible.add(receiver("Office TV", "10.0.0.96"));
 
-        manager.adopt(new Device("10-0-0-8", "Office TV", DeviceKind.ANDROID_TV, "10.0.0.8",
+        devices.enrollment().adopt(new Device("10-0-0-8", "Office TV", DeviceKind.ANDROID_TV, "10.0.0.8",
                 Map.of("androidtv", Map.of()), Instant.EPOCH));
 
         assertThat(registry.findById("10-0-0-8").orElseThrow().adapterSettings("cast"))
@@ -288,10 +288,10 @@ class DeviceManagerMergeTest {
     @Test
     void aReceiverThatChangedAddressIsReconnectedAtItsNewAddress() {
         registry.save(shield().withAdapter("cast", Map.of("host", "10.0.0.5", "port", "8009", "stableId", "abc")));
-        manager.start();
+        devices.start();
         published.clear();
 
-        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.50")));
+        devices.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.50")));
 
         Device updated = registry.findById("10-0-0-5").orElseThrow();
         assertThat(updated.adapterSettings("cast")).containsEntry("host", "10.0.0.50");
@@ -304,10 +304,10 @@ class DeviceManagerMergeTest {
     @Test
     void aReceiverAtItsKnownAddressIsNotReconnectedAgain() {
         registry.save(shield().withAdapter("cast", Map.of("host", "10.0.0.5", "port", "8009", "stableId", "abc")));
-        manager.start();
+        devices.start();
         published.clear();
 
-        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.5")));
+        devices.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.5")));
 
         assertThat(published).isEmpty();
     }
@@ -315,13 +315,13 @@ class DeviceManagerMergeTest {
     @Test
     void aReceiverAnnouncedAfterStartupIsMergedByTheListener() {
         registry.save(shield());
-        manager.start();
+        devices.start();
         cast.visible.add(receiver("SHIELD", "10.0.0.5"));
 
-        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.5")));
+        devices.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.5")));
 
         assertThat(registry.findById("10-0-0-5").orElseThrow().hasAdapter("cast")).isTrue();
-        assertThat(manager.addable()).isEmpty();
+        assertThat(devices.enrollment().addable()).isEmpty();
     }
 
     @Test
@@ -333,11 +333,11 @@ class DeviceManagerMergeTest {
         attachRegistry.save(new Device("tv", "Living Room TV", DeviceKind.CAST, "10.0.0.60",
                 Map.of("alpha", Map.of()), Instant.EPOCH));
 
-        try (DeviceManager attachManager = new DeviceManager(attachRegistry, List.of(alpha, beta), published::add)) {
+        try (Devices attachManager = Devices.assemble(attachRegistry, List.of(alpha, beta), published::add)) {
             attachManager.start();
             StubAdapter.StubHandle firstAlpha = alpha.handles.get("tv");
 
-            Device result = attachManager.attach("10.0.0.60", "[LG] webOS TV", DeviceKind.WEBOS, "beta",
+            Device result = attachManager.enrollment().attach("10.0.0.60", "[LG] webOS TV", DeviceKind.WEBOS, "beta",
                     Map.of("clientKey", "k"));
 
             assertThat(result.id()).isEqualTo("tv");
@@ -348,7 +348,7 @@ class DeviceManagerMergeTest {
             assertThat(firstAlpha.closed).isTrue();
             assertThat(alpha.handles.get("tv")).isNotSameAs(firstAlpha);
             assertThat(beta.handles).containsKey("tv");
-            assertThat(attachManager.capabilities("tv")).containsExactlyInAnyOrder(
+            assertThat(attachManager.queries().capabilities("tv")).containsExactlyInAnyOrder(
                     Capability.VOLUME, Capability.REMOTE_KEYS, Capability.APP_LINK);
         }
     }
@@ -360,12 +360,12 @@ class DeviceManagerMergeTest {
                 Capability.REMOTE_KEYS, Capability.APP_LINK);
         DeviceRegistry attachRegistry = new JsonFileDeviceRegistry(dir.resolve("attach-devices-2.json"));
 
-        try (DeviceManager attachManager = new DeviceManager(attachRegistry, List.of(alpha, beta), published::add)) {
-            Device result = attachManager.attach("10.0.0.61", "Samsung", DeviceKind.TIZEN, "beta", Map.of());
+        try (Devices attachManager = Devices.assemble(attachRegistry, List.of(alpha, beta), published::add)) {
+            Device result = attachManager.enrollment().attach("10.0.0.61", "Samsung", DeviceKind.TIZEN, "beta", Map.of());
 
             assertThat(result.id()).isEqualTo("beta-10-0-0-61");
             assertThat(result.kind()).isEqualTo(DeviceKind.TIZEN);
-            assertThat(attachManager.states()).containsKey("beta-10-0-0-61");
+            assertThat(attachManager.queries().states()).containsKey("beta-10-0-0-61");
         }
     }
 }
