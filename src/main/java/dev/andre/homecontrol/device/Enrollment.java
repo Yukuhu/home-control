@@ -87,7 +87,7 @@ final class Enrollment {
         }
 
         void run() {
-            toClose.forEach(DeviceHandle::close);
+            toClose.forEach(DeviceConnections::closeQuietly);
             connects.forEach(connections::complete);
             removed.forEach(id -> events.publishEvent(new DeviceStateChangedEvent(id, DeviceState.initial())));
         }
@@ -171,7 +171,6 @@ final class Enrollment {
                 return;
             }
             Device device = registered.get();
-            after.remove(id);
             device.adapters().keySet().forEach(adapterId -> {
                 DeviceAdapter adapter = adapters.get(adapterId);
                 if (adapter != null) {
@@ -179,6 +178,8 @@ final class Enrollment {
                 }
             });
             registry.delete(id);
+            // Last, so a forget or delete that fails leaves the device registered and still connected.
+            after.remove(id);
         }
         after.run();
     }
@@ -343,9 +344,10 @@ final class Enrollment {
                 merged = merged.withAdapter(adapterId, entry.getValue());
             }
             // Credentials move with the settings, so the source is removed WITHOUT adapter.forget().
-            after.remove(sourceId);
             registry.delete(sourceId);
             registry.save(merged);
+            // After the writes, so a merge that cannot be saved leaves the source connected.
+            after.remove(sourceId);
             after.connect(merged);
         }
         after.run();

@@ -24,9 +24,12 @@ import java.util.concurrent.ConcurrentHashMap;
  *       Callers begin while holding the registry lock, so connects and removals follow the order of the registry
  *       changes.</li>
  *   <li>{@link #complete} closes the old handles and calls {@code adapter.connect} outside every lock. It installs
- *       the new handles only if their generation is still current, and closes them otherwise.</li>
+ *       the new handles only if their generation is still current, and closes them otherwise. A ticket superseded
+ *       before it reaches an adapter connects nothing more: its successor does.</li>
  * </ul>
- * The lock guards only these maps: it never covers {@code connect}, {@code close} or publishing an event.
+ * The lock guards only these maps: it never covers {@code connect}, {@code close} or publishing an event. Two connects
+ * of one device overlap only when the second begins while the first is inside {@code adapter.connect}; the first then
+ * closes what it opened. A handle that fails to close is logged and dropped, so it stops no other close or connect.
  */
 final class DeviceConnections {
 
@@ -73,18 +76,22 @@ final class DeviceConnections {
      * handle last published would otherwise stay on every screen.
      */
     void complete(Connecting connecting) {
-        connecting.previous().forEach(DeviceHandle::close);
+        connecting.previous().forEach(DeviceConnections::closeQuietly);
         Device device = connecting.device();
         Generation generation = connecting.generation();
         Map<String, DeviceHandle> opened = new LinkedHashMap<>();
         for (String adapterId : generation.adapterIds) {
+            if (!generation.current()) {
+                opened.values().forEach(DeviceConnections::closeQuietly);
+                return;
+            }
             try {
                 opened.put(adapterId, adapters.get(adapterId).connect(device,
                         state -> generation.report(adapterId, state),
                         updates -> learned.store(device.id(), adapterId, updates)));
             } catch (RuntimeException e) {
                 log.warn("Could not connect {} via the {} adapter; leaving it disconnected", device.id(), adapterId, e);
-                opened.values().forEach(DeviceHandle::close);
+                opened.values().forEach(DeviceConnections::closeQuietly);
                 boolean current;
                 synchronized (lock) {
                     current = reported.remove(device.id(), generation);
@@ -103,7 +110,16 @@ final class DeviceConnections {
             }
         }
         if (!installed) {
-            opened.values().forEach(DeviceHandle::close);
+            opened.values().forEach(DeviceConnections::closeQuietly);
+        }
+    }
+
+    /** Closes a handle; one that fails to close is logged and dropped, so it stops no other close, connect or event. */
+    static void closeQuietly(DeviceHandle handle) {
+        try {
+            handle.close();
+        } catch (RuntimeException e) {
+            log.warn("Could not close a device connection; dropping it", e);
         }
     }
 
@@ -123,7 +139,7 @@ final class DeviceConnections {
             handles.values().forEach(deviceHandles -> open.addAll(deviceHandles.values()));
             handles.clear();
         }
-        open.forEach(DeviceHandle::close);
+        open.forEach(DeviceConnections::closeQuietly);
     }
 
     Map<String, DeviceHandle> handles(String id) {
@@ -156,9 +172,14 @@ final class DeviceConnections {
             return DeviceStates.compose(List.copyOf(states.values()));
         }
 
+        /** True while no later {@link #begin} or {@link #end} has replaced this generation. */
+        boolean current() {
+            return reported.get(deviceId) == this;
+        }
+
         /** Publishes the composed state inside this monitor, so two adapters' updates reach SSE in the order they were composed. */
         synchronized void report(String adapterId, DeviceState state) {
-            if (reported.get(deviceId) != this) {
+            if (!current()) {
                 return; // a handle of a replaced or ended generation reporting late
             }
             states.put(adapterId, state);
