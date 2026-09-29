@@ -22,7 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.device.Devices;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import org.junit.jupiter.api.io.TempDir;
 import java.time.Instant;
@@ -113,20 +113,20 @@ class SonosDiscoveryTest {
         assertRegistryUntouchedBy(registry, room);
     }
 
-    /** Runs a real device manager fed by this discovery's events and checks {@code registered} stays as it was. */
+    /** Runs the real device collaborators fed by this discovery's events and checks {@code registered} stays as it was. */
     private void assertRegistryUntouchedBy(DeviceRegistry registry, Device registered) {
         SonosProperties properties = new SonosProperties(true, Duration.ofSeconds(1), Duration.ofSeconds(1),
                 Duration.ofSeconds(0), Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1),
                 Duration.ofSeconds(2));
-        DeviceManager[] manager = new DeviceManager[1];
+        Devices[] devices = new Devices[1];
         List<Object> managerEvents = new CopyOnWriteArrayList<>();
         SonosDiscovery fed = new SonosDiscovery(ssdp, properties, event -> {
             managerEvents.add(event);
-            if (event instanceof DeviceDiscoveredEvent discovered && manager[0] != null) {
-                manager[0].onDiscovered(discovered);
+            if (event instanceof DeviceDiscoveredEvent discovered && devices[0] != null) {
+                devices[0].onDiscovered(discovered);
             }
         });
-        manager[0] = new DeviceManager(registry, List.of(new SonosAdapter(properties, fed)), event -> { });
+        devices[0] = Devices.assemble(registry, List.of(new SonosAdapter(properties, fed)), event -> { });
         try {
             search();
             await().atMost(Duration.ofSeconds(5)).until(() -> fed.devices().size() == 2 && !managerEvents.isEmpty());
@@ -135,7 +135,7 @@ class SonosDiscoveryTest {
 
             assertThat(registry.findAll()).containsExactly(registered);
         } finally {
-            manager[0].close();
+            devices[0].close();
             fed.close();
         }
     }

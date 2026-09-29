@@ -23,7 +23,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class DeviceManagerQueryTest {
+class DevicesQueryTest {
 
     private static final CastAppQuery MDX = new CastAppQuery("233637DE", "urn:x-cast:com.google.youtube.mdx",
             Map.of("type", "getMdxSessionStatus"), "mdxSessionStatus");
@@ -36,7 +36,7 @@ class DeviceManagerQueryTest {
     private final StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false,
             Capability.CAST_RECEIVER, Capability.VOLUME);
     private DeviceRegistry registry;
-    private DeviceManager manager;
+    private Devices devices;
 
     @BeforeEach
     void setUp() {
@@ -45,8 +45,8 @@ class DeviceManagerQueryTest {
 
     @AfterEach
     void tearDown() {
-        if (manager != null) {
-            manager.close();
+        if (devices != null) {
+            devices.close();
         }
     }
 
@@ -56,17 +56,17 @@ class DeviceManagerQueryTest {
             adapters.put(adapterId, Map.of());
         }
         registry.save(new Device("shield", "Shield", DeviceKind.ANDROID_TV, "10.0.0.5", adapters, Instant.now()));
-        manager = new DeviceManager(registry, List.of(androidtv, cast), event -> { });
+        devices = Devices.assemble(registry, List.of(androidtv, cast), event -> { });
     }
 
     @Test
     void asksTheFirstCastAdapter() {
         register("androidtv", "cast");
-        manager.start();
+        devices.start();
         androidtv.handles.get("shield").answer = Map.of("type", "wrong");
         cast.handles.get("shield").answer = Map.of("type", "mdxSessionStatus");
 
-        assertThat(manager.query("shield", MDX)).isEqualTo(Map.of("type", "mdxSessionStatus"));
+        assertThat(devices.commands().query("shield", MDX)).isEqualTo(Map.of("type", "mdxSessionStatus"));
         assertThat(cast.handles.get("shield").queried).containsExactly(MDX);
         assertThat(androidtv.handles.get("shield").queried).isEmpty();
     }
@@ -76,7 +76,7 @@ class DeviceManagerQueryTest {
         register("androidtv", "cast");
         // not started: no handles
 
-        assertThatThrownBy(() -> manager.query("shield", MDX))
+        assertThatThrownBy(() -> devices.commands().query("shield", MDX))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("Shield is not connected");
     }
@@ -84,9 +84,9 @@ class DeviceManagerQueryTest {
     @Test
     void noCastAdapterIsUnsupported() {
         register("androidtv");
-        manager.start();
+        devices.start();
 
-        assertThatThrownBy(() -> manager.query("shield", MDX))
+        assertThatThrownBy(() -> devices.commands().query("shield", MDX))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("Shield is not a Cast receiver");
         assertThat(androidtv.handles.get("shield").queried).isEmpty();
@@ -95,17 +95,17 @@ class DeviceManagerQueryTest {
     @Test
     void failuresPropagate() {
         register("androidtv", "cast");
-        manager.start();
+        devices.start();
         ActionFailedException refused = new ActionFailedException("Shield refused the request (nope)");
         cast.handles.get("shield").failure = refused;
 
-        assertThatThrownBy(() -> manager.query("shield", MDX)).isSameAs(refused);
+        assertThatThrownBy(() -> devices.commands().query("shield", MDX)).isSameAs(refused);
     }
 
     @Test
     void unknownDevice() {
         register("cast");
 
-        assertThatThrownBy(() -> manager.query("ghost", MDX)).isInstanceOf(DeviceNotFoundException.class);
+        assertThatThrownBy(() -> devices.commands().query("ghost", MDX)).isInstanceOf(DeviceNotFoundException.class);
     }
 }

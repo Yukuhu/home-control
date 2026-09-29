@@ -27,7 +27,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class DeviceManagerExecuteTest {
+class DevicesExecuteTest {
 
     @TempDir
     Path dir;
@@ -37,7 +37,7 @@ class DeviceManagerExecuteTest {
     private final StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false,
             Capability.CAST_RECEIVER, Capability.VOLUME);
     private DeviceRegistry registry;
-    private DeviceManager manager;
+    private Devices devices;
 
     @BeforeEach
     void aMergedShield() {
@@ -46,18 +46,18 @@ class DeviceManagerExecuteTest {
         adapters.put("androidtv", Map.of("port", "6466"));
         adapters.put("cast", Map.of("port", "8009"));
         registry.save(new Device("shield", "Shield", DeviceKind.ANDROID_TV, "10.0.0.5", adapters, Instant.now()));
-        manager = new DeviceManager(registry, List.of(androidtv, cast), event -> { });
-        manager.start();
+        devices = Devices.assemble(registry, List.of(androidtv, cast), event -> { });
+        devices.start();
     }
 
     @AfterEach
     void tearDown() {
-        manager.close();
+        devices.close();
     }
 
     @Test
     void theFirstAdapterThatCanDoItIsTheOnlyOneAsked() {
-        manager.execute("shield", new Action.SetVolume(10));
+        devices.commands().execute("shield", new Action.SetVolume(10));
 
         assertThat(androidtv.handles.get("shield").executed).containsExactly(new Action.SetVolume(10));
         assertThat(cast.handles.get("shield").executed).isEmpty();
@@ -67,7 +67,7 @@ class DeviceManagerExecuteTest {
     void anActionTheFirstAdapterCannotDoFallsThroughToTheNext() {
         androidtv.handles.get("shield").failure = new UnsupportedActionException("no absolute volume");
 
-        manager.execute("shield", new Action.SetVolume(40));
+        devices.commands().execute("shield", new Action.SetVolume(40));
 
         assertThat(cast.handles.get("shield").executed).containsExactly(new Action.SetVolume(40));
     }
@@ -76,7 +76,7 @@ class DeviceManagerExecuteTest {
     void anOfflineFirstAdapterFallsThroughToo() {
         androidtv.handles.get("shield").failure = new DeviceOfflineException("must be paired again");
 
-        manager.execute("shield", new Action.Mute(true));
+        devices.commands().execute("shield", new Action.Mute(true));
 
         assertThat(cast.handles.get("shield").executed).containsExactly(new Action.Mute(true));
     }
@@ -87,7 +87,7 @@ class DeviceManagerExecuteTest {
         cast.handles.get("shield").failure = new UnsupportedActionException("not this one");
 
         var setVolume = new Action.SetVolume(5);
-        assertThatThrownBy(() -> manager.execute("shield", setVolume))
+        assertThatThrownBy(() -> devices.commands().execute("shield", setVolume))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("paired again");
     }
@@ -98,7 +98,7 @@ class DeviceManagerExecuteTest {
         cast.handles.get("shield").failure = new UnsupportedActionException("last reason");
 
         var setVolume = new Action.SetVolume(5);
-        assertThatThrownBy(() -> manager.execute("shield", setVolume))
+        assertThatThrownBy(() -> devices.commands().execute("shield", setVolume))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("last reason");
     }
@@ -108,14 +108,14 @@ class DeviceManagerExecuteTest {
         androidtv.handles.get("shield").failure = new ActionFailedException("Shield refused");
 
         var setVolume = new Action.SetVolume(5);
-        assertThatThrownBy(() -> manager.execute("shield", setVolume))
+        assertThatThrownBy(() -> devices.commands().execute("shield", setVolume))
                 .isInstanceOf(ActionFailedException.class);
         assertThat(cast.handles.get("shield").executed).isEmpty();
     }
 
     @Test
     void onlyAdaptersDeclaringTheCapabilityAreAsked() {
-        manager.execute("shield", new Action.Stop());
+        devices.commands().execute("shield", new Action.Stop());
 
         assertThat(androidtv.handles.get("shield").executed).isEmpty();
         assertThat(cast.handles.get("shield").executed).containsExactly(new Action.Stop());
@@ -130,17 +130,17 @@ class DeviceManagerExecuteTest {
                 throw new IllegalStateException("no connection");
             }
         };
-        manager.close();
+        devices.close();
         // A failed connect leaves the whole device without handles.
-        manager = new DeviceManager(registry, List.of(broken, cast), event -> { });
-        manager.start();
+        devices = Devices.assemble(registry, List.of(broken, cast), event -> { });
+        devices.start();
 
         var setVolume = new Action.SetVolume(5);
-        assertThatThrownBy(() -> manager.execute("shield", setVolume))
+        assertThatThrownBy(() -> devices.commands().execute("shield", setVolume))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("Shield is not connected");
         var openLink = new Action.OpenAppLink(URI.create("https://a.example"));
-        assertThatThrownBy(() -> manager.execute("shield", openLink))
+        assertThatThrownBy(() -> devices.commands().execute("shield", openLink))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -150,22 +150,22 @@ class DeviceManagerExecuteTest {
                 orderedAdapters("cast", "upnp"), Instant.now()));
         StubAdapter upnp = new StubAdapter("upnp", DeviceKind.UPNP, true, false, Capability.MEDIA_RENDERER, Capability.VOLUME);
         StubAdapter tvCast = new StubAdapter("cast", DeviceKind.CAST, true, false, Capability.CAST_RECEIVER, Capability.VOLUME);
-        DeviceManager both = new DeviceManager(registry, List.of(tvCast, upnp), event -> { });
+        Devices both = Devices.assemble(registry, List.of(tvCast, upnp), event -> { });
         both.start();
         try {
-            both.execute("tv", new Action.Stop());
+            both.commands().execute("tv", new Action.Stop());
             assertThat(tvCast.handles.get("tv").executed).containsExactly(new Action.Stop());
             assertThat(upnp.handles.get("tv").executed).containsExactly(new Action.Stop());
 
             // One adapter's refusal does not keep the other from stopping; the stop counts as done.
             tvCast.handles.get("tv").failure = new ActionFailedException("nothing is casting");
-            both.execute("tv", new Action.Stop());
+            both.commands().execute("tv", new Action.Stop());
             assertThat(upnp.handles.get("tv").executed).hasSize(2);
 
             // Only when nobody could stop is the failure reported.
             upnp.handles.get("tv").failure = new DeviceOfflineException("gone");
             var stop = new Action.Stop();
-            assertThatThrownBy(() -> both.execute("tv", stop)).isInstanceOf(ActionFailedException.class);
+            assertThatThrownBy(() -> both.commands().execute("tv", stop)).isInstanceOf(ActionFailedException.class);
         } finally {
             both.close();
         }
@@ -185,15 +185,15 @@ class DeviceManagerExecuteTest {
                 Map.of("bluetooth", Map.of()), Instant.now()));
         StubAdapter bluetooth = new StubAdapter("bluetooth", DeviceKind.BLUETOOTH, false, false,
                 Capability.LOCAL_AUDIO_SINK, Capability.VOLUME);
-        DeviceManager speakers = new DeviceManager(registry, List.of(bluetooth), event -> { });
+        Devices speakers = Devices.assemble(registry, List.of(bluetooth), event -> { });
         speakers.start();
         try {
-            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.PlayMedia(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null));
-            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Pause());
-            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Resume());
-            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Stop());
-            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.SetVolume(20));
-            speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Mute(true));
+            speakers.commands().execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.PlayMedia(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null));
+            speakers.commands().execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Pause());
+            speakers.commands().execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Resume());
+            speakers.commands().execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Stop());
+            speakers.commands().execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.SetVolume(20));
+            speakers.commands().execute("bluetooth-aa-bb-cc-dd-ee-ff", new Action.Mute(true));
 
             assertThat(bluetooth.handles.get("bluetooth-aa-bb-cc-dd-ee-ff").executed).containsExactly(
                     new Action.PlayMedia(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null),
@@ -201,7 +201,7 @@ class DeviceManagerExecuteTest {
                     new Action.SetVolume(20), new Action.Mute(true));
 
             var pressHome = new Action.PressKey(RemoteKey.HOME);
-            assertThatThrownBy(() -> speakers.execute("bluetooth-aa-bb-cc-dd-ee-ff", pressHome))
+            assertThatThrownBy(() -> speakers.commands().execute("bluetooth-aa-bb-cc-dd-ee-ff", pressHome))
                     .isInstanceOf(UnsupportedActionException.class);
         } finally {
             speakers.close();
@@ -214,14 +214,14 @@ class DeviceManagerExecuteTest {
                 Map.of("upnp", Map.of()), Instant.now()));
         StubAdapter upnp = new StubAdapter("upnp", DeviceKind.UPNP, true, false,
                 Capability.MEDIA_RENDERER, Capability.VOLUME);
-        DeviceManager speakers = new DeviceManager(registry, List.of(upnp), event -> { });
+        Devices speakers = Devices.assemble(registry, List.of(upnp), event -> { });
         speakers.start();
         try {
-            speakers.execute("speaker", new Action.Stop());
+            speakers.commands().execute("speaker", new Action.Stop());
 
             assertThat(upnp.handles.get("speaker").executed).containsExactly(new Action.Stop());
             var pressHome = new Action.PressKey(RemoteKey.HOME);
-            assertThatThrownBy(() -> speakers.execute("speaker", pressHome))
+            assertThatThrownBy(() -> speakers.commands().execute("speaker", pressHome))
                     .isInstanceOf(UnsupportedActionException.class);
         } finally {
             speakers.close();

@@ -3,7 +3,7 @@ package dev.andre.homecontrol.adapters.webos;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.device.Devices;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
@@ -53,8 +53,8 @@ class WebOsKeyMigrationTest {
         Files.copy(Path.of("src/test/resources/fixtures/devices/devices-v2-tv-keys.json"), file);
         JsonFileDeviceRegistry registry = new JsonFileDeviceRegistry(file);
 
-        try (DeviceManager manager = new DeviceManager(registry, List.of(adapter(registry)), event -> { })) {
-            manager.start();
+        try (Devices devices = Devices.assemble(registry, List.of(adapter(registry)), event -> { })) {
+            devices.start();
         }
 
         Map<String, String> settings = new JsonFileDeviceRegistry(file).findById("lg-1").orElseThrow().adapterSettings("webos");
@@ -126,8 +126,8 @@ class WebOsKeyMigrationTest {
         registry.save(lg(Map.of("keyRef", REF)));
 
         Device merged;
-        try (DeviceManager manager = new DeviceManager(registry, List.of(adapter(registry)), event -> { })) {
-            merged = manager.merge("tv", "lg-1");
+        try (Devices devices = Devices.assemble(registry, List.of(adapter(registry)), event -> { })) {
+            merged = devices.enrollment().merge("tv", "lg-1");
         }
 
         assertThat(merged.adapterSettings("webos")).containsEntry("keyRef", REF);

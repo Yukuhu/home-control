@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** The fall-through rules of stop and query, and the per-connect state generations. */
-class DeviceManagerFallThroughTest {
+class DevicesFallThroughTest {
 
     private static final CastAppQuery MDX = new CastAppQuery("233637DE", "urn:x-cast:com.google.youtube.mdx",
             Map.of("type", "getMdxSessionStatus"), "mdxSessionStatus");
@@ -43,17 +43,17 @@ class DeviceManagerFallThroughTest {
     private final StubAdapter remote = new StubAdapter("remote", DeviceKind.ANDROID_TV, false, false,
             Capability.REMOTE_KEYS);
     private DeviceRegistry registry;
-    private DeviceManager manager;
+    private Devices devices;
 
     @BeforeEach
     void setUp() {
         registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-        manager = new DeviceManager(registry, List.of(cast, upnp, remote), published::add);
+        devices = Devices.assemble(registry, List.of(cast, upnp, remote), published::add);
     }
 
     @AfterEach
     void tearDown() {
-        manager.close();
+        devices.close();
     }
 
     private void register(String... adapterIds) {
@@ -67,12 +67,12 @@ class DeviceManagerFallThroughTest {
     @Test
     void aStopNobodyCouldSendGivesTheFirstOfflineReasonOverTheLastUnsupportedOne() {
         register("cast", "upnp");
-        manager.start();
+        devices.start();
         cast.handles.get("tv").failure = new DeviceOfflineException("cast is gone");
         upnp.handles.get("tv").failure = new UnsupportedActionException("upnp cannot");
 
         var stop = new Action.Stop();
-        assertThatThrownBy(() -> manager.execute("tv", stop))
+        assertThatThrownBy(() -> devices.commands().execute("tv", stop))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("cast is gone");
     }
@@ -80,12 +80,12 @@ class DeviceManagerFallThroughTest {
     @Test
     void aStopEveryAdapterCannotDoGivesTheLastUnsupportedReason() {
         register("cast", "upnp");
-        manager.start();
+        devices.start();
         cast.handles.get("tv").failure = new UnsupportedActionException("first reason");
         upnp.handles.get("tv").failure = new UnsupportedActionException("last reason");
 
         var stop = new Action.Stop();
-        assertThatThrownBy(() -> manager.execute("tv", stop))
+        assertThatThrownBy(() -> devices.commands().execute("tv", stop))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("last reason");
     }
@@ -96,7 +96,7 @@ class DeviceManagerFallThroughTest {
         // not started: no handles
 
         var stop = new Action.Stop();
-        assertThatThrownBy(() -> manager.execute("tv", stop))
+        assertThatThrownBy(() -> devices.commands().execute("tv", stop))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("TV is not connected");
     }
@@ -104,10 +104,10 @@ class DeviceManagerFallThroughTest {
     @Test
     void aStopNoAdapterDeclaresIsPlainlyUnsupported() {
         register("remote");
-        manager.start();
+        devices.start();
 
         var stop = new Action.Stop();
-        assertThatThrownBy(() -> manager.execute("tv", stop))
+        assertThatThrownBy(() -> devices.commands().execute("tv", stop))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("TV cannot perform " + stop);
         assertThat(remote.handles.get("tv").executed).isEmpty();
@@ -117,23 +117,23 @@ class DeviceManagerFallThroughTest {
     void anOfflineOrUnsupportedCastAdapterHandsTheQuestionToTheNextOne() {
         StubAdapter second = new StubAdapter("cast2", DeviceKind.CAST, true, false, Capability.CAST_RECEIVER);
         StubAdapter third = new StubAdapter("cast3", DeviceKind.CAST, true, false, Capability.CAST_RECEIVER);
-        manager.close();
-        manager = new DeviceManager(registry, List.of(cast, second, third), published::add);
+        devices.close();
+        devices = Devices.assemble(registry, List.of(cast, second, third), published::add);
         register("cast", "cast2", "cast3");
-        manager.start();
+        devices.start();
         cast.handles.get("tv").failure = new DeviceOfflineException("cast is gone");
         second.handles.get("tv").failure = new UnsupportedActionException("cast2 cannot");
         third.handles.get("tv").answer = Map.of("type", "mdxSessionStatus");
 
-        assertThat(manager.query("tv", MDX)).isEqualTo(Map.of("type", "mdxSessionStatus"));
+        assertThat(devices.commands().query("tv", MDX)).isEqualTo(Map.of("type", "mdxSessionStatus"));
 
         third.handles.get("tv").failure = new UnsupportedActionException("cast3 cannot");
-        assertThatThrownBy(() -> manager.query("tv", MDX))
+        assertThatThrownBy(() -> devices.commands().query("tv", MDX))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("cast is gone");
 
         cast.handles.get("tv").failure = new UnsupportedActionException("cast cannot");
-        assertThatThrownBy(() -> manager.query("tv", MDX))
+        assertThatThrownBy(() -> devices.commands().query("tv", MDX))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("cast3 cannot");
     }
@@ -141,9 +141,9 @@ class DeviceManagerFallThroughTest {
     @Test
     void aHandleOfAClosedConnectReportingLateIsIgnored() {
         register("cast");
-        manager.start();
+        devices.start();
         StubAdapter.StubHandle first = cast.handles.get("tv");
-        manager.adopt(registry.findById("tv").orElseThrow());
+        devices.enrollment().adopt(registry.findById("tv").orElseThrow());
         StubAdapter.StubHandle second = cast.handles.get("tv");
         assertThat(second).isNotSameAs(first);
         published.clear();
@@ -151,7 +151,7 @@ class DeviceManagerFallThroughTest {
         first.report(DeviceState.initial().withStatus(DeviceStatus.DISCONNECTED));
 
         assertThat(published).isEmpty();
-        assertThat(manager.state("tv").status()).isEqualTo(DeviceStatus.CONNECTED);
+        assertThat(devices.queries().state("tv").status()).isEqualTo(DeviceStatus.CONNECTED);
 
         second.report(DeviceState.initial().withStatus(DeviceStatus.DISCONNECTED));
 
@@ -159,12 +159,12 @@ class DeviceManagerFallThroughTest {
             assertThat(event.deviceId()).isEqualTo("tv");
             assertThat(event.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
         });
-        assertThat(manager.state("tv").status()).isEqualTo(DeviceStatus.DISCONNECTED);
+        assertThat(devices.queries().state("tv").status()).isEqualTo(DeviceStatus.DISCONNECTED);
     }
 
     @Test
     void generatedIdsNeverStartOrEndWithADash() {
-        assertThat(DeviceManager.uniqueId(List.of(), "upnp", "[FE80::1]")).isEqualTo("upnp-fe80-1");
-        assertThat(DeviceManager.uniqueId(List.of(), "upnp", "10.0.0.5")).isEqualTo("upnp-10-0-0-5");
+        assertThat(DeviceMatching.uniqueId(List.of(), "upnp", "[FE80::1]")).isEqualTo("upnp-fe80-1");
+        assertThat(DeviceMatching.uniqueId(List.of(), "upnp", "10.0.0.5")).isEqualTo("upnp-10-0-0-5");
     }
 }
