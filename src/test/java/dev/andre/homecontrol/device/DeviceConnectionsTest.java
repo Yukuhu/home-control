@@ -77,7 +77,7 @@ class DeviceConnectionsTest {
         for (DeviceAdapter adapter : adapters) {
             byId.put(adapter.id(), adapter);
         }
-        return new DeviceConnections(byId, published::add, (deviceId, adapterId, updates) -> { });
+        return new DeviceConnections(byId, published::add, (deviceId, adapterId, updates, current) -> { });
     }
 
     @Test
@@ -208,7 +208,11 @@ class DeviceConnectionsTest {
             }
         };
         DeviceConnections connections = new DeviceConnections(Map.of("stub", adapter), published::add,
-                (deviceId, adapterId, updates) -> stored.add(updates));
+                (deviceId, adapterId, updates, current) -> {
+                    if (current.getAsBoolean()) {
+                        stored.add(updates);
+                    }
+                });
         connections.complete(connections.begin(device("a", "stub")));
         connections.complete(connections.begin(device("a", "stub")));
 
