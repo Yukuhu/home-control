@@ -53,10 +53,10 @@ class JellyfinRouteExecutorTest {
         return new JellyfinSession(id, "jf-shield", "Shield", "Android TV", "10.0.0.5", Instant.now(), true);
     }
 
-    /** The Shield's Android TV remote is up unless a test says otherwise. */
+    /** The Android TV module is on unless a test says otherwise. */
     @BeforeEach
-    void theShieldCanBeWokenAndLaunched() {
-        given(devices.capabilities("shield")).willReturn(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS));
+    void androidTvIsOn() {
+        given(devices.adapterEnabled("androidtv")).willReturn(true);
     }
 
     @Test
@@ -79,10 +79,14 @@ class JellyfinRouteExecutorTest {
         verifyNoInteractions(devices);
     }
 
-    /** Android TV switched off: the Shield has no remote to wake or launch with, so the open session plays as is. */
+    /**
+     * Android TV switched off: nothing can wake the device or launch Android's Jellyfin app, even when another adapter
+     * of a merged device (webOS, Tizen) offers keys and app links, so the open session plays as is.
+     */
     @Test
-    void aShieldWithoutItsAndroidTvRemotePlaysTheOpenSessionDirectly() {
-        given(devices.capabilities("shield")).willReturn(Set.of());
+    void aDeviceWhoseAndroidTvModuleIsOffPlaysTheOpenSessionDirectly() {
+        given(devices.adapterEnabled("androidtv")).willReturn(false);
+        given(devices.capabilities("shield")).willReturn(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS));
 
         executor.execute(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV"), shield);
 

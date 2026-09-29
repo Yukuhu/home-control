@@ -43,7 +43,8 @@ class JellyfinPlayableResolverTest {
     private final JellyfinSetupService setup = mock(JellyfinSetupService.class);
     private final JellyfinSessions sessions = new JellyfinSessions(client, setup, JellyfinSessions::resolve);
     private final JellyfinStreams streams = new JellyfinStreams(client);
-    private final JellyfinPlayableResolver resolver = new JellyfinPlayableResolver(setup, sessions, client, streams);
+    private final JellyfinPlayableResolver resolver = new JellyfinPlayableResolver(setup, sessions, client, streams,
+            adapter -> true);
     private FakeJellyfinServer fake;
 
     @AfterEach
@@ -116,6 +117,21 @@ class JellyfinPlayableResolverTest {
                 .isInstanceOfSatisfying(PlayAttempt.Played.class,
                         played -> assertThat(played.route()).isInstanceOf(Route.CastMessage.class));
         verify(devices).execute(eq(shield.id()), isA(Action.CastMessage.class));
+    }
+
+    /** A merged device whose webOS entry offers keys and app links is no Android TV while that module is off. */
+    @Test
+    void aDeviceWhoseAndroidTvModuleIsOffGetsNoNativeRoute() throws IOException {
+        connected();
+        JellyfinPlayableResolver withoutAndroidTv = new JellyfinPlayableResolver(setup, sessions, client, streams,
+                adapter -> !"androidtv".equals(adapter));
+        Device merged = device("Living Room", "192.168.1.50").withAdapter("androidtv", Map.of()).withAdapter("webos", Map.of());
+
+        PlayableResolver.Resolution resolution = withoutAndroidTv.resolve(WANTED, item(WANTED), merged,
+                Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS));
+
+        assertThat(resolution.playables()).containsExactly(
+                new PlayableRef.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", ITEM_ID, 6_120_000_000L, "Android TV"));
     }
 
     @Test
