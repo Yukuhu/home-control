@@ -9,9 +9,11 @@ import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.CastLoads;
+import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
+import java.util.Set;
 
 /** Resolves fresh credentials only on Play, then serializes final dispatch with definition mutations. */
 public final class WorkflowCastRouteExecutor implements RouteExecutor {
@@ -30,9 +32,11 @@ public final class WorkflowCastRouteExecutor implements RouteExecutor {
         this.preferences = preferences;
     }
 
-    @Override public boolean executes(Route route) { return route instanceof Route.WorkflowCast; }
+    @Override public Set<String> keys() {
+        return Set.of("workflow-cast");
+    }
 
-    @Override public void execute(Route route, Device device) {
+    @Override public void execute(DelegatedRoute route, Device device) {
         if (!(route instanceof Route.WorkflowCast(var workflowId, var revision, var entryKey))) throw new IllegalArgumentException("Not a workflow route");
         try {
             requireSource();

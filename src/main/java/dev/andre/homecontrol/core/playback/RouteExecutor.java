@@ -2,11 +2,14 @@ package dev.andre.homecontrol.core.playback;
 
 import dev.andre.homecontrol.core.Device;
 
-/** Runs routes that go through a content server instead of a device adapter (e.g. Jellyfin session PlayNow). */
+import java.util.Set;
+
+/** Runs the delegated routes whose keys it lists (e.g. a Jellyfin session's PlayNow). */
 public interface RouteExecutor {
 
-    boolean executes(Route route);
+    /** The keys of the routes this executor runs; no two executors share one. */
+    Set<String> keys();
 
     /** Throws {@code ActionFailedException} with a user-facing reason when the command is refused. */
-    void execute(Route route, Device device);
+    void execute(DelegatedRoute route, Device device);
 }

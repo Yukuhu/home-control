@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import dev.andre.homecontrol.core.playback.Route;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,8 +71,7 @@ class JellyfinRouteExecutorTest {
 
     @Test
     void executesOnlySessionRoutes() {
-        assertThat(executor.executes(new Route.JellyfinSession("s1", "item-1", 0, "Android TV"))).isTrue();
-        assertThat(executor.executes(new Route.Cast("CC1AD845", Map.of()))).isFalse();
+        assertThat(executor.keys()).containsExactlyInAnyOrder("jellyfin-session", "jellyfin-app");
     }
 
     @Test
@@ -101,7 +101,7 @@ class JellyfinRouteExecutorTest {
     void aClosedSessionOrUnreachableServerIsAFailedAction() {
         willThrow(new JellyfinException(JellyfinException.Kind.NOT_FOUND, "The Jellyfin app on that device has closed its session"))
                 .given(sessions).playNow("s1", "item-1", 600L);
-        Route route = new Route.JellyfinSession("s1", "item-1", 600L, "Web");
+        DelegatedRoute route = new Route.JellyfinSession("s1", "item-1", 600L, "Web");
 
         assertThatThrownBy(() -> executor.execute(route, browser))
                 .isInstanceOf(ActionFailedException.class)
@@ -230,7 +230,7 @@ class JellyfinRouteExecutorTest {
     @Test
     void aLaunchThatNeverReachesJellyfinCannotUseAnOldSession() {
         given(devices.state("shield")).willReturn(ready().withCurrentApp("launcher"));
-        Route route = new Route.JellyfinSession("stale", "item-1", 0, "Android TV");
+        DelegatedRoute route = new Route.JellyfinSession("stale", "item-1", 0, "Android TV");
 
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("installed");
@@ -243,7 +243,7 @@ class JellyfinRouteExecutorTest {
     void aMissingSessionTimesOutWithoutSendingPlayback() {
         given(devices.state("shield")).willReturn(ready());
         given(sessions.sessionFor(shield)).willReturn(Optional.empty());
-        Route route = new Route.JellyfinApp("item-1", 0);
+        DelegatedRoute route = new Route.JellyfinApp("item-1", 0);
 
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("Jellyfin").hasMessageContaining("sign in");
@@ -254,7 +254,7 @@ class JellyfinRouteExecutorTest {
     @Test
     void aFailedWakeNeverLaunchesOrPlays() {
         given(devices.state("shield")).willReturn(ready().withPower(false));
-        Route route = new Route.JellyfinApp("item-1", 0);
+        DelegatedRoute route = new Route.JellyfinApp("item-1", 0);
 
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("wake");
@@ -266,7 +266,7 @@ class JellyfinRouteExecutorTest {
     @Test
     void anOfflineDeviceDoesNotReceiveCommands() {
         given(devices.state("shield")).willReturn(DeviceState.initial());
-        Route route = new Route.JellyfinApp("item-1", 0);
+        DelegatedRoute route = new Route.JellyfinApp("item-1", 0);
 
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(DeviceOfflineException.class).hasMessageContaining("connect");
@@ -291,7 +291,7 @@ class JellyfinRouteExecutorTest {
         });
         var bounded = new JellyfinRouteExecutor(sessions, devices, commands, Duration.ofMillis(100),
                 Duration.ofMillis(100), Duration.ofMillis(10));
-        Route route = new Route.JellyfinApp("item-1", 0);
+        DelegatedRoute route = new Route.JellyfinApp("item-1", 0);
 
         try {
             assertTimeout(Duration.ofSeconds(1), () ->
@@ -309,7 +309,7 @@ class JellyfinRouteExecutorTest {
     void interruptionStopsStartupWithoutPlayback() {
         given(devices.state("shield")).willReturn(ready());
         given(sessions.sessionFor(shield)).willReturn(Optional.empty());
-        Route route = new Route.JellyfinApp("item-1", 0);
+        DelegatedRoute route = new Route.JellyfinApp("item-1", 0);
         Thread.currentThread().interrupt();
         try {
             assertThatThrownBy(() -> executor.execute(route, shield))

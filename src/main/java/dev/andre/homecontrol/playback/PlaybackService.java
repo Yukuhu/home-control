@@ -9,6 +9,8 @@ import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.ContentItem;
+import dev.andre.homecontrol.core.playback.DelegatedRoute;
+import dev.andre.homecontrol.core.playback.DeviceRoute;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlayableResolver;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
@@ -21,7 +23,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -33,7 +37,8 @@ public class PlaybackService {
     private final DeviceCommands commands;
     private final PlaybackPlanner planner;
     private final List<PlayableResolver> resolvers;
-    private final List<RouteExecutor> executors;
+    /** route key → the executor that runs it. */
+    private final Map<String, RouteExecutor> executors;
 
     public PlaybackService(DeviceQueries devices, DeviceCommands commands, PlaybackPlanner planner) {
         this(devices, commands, planner, List.of(), List.of());
@@ -51,7 +56,7 @@ public class PlaybackService {
         this.commands = commands;
         this.planner = planner;
         this.resolvers = List.copyOf(resolvers);
-        this.executors = List.copyOf(executors);
+        this.executors = byKey(executors);
     }
 
     /** The route the item would take now, without playing it. May do I/O through resolvers. */
@@ -147,36 +152,30 @@ public class PlaybackService {
 
     private void execute(Route route, Device device) {
         switch (route) {
-            case Route.OpenAppLink open -> commands.execute(device.id(), open.action());
-            case Route.Cast cast -> commands.execute(device.id(), cast.action());
-            case Route.CastMessage message -> commands.execute(device.id(), message.action());
-            case Route.Render render -> commands.execute(device.id(), render.action());
-            case Route.PlayLocally local -> commands.execute(device.id(), local.action());
-            case Route.JellyfinSession _ -> executeJellyfin(route, device);
-            case Route.JellyfinVlc _ -> executeJellyfin(route, device);
-            case Route.JellyfinApp _ -> executeJellyfin(route, device);
-            case Route.WorkflowCast workflow -> executors.stream()
-                    .filter(executor -> executor.executes(workflow))
-                    .findFirst()
-                    .orElseThrow(() -> new UnroutableException(device.name() + ": Workflows are switched off on this server"))
-                    .execute(workflow, device);
-            case Route.YouTubeLounge lounge -> executors.stream()
-                    .filter(executor -> executor.executes(lounge))
-                    .findFirst()
-                    .orElseThrow(() -> new UnroutableException(device.name() + ": YouTube is switched off on this server"))
-                    .execute(lounge, device);
+            case DeviceRoute deviceRoute -> commands.execute(device.id(), deviceRoute.action());
+            case DelegatedRoute delegated -> Optional.ofNullable(executors.get(delegated.key()))
+                    .orElseThrow(() -> new UnroutableException(
+                            device.name() + ": " + delegated.source() + " is switched off on this server"))
+                    .execute(delegated, device);
             case Route.Unroutable(var reason) -> throw new UnroutableException(device.name() + ": " + reason);
         }
+    }
+
+    /** Each executor under every key it runs; two executors claiming one key is a wiring mistake. */
+    private static Map<String, RouteExecutor> byKey(List<RouteExecutor> executors) {
+        Map<String, RouteExecutor> byKey = new HashMap<>();
+        for (RouteExecutor executor : executors) {
+            for (String key : executor.keys()) {
+                if (byKey.putIfAbsent(key, executor) != null) {
+                    throw new IllegalStateException("Two route executors claim " + key);
+                }
+            }
+        }
+        return Map.copyOf(byKey);
     }
 
     private Device device(String deviceId) {
         return devices.device(deviceId)
                 .orElseThrow(() -> new DeviceNotFoundException("No device with id " + deviceId));
-    }
-
-    private void executeJellyfin(Route route, Device device) {
-        executors.stream().filter(executor -> executor.executes(route)).findFirst()
-                .orElseThrow(() -> new UnroutableException(device.name() + ": Jellyfin is switched off on this server"))
-                .execute(route, device);
     }
 }

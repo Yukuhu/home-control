@@ -4,10 +4,12 @@ import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceCommands;
+import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -33,12 +35,12 @@ public class YouTubeLoungeRouteExecutor implements RouteExecutor {
     }
 
     @Override
-    public boolean executes(Route route) {
-        return route instanceof Route.YouTubeLounge;
+    public Set<String> keys() {
+        return Set.of("youtube-lounge");
     }
 
     @Override
-    public void execute(Route route, Device device) {
+    public void execute(DelegatedRoute route, Device device) {
         Route.YouTubeLounge play = (Route.YouTubeLounge) route;
         Map<String, Object> reply;
         try {

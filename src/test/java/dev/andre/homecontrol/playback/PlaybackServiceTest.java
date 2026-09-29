@@ -17,6 +17,7 @@ import dev.andre.homecontrol.core.playback.CastMessageStrategy;
 import dev.andre.homecontrol.core.playback.CastStreamStrategy;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
+import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import dev.andre.homecontrol.core.playback.LocalAudioSinkStrategy;
 import dev.andre.homecontrol.core.playback.MediaRendererStrategy;
 import dev.andre.homecontrol.core.playback.PlayableRef;
@@ -81,7 +82,7 @@ class PlaybackServiceTest {
         var route = new Route.WorkflowCast("w-0123456789ab", 1, "single");
         var item = new ContentItem("w-0123456789ab", "workflows", ContentKind.VIDEO, "News", null, null,
                 List.of(new PlayableRef.WorkflowCast("w-0123456789ab", 1, "single")));
-        given(executor.executes(route)).willReturn(true);
+        given(executor.keys()).willReturn(Set.of("workflow-cast"));
         var workflows = new PlaybackService(devices, commands,
                 new PlaybackPlanner(List.of(new dev.andre.homecontrol.core.playback.WorkflowCastStrategy())),
                 List.of(), List.of(executor));
@@ -129,7 +130,7 @@ class PlaybackServiceTest {
     void aResolvedSessionRunsThroughItsExecutorNotTheDevice() {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
-        given(executor.executes(any())).willReturn(true);
+        given(executor.keys()).willReturn(Set.of("jellyfin-session"));
         PlaybackService service = new PlaybackService(devices, commands, new HomeControlConfiguration().playbackPlanner(),
                 List.of(resolverReturning(new PlayableResolver.Resolution(
                         List.of(new PlayableRef.JellyfinSession("s1", "item-1", 600L, "Android TV")),
@@ -139,7 +140,7 @@ class PlaybackServiceTest {
         Route route = service.play(JELLYFIN_ITEM, "shield");
 
         assertThat(route).isEqualTo(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV"));
-        verify(executor).execute(route, shield);
+        verify(executor).execute((DelegatedRoute) route, shield);
         verify(commands, never()).execute(any(), any());
     }
 
@@ -351,7 +352,7 @@ class PlaybackServiceTest {
     void sourceSideRoutesUseTheirExecutor() {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
-        given(executor.executes(any())).willReturn(true);
+        given(executor.keys()).willReturn(Set.of("jellyfin-session"));
         PlaybackService service = new PlaybackService(devices, commands, new HomeControlConfiguration().playbackPlanner(),
                 List.of(resolverReturning(new PlayableResolver.Resolution(
                         List.of(new PlayableRef.JellyfinSession("s1", "item-1", 600L, "Android TV")),
@@ -398,14 +399,14 @@ class PlaybackServiceTest {
     void aLoungeRouteRunsThroughItsExecutor() {
         given(devices.device("kitchen")).willReturn(Optional.of(kitchen));
         given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
-        given(executor.executes(any())).willReturn(true);
+        given(executor.keys()).willReturn(Set.of("youtube-lounge"));
         PlaybackService service = new PlaybackService(devices, commands,
                 new PlaybackPlanner(List.of(new YouTubeLoungeStrategy())), List.of(), List.of(executor));
 
         Route route = service.play(LOUNGE_ITEM, "kitchen");
 
         assertThat(route).isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ"));
-        verify(executor).execute(route, kitchen);
+        verify(executor).execute((DelegatedRoute) route, kitchen);
         verify(commands, never()).execute(any(), any());
     }
 
@@ -425,7 +426,7 @@ class PlaybackServiceTest {
     void attemptFallsThroughToLoungeAfterAFailedAppLink() {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
-        given(executor.executes(any())).willReturn(true);
+        given(executor.keys()).willReturn(Set.of("youtube-lounge"));
         PlaybackService service = new PlaybackService(devices, commands,
                 new HomeControlConfiguration().playbackPlanner(), List.of(), List.of(executor));
         ContentItem item = LOUNGE_ITEM.withPlayables(List.of(new PlayableRef.AppLink(WATCH, "youtube"),
@@ -444,5 +445,52 @@ class PlaybackServiceTest {
                 .isInstanceOfSatisfying(PlayAttempt.Played.class,
                         played -> assertThat(played.route()).isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ")));
         verify(executor).execute(new Route.YouTubeLounge("aqz-KE-bpKQ"), shield);
+    }
+
+    @Test
+    void aDelegatedRouteGoesToTheExecutorForItsKey() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(Set.of(Capability.CAST_RECEIVER));
+        RouteExecutor other = mock(RouteExecutor.class);
+        given(other.keys()).willReturn(Set.of("youtube-lounge"));
+        given(executor.keys()).willReturn(Set.of("workflow-cast"));
+        var item = new ContentItem("w-0123456789ab", "workflows", ContentKind.VIDEO, "News", null, null,
+                List.of(new PlayableRef.WorkflowCast("w-0123456789ab", 1, "single")));
+        var service = new PlaybackService(devices, commands,
+                new PlaybackPlanner(List.of(new dev.andre.homecontrol.core.playback.WorkflowCastStrategy())),
+                List.of(), List.of(other, executor));
+
+        service.play(item, "shield");
+
+        verify(executor).execute(new Route.WorkflowCast("w-0123456789ab", 1, "single"), shield);
+        verify(other, never()).execute(any(), any());
+    }
+
+    @Test
+    void aDelegatedRouteWithoutItsExecutorSaysItsSourceIsSwitchedOff() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
+        PlaybackService service = new PlaybackService(devices, commands, new HomeControlConfiguration().playbackPlanner(),
+                List.of(resolverReturning(new PlayableResolver.Resolution(
+                        List.of(new PlayableRef.JellyfinSession("s1", "item-1", 600L, "Android TV")),
+                        Set.of(Capability.JELLYFIN_CLIENT), List.of()))),
+                List.of());
+
+        assertThatThrownBy(() -> service.play(JELLYFIN_ITEM, "shield"))
+                .isInstanceOf(UnroutableException.class)
+                .hasMessage(shield.name() + ": Jellyfin is switched off on this server");
+    }
+
+    @Test
+    void twoExecutorsForOneKeyFailConstruction() {
+        RouteExecutor other = mock(RouteExecutor.class);
+        given(other.keys()).willReturn(Set.of("jellyfin-session"));
+        given(executor.keys()).willReturn(Set.of("jellyfin-session", "jellyfin-app"));
+        PlaybackPlanner planner = new PlaybackPlanner(List.of());
+        List<RouteExecutor> both = List.of(executor, other);
+
+        assertThatThrownBy(() -> new PlaybackService(devices, commands, planner, List.of(), both))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Two route executors claim jellyfin-session");
     }
 }
