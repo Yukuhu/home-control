@@ -70,6 +70,8 @@ no pairing.
 - Open **Setup**. Receivers found on the network appear under **Ready to add**; press **Add**.
 - A receiver at the same address, or with the same name, as a paired Android TV is added to
   that TV automatically, so the Shield shows up once with remote keys *and* Cast volume.
+  A receiver matched only by name is left alone when another device also has that name or
+  that address: it stays under **Ready to add**, and **Add** makes it a device of its own.
 - If that guess is wrong, use **Split** on the device, or **Merge devices** to join two
   entries. An Android TV pairing always stays with its own entry: merge the Cast entry into
   the TV, not the other way round.
