@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -82,11 +83,11 @@ public class JellyfinRouteExecutor implements RouteExecutor {
     }
 
     /**
-     * Whether Android TV can wake the device and launch Jellyfin now: its entry alone is not enough when the Android TV
-     * module is switched off, and another adapter's keys and app links (webOS, Tizen) cannot launch Android's app.
+     * Whether the device can wake and launch Jellyfin now: it runs Android apps. A switched-off Android TV module
+     * declares nothing, and another adapter's keys and app links (webOS, Tizen) cannot launch Android's app.
      */
     private boolean hasAndroidTvRemote(Device device) {
-        return device.hasAdapter("androidtv") && devices.adapterEnabled("androidtv");
+        return devices.capabilities(device.id()).contains(Capability.ANDROID_APPS);
     }
 
     private String prepare(Device device) {

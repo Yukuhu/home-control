@@ -55,10 +55,11 @@ class JellyfinRouteExecutorTest {
         return new JellyfinSession(id, "jf-shield", "Shield", "Android TV", "10.0.0.5", Instant.now(), true);
     }
 
-    /** The Android TV module is on unless a test says otherwise. */
+    /** The Android TV module is on, so the Shield runs Android apps, unless a test says otherwise. */
     @BeforeEach
     void androidTvIsOn() {
-        given(devices.adapterEnabled("androidtv")).willReturn(true);
+        given(devices.capabilities("shield")).willReturn(Set.of(Capability.REMOTE_KEYS, Capability.APP_LINK,
+                Capability.ANDROID_APPS));
     }
 
     @Test
@@ -78,7 +79,7 @@ class JellyfinRouteExecutorTest {
         executor.execute(new Route.JellyfinSession("s1", "item-1", 600L, "Web"), browser);
 
         verify(sessions).playNow("s1", "item-1", 600L);
-        verifyNoInteractions(devices, commands);
+        verifyNoInteractions(commands);
     }
 
     /**
@@ -87,7 +88,6 @@ class JellyfinRouteExecutorTest {
      */
     @Test
     void aDeviceWhoseAndroidTvModuleIsOffPlaysTheOpenSessionDirectly() {
-        given(devices.adapterEnabled("androidtv")).willReturn(false);
         given(devices.capabilities("shield")).willReturn(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS));
 
         executor.execute(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV"), shield);

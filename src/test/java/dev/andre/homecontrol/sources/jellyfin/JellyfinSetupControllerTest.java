@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -31,6 +33,8 @@ class JellyfinSetupControllerTest extends WebSliceTest {
         var shield = new dev.andre.homecontrol.core.Device("shield", "Shield", dev.andre.homecontrol.core.DeviceKind.ANDROID_TV,
                 "10.0.0.5", Map.of("androidtv", Map.of()), java.time.Instant.EPOCH);
         given(devices.device("shield")).willReturn(java.util.Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(java.util.Set.of(Capability.REMOTE_KEYS,
+                Capability.ANDROID_APPS));
         var settings = new JellyfinSettings(URI.create("http://nas:8096"), URI.create("http://nas:8096"),
                 "server", "nas", "10.11.2", "user", "andre", JellyfinSettings.AuthMode.PASSWORD, "hc", "F007D354", Map.of());
         given(jellyfinSetup.settings()).willReturn(java.util.Optional.of(settings));
@@ -140,5 +144,26 @@ class JellyfinSetupControllerTest extends WebSliceTest {
                 .andExpect(redirectedUrl("/setup"));
 
         verify(jellyfinSetup).link("jf-1", "shield");
+    }
+
+    @Test
+    void onlyADeviceThatRunsAndroidAppsIsOfferedAPlayer() throws Exception {
+        var shield = new dev.andre.homecontrol.core.Device("shield", "Shield", dev.andre.homecontrol.core.DeviceKind.ANDROID_TV,
+                "10.0.0.5", Map.of("androidtv", Map.of()), java.time.Instant.EPOCH);
+        var living = new dev.andre.homecontrol.core.Device("living", "Living Room", dev.andre.homecontrol.core.DeviceKind.WEBOS,
+                "10.0.0.6", Map.of("androidtv", Map.of(), "webos", Map.of()), java.time.Instant.EPOCH);
+        given(devices.devices()).willReturn(java.util.List.of(shield, living));
+        given(devices.capabilities("shield")).willReturn(java.util.Set.of(Capability.REMOTE_KEYS, Capability.ANDROID_APPS));
+        // Android TV's module is off for the living room: only webOS declares anything there.
+        given(devices.capabilities("living")).willReturn(java.util.Set.of(Capability.REMOTE_KEYS, Capability.APP_LINK));
+        given(jellyfinSetup.settings()).willReturn(java.util.Optional.of(new JellyfinSettings(URI.create("http://nas:8096"),
+                URI.create("http://nas:8096"), "server", "nas", "10.11.2", "user", "andre",
+                JellyfinSettings.AuthMode.PASSWORD, "hc", "F007D354", Map.of())));
+
+        String page = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
+        String playback = page.substring(page.indexOf("<h3>Device playback</h3>"));
+        playback = playback.substring(0, playback.indexOf("</section>") > 0 ? playback.indexOf("</section>") : playback.length());
+
+        assertThat(playback).contains("value=\"shield\"").doesNotContain("value=\"living\"");
     }
 }

@@ -89,12 +89,6 @@ final class RegisteredDevices implements DeviceQueries {
                 .orElse(ForegroundAppReporting.NONE);
     }
 
-    /** Whether the adapter's module is switched on: a device's entry for it in devices.json does not say so. */
-    @Override
-    public boolean adapterEnabled(String adapterId) {
-        return adapters.containsKey(adapterId);
-    }
-
     /** Grouping as seen by the first of the device's handles that knows it; empty otherwise. */
     @Override
     public Optional<SpeakerTopology> speakerTopology(String id) {

@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -55,7 +56,8 @@ public class JellyfinVlcExecutor implements RouteExecutor {
 
     @Override
     public void execute(Route route, Device device) {
-        if (!(route instanceof Route.JellyfinVlc(var itemId)) || !device.hasAdapter("androidtv")) {
+        if (!(route instanceof Route.JellyfinVlc(var itemId))
+                || !devices.capabilities(device.id()).contains(Capability.ANDROID_APPS)) {
             throw new IllegalArgumentException("VLC needs an Android TV device");
         }
         long deadline = System.nanoTime() + timeout.toNanos();

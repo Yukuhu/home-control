@@ -48,9 +48,8 @@ public class JellyfinConfiguration {
 
     @Bean
     public JellyfinPlayableResolver jellyfinPlayableResolver(JellyfinSetupService setup, JellyfinSessions sessions,
-                                                              JellyfinClient client, JellyfinStreams streams,
-                                                              DeviceQueries devices) {
-        return new JellyfinPlayableResolver(setup, sessions, client, streams, devices::adapterEnabled);
+                                                              JellyfinClient client, JellyfinStreams streams) {
+        return new JellyfinPlayableResolver(setup, sessions, client, streams);
     }
 
     @Bean

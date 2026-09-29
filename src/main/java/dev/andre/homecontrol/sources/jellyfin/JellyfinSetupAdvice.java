@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.web.SetupController;
@@ -85,7 +86,8 @@ public class JellyfinSetupAdvice {
         }
         DeviceQueries registered = devices.getIfAvailable();
         List<DeviceOption> deviceOptions = registered == null ? List.of()
-                : registered.devices().stream().map(d -> new DeviceOption(d.id(), d.name(), d.hasAdapter("androidtv"),
+                : registered.devices().stream().map(d -> new DeviceOption(d.id(), d.name(),
+                        registered.capabilities(d.id()).contains(Capability.ANDROID_APPS),
                         s.player(d.id()).name().toLowerCase(java.util.Locale.ROOT))).toList();
         return new View(true, s.serverName(), s.serverVersion(), s.serverUrl().toString(),
                 s.deviceServerUrl().toString(), s.userName(),
