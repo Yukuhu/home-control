@@ -93,8 +93,9 @@ public class LoginController {
     public String changePassword(@RequestParam(required = false) String current, @RequestParam(required = false) String password,
                                  @RequestParam(required = false) String confirmation, HttpServletRequest request,
                                  RedirectAttributes redirect) {
-        return guessing(request, redirect, () -> loginService.changePassword(current, password, confirmation, request),
+        guessing(request, redirect, () -> loginService.changePassword(current, password, confirmation, request),
                 "Password changed. Other browsers need to log in again.");
+        return SETUP_REDIRECT;
     }
 
     /** No guess is involved, so it is not rate-limited. Only possible while no login exists. */
@@ -114,20 +115,21 @@ public class LoginController {
     @PostMapping("/setup/password/remove")
     public String removePassword(@RequestParam(required = false) String current, HttpServletRequest request,
                                  RedirectAttributes redirect) {
-        return guessing(request, redirect, () -> loginService.removePassword(current),
+        guessing(request, redirect, () -> loginService.removePassword(current),
                 "Password removed. Anyone on your network can open Home Control.");
+        return SETUP_REDIRECT;
     }
 
     /**
      * Runs an action that checks the current password. Every checked guess counts against the address. A rejected
      * request, a busy verifier or an unexpected failure gives the reservation back.
      */
-    private String guessing(HttpServletRequest request, RedirectAttributes redirect, Runnable attempt, String success) {
+    private void guessing(HttpServletRequest request, RedirectAttributes redirect, Runnable attempt, String success) {
         String address = request.getRemoteAddr();
         Optional<Duration> blocked = limiter.reserve(address);
         if (blocked.isPresent()) {
             redirect.addFlashAttribute(LOGIN_ERROR, tooManyAttempts(blocked.get()));
-            return SETUP_REDIRECT;
+            return;
         }
         try {
             attempt.run();
@@ -142,7 +144,6 @@ public class LoginController {
             limiter.release(address);
             throw e;
         }
-        return SETUP_REDIRECT;
     }
 
     private static String tooManyAttempts(Duration wait) {

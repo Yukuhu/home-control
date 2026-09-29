@@ -145,10 +145,10 @@ class JsonFileDeviceRegistryTest {
         });
         JsonNode rewritten = JsonMapper.builder().build().readTree(Files.readAllBytes(file));
         assertThat(rewritten.path("version").asInt()).isEqualTo(3);
-        JsonNode record = rewritten.path("devices").path(0);
-        assertThat(record.path("kind").asString()).isEqualTo("ANDROID_TV");
-        assertThat(record.path("adapters").path("androidtv").path("certificateFingerprint").asString()).isEqualTo("AB:CD");
-        assertThat(record.has("certificateFingerprint")).isFalse();
+        JsonNode entry = rewritten.path("devices").path(0);
+        assertThat(entry.path("kind").asString()).isEqualTo("ANDROID_TV");
+        assertThat(entry.path("adapters").path("androidtv").path("certificateFingerprint").asString()).isEqualTo("AB:CD");
+        assertThat(entry.has("certificateFingerprint")).isFalse();
 
         // The rewritten file must be readable on its own, without going through migration again.
         List<Device> reread = new JsonFileDeviceRegistry(file).findAll();
@@ -235,6 +235,19 @@ class JsonFileDeviceRegistryTest {
     }
 
     @Test
+    void theBackupLeavesOutTheTvKeysThatNowLiveOnlyInSecrets() throws Exception {
+        Path file = dir.resolve("devices.json");
+        Files.copy(Path.of("src/test/resources/fixtures/devices/devices-v2-tv-keys.json"), file);
+
+        new JsonFileDeviceRegistry(file).findAll();
+
+        String backup = Files.readString(dir.resolve("devices.v2.json"));
+        assertThat(backup).doesNotContain("lg-client-key").doesNotContain("sam-token")
+                .contains("lg-1").contains("aa:bb:cc:dd:ee:ff").contains("\"paired\"");
+        assertThat(Files.readString(file)).contains("lg-client-key"); // moved to secrets by the adapter at startup
+    }
+
+    @Test
     void theRegistryIsReadOnceAndThenServedFromMemory() throws Exception {
         Path file = dir.resolve("devices.json");
         JsonFileDeviceRegistry registry = new JsonFileDeviceRegistry(file);
@@ -250,7 +263,7 @@ class JsonFileDeviceRegistryTest {
         Path file = dir.resolve("devices.json");
         Files.writeString(file, "{\"version\":4,\"devices\":[]}");
 
-        assertThatThrownBy(() -> new JsonFileDeviceRegistry(file).findAll())
+        assertThatThrownBy(new JsonFileDeviceRegistry(file)::findAll)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining("newer Home Control");
     }

@@ -32,7 +32,24 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
                 JsonFileDeviceRegistry::readDevices, JsonFileDeviceRegistry::writeDevices)
                 .versionOf(JsonFileDeviceRegistry::versionOf)
                 .migrate(1, JsonFileDeviceRegistry::migrateVersionOne)
-                .migrate(2, JsonFileDeviceRegistry::wrap);
+                .migrate(2, JsonFileDeviceRegistry::wrap)
+                .redactBackup(JsonFileDeviceRegistry::withoutTvKeys);
+    }
+
+    /**
+     * The webOS client keys and Tizen tokens that versions 1 and 2 kept in plain text. Since version 3 they are
+     * device secrets, encrypted in secrets.json, so the backup of an older registry leaves them out.
+     */
+    private static JsonNode withoutTvKeys(JsonNode array) {
+        for (JsonNode device : array) {
+            if (device.path("adapters").path("webos") instanceof ObjectNode webos) {
+                webos.remove("clientKey");
+            }
+            if (device.path("adapters").path("tizen") instanceof ObjectNode tizen) {
+                tizen.remove("token");
+            }
+        }
+        return array;
     }
 
     /** A bare array is version 1 when an element has no kind (v0.3), else version 2. */

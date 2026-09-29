@@ -138,7 +138,9 @@ class JsonFileSourceSettingsTest {
         Path file = dir.resolve("sources.json");
         Files.writeString(file, "{\"version\":2,\"sources\":{\"jellyfin\":{\"links\":\"not an object\"}}}");
 
-        assertThatThrownBy(() -> probe(new JsonFileSourceSettings(file), "jellyfin"))
+        JsonFileSourceSettings settings = new JsonFileSourceSettings(file);
+
+        assertThatThrownBy(() -> probe(settings, "jellyfin"))
                 .isInstanceOf(StorageException.class)
                 .hasMessage("Could not read the jellyfin settings in " + file + "; fix or delete that section");
     }

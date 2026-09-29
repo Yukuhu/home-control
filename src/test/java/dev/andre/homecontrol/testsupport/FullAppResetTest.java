@@ -1,7 +1,6 @@
 package dev.andre.homecontrol.testsupport;
 
 import dev.andre.homecontrol.core.Device;
-import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginRateLimiter;
@@ -87,7 +86,7 @@ class FullAppResetTest extends FullAppTest {
 
         assertThat(devices.devices()).isEmpty();
         assertThat(login.loginRequired()).isFalse();
-        assertThat(secrets.names()).allMatch(name -> name.startsWith(DeviceSecrets.PREFIX));
+        assertThat(secrets.accountCredentialNames()).isEmpty();
         assertThat(limiter.blockedFor("127.0.0.1")).isEmpty();
         assertThat(pins.all()).isEmpty();
         assertThat(sports.current()).isEqualTo(SportsSettings.empty());

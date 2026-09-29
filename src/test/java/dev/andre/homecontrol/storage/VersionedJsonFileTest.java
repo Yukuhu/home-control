@@ -84,7 +84,7 @@ class VersionedJsonFileTest {
     void aNewerVersionIsRefusedByName() throws Exception {
         Files.writeString(path(), "{\"version\":4}");
 
-        assertThatThrownBy(() -> notes().read())
+        assertThatThrownBy(notes()::read)
                 .isInstanceOf(StorageException.class)
                 .hasMessage("the notes in " + path() + " was written by a newer Home Control (version 4);"
                         + " upgrade Home Control or restore a backup");
@@ -94,7 +94,7 @@ class VersionedJsonFileTest {
     void unreadableJsonNamesTheFile() throws Exception {
         Files.writeString(path(), "not json");
 
-        assertThatThrownBy(() -> notes().read())
+        assertThatThrownBy(notes()::read)
                 .isInstanceOf(StorageException.class)
                 .hasMessage("Could not read the notes in " + path() + "; fix or delete it");
     }
@@ -103,7 +103,7 @@ class VersionedJsonFileTest {
     void aVersionWithoutAStepIsUnreadable() throws Exception {
         Files.writeString(path(), "{\"version\":0}");
 
-        assertThatThrownBy(() -> notes().read())
+        assertThatThrownBy(notes()::read)
                 .isInstanceOf(StorageException.class)
                 .hasMessage("Could not read the notes in " + path() + "; fix or delete it");
     }
@@ -112,7 +112,7 @@ class VersionedJsonFileTest {
     void aDocumentWithoutAVersionIsUnreadable() throws Exception {
         Files.writeString(path(), "{\"text\":\"milk\"}");
 
-        assertThatThrownBy(() -> notes().read())
+        assertThatThrownBy(notes()::read)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining("fix or delete it");
     }
