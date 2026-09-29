@@ -94,6 +94,20 @@ class TizenTokenMigrationTest {
     }
 
     @Test
+    void forgettingOneOfTwoEntriesThatShareAReferenceKeepsTheTokenForTheOther() {
+        secrets.putDeviceSecret(TizenSettings.secretName(REF), "the-token");
+        JsonFileDeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        Device stale = new Device("sam-old", "Samsung (cast)", DeviceKind.TIZEN, "192.168.1.31",
+                Map.of("tizen", Map.of("paired", "true", "keyRef", REF)), Instant.now());
+        registry.save(stale);
+        registry.save(samsung(Map.of("paired", "true", "keyRef", REF)));
+
+        adapter(registry).forget(stale);
+
+        assertThat(secrets.deviceSecret(TizenSettings.secretName(REF))).contains("the-token");
+    }
+
+    @Test
     void forgettingTheDeviceRemovesItsSecret() {
         secrets.putDeviceSecret(TizenSettings.secretName(REF), "the-token");
 

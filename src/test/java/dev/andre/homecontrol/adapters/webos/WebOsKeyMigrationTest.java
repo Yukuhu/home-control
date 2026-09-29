@@ -104,6 +104,20 @@ class WebOsKeyMigrationTest {
     }
 
     @Test
+    void forgettingOneOfTwoEntriesThatShareAReferenceKeepsTheKeyForTheOther() {
+        secrets.putDeviceSecret(WebOsSettings.secretName(REF), "the-key");
+        JsonFileDeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        Device stale = new Device("lg-old", "LG (cast)", DeviceKind.WEBOS, "192.168.1.30",
+                Map.of("webos", Map.of("keyRef", REF)), Instant.now());
+        registry.save(stale);
+        registry.save(lg(Map.of("keyRef", REF)));
+
+        adapter(registry).forget(stale);
+
+        assertThat(secrets.deviceSecret(WebOsSettings.secretName(REF))).contains("the-key");
+    }
+
+    @Test
     void aMergeCarriesTheReferenceSoThePairingStillWorks() {
         secrets.putDeviceSecret(WebOsSettings.secretName(REF), "the-key");
         JsonFileDeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));

@@ -110,7 +110,7 @@ public class WebOsAdapter implements WakeOnLanAdapter {
 
     @Override
     public void forget(Device device) {
-        keys.forget(device);
+        keys.forget(device, registry.findAll());
     }
 
     @Override
