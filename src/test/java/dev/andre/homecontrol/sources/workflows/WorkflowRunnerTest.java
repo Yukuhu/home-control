@@ -68,6 +68,16 @@ class WorkflowRunnerTest {
                 .hasMessage("Choose entries: This item is no longer available; refresh the Dashboard");
     }
 
+    @Test void aSingleTileWithoutCallsResolvesItsFixedUrlWithoutFetchingAnyCall() {
+        var client = mock(WorkflowHttpClient.class);
+        var draft = WorkflowFixtures.singleWith(List.of());
+        var definition = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, WorkflowIntegrationFixture.ID, 1, draft);
+        var media = new WorkflowRunner(client, PROPERTIES).resolve(definition, "single");
+        assertThat(media.url()).isEqualTo(URI.create("https://media.example/play"));
+        verify(client, never()).fetch(any(WorkflowHttpClient.Request.class), anyLong());
+        verify(client).checkMedia(eq(media.url()), anyLong());
+    }
+
     @Test void singleResolutionFetchesOnlyJsonAndNeverRequestsMedia() throws Exception {
         try (var server = new FakeWorkflowServer()) {
             server.respond("/json", 200, "{\"id\":\"news\",\"token\":\"secret\"}");

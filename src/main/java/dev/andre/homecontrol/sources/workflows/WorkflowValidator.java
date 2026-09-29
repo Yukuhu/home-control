@@ -49,7 +49,9 @@ public final class WorkflowValidator {
     }
 
     private static Set<String> variableNames(WorkflowDraft draft) {
-        if (draft.calls() == null || draft.calls().isEmpty()) fail("at least one call is required");
+        if (draft.calls() == null) fail("at least one call is required");
+        // A single tile may play a fixed media URL without any call; a generated workflow needs its entry source.
+        if (draft.calls().isEmpty() && draft.mode() != Mode.SINGLE) fail("at least one call is required");
         if (draft.calls().size() > MAX_CALLS) fail("too many calls");
         Set<String> names = new HashSet<>();
         for (Call call : draft.calls()) {

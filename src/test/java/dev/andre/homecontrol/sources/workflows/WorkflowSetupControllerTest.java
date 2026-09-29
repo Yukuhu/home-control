@@ -216,6 +216,18 @@ class WorkflowSetupControllerTest extends WebSliceTest {
         assertThat(draft.cast().template()).isEqualTo("https://media.example/new/{A}");
     }
 
+    @Test void aSingleTileFormWithNoCallRowsSaves() throws Exception {
+        when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
+        mvc.perform(post("/setup/workflows/" + id).param("name", "Radio").param("enabled", "true").param("_enabled", "on")
+                        .param("mode", "SINGLE").param("kind", "VIDEO").param("title", "Radio")
+                        .param("expectedRevision", "3").param("mimeType", "video/mp4")
+                        .param("templateMode", "REPLACE").param("template", "https://media.example/radio.mp4"))
+                .andExpect(status().is3xxRedirection());
+        var draft = captureUpdatedDraft();
+        assertThat(draft.calls()).isEmpty();
+        assertThat(draft.cast().template()).isEqualTo("https://media.example/radio.mp4");
+    }
+
     @Test void typedHeaderValuesAreStoredAsWrittenTemplates() throws Exception {
         when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
         mvc.perform(validPost().with(request -> { request.setParameter("calls[0].name", "token"); return request; })

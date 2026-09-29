@@ -52,7 +52,8 @@ A workflow definition holds:
   - Formats: `ISO_DATE` (`2026-09-29`), `ISO_DATE_TIME` (offset date-time, `2026-09-29T20:15:00+02:00`),
     `UNIX_SECONDS`, `UNIX_MILLIS`, or a pattern of up to 64 characters in `java.time.format.DateTimeFormatter`
     notation, such as `yyyyMMdd`.
-- **Calls:** an ordered list of 1 to 8 calls. Each call has:
+- **Calls:** an ordered list of up to 8 calls. A single-tile workflow may have no calls (its media URL is fixed);
+  a generated one needs at least one, its entry source. Each call has:
   - a name matching `[a-z][a-z0-9_]{0,23}`, unique within the workflow;
   - a scope: `SHARED` (runs once per run) or `ENTRY` (runs once per entry, generated mode only);
   - a URL template and up to 16 header templates, which may use variables;

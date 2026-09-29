@@ -85,6 +85,21 @@ class WorkflowPlanTest {
                 .hasMessage("Workflow: entry subtitle variable {token} is marked sensitive");
     }
 
+    @Test void aSingleTileWithoutCallsCanBeSavedWithAFixedMediaUrl() {
+        var draft = WorkflowFixtures.singleWith(List.of());
+        WorkflowValidator.validate(draft);
+        var plan = WorkflowPlan.of(draft);
+        assertThat(plan.playCalls(CallScope.SHARED)).isEmpty();
+        assertThat(plan.variables()).isEmpty();
+    }
+
+    @Test void aGeneratedWorkflowStillNeedsACall() {
+        var generated = WorkflowFixtures.generated();
+        var draft = new WorkflowDraft(generated.name(), true, generated.mode(), generated.kind(), List.of(),
+                generated.listing(), null, new Cast("https://media.example/play", "video/mp4"));
+        assertThatThrownBy(() -> WorkflowValidator.validate(draft)).hasMessage("Workflow: at least one call is required");
+    }
+
     @Test void saveRejectsAnUnusedCallButAStoredOneRunsAtPlay() {
         var chain = WorkflowFixtures.chain(BASE);
         var calls = new ArrayList<>(chain.calls());
