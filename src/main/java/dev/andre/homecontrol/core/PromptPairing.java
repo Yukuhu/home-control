@@ -3,7 +3,7 @@ package dev.andre.homecontrol.core;
 /**
  * Pairing by accepting a prompt on the device itself (webOS, Tizen). The web layer lists every
  * bean of this type without knowing any protocol. {@link #pair} blocks until the device answers
- * or the adapter's pairing timeout elapses, and registers the device through the device manager.
+ * or the adapter's pairing timeout elapses, and registers the device through DeviceEnrollment.
  */
 public interface PromptPairing {
 

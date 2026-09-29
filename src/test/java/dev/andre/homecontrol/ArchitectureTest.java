@@ -56,6 +56,14 @@ class ArchitectureTest {
             .because("only adapters speak device protocols and only sources speak content APIs");
 
     @ArchTest
+    static final ArchRule onlyTheConfigurationReachesIntoDevice = noClasses()
+            .that().resideOutsideOfPackage("dev.andre.homecontrol.device..")
+            .and().doNotBelongToAnyOf(HomeControlConfiguration.class)
+            .should().dependOnClassesThat().resideInAPackage("dev.andre.homecontrol.device..")
+            .because("callers see devices through the four core interfaces; only the application's configuration "
+                    + "wires the device package");
+
+    @ArchTest
     static final ArchRule protocolPackagesStandAlone = freeze(noClasses()
             .that().resideInAPackage("..protocol..")
             .should().dependOnClassesThat().resideInAPackage("org.springframework..")

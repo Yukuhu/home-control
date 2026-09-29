@@ -12,7 +12,7 @@ root.
 | --- | --- |
 | `config` | The configuration root (`HomeControlProperties`), the list of modules that can be switched off (`Module`, `@ConditionalOnModule`), and `LegacyPropertyNames`, which keeps renamed configuration keys working. |
 | `core` | The domain model every other package builds on: devices, capabilities, actions and device states, the adapter contract (`DeviceAdapter`, `DeviceHandle`, and `AdapterDiscovery` for adapters that find devices on the network), and what the rest of the application may ask of devices (`DeviceQueries`, `DeviceCommands`, `DeviceEnrollment`, `DeviceSettings`). `core.content` holds content sources, items and rails; `core.playback` playable references, routes and the playback planner. It depends only on the JDK. |
-| `device` | The known devices, their connections and state, merging what discovery finds, and sending commands to a device's adapters. `Devices.assemble` wires one collaborator per job: `RegisteredDevices` answers queries, `CommandRouter` sends commands, `Enrollment` adds, merges, splits and forgets devices, `AdapterSettingsStore` keeps Wake-on-LAN and learned settings, and `DeviceConnections` holds one handle per device and adapter. `DeviceMatching` holds the pure rules that decide which device a discovered one belongs to. Enrollment decides under one registry lock, but resolves host names before it and connects and publishes events after it. At startup it lets each adapter check and bring up to date its own settings (`DeviceAdapter.validate`, `migrate`). `DeviceManager` implements the four `core` interfaces over the collaborators until its callers depend on the interfaces instead. `JsonFileDeviceRegistry` stores the paired devices in `devices.json`. |
+| `device` | The known devices, their connections and state, merging what discovery finds, and sending commands to a device's adapters. `Devices.assemble` wires one collaborator per job: `RegisteredDevices` answers queries, `CommandRouter` sends commands, `Enrollment` adds, merges, splits and forgets devices, `AdapterSettingsStore` keeps Wake-on-LAN and learned settings, and `DeviceConnections` holds one handle per device and adapter. `DeviceMatching` holds the pure rules that decide which device a discovered one belongs to. Enrollment decides under one registry lock, but resolves host names before it and connects and publishes events after it. At startup it lets each adapter check and bring up to date its own settings (`DeviceAdapter.validate`, `migrate`). `HomeControlConfiguration` exposes the four `core` interfaces as beans; nothing else outside `device` depends on it. `JsonFileDeviceRegistry` stores the paired devices in `devices.json`. |
 | `adapters` | One package per device protocol: `androidtv`, `cast`, `webos`, `tizen`, `upnp`, `sonos`, `bluetooth`. Each is a module that can be switched off, with its wire protocol in a `protocol` subpackage where it has one. `adapters.net` (TLS, WebSockets, Wake-on-LAN), `adapters.links` (content ids in service links) and `adapters.support` (TV pairing keys kept as device secrets) are shared. |
 | `discovery` | mDNS and SSDP discovery. Both start listening once the application is ready, so every listener of a `DeviceDiscoveredEvent` exists before the first one is published. |
 | `sources` | One package per content source: `jellyfin`, `youtube`, `tmdb`, `sports`, `pinned`, `workflows`. Each is a module that can be switched off. `sources.http` is shared: HTTP clients that connect only to vetted addresses and bound response bodies in size and time. |
@@ -33,24 +33,23 @@ dependencies, and the roadmap removes them.
 flowchart TD
     sources --> web
     sources --> content
-    sources --> device
     sources --> security
     sources --> storage
     web --> playback
     web --> content
-    web --> device
     web --> security
     web --> storage
-    playback --> device
     content --> storage
     device --> storage
-    adapters --> device
     adapters --> discovery
     adapters --> storage
     security --> storage
     security --> crypto
     storage --> crypto
 ```
+
+No package depends on `device`. The application's configuration in the root package assembles it and exposes the
+four `core` device interfaces as beans; every other package sees devices only through them.
 
 ## Package rules
 
@@ -62,6 +61,7 @@ flowchart TD
 | Content sources are independent of each other, apart from the shared `sources.http` | strict |
 | Device adapters are independent of each other, apart from the shared `adapters.net`, `adapters.links` and `adapters.support`, and Sonos using `adapters.upnp.protocol` | strict |
 | `java.net.http`, Apache HttpClient 5, jmDNS and D-Bus are used only in `adapters`, `sources` and `discovery` | strict |
+| Nothing outside `device` depends on it, except the application's configuration (`HomeControlConfiguration`): callers use the four `core` device interfaces | strict |
 | `..protocol..` packages depend on neither Spring nor any application package other than `adapters.net` and other protocol packages | frozen: 42 |
 | No cycles between the top-level packages | frozen: 1 |
 | `sources` does not depend on `adapters` | frozen: 0 |

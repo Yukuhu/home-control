@@ -4,13 +4,13 @@ import java.util.Map;
 
 /**
  * Where a handle stores what it learns about its device while connected — a TV's client key, its
- * MAC address — without writing the {@link DeviceRegistry} itself. The device manager binds one to
+ * MAC address — without writing the {@link DeviceRegistry} itself. The device package binds one to
  * each handle's device and adapter, so every registry write stays under its single lock.
  */
 @FunctionalInterface
 public interface LearnedSettings {
 
-    /** Stores nothing: for handles connected outside the device manager (tests, probes). */
+    /** Stores nothing: for handles connected outside the device package (tests, probes). */
     LearnedSettings DISCARD = updates -> { };
 
     /**

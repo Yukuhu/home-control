@@ -104,7 +104,7 @@ public class SonosDiscovery implements AutoCloseable {
                     log.info("Discovered Sonos room {} at {}", room.name(), room.host());
                     // A player speaks only for itself: the other rooms it lists are shown on Setup, but only the
                     // room at the announcing address, under the announced id, may merge into or re-point a
-                    // registered device (DeviceManager.onDiscovered) — a forged household cannot rewrite others.
+                    // registered device (Devices.onDiscovered) — a forged household cannot rewrite others.
                     if (id.equals(uuid) && room.host().equals(address)) {
                         events.publishEvent(new DeviceDiscoveredEvent(room));
                     }

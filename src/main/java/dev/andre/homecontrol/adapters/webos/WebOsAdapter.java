@@ -33,7 +33,7 @@ import java.util.function.Consumer;
 
 /**
  * LG webOS TVs over SSAP (spec §4.1). The client key is a device secret, named by a reference in the device's adapter
- * settings. The registry is only read here; what a session learns is stored through the device manager.
+ * settings. The registry is only read here; what a session learns is stored through the device package.
  */
 public class WebOsAdapter implements WakeOnLanAdapter, AdapterDiscovery {
 
@@ -86,7 +86,7 @@ public class WebOsAdapter implements WakeOnLanAdapter, AdapterDiscovery {
         return EnumSet.of(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME, Capability.APP_LINK);
     }
 
-    /** Outside the device manager: the session works, but a learned MAC address or key is not stored. */
+    /** Outside the device package: the session works, but a learned MAC address or key is not stored. */
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
         return connect(device, onChange, LearnedSettings.DISCARD);

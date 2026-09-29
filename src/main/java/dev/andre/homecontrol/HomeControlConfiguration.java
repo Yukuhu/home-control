@@ -19,7 +19,6 @@ import dev.andre.homecontrol.core.playback.MediaRendererStrategy;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.YouTubeLoungeStrategy;
 import dev.andre.homecontrol.core.playback.WorkflowCastStrategy;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.device.Devices;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.discovery.MdnsBrowser;
@@ -31,7 +30,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 
 import java.util.List;
 
@@ -53,35 +51,24 @@ public class HomeControlConfiguration {
         return Devices.assemble(registry, adapters, events);
     }
 
-    // @Primary until DeviceManager, which implements the four interfaces too, is gone (3A PR 2, Task 8).
     @Bean
-    @Primary
     public DeviceQueries deviceQueries(Devices devices) {
         return devices.queries();
     }
 
     @Bean
-    @Primary
     public DeviceCommands deviceCommands(Devices devices) {
         return devices.commands();
     }
 
     @Bean
-    @Primary
     public DeviceEnrollment deviceEnrollment(Devices devices) {
         return devices.enrollment();
     }
 
     @Bean
-    @Primary
     public DeviceSettings deviceSettings(Devices devices) {
         return devices.settings();
-    }
-
-    /** For the callers that have not moved onto the four interfaces yet. */
-    @Bean
-    public DeviceManager deviceManager(Devices devices) {
-        return new DeviceManager(devices);
     }
 
     @Bean

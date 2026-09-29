@@ -25,7 +25,7 @@ public interface DeviceAdapter {
     DeviceHandle connect(Device device, Consumer<DeviceState> onChange);
 
     /**
-     * What the device manager calls: like {@link #connect(Device, Consumer)}, for adapters whose
+     * What the device package calls: like {@link #connect(Device, Consumer)}, for adapters whose
      * handles learn settings while connected and store them through {@code learned}. Default:
      * ignores {@code learned}.
      */
@@ -51,7 +51,7 @@ public interface DeviceAdapter {
 
     /**
      * Brings this adapter's settings of a registered device up to date at startup, for example by moving a credential
-     * out of the registry. The device manager saves a changed result. Must be idempotent. Default: unchanged.
+     * out of the registry. Startup saves a changed result. Must be idempotent. Default: unchanged.
      */
     default Device migrate(Device device) {
         return device;

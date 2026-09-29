@@ -1,9 +1,11 @@
 package dev.andre.homecontrol.testsupport;
 
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.core.DeviceSettings;
 import dev.andre.homecontrol.security.LoginRateLimiter;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.pinned.PinnedShortcuts;
@@ -13,6 +15,7 @@ import dev.andre.homecontrol.sources.youtube.KnownVideos;
 import dev.andre.homecontrol.sources.youtube.QuotaLedger;
 import dev.andre.homecontrol.sources.youtube.YouTubeVideo;
 import dev.andre.homecontrol.core.content.SourcePreferences;
+import dev.andre.homecontrol.device.Devices;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.junit.jupiter.api.Test;
@@ -101,5 +104,14 @@ class FullAppResetTest extends FullAppTest {
             assertThat(dataDir().resolve(file)).doesNotExist();
         }
         assertThat(SharedFakes.tmdb().requests()).isEmpty();
+    }
+
+    @Test
+    void theApplicationHoldsOneDevicesAndOneBeanPerDeviceInterface() {
+        assertThat(context.getBeansOfType(Devices.class)).hasSize(1);
+        assertThat(context.getBeansOfType(DeviceQueries.class)).hasSize(1);
+        assertThat(context.getBeansOfType(DeviceCommands.class)).hasSize(1);
+        assertThat(context.getBeansOfType(DeviceEnrollment.class)).hasSize(1);
+        assertThat(context.getBeansOfType(DeviceSettings.class)).hasSize(1);
     }
 }

@@ -45,7 +45,7 @@ import java.util.function.UnaryOperator;
  * accepts the key: then it is UNPAIRED and only re-pairing helps (connecting again would re-prompt).
  *
  * <p>Settings are read from the registry (the MAC may be typed in while connected) but written only
- * through {@link LearnedSettings}, i.e. by the device manager under its lock. A client key the TV hands out goes to
+ * through {@link LearnedSettings}, i.e. by the device package under its registry lock. A client key the TV hands out goes to
  * the device secrets, under the reference the settings already name.
  *
  * <p>Threading: connect, loss and reconnect run on one scheduler thread; commands run on the
