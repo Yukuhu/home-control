@@ -6,7 +6,7 @@ import dev.andre.homecontrol.testsupport.TestCredentials;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
 import dev.andre.homecontrol.adapters.androidtv.MdnsDiscovery;
-import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
+import dev.andre.homecontrol.adapters.androidtv.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;

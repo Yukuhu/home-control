@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
-import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.core.CodePairing;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;

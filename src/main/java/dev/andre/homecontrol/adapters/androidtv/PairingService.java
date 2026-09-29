@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
-import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.PairingResult;
 import dev.andre.homecontrol.adapters.androidtv.protocol.PairingSession;

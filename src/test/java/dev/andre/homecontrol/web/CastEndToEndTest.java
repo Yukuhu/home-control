@@ -1,7 +1,7 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
-import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
+import dev.andre.homecontrol.adapters.androidtv.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.adapters.cast.protocol.CastIncoming;
 import dev.andre.homecontrol.adapters.cast.protocol.FakeCastReceiver;

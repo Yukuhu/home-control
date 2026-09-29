@@ -1,6 +1,8 @@
-package dev.andre.homecontrol.adapters.androidtv.protocol;
+package dev.andre.homecontrol.adapters.androidtv;
 
+import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.storage.StorageException;
+import dev.andre.homecontrol.testsupport.TestCredentials;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -94,5 +96,16 @@ class CertificateStoreTest {
         new CertificateStore(file, "secret".toCharArray()).verifyReadable();
 
         assertThat(file).doesNotExist();
+    }
+
+    @Test
+    void theKeystoreIsWrittenOwnerOnly() throws Exception {
+        org.assertj.core.api.Assumptions.assumeThat(dir.getFileSystem().supportedFileAttributeViews()).contains("posix");
+        Path file = dir.resolve("keystore.p12");
+
+        new CertificateStore(file, "secret".toCharArray()).save("living", TestCredentials.clientCertificate());
+
+        assertThat(java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(file)))
+                .isEqualTo("rw-------");
     }
 }
