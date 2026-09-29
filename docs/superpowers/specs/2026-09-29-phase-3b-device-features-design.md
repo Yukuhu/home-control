@@ -140,7 +140,7 @@ Each feature pairs with a capability: `INPUTS` with `InputListing`, `GROUPING` w
 - The `WakeOnLanAdapter` marker goes; webOS and Tizen declare `WAKE_ON_LAN`.
 - `AdapterSettingsStore` asks `adapter.capabilities(device).contains(WAKE_ON_LAN)` wherever it tested `instanceof
   WakeOnLanAdapter`.
-- The setting keys `macAddress` and `macAddressManual` move, unchanged, into a constants class, `core.WakeOnLan`.
+- The setting keys `macAddress` and `macAddressManual` move, unchanged, into a constants class, `core.WakeOnLanSettings`.
 
 ### 4. Jellyfin
 
@@ -170,7 +170,7 @@ One PR, `refactor/device-features`, from main `092919a`. One commit per step, th
    `purpose()`.
 2. Exact adapter declarations, and `CommandRouter` refusing up front with a named reason.
 3. `DeviceHandle.feature(Class)` and `ReceiverApps`. `InputListing` and `GroupListing` are reached through it.
-4. Wake-on-LAN as a capability, with `core.WakeOnLan`.
+4. Wake-on-LAN as a capability, with `core.WakeOnLanSettings`.
 5. Jellyfin on `ANDROID_APPS`; `adapterEnabled` leaves `DeviceQueries`.
 6. Bluetooth's explicit refusal arms.
 7. The architecture guide's `core` row.
