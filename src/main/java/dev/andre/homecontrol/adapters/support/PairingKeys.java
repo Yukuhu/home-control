@@ -85,10 +85,19 @@ public final class PairingKeys {
         return device.withAdapter(adapterId, next);
     }
 
-    /** Removes the key of a device that is being forgotten. */
-    public void forget(Device device) {
+    /**
+     * Removes the key of a device that is being forgotten, unless another of the {@code registered} devices still
+     * names it: a re-pair can attach the adapter to another entry at the same address, which then shares the
+     * reference.
+     */
+    public void forget(Device device, List<Device> registered) {
         String keyRef = referenceOf(device);
-        if (keyRef != null) {
+        if (keyRef == null) {
+            return;
+        }
+        boolean stillUsed = registered.stream()
+                .anyMatch(other -> !other.id().equals(device.id()) && keyRef.equals(referenceOf(other)));
+        if (!stillUsed) {
             secrets.removeDeviceSecrets(List.of(secretName.apply(keyRef)));
         }
     }
