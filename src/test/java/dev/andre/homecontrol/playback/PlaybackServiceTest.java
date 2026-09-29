@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.playback;
 
-import dev.andre.homecontrol.HomeControlConfiguration;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Capability;
@@ -10,23 +9,19 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceQueries;
-import dev.andre.homecontrol.core.playback.AppLinkStrategy;
 import dev.andre.homecontrol.core.playback.AppLinks;
-import dev.andre.homecontrol.core.playback.CastLoadStrategy;
-import dev.andre.homecontrol.core.playback.CastMessageStrategy;
-import dev.andre.homecontrol.core.playback.CastStreamStrategy;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.DelegatedRoute;
-import dev.andre.homecontrol.core.playback.LocalAudioSinkStrategy;
-import dev.andre.homecontrol.core.playback.MediaRendererStrategy;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlayableResolver;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
+import dev.andre.homecontrol.core.playback.RouteStrategies;
 import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.core.playback.YouTubeLoungeStrategy;
+import dev.andre.homecontrol.testsupport.Planners;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -52,7 +47,7 @@ class PlaybackServiceTest {
     private final DeviceQueries devices = mock(DeviceQueries.class);
     private final DeviceCommands commands = mock(DeviceCommands.class);
     private final PlaybackService defaultService = new PlaybackService(devices, commands,
-            new PlaybackPlanner(List.of(new AppLinkStrategy())));
+            new PlaybackPlanner(List.of(RouteStrategies.appLink())));
     private final Device shield = new Device("shield", "Shield", DeviceKind.ANDROID_TV, "10.0.0.5",
             Map.of("androidtv", Map.of()), Instant.now());
     private final RouteExecutor executor = mock(RouteExecutor.class);
@@ -100,8 +95,8 @@ class PlaybackServiceTest {
                 Map.of("upnp", Map.of()), Instant.now());
         given(devices.device("upnp-10-0-0-30")).willReturn(Optional.of(speaker));
         given(devices.capabilities("upnp-10-0-0-30")).willReturn(EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME));
-        PlaybackService renderers = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new AppLinkStrategy(),
-                new CastLoadStrategy(), new CastStreamStrategy(), new MediaRendererStrategy())));
+        PlaybackService renderers = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(RouteStrategies.appLink(),
+                RouteStrategies.castLoad(), RouteStrategies.castStream(), RouteStrategies.renderer())));
 
         Route route = renderers.play(AppLinks.fromUrl("http://nas.local/music/song.flac"), "upnp-10-0-0-30");
 
@@ -116,8 +111,8 @@ class PlaybackServiceTest {
                 Map.of("bluetooth", Map.of()), Instant.now());
         given(devices.device("bluetooth-aa-bb-cc-dd-ee-ff")).willReturn(Optional.of(speaker));
         given(devices.capabilities("bluetooth-aa-bb-cc-dd-ee-ff")).willReturn(EnumSet.of(Capability.LOCAL_AUDIO_SINK, Capability.VOLUME));
-        PlaybackService local = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new AppLinkStrategy(),
-                new CastStreamStrategy(), new MediaRendererStrategy(), new LocalAudioSinkStrategy())));
+        PlaybackService local = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(RouteStrategies.appLink(),
+                RouteStrategies.castStream(), RouteStrategies.renderer(), RouteStrategies.localSink())));
 
         Route route = local.play(AppLinks.fromUrl("http://nas.local/music/song.mp3"), "bluetooth-aa-bb-cc-dd-ee-ff");
 
@@ -131,7 +126,7 @@ class PlaybackServiceTest {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
         given(executor.keys()).willReturn(Set.of("jellyfin-session"));
-        PlaybackService service = new PlaybackService(devices, commands, new HomeControlConfiguration().playbackPlanner(),
+        PlaybackService service = new PlaybackService(devices, commands, Planners.production(),
                 List.of(resolverReturning(new PlayableResolver.Resolution(
                         List.of(new PlayableRef.JellyfinSession("s1", "item-1", 600L, "Android TV")),
                         Set.of(Capability.JELLYFIN_CLIENT), List.of()))),
@@ -148,7 +143,7 @@ class PlaybackServiceTest {
     void resolverNotesExplainWhyNothingRoutes() {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
-        PlaybackService service = new PlaybackService(devices, commands, new HomeControlConfiguration().playbackPlanner(),
+        PlaybackService service = new PlaybackService(devices, commands, Planners.production(),
                 List.of(resolverReturning(new PlayableResolver.Resolution(List.of(), Set.of(),
                         List.of("no Jellyfin app is open on Shield")))),
                 List.of());
@@ -162,7 +157,7 @@ class PlaybackServiceTest {
     void notesPrefixThePlannersOwnReasons() {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
-        PlaybackService service = new PlaybackService(devices, commands, new HomeControlConfiguration().playbackPlanner(),
+        PlaybackService service = new PlaybackService(devices, commands, Planners.production(),
                 List.of(resolverReturning(new PlayableResolver.Resolution(
                         List.of(new PlayableRef.StreamUrl(URI.create("http://nas/x.mp4?ApiKey=k"), "video/mp4")),
                         Set.of(), List.of("no Jellyfin app is open on Shield")))),
@@ -210,7 +205,7 @@ class PlaybackServiceTest {
     @Test
     void executesACastRoute() {
         PlaybackService castService = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastLoadStrategy(), new CastStreamStrategy())));
+                new PlaybackPlanner(List.of(RouteStrategies.appLink(), RouteStrategies.castLoad(), RouteStrategies.castStream())));
         Device castDevice = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9", Map.of("cast", Map.of()), Instant.now());
         given(devices.device("kitchen")).willReturn(Optional.of(castDevice));
         given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME));
@@ -228,7 +223,7 @@ class PlaybackServiceTest {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
         PlaybackService service = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy())));
+                new PlaybackPlanner(List.of(RouteStrategies.appLink(), RouteStrategies.castStream())));
         URI uri = URI.create("https://www.youtube.com/watch?v=abc");
         ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
                 List.of(new PlayableRef.AppLink(uri, "youtube"),
@@ -245,7 +240,7 @@ class PlaybackServiceTest {
     void previewExplainsWhenNothingRoutes() {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.noneOf(Capability.class));
-        PlaybackService service = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new AppLinkStrategy())));
+        PlaybackService service = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(RouteStrategies.appLink())));
         ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
                 List.of(new PlayableRef.AppLink(URI.create("https://x"), "web")));
 
@@ -260,7 +255,7 @@ class PlaybackServiceTest {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
         PlaybackService service = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy())));
+                new PlaybackPlanner(List.of(RouteStrategies.appLink(), RouteStrategies.castStream())));
         URI uri = URI.create("https://www.youtube.com/watch?v=abc");
         ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
                 List.of(new PlayableRef.AppLink(uri, "youtube"),
@@ -280,7 +275,7 @@ class PlaybackServiceTest {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
         PlaybackService service = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy())));
+                new PlaybackPlanner(List.of(RouteStrategies.appLink(), RouteStrategies.castStream())));
         ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
                 List.of(new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube"),
                         new PlayableRef.StreamUrl(URI.create("http://nas/x.mp4"), "video/mp4")));
@@ -302,7 +297,7 @@ class PlaybackServiceTest {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
         PlaybackService service = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy())));
+                new PlaybackPlanner(List.of(RouteStrategies.appLink(), RouteStrategies.castStream())));
         ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
                 List.of(new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube"),
                         new PlayableRef.StreamUrl(URI.create("http://nas/x.mp4"), "video/mp4")));
@@ -319,7 +314,7 @@ class PlaybackServiceTest {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
         PlaybackService service = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy())));
+                new PlaybackPlanner(List.of(RouteStrategies.appLink(), RouteStrategies.castStream())));
         ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
                 List.of(new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube"),
                         new PlayableRef.StreamUrl(URI.create("http://nas/x.mp4"), "video/mp4")));
@@ -333,7 +328,7 @@ class PlaybackServiceTest {
     void offlineAndUnsupportedAreFailuresToo() {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
-        PlaybackService service = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new AppLinkStrategy())));
+        PlaybackService service = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(RouteStrategies.appLink())));
         ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
                 List.of(new PlayableRef.AppLink(URI.create("https://x"), "web")));
         willThrow(new DeviceOfflineException("Shield is not connected"))
@@ -353,7 +348,7 @@ class PlaybackServiceTest {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
         given(executor.keys()).willReturn(Set.of("jellyfin-session"));
-        PlaybackService service = new PlaybackService(devices, commands, new HomeControlConfiguration().playbackPlanner(),
+        PlaybackService service = new PlaybackService(devices, commands, Planners.production(),
                 List.of(resolverReturning(new PlayableResolver.Resolution(
                         List.of(new PlayableRef.JellyfinSession("s1", "item-1", 600L, "Android TV")),
                         Set.of(Capability.JELLYFIN_CLIENT), List.of()))),
@@ -374,7 +369,7 @@ class PlaybackServiceTest {
 
     @Test
     void executesACastMessageRoute() {
-        PlaybackPlanner castMessagePlanner = new PlaybackPlanner(List.of(new CastMessageStrategy()));
+        PlaybackPlanner castMessagePlanner = new PlaybackPlanner(List.of(RouteStrategies.castMessage()));
         PlaybackService castMessageService = new PlaybackService(devices, commands, castMessagePlanner);
         Device castDevice = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9", Map.of("cast", Map.of()), Instant.now());
         given(devices.device("kitchen")).willReturn(Optional.of(castDevice));
@@ -429,7 +424,7 @@ class PlaybackServiceTest {
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
         given(executor.keys()).willReturn(Set.of("youtube-lounge"));
         PlaybackService service = new PlaybackService(devices, commands,
-                new HomeControlConfiguration().playbackPlanner(), List.of(), List.of(executor));
+                Planners.production(), List.of(), List.of(executor));
         ContentItem item = LOUNGE_ITEM.withPlayables(List.of(new PlayableRef.AppLink(WATCH, "youtube"),
                 new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")));
         willThrow(new ActionFailedException("Shield refused to open the link"))
@@ -471,7 +466,7 @@ class PlaybackServiceTest {
     void aDelegatedRouteWithoutItsExecutorSaysItsSourceIsSwitchedOff() {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
-        PlaybackService service = new PlaybackService(devices, commands, new HomeControlConfiguration().playbackPlanner(),
+        PlaybackService service = new PlaybackService(devices, commands, Planners.production(),
                 List.of(resolverReturning(new PlayableResolver.Resolution(
                         List.of(new PlayableRef.JellyfinSession("s1", "item-1", 600L, "Android TV")),
                         Set.of(Capability.JELLYFIN_CLIENT), List.of()))),

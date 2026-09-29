@@ -10,6 +10,10 @@ import java.util.Set;
  * be started on demand. It preserves the user's profile, audio and subtitle choices.
  */
 public class JellyfinSessionStrategy implements RouteStrategy {
+    @Override
+    public Rung rung() {
+        return Rung.NATIVE_APP;
+    }
 
     @Override
     public Optional<Route> route(ContentItem item, Set<Capability> capabilities) {

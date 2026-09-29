@@ -13,8 +13,8 @@ import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlayableResolver;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.JellyfinSessionStrategy;
-import dev.andre.homecontrol.core.playback.CastMessageStrategy;
 import dev.andre.homecontrol.core.playback.Route;
+import dev.andre.homecontrol.core.playback.RouteStrategies;
 import dev.andre.homecontrol.playback.PlaybackService;
 import dev.andre.homecontrol.playback.PlayAttempt;
 import org.junit.jupiter.api.AfterEach;
@@ -105,7 +105,7 @@ class JellyfinPlayableResolverTest {
         given(devices.capabilities(shield.id())).willReturn(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS,
                 Capability.ANDROID_APPS, Capability.CAST_RECEIVER));
         PlaybackService playback = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), new CastMessageStrategy())),
+                new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), RouteStrategies.castMessage())),
                 List.of(resolver), List.of(new JellyfinRouteExecutor(sessions, devices, commands, Duration.ofSeconds(1))));
 
         assertThat(playback.attempt(item(WANTED), shield.id(), Set.of()))

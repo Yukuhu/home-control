@@ -10,6 +10,10 @@ import java.util.Set;
  * best-effort remote pairing (only for Cast devices whose switch is on). App links still come first.
  */
 public class YouTubeLoungeStrategy implements RouteStrategy {
+    @Override
+    public Rung rung() {
+        return Rung.CAST_APP;
+    }
 
     @Override
     public Optional<Route> route(ContentItem item, Set<Capability> capabilities) {

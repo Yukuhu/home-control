@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class MediaRendererStrategyTest {
 
-    private final MediaRendererStrategy strategy = new MediaRendererStrategy();
+    private final RouteStrategy strategy = RouteStrategies.renderer();
 
     private static ContentItem song(PlayableRef... playables) {
         return new ContentItem("x", "test", ContentKind.TRACK, "Bunny Song", "The Rabbits", null, List.of(playables));

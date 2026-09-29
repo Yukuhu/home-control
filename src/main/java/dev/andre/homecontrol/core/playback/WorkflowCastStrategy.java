@@ -6,6 +6,8 @@ import java.util.Set;
 
 /** Pure planning: credentials and media addresses are resolved only by the route executor. */
 public final class WorkflowCastStrategy implements RouteStrategy {
+    @Override public Rung rung() { return Rung.CAST_APP; }
+
     @Override public Optional<Route> route(ContentItem item, Set<Capability> capabilities) {
         if (!capabilities.contains(Capability.CAST_RECEIVER)) return Optional.empty();
         return item.playables().stream().filter(PlayableRef.WorkflowCast.class::isInstance)
