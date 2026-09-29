@@ -50,7 +50,6 @@ class WorkflowMigrationTest {
         assertThat(codec.decode(encoded)).isEqualTo(migrated);
     }
 
-    @org.junit.jupiter.api.Disabled("Task 4")
     @Test void singleV1WithoutMappingsStaysReadable() {
         String v1 = """
                 {"schemaVersion":1,"id":"w-0123456789ab","revision":1,"draft":{

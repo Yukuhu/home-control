@@ -170,20 +170,22 @@ class WorkflowSetupControllerTest extends WebSliceTest {
     @Test void replacesCredentialsAndClearsHeadersOnlyWhenExplicitlySelected() throws Exception {
         when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
         mvc.perform(validPost().param("urlMode", "REPLACE").param("url", "https://new.example/source")
-                        .param("templateMode", "REPLACE").param("template", "https://media.example/new")
+                        .param("templateMode", "REPLACE").param("template", "https://media.example/new/{A}")
+                        .param("variables[0].name", "A").param("variables[0].scope", "ROOT").param("variables[0].pointer", "/id")
                         .param("headersMode", "REPLACE"))
                 .andExpect(status().is3xxRedirection());
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
         verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
         assertThat(captor.getValue().calls().getFirst().url()).isEqualTo("https://new.example/source");
         assertThat(captor.getValue().calls().getFirst().headers()).isEmpty();
-        assertThat(captor.getValue().cast().template()).isEqualTo("https://media.example/new");
+        assertThat(captor.getValue().cast().template()).isEqualTo("https://media.example/new/{A}");
     }
 
     @Test void typedHeaderValuesAreStoredAsLiteralTemplateText() throws Exception {
         when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
         mvc.perform(validPost().param("urlMode", "REPLACE").param("url", "https://new.example/source")
-                        .param("templateMode", "REPLACE").param("template", "https://media.example/new")
+                        .param("templateMode", "REPLACE").param("template", "https://media.example/new/{A}")
+                        .param("variables[0].name", "A").param("variables[0].scope", "ROOT").param("variables[0].pointer", "/id")
                         .param("headersMode", "REPLACE").param("headers[0].name", "X-Filter")
                         .param("headers[0].value", "{\"a\":1}"))
                 .andExpect(status().is3xxRedirection());
@@ -232,7 +234,8 @@ class WorkflowSetupControllerTest extends WebSliceTest {
                     request.removeParameter("enabled");
                     return request;
                 }).header("Enabled", "true")
-                .param("templateMode", "REPLACE").param("template", "https://media.example/item.mp4"))
+                .param("templateMode", "REPLACE").param("template", "https://media.example/item/{A}")
+                .param("variables[0].name", "A").param("variables[0].scope", "ROOT").param("variables[0].pointer", "/id"))
                 .andExpect(status().is3xxRedirection());
 
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
@@ -280,7 +283,8 @@ class WorkflowSetupControllerTest extends WebSliceTest {
         assertThat(result.getResponse().getContentAsString()).contains("href=\"#workflow-url\"");
         when(workflowStore.update(eq(id), eq(3L), any(), any())).thenThrow(
                 new WorkflowException(WorkflowException.Stage.WORKFLOW, "Workflow changed; reopen this item"));
-        var concurrent = mvc.perform(validPost().param("templateMode", "REPLACE").param("template", "https://media.example/x"))
+        var concurrent = mvc.perform(validPost().param("templateMode", "REPLACE").param("template", "https://media.example/x/{A}")
+                        .param("variables[0].name", "A").param("variables[0].scope", "ROOT").param("variables[0].pointer", "/id"))
                 .andExpect(status().isConflict()).andReturn();
         assertSafeError(concurrent);
     }
@@ -339,7 +343,8 @@ class WorkflowSetupAuthenticationTest extends FullAppTest {
     private MockHttpServletRequestBuilder firstSave() {
         return post("/setup/workflows").param("name", "Saved safely").param("mode", "SINGLE").param("kind", "VIDEO")
                 .param("title", "News").param("urlMode", "REPLACE").param("url", "https://example.invalid/source-secret")
-                .param("templateMode", "REPLACE").param("template", "https://example.invalid/template-secret")
+                .param("templateMode", "REPLACE").param("template", "https://example.invalid/template-secret/{A}")
+                .param("variables[0].name", "A").param("variables[0].scope", "ROOT").param("variables[0].pointer", "/id")
                 .param("headersMode", "REPLACE").param("mimeType", "video/mp4");
     }
 }

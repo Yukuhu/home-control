@@ -46,4 +46,23 @@ public final class WorkflowFixtures {
         return new WorkflowDraft("Calls", true, Mode.SINGLE, ContentKind.VIDEO, calls, null,
                 new Tile("Calls", null, null), new Cast("https://media.example/play", "video/mp4"));
     }
+
+    /**
+     * A list call, a per-entry artwork lookup for the tiles, and a per-entry stream call for Play:
+     * list → {token} and entries with {id}; images/{id} → {art}; stream/{id}?token={token} → {path}.
+     */
+    public static WorkflowDraft chain(URI base) {
+        String root = base.toString().replaceAll("/$", "");
+        return new WorkflowDraft("Chain", true, Mode.GENERATED, ContentKind.VIDEO,
+                List.of(new Call("list", CallScope.SHARED, root + "/list", List.of(),
+                                List.of(new Variable("token", "/token", true))),
+                        new Call("images", CallScope.ENTRY, root + "/images/{id}", List.of(),
+                                List.of(new Variable("art", "/url", false))),
+                        new Call("stream", CallScope.ENTRY, root + "/stream/{id}?token={token}",
+                                List.of(new Header("Authorization", "Bearer {token}")),
+                                List.of(new Variable("path", "/path", true)))),
+                new Listing("list", "/items", "/id", "/title", null, new Field(null, "art"),
+                        List.of(new Variable("id", "/id", false))),
+                null, new Cast("https://media.example/play/{path}?t={token}", "video/mp4"));
+    }
 }
