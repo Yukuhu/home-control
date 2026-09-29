@@ -261,7 +261,7 @@ public class SecretStore {
         root.put("ciphertext", Base64.getEncoder().encodeToString(ciphertext));
 
         try {
-            OwnerOnlyFiles.write(file, mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(root), ".secrets-", true);
+            AtomicFiles.write(file, mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(root), true);
         } catch (IOException e) {
             throw new StorageException("Could not write " + file + "; check that /data is bind-mounted and writable", e);
         }

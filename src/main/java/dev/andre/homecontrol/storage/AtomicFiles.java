@@ -3,17 +3,17 @@ package dev.andre.homecontrol.storage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.file.CopyOption;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermissions;
 
-/** Durable, atomic writes of files that only the owner can read, for secrets. */
-final class OwnerOnlyFiles {
+/** Durable, atomic, owner-only writes: every file under /data is written through here. */
+public final class AtomicFiles {
 
-    private OwnerOnlyFiles() {
+    private AtomicFiles() {
     }
 
     /**
@@ -21,9 +21,9 @@ final class OwnerOnlyFiles {
      * it over the target atomically and then syncs the directory, so a power cut leaves either the
      * old file or the complete new one. {@code replace} false fails if the target already exists.
      */
-    static void write(Path target, byte[] bytes, String tempPrefix, boolean replace) throws IOException {
+    public static void write(Path target, byte[] bytes, boolean replace) throws IOException {
         Path directory = target.toAbsolutePath().getParent();
-        Path temp = createTemp(directory, tempPrefix);
+        Path temp = createTemp(directory, "." + target.getFileName() + "-");
         try {
             try (FileChannel channel = FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
                 ByteBuffer buffer = ByteBuffer.wrap(bytes);
@@ -32,21 +32,37 @@ final class OwnerOnlyFiles {
                 }
                 channel.force(true);
             }
-            CopyOption[] options = replace
-                    ? new CopyOption[] {StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING}
-                    : new CopyOption[] {StandardCopyOption.ATOMIC_MOVE};
-            Files.move(temp, target, options);
+            if (replace) {
+                Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                createExclusively(temp, target);
+            }
             syncDirectory(directory);
         } finally {
             try {
-                Files.deleteIfExists(temp); // gone after a successful move; a leftover after a failure
+                Files.deleteIfExists(temp); // gone after a move; the spare name after a link; a leftover after a failure
             } catch (IOException _) {
                 // a stray temp file is harmless; the next write creates a new one
             }
         }
     }
 
-    static Path createTemp(Path directory, String prefix) throws IOException {
+    /**
+     * An atomic rename replaces an existing target on Linux even without {@code REPLACE_EXISTING}; a hard link never
+     * does. Where the file system has no hard links, a plain move still refuses an existing target, though a second
+     * writer racing it could slip in between its check and its rename.
+     */
+    private static void createExclusively(Path temp, Path target) throws IOException {
+        try {
+            Files.createLink(target, temp);
+        } catch (FileAlreadyExistsException e) {
+            throw e;
+        } catch (UnsupportedOperationException | IOException _) {
+            Files.move(temp, target);
+        }
+    }
+
+    public static Path createTemp(Path directory, String prefix) throws IOException {
         Files.createDirectories(directory);
         if (directory.getFileSystem().supportedFileAttributeViews().contains("posix")) {
             return Files.createTempFile(directory, prefix, ".tmp",

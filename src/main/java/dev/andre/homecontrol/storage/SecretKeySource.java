@@ -145,8 +145,7 @@ public final class SecretKeySource {
         byte[] key = new byte[KEY_BYTES];
         random.nextBytes(key);
         try {
-            OwnerOnlyFiles.write(keyFile, (Base64.getEncoder().encodeToString(key) + "\n").getBytes(StandardCharsets.US_ASCII),
-                    ".secret-key-", false);
+            AtomicFiles.write(keyFile, (Base64.getEncoder().encodeToString(key) + "\n").getBytes(StandardCharsets.US_ASCII), false);
             return new SecretKeySpec(key, "AES");
         } catch (IOException e) {
             throw new StorageException("Could not create " + keyFile + "; check that /data is bind-mounted and writable", e);
