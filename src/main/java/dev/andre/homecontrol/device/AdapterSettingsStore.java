@@ -11,6 +11,7 @@ import dev.andre.homecontrol.core.WakeOnLanAdapter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
 /**
  * The adapter settings a handle learns while connected and the Wake-on-LAN MAC the user types in. Every rewrite of a
@@ -37,7 +38,19 @@ final class AdapterSettingsStore {
      * address the user typed in is never replaced by a learned one.
      */
     void updateAdapterSettings(String id, String adapterId, Map<String, String> updates) {
+        updateAdapterSettings(id, adapterId, updates, () -> true);
+    }
+
+    /**
+     * Like {@link #updateAdapterSettings(String, String, Map)}, for a handle's connection: written only if
+     * {@code current} still holds under the registry lock. A reconnect begins under that lock, so a superseded
+     * connection can never overwrite what its successor saved.
+     */
+    void updateAdapterSettings(String id, String adapterId, Map<String, String> updates, BooleanSupplier current) {
         synchronized (lock) {
+            if (!current.getAsBoolean()) {
+                return;
+            }
             Optional<Device> registered = registry.findById(id).filter(device -> device.hasAdapter(adapterId));
             if (registered.isEmpty()) {
                 return;

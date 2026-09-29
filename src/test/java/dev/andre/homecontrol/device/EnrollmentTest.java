@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
+import dev.andre.homecontrol.core.LearnedSettings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -33,6 +34,7 @@ import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 class EnrollmentTest {
 
@@ -47,7 +49,8 @@ class EnrollmentTest {
         background.shutdownNow();
     }
 
-    private record Wiring(DeviceRegistry registry, DeviceConnections connections, Enrollment enrollment) {
+    private record Wiring(DeviceRegistry registry, DeviceConnections connections, Enrollment enrollment,
+                          RegistryLock lock) {
     }
 
     private Wiring wire(Function<String, Optional<InetAddress>> resolver, DeviceAdapter... adapters) {
@@ -63,7 +66,8 @@ class EnrollmentTest {
         RegistryLock lock = new RegistryLock();
         AdapterSettingsStore settings = new AdapterSettingsStore(registry, byId, lock);
         DeviceConnections connections = new DeviceConnections(byId, published::add, settings::updateAdapterSettings);
-        return new Wiring(registry, connections, new Enrollment(registry, byId, connections, lock, published::add, resolver));
+        return new Wiring(registry, connections,
+                new Enrollment(registry, byId, connections, lock, published::add, resolver), lock);
     }
 
     /** A registry on a disk that is full once {@code full} is set: every write fails, reads still work. */
@@ -226,6 +230,31 @@ class EnrollmentTest {
         assertThat(wiring.registry().findById("a")).isEmpty();
         assertThat(wiring.connections().handles("a")).isEmpty();
         assertThat(slow.handles.get("a").closed).isTrue();
+    }
+
+    @Test
+    void whatASupersededSessionLearnsWhileItsSuccessorCommitsIsNotWritten() throws Exception {
+        List<LearnedSettings> sinks = new CopyOnWriteArrayList<>();
+        StubAdapter tv = new StubAdapter("tv", DeviceKind.ANDROID_TV, false, false) {
+            @Override
+            public DeviceHandle connect(Device device, Consumer<DeviceState> onChange, LearnedSettings learned) {
+                sinks.add(learned);
+                return connect(device, onChange);
+            }
+        };
+        Wiring wiring = wire(HostAddresses::lookup, tv);
+        Device device = device("a", "tv", "10.0.0.5");
+        wiring.enrollment().adopt(device);
+
+        Thread stale;
+        synchronized (wiring.lock()) {
+            stale = Thread.ofPlatform().start(() -> sinks.getFirst().store(Map.of("clientKey", "stale")));
+            await().until(() -> stale.getState() == Thread.State.BLOCKED);
+            wiring.connections().begin(device);
+        }
+        stale.join(5_000);
+
+        assertThat(wiring.registry().findById("a").orElseThrow().adapterSettings("tv")).doesNotContainKey("clientKey");
     }
 
     @Test

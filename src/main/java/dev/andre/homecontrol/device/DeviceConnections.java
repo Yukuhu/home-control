@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 
 /**
  * The live handles of every device and their composed state. A connect runs in two steps.
@@ -37,10 +38,13 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 final class DeviceConnections {
 
-    /** Where a handle's learned settings go: the adapter settings store. */
+    /**
+     * Where a handle's learned settings go: the adapter settings store, which writes them only while {@code current}
+     * holds under the registry lock.
+     */
     @FunctionalInterface
     interface LearnedSink {
-        void store(String deviceId, String adapterId, Map<String, String> updates);
+        void store(String deviceId, String adapterId, Map<String, String> updates, BooleanSupplier current);
     }
 
     /** A connect begun under the registry lock and completed after it is released. */
@@ -100,11 +104,7 @@ final class DeviceConnections {
             try {
                 opened.put(adapterId, adapters.get(adapterId).connect(device,
                         state -> generation.report(adapterId, state),
-                        updates -> {
-                            if (generation.current()) {
-                                learned.store(device.id(), adapterId, updates);
-                            }
-                        }));
+                        updates -> learned.store(device.id(), adapterId, updates, generation::current)));
             } catch (RuntimeException e) {
                 log.warn("Could not connect {} via the {} adapter; leaving it disconnected", device.id(), adapterId, e);
                 opened.values().forEach(DeviceConnections::closeQuietly);
