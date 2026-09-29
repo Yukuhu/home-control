@@ -167,7 +167,7 @@ class TmdbSetupServiceTest {
 
         assertThat(setup.credential()).isEmpty();
         assertThat(setup.settings()).isEmpty();
-        assertThat(loginService.loginRequired()).isFalse();
+        assertThat(loginService.loginRequired()).isTrue();
     }
 
     @Test

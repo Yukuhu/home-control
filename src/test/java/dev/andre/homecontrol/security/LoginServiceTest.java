@@ -159,12 +159,94 @@ class LoginServiceTest {
     }
 
     @Test
-    void removingTheLastSecretEndsTheLoginRequirement() {
+    void removingTheLastSecretKeepsTheLogin() {
         firstSecretStored();
 
         login.removeSecrets(List.of("jellyfin.token"));
 
+        assertThat(login.loginRequired()).isTrue();
+    }
+
+    @Test
+    void aPasswordIsSetWithoutAnySecretAndLogsThisBrowserIn() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        login.setPassword(PASSWORD, PASSWORD, request);
+
+        assertThat(login.loginRequired()).isTrue();
+        assertThat(login.isAuthenticated(request)).isTrue();
+        assertThat(login.isAuthenticated(new MockHttpServletRequest())).isFalse();
+    }
+
+    @Test
+    void aSecondPasswordIsRefused() {
+        login.setPassword(PASSWORD, PASSWORD, new MockHttpServletRequest());
+        var request = new MockHttpServletRequest();
+
+        assertThatThrownBy(() -> login.setPassword("another password", "another password", request))
+                .isInstanceOf(PasswordRejectedException.class)
+                .hasMessage("A login password is already set; change it instead");
+    }
+
+    @Test
+    void theCurrentPasswordRemovesTheLogin() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        login.setPassword(PASSWORD, PASSWORD, request);
+        HttpSession before = request.getSession(false);
+
+        login.removePassword(PASSWORD);
+
         assertThat(login.loginRequired()).isFalse();
+        login.setPassword("a later password", "a later password", new MockHttpServletRequest());
+        assertThat(login.isAuthenticated(before)).isFalse();
+    }
+
+    @Test
+    void aWrongPasswordDoesNotRemoveTheLogin() {
+        login.setPassword(PASSWORD, PASSWORD, new MockHttpServletRequest());
+
+        assertThatThrownBy(() -> login.removePassword("not the password"))
+                .isInstanceOf(WrongPasswordException.class);
+        assertThat(login.loginRequired()).isTrue();
+    }
+
+    @Test
+    void theLoginStaysWhileAnAccountIsConnectedAndTheRefusalNamesIt() {
+        firstSecretStored();
+
+        assertThatThrownBy(() -> login.removePassword(PASSWORD))
+                .isInstanceOf(PasswordRejectedException.class)
+                .isNotInstanceOf(WrongPasswordException.class)
+                .hasMessage("Disconnect Jellyfin first: its credentials need the login password");
+        assertThat(login.loginRequired()).isTrue();
+    }
+
+    @Test
+    void connectedAccountsAreNamedOnceEachAndDeviceSecretsAreNotAccounts() {
+        store.putDeviceSecret("device.androidtv.keystore-password", "p");
+        MockHttpServletRequest request = firstSecretStored();
+        login.storeSecrets(Map.of("youtube.client-id", "id", "youtube.client-secret", "s", "workflow.w-0123456789ab", "x"),
+                null, null, request);
+
+        assertThat(login.connectedAccounts()).containsExactly("Jellyfin", "Workflows", "YouTube");
+    }
+
+    @Test
+    void removingThePasswordIsRefusedOnceAnAccountIsConnectedMeanwhile() {
+        Argon2PasswordHasher hasher = mock(Argon2PasswordHasher.class);
+        given(hasher.hash(anyString())).willAnswer(call -> "hash of " + call.getArgument(0));
+        LoginService scripted = new LoginService(store, hasher, new SecureRandom());
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        scripted.setPassword(PASSWORD, PASSWORD, request);
+        given(hasher.matches(anyString(), anyString())).willAnswer(call -> {
+            store.putSecrets(Map.of("tmdb.credential", "c")); // connected while the password was being checked
+            return true;
+        });
+
+        assertThatThrownBy(() -> scripted.removePassword(PASSWORD))
+                .isInstanceOf(PasswordRejectedException.class)
+                .hasMessage("Disconnect TMDB first: its credentials need the login password");
+        assertThat(store.login()).isPresent();
     }
 
     @Test

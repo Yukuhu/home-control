@@ -17,7 +17,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-/** The single household password (spec §9). A login exists exactly when secrets exist. */
+/** The single household password (spec §9): set and removed on purpose, required while it exists. */
 public class LoginService {
 
     private static final Logger log = LoggerFactory.getLogger(LoginService.class);
@@ -25,6 +25,9 @@ public class LoginService {
     public static final int MIN_PASSWORD_LENGTH = 10;
     public static final int MAX_PASSWORD_LENGTH = 1024;
     static final String SESSION_ATTRIBUTE = LoginService.class.getName() + ".version";
+    /** What the Account section calls each kind of account credential, by the first part of its name. */
+    private static final Map<String, String> ACCOUNTS = Map.of("jellyfin", "Jellyfin", "youtube", "YouTube",
+            "tmdb", "TMDB", "sports", "Sports", "workflow", "Workflows");
 
     private final SecretStore store;
     private final Argon2PasswordHasher hasher;
@@ -108,7 +111,7 @@ public class LoginService {
     }
 
     /**
-     * The first secrets need a new login password and log this browser in; later secrets need an
+     * The first account credentials need a new login password and log this browser in; later ones need an
      * already authenticated request. Nothing is stored before the password is accepted.
      */
     public void storeSecrets(Map<String, String> secrets, String newPassword, String confirmation,
@@ -134,6 +137,65 @@ public class LoginService {
             store.removeSecrets(names);
         }
         changed();
+    }
+
+    /** The sources whose credentials need the login, by name, each once, sorted. */
+    public List<String> connectedAccounts() {
+        return store.accountCredentialNames().stream().map(LoginService::account).distinct().sorted().toList();
+    }
+
+    private static String account(String secretName) {
+        int dot = secretName.indexOf('.');
+        String kind = dot < 0 ? secretName : secretName.substring(0, dot);
+        return ACCOUNTS.getOrDefault(kind, kind);
+    }
+
+    /** Sets the first login password and logs this browser in. The slow hash runs outside the lock. */
+    public void setPassword(String password, String confirmation, HttpServletRequest request) {
+        checkNewPassword(password, confirmation);
+        LoginCredential credential = newCredential(password);
+        synchronized (this) {
+            if (store.login().isPresent()) {
+                throw new PasswordRejectedException("A login password is already set; change it instead");
+            }
+            store.setLogin(credential);
+            startSession(request, credential);
+        }
+        changed();
+    }
+
+    /**
+     * Removes the login password. The accounts are checked first, so a refusal never costs a guess. The current
+     * password is checked outside the lock. The login is then removed only if it was not changed meanwhile and no
+     * account was connected meanwhile. Sessions need no ending: without a login every browser is let in, and a
+     * session's version matches no later password.
+     */
+    public void removePassword(String current) {
+        LoginCredential login = store.login()
+                .orElseThrow(() -> new PasswordRejectedException("There is no login password to remove"));
+        refuseWhileAccountsAreConnected();
+        if (!verify(current, login)) {
+            throw new WrongPasswordException("The current password is wrong");
+        }
+        synchronized (this) {
+            if (!store.login().map(login::equals).orElse(false)) {
+                throw new PasswordRejectedException("The password was changed meanwhile; try again");
+            }
+            refuseWhileAccountsAreConnected();
+            store.removeLogin();
+        }
+        changed();
+    }
+
+    private void refuseWhileAccountsAreConnected() {
+        List<String> accounts = connectedAccounts();
+        if (accounts.isEmpty()) {
+            return;
+        }
+        String names = accounts.size() == 1 ? accounts.getFirst()
+                : String.join(", ", accounts.subList(0, accounts.size() - 1)) + " and " + accounts.getLast();
+        throw new PasswordRejectedException("Disconnect " + names + " first: "
+                + (accounts.size() == 1 ? "its" : "their") + " credentials need the login password");
     }
 
     /**

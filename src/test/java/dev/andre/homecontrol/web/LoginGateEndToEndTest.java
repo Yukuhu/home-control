@@ -47,8 +47,9 @@ class LoginGateEndToEndTest extends FullAppTest {
     }
 
     @AfterEach
-    void removeTheSecrets() {
-        login.removeSecrets(store.names());
+    void removeTheSecretsAndTheLogin() {
+        login.removeSecrets(store.accountCredentialNames());
+        login.removePassword(PASSWORD);
     }
 
     private HttpRequest.Builder request(String path) {

@@ -266,15 +266,14 @@ class YouTubeEndToEndTest extends FullAppTest {
                 // + 3 playlistItems.list (7 units) + 1 search.list (100 units) = 107 units; 1 search used.
                 assertThat(send(browser, page("/setup")).body()).contains("107 of 10000 units").contains("1 of 20 searches");
 
-                // 15. Disconnecting revokes the grant and removes only the YouTube secrets, so a
-                // device-only deployment (no other secret) no longer requires login; the Lounge
-                // pairing for Kitchen survives.
+                // 15. Disconnecting revokes the grant and removes only the YouTube secrets; the login stays
+                // until it is removed on purpose, and the Lounge pairing for Kitchen survives.
                 assertThat(send(browser, post("/setup/sources/youtube/disconnect", Map.of())).statusCode()).isEqualTo(302);
                 assertThat(GOOGLE.requests("/oauth/revoke")).anyMatch(
                         r -> "1//0gFixtureRefreshTokenGranted-0001".equals(r.form().get("token")));
                 HttpResponse<String> setupAfterDisconnect = send(browser, page("/setup"));
                 assertThat(setupAfterDisconnect.body()).contains("OAuth client ID");
-                assertThat(send(stranger, page("/")).statusCode()).isEqualTo(200);
+                assertThat(send(stranger, page("/")).statusCode()).isEqualTo(302);
                 assertThat(send(browser, page("/setup")).body()).contains("Kitchen: YouTube Cast on");
 
                 // 16. No secret ever reached the browser, in any response, or the application log.

@@ -245,7 +245,7 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
                 // 15. Nothing the browser received ever carried the credential.
                 assertNoBrowserBodyCarriesTheCredential();
 
-                // 16. Disconnect: device-only again, but the pinned rail (no secret) still answers.
+                // 16. Disconnect: the login stays, and the pinned rail (no secret) still answers.
                 assertThat(send(browser, post("/setup/sources/tmdb/disconnect", Map.of())).statusCode()).isEqualTo(302);
                 JsonNode sourcesAfterDisconnect = json(send(browser, getJson("/sources")));
                 boolean tmdbUnavailable = false;
@@ -256,7 +256,7 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
                 }
                 assertThat(tmdbUnavailable).isTrue();
                 assertThat(send(browser, getJson("/sources/pinned/rails/pinned")).statusCode()).isEqualTo(200);
-                assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(200);
+                assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(302);
             } finally {
                 devices.forget("shield-e2e");
             }
@@ -266,9 +266,8 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
     @Test
     @Order(2)
     void reconnectingWithAnApiKeyUsesTheQueryParameter() throws Exception {
-        // Disconnecting TMDB at the end of the previous test removed the household's only secret,
-        // so ("a login exists exactly when secrets exist", LoginService) the login password lapsed
-        // too — reconnecting is a "first secret" again and sets it once more.
+        // Disconnecting TMDB at the end of the previous test kept the login, and this browser is still logged in,
+        // so reconnecting stores the credential under it; the login password fields are not needed.
         HttpResponse<String> reconnected = send(browser, post("/setup/sources/tmdb", Map.of(
                 "credential", FakeTmdbServer.API_KEY, "loginPassword", LOGIN, "loginPasswordConfirmation", LOGIN)));
         assertThat(reconnected.statusCode()).isEqualTo(302);

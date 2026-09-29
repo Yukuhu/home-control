@@ -17,7 +17,6 @@ import dev.andre.homecontrol.sources.youtube.KnownVideos;
 import dev.andre.homecontrol.sources.youtube.QuotaLedger;
 import dev.andre.homecontrol.sources.youtube.YouTubeSearch;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupService;
-import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.junit.jupiter.api.extension.AfterAllCallback;
@@ -25,14 +24,11 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 /**
  * Brings the shared full application back to a fresh install after each test class, with the application's own
- * operations and the reset methods that exist for this. Besides devices, secrets and settings, that includes the
+ * operations and the reset methods that exist for this, never by deleting files behind the stores, which cache what
+ * they read. The account credentials and the login go; device secrets stay, like the keystore they protect, and the
+ * devices' own secrets go with the devices. Besides devices, secrets and settings, that includes the
  * in-memory caches of upstream answers (TMDB watch providers and image configuration, YouTube searches and known
  * videos, TheSportsDB fixtures) and a pending Android TV pairing, so a later class that uses the same fixture ids asks
  * the fakes again. Calendar feeds are cached per calendar id, which is new for every calendar added, and the sports
@@ -53,7 +49,9 @@ public final class FullAppReset implements AfterAllCallback {
         DeviceManager devices = app.getBean(DeviceManager.class);
         devices.devices().forEach(device -> devices.forget(device.id()));
 
-        app.getBean(LoginService.class).removeSecrets(app.getBean(SecretStore.class).names());
+        SecretStore secrets = app.getBean(SecretStore.class);
+        app.getBean(LoginService.class).removeSecrets(secrets.accountCredentialNames());
+        secrets.removeLogin();
         app.getBean(YouTubeSetupService.class).disconnect();
         app.getBean(WorkflowStore.class).reload();
         app.getBean(SportsSettingsService.class).update(current -> SportsSettings.empty());
@@ -68,22 +66,10 @@ public final class FullAppReset implements AfterAllCallback {
         app.getBean(PairingService.class).cancel();
         app.getBean(LoginRateLimiter.class).reset();
         app.getBean(JsonFileSourceSettings.class).reset();
-
-        Path dataDir = app.getBean(DataDirectory.class).path();
-        for (String file : new String[]{"secrets.json", "secret.key"}) {
-            delete(dataDir.resolve(file));
-        }
         RailCache rails = app.getBean(RailCache.class);
         app.getBean(ContentSources.class).all().forEach(source -> rails.invalidateSource(source.id()));
 
         SharedFakes.resetAll();
     }
 
-    private static void delete(Path file) {
-        try {
-            Files.deleteIfExists(file);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not delete " + file, e);
-        }
-    }
 }

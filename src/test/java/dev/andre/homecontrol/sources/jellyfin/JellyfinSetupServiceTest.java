@@ -162,7 +162,7 @@ class JellyfinSetupServiceTest {
     }
 
     @Test
-    void disconnectRevokesAPasswordTokenAndEndsTheLoginRequirement() {
+    void disconnectRevokesAPasswordTokenAndKeepsTheLogin() {
         setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new MockHttpServletRequest());
 
         setup.disconnect();
@@ -170,7 +170,7 @@ class JellyfinSetupServiceTest {
         FakeJellyfinServer.Recorded logout = fake.last("POST", "/Sessions/Logout");
         assertThat(logout.header("authorization")).contains("Token=\"" + FakeJellyfinServer.ACCESS_TOKEN + "\"");
         assertThat(setup.settings()).isEmpty();
-        assertThat(loginService.loginRequired()).isFalse();
+        assertThat(loginService.loginRequired()).isTrue();
     }
 
     @Test

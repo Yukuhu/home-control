@@ -5,15 +5,19 @@ import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.nio.file.Files;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** The module is on but nothing is configured yet: no I/O happens and no file is created. */
+/**
+ * The module is on but nothing is configured yet. The shared application may have written sports.json for an earlier
+ * test class and reset it to empty since, so this checks the settings, not the file.
+ */
 class SportsUnconfiguredTest extends FullAppTest {
 
     @Autowired
     ContentSources sources;
+
+    @Autowired
+    SportsSettingsService settings;
 
     @Test
     void theModuleIsPresentButUnavailable() {
@@ -21,6 +25,6 @@ class SportsUnconfiguredTest extends FullAppTest {
         assertThat(source).isPresent();
         assertThat(source.get().available()).isFalse();
 
-        assertThat(Files.exists(dataDir().resolve("sports.json"))).isFalse();
+        assertThat(settings.current()).isEqualTo(SportsSettings.empty());
     }
 }
