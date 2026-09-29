@@ -8,5 +8,6 @@ promises. Superseded decisions stay, marked as such.
 | --- | --- | --- | --- |
 | [0001](0001-cast-sender.md) | Google Cast: an in-house minimal CASTV2 sender instead of a library | Accepted | 2026-09-16 |
 | [0002](0002-versioned-data-files-and-device-secrets.md) | Versioned data files, and device secrets that need no login | Accepted | 2026-09-29 |
+| [0003](0003-workflow-chains.md) | Workflow chains: schema version 2, and response values in the editor | Accepted | 2026-09-29 |
 
 New decisions copy the header of 0001 (date, status, context) and take the next number.

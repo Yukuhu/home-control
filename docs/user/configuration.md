@@ -32,6 +32,10 @@ Every setting, as a Spring property or an environment variable.
 | `HOME_CONTROL_YOUTUBE_ENABLED` | `true` | Turn the YouTube module off entirely |
 | `HOME_CONTROL_WORKFLOWS_ENABLED` | `true` | Turn the workflow UI, source, Test and Cast execution off while retaining encrypted definitions |
 | `HOME_CONTROL_WORKFLOWS_ALLOW_LOOPBACK` | `false` | Allow workflow source and media URLs to use this host's loopback address |
+| `home-control.workflows.request-timeout` | `10s` | The limit for one workflow call |
+| `home-control.workflows.max-concurrent-fetches` | `8` | How many workflow calls may run at once, across all workflows |
+| `home-control.workflows.play-timeout` | `20s` | The limit for one Play, or for the Play part of a Test |
+| `home-control.workflows.refresh-timeout` | `60s` | The limit for one refresh of a workflow's tiles |
 | `home-control.youtube.daily-quota-units` | `10000` | Your Cloud project's daily YouTube Data API budget |
 | `home-control.youtube.searches-per-day` | `20` | On-demand searches allowed per day (100 quota units each) |
 | `home-control.youtube.channels-per-refresh` | `30` | Subscribed channels read per subscriptions refresh |
