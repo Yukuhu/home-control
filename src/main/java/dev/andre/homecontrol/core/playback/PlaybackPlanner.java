@@ -23,16 +23,11 @@ public class PlaybackPlanner {
         this.strategies = List.copyOf(strategies);
     }
 
-    public Route plan(ContentItem item, Set<Capability> capabilities) {
+    /** Every route the strategies offer, in preference order (spec §5.3), or the reasons none does. Pure. */
+    public Plan plan(ContentItem item, Set<Capability> capabilities) {
         if (item.playables().isEmpty()) {
-            return new Route.Unroutable("This item has nothing playable");
+            return new Plan(List.of(), "This item has nothing playable");
         }
-        return routes(item, capabilities).stream().findFirst()
-                .orElseGet(() -> new Route.Unroutable(String.join("; ", explain(item, capabilities))));
-    }
-
-    /** Every route the strategies offer, in preference order (spec §5.3). Pure. */
-    public List<Route> routes(ContentItem item, Set<Capability> capabilities) {
         List<Route> routes = new ArrayList<>();
         Set<String> keys = new HashSet<>();
         for (RouteStrategy strategy : strategies) {
@@ -41,7 +36,9 @@ public class PlaybackPlanner {
                     .filter(route -> keys.add(route.key()))
                     .ifPresent(routes::add);
         }
-        return routes;
+        return routes.isEmpty()
+                ? new Plan(List.of(), String.join("; ", explain(item, capabilities)))
+                : new Plan(routes, null);
     }
 
     /**

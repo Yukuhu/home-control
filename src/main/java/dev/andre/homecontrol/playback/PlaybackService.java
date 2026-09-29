@@ -11,6 +11,7 @@ import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import dev.andre.homecontrol.core.playback.DeviceRoute;
+import dev.andre.homecontrol.core.playback.Plan;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlayableResolver;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
@@ -61,12 +62,13 @@ public class PlaybackService {
 
     /** The route the item would take now, without playing it. May do I/O through resolvers. */
     public Route plan(ContentItem item, String deviceId) {
-        return plan(item, device(deviceId));
+        Device device = device(deviceId);
+        return plan(resolve(item, device)).first();
     }
 
     public Route play(ContentItem item, String deviceId) {
         Device device = device(deviceId);
-        Route route = plan(item, device);
+        Route route = plan(resolve(item, device)).first();
         execute(route, device);
         return route;
     }
@@ -74,17 +76,8 @@ public class PlaybackService {
     /** The route the item would take now plus every alternative, without playing anything. May do I/O through resolvers. */
     public PlaybackPreview preview(ContentItem item, String deviceId) {
         Device device = device(deviceId);
-        Resolved resolved = resolve(item, device);
-        if (resolved.item().playables().isEmpty()) {
-            String reason = resolved.notes().isEmpty()
-                    ? "This item has nothing playable" : String.join("; ", resolved.notes());
-            return new PlaybackPreview(device, List.of(), reason);
-        }
-        List<Route> routes = planner.routes(resolved.item(), resolved.capabilities());
-        if (routes.isEmpty()) {
-            return new PlaybackPreview(device, List.of(), explain(resolved));
-        }
-        return new PlaybackPreview(device, routes, null);
+        Plan plan = plan(resolve(item, device));
+        return new PlaybackPreview(device, plan.routes(), plan.reason());
     }
 
     /**
@@ -131,23 +124,17 @@ public class PlaybackService {
         return new Resolved(item.withPlayables(playables), capabilities, notes);
     }
 
-    private Route plan(ContentItem item, Device device) {
-        Resolved resolved = resolve(item, device);
-        if (resolved.item().playables().isEmpty() && !resolved.notes().isEmpty()) {
-            return new Route.Unroutable(String.join("; ", resolved.notes()));
+    /** The planner's plan, its reason prefixed with the resolvers' notes when nothing routes. */
+    private Plan plan(Resolved resolved) {
+        String notes = String.join("; ", resolved.notes());
+        if (resolved.item().playables().isEmpty()) {
+            return new Plan(List.of(), notes.isEmpty() ? "This item has nothing playable" : notes);
         }
-        Route route = planner.plan(resolved.item(), resolved.capabilities());
-        if (route instanceof Route.Unroutable(var reason) && !resolved.notes().isEmpty()) {
-            return new Route.Unroutable(String.join("; ", resolved.notes()) + "; " + reason);
+        Plan plan = planner.plan(resolved.item(), resolved.capabilities());
+        if (plan.routes().isEmpty() && !notes.isEmpty()) {
+            return new Plan(List.of(), notes + "; " + plan.reason());
         }
-        return route;
-    }
-
-    /** The planner's own reason nothing routes, prefixed with any resolver notes — shared wording with {@link #plan}. */
-    private String explain(Resolved resolved) {
-        Route route = planner.plan(resolved.item(), resolved.capabilities());
-        String reason = route instanceof Route.Unroutable(var routeReason) ? routeReason : "no route";
-        return resolved.notes().isEmpty() ? reason : String.join("; ", resolved.notes()) + "; " + reason;
+        return plan;
     }
 
     private void execute(Route route, Device device) {

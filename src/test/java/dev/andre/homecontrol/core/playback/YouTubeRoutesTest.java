@@ -26,7 +26,7 @@ class YouTubeRoutesTest {
     @Test
     void androidTvOpensTheYouTubeApp() {
         Route route = planner.plan(item, EnumSet.of(Capability.REMOTE_KEYS, Capability.VOLUME,
-                Capability.APP_LINK));
+                Capability.APP_LINK)).first();
 
         assertThat(route).isEqualTo(new Route.OpenAppLink(WATCH, "youtube"));
         assertThat(route.describe()).isEqualTo("Open in the YouTube app");
@@ -36,18 +36,18 @@ class YouTubeRoutesTest {
     void smartTvsUseTheSameAppLink() {
         // webOS and Tizen both declare keys and app links; their adapters translate the link to contentTarget / DIAL.
         assertThat(planner.plan(lounge, EnumSet.of(Capability.REMOTE_KEYS, Capability.VOLUME,
-                Capability.APP_LINK))).isEqualTo(new Route.OpenAppLink(WATCH, "youtube"));
+                Capability.APP_LINK)).first()).isEqualTo(new Route.OpenAppLink(WATCH, "youtube"));
     }
 
     @Test
     void aCastOnlyDeviceWithoutTheSwitchCannotPlayIt() {
-        assertThat(planner.plan(item, EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME)))
+        assertThat(planner.plan(item, EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME)).first())
                 .isEqualTo(new Route.Unroutable("this device cannot open app links"));
     }
 
     @Test
     void aCastOnlyDeviceWithTheSwitchCastsThroughLounge() {
-        Route route = planner.plan(lounge, EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME));
+        Route route = planner.plan(lounge, EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME)).first();
 
         assertThat(route).isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ"));
         assertThat(route.describe()).isEqualTo("Cast with the YouTube receiver (best effort)");
@@ -58,14 +58,14 @@ class YouTubeRoutesTest {
         EnumSet<Capability> shield = EnumSet.of(Capability.REMOTE_KEYS, Capability.VOLUME,
                 Capability.APP_LINK, Capability.CAST_RECEIVER);
 
-        assertThat(planner.plan(lounge, shield)).isEqualTo(new Route.OpenAppLink(WATCH, "youtube"));
-        assertThat(planner.routes(lounge, shield))
+        assertThat(planner.plan(lounge, shield).first()).isEqualTo(new Route.OpenAppLink(WATCH, "youtube"));
+        assertThat(planner.plan(lounge, shield).routes())
                 .containsExactly(new Route.OpenAppLink(WATCH, "youtube"), new Route.YouTubeLounge("aqz-KE-bpKQ"));
     }
 
     @Test
     void aSpeakerCannotPlayYouTube() {
-        assertThat(planner.plan(lounge, EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME)))
+        assertThat(planner.plan(lounge, EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME)).first())
                 .isEqualTo(new Route.Unroutable("this device cannot open app links; this device is not a Cast receiver"));
     }
 }
