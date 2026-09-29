@@ -16,7 +16,8 @@ public record WebOsSettings(String keyRef, String clientKey, String macAddress, 
 
     public static final String ADAPTER_ID = "webos";
     static final String KEY_REF = PairingKeys.KEY_REF;
-    static final String LEGACY_CLIENT_KEY = "clientKey";
+    /** Where versions before 2B kept the key in the settings. */
+    static final String LEGACY_KEY_FIELD = "clientKey";
 
     public static WebOsSettings of(Device device, DeviceSecrets secrets) {
         Map<String, String> settings = device.adapterSettings(ADAPTER_ID);

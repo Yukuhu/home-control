@@ -23,7 +23,8 @@ import java.util.function.UnaryOperator;
  */
 public final class VersionedJsonFile<T> {
 
-    private static final String VERSION = "version";
+    private static final String VERSION_FIELD = "version";
+    private static final String JSON = ".json";
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     private final Path file;
@@ -34,6 +35,7 @@ public final class VersionedJsonFile<T> {
     private final Function<T, ObjectNode> writer;
     private final Map<Integer, UnaryOperator<JsonNode>> steps = new HashMap<>();
     private ToIntFunction<JsonNode> versionOf = VersionedJsonFile::versionField;
+    private UnaryOperator<JsonNode> redact = UnaryOperator.identity();
     private T snapshot;
 
     /**
@@ -63,9 +65,18 @@ public final class VersionedJsonFile<T> {
         return this;
     }
 
+    /**
+     * What the backup of an older version leaves out, such as credentials the new version keeps encrypted elsewhere.
+     * Given a copy of the original tree; a backup it does not change keeps the original bytes.
+     */
+    public VersionedJsonFile<T> redactBackup(UnaryOperator<JsonNode> redaction) {
+        this.redact = redaction;
+        return this;
+    }
+
     /** The {@code version} field of an object, or -1 when it has none. */
     public static int versionField(JsonNode root) {
-        JsonNode field = root.path(VERSION);
+        JsonNode field = root.path(VERSION_FIELD);
         return root.isObject() && field.isIntegralNumber() ? field.asInt() : -1;
     }
 
@@ -88,9 +99,9 @@ public final class VersionedJsonFile<T> {
 
     public synchronized void write(T value) {
         ObjectNode document = MAPPER.createObjectNode();
-        document.put(VERSION, version);
+        document.put(VERSION_FIELD, version);
         writer.apply(value).properties().forEach(field -> {
-            if (!VERSION.equals(field.getKey())) {
+            if (!VERSION_FIELD.equals(field.getKey())) {
                 document.set(field.getKey(), field.getValue());
             }
         });
@@ -147,22 +158,25 @@ public final class VersionedJsonFile<T> {
             throw unreadable(e);
         }
         if (found < version) {
-            backUp(original, found);
+            backUp(original, root, found);
             write(value);
         }
         return value;
     }
 
     /** One-way migrations: the original is kept once for a rollback. An existing backup is the older, so it stays. */
-    private void backUp(byte[] original, int from) {
+    private void backUp(byte[] original, JsonNode root, int from) {
         String name = file.getFileName().toString();
-        String base = name.endsWith(".json") ? name.substring(0, name.length() - ".json".length()) : name;
-        Path backup = file.resolveSibling(base + ".v" + from + ".json");
+        String base = name.endsWith(JSON) ? name.substring(0, name.length() - JSON.length()) : name;
+        Path backup = file.resolveSibling(base + ".v" + from + JSON);
         if (Files.exists(backup)) {
             return;
         }
         try {
-            AtomicFiles.write(backup, original, false);
+            JsonNode redacted = redact.apply(root.deepCopy());
+            byte[] bytes = redacted.equals(root)
+                    ? original : MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(redacted);
+            AtomicFiles.write(backup, bytes, false);
         } catch (IOException e) {
             throw new StorageException("Could not keep " + file + " as " + backup
                     + " before migrating it; check that /data is bind-mounted and writable", e);

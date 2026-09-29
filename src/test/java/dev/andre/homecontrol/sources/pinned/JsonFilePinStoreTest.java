@@ -113,7 +113,7 @@ class JsonFilePinStoreTest {
         Path file = dir.resolve("pinned.json");
         Files.writeString(file, "{\"version\":2,\"pins\":[]}");
 
-        assertThatThrownBy(() -> new JsonFilePinStore(file).load())
+        assertThatThrownBy(new JsonFilePinStore(file)::load)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("newer Home Control");
@@ -124,7 +124,7 @@ class JsonFilePinStoreTest {
         Path file = dir.resolve("pinned.json");
         Files.writeString(file, "{\"version\":0,\"pins\":[]}");
 
-        assertThatThrownBy(() -> new JsonFilePinStore(file).load())
+        assertThatThrownBy(new JsonFilePinStore(file)::load)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining("fix or delete it");
     }

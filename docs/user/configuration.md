@@ -86,8 +86,8 @@ re-protected `keystore.p12`. **Copy the whole data directory before you upgrade.
 stop the app, put that copy back in place, and start the older image. Without a copy there is
 no way back that keeps the Android TV pairings: delete `keystore.p12` and `secrets.json`, pair
 the TVs again and reconnect the content sources. Each original is also kept once beside it as
-`<name>.v<n>.json`, for example `devices.v2.json`; that copy still holds the LG and Samsung
-pairing keys in plain text, so delete it once the upgraded install works.
+`<name>.v<n>.json`, for example `devices.v2.json`, for reference; that copy leaves out the LG
+and Samsung pairing keys, which are kept only encrypted now.
 
 Edit the files under `/data` only while the app is stopped: it reads each one once and would
 overwrite a change made while it runs.

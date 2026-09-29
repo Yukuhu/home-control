@@ -25,6 +25,8 @@ import java.util.function.Supplier;
  */
 public class CertificateStore {
 
+    private static final String KEYSTORE_TYPE = "PKCS12";
+
     private final Path file;
     private final Supplier<char[]> passwordSource;
     private char[] password;
@@ -126,7 +128,7 @@ public class CertificateStore {
     /** True when the keystore file opens with {@code password}. */
     static boolean opens(Path file, char[] password) {
         try (InputStream in = Files.newInputStream(file)) {
-            KeyStore.getInstance("PKCS12").load(in, password);
+            KeyStore.getInstance(KEYSTORE_TYPE).load(in, password);
             return true;
         } catch (IOException | GeneralSecurityException _) {
             return false;
@@ -140,7 +142,7 @@ public class CertificateStore {
     static boolean reprotect(Path file, char[] current, char[] next) {
         KeyStore keyStore;
         try (InputStream in = Files.newInputStream(file)) {
-            keyStore = KeyStore.getInstance("PKCS12");
+            keyStore = KeyStore.getInstance(KEYSTORE_TYPE);
             keyStore.load(in, current);
         } catch (IOException | GeneralSecurityException _) {
             return false;
@@ -162,7 +164,7 @@ public class CertificateStore {
     }
 
     private KeyStore openOrEmpty() throws GeneralSecurityException, IOException {
-        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        KeyStore keyStore = KeyStore.getInstance(KEYSTORE_TYPE);
         if (Files.exists(file)) {
             try (InputStream in = Files.newInputStream(file)) {
                 keyStore.load(in, password());

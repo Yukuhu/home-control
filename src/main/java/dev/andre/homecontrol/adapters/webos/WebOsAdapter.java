@@ -105,7 +105,7 @@ public class WebOsAdapter implements WakeOnLanAdapter {
     /** Moves a client key still in devices.json into a device secret. Idempotent, and safe to rerun after a crash. */
     @Override
     public Device migrate(Device device) {
-        return keys.migrate(device, WebOsSettings.LEGACY_CLIENT_KEY);
+        return keys.migrate(device, WebOsSettings.LEGACY_KEY_FIELD);
     }
 
     @Override
