@@ -21,7 +21,7 @@ class WorkflowPointerAndPreviewTest {
                 List.of(new Call("main", CallScope.SHARED, draft.calls().getFirst().url(), List.of(),
                         List.of(new Variable("A", pointer, false)))),
                 draft.listing(), draft.tile(),
-                new Cast("https://media.example/play", "video/mp4"));
+                new Cast("https://media.example/play/{A}", "video/mp4"));
     }
 
     @Test

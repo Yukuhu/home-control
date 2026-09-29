@@ -281,7 +281,7 @@ class WorkflowDefinitionTest {
         var first = draft.calls().getFirst();
         return new WorkflowDraft(draft.name(), draft.enabled(), draft.mode(), draft.kind(),
                 List.of(new Call(first.name(), first.scope(), first.url(), first.headers(), variables)),
-                draft.listing(), draft.tile(), new Cast("https://media.example/play", "video/mp4"));
+                draft.listing(), draft.tile(), new Cast("https://media.example/play/{A}", "video/mp4"));
     }
 
     private static WorkflowDraft withHeaders(WorkflowDraft draft, List<Header> headers) {

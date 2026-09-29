@@ -28,7 +28,7 @@ public final class WorkflowValidator {
     private WorkflowValidator() {}
 
     /** Everything a stored definition satisfies. The codec checks this when reading and writing. */
-    public static void validateStored(WorkflowDraft draft) {
+    public static WorkflowPlan validateStored(WorkflowDraft draft) {
         if (draft == null) fail("definition has no draft");
         text(draft.name(), 120, "name");
         if (draft.mode() == null) fail("mode is required");
@@ -37,11 +37,15 @@ public final class WorkflowValidator {
         calls(draft, names);
         presentation(draft, names);
         cast(draft.cast(), names);
+        return WorkflowPlan.of(draft);
     }
 
     /** What a Save additionally requires. */
     public static void validate(WorkflowDraft draft) {
-        validateStored(draft);
+        WorkflowPlan plan = validateStored(draft);
+        for (Call call : draft.calls()) {
+            if (plan.phase(call.name()) == WorkflowPlan.Phase.UNUSED) fail("call " + call.name() + ": nothing uses this call");
+        }
     }
 
     private static Set<String> variableNames(WorkflowDraft draft) {
