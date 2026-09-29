@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
@@ -37,7 +38,7 @@ import java.util.stream.Stream;
  *   <li>after it, closing handles, completing connects and publishing events.</li>
  * </ol>
  */
-final class Enrollment {
+final class Enrollment implements DeviceEnrollment {
 
     private static final Logger log = LoggerFactory.getLogger(Enrollment.class);
     private static final String NO_DEVICE_PREFIX = "No device with id ";
@@ -141,7 +142,8 @@ final class Enrollment {
      * this id (a Cast entry on a re-paired Shield) are kept, and pairing-free receivers seen at
      * the same address or under the same name are merged in.
      */
-    void adopt(Device device) {
+    @Override
+    public void adopt(Device device) {
         List<DiscoveredDevice> visible = discovered();
         AfterLock after = new AfterLock();
         synchronized (lock) {
@@ -161,7 +163,8 @@ final class Enrollment {
         return adopted;
     }
 
-    void forget(String id) {
+    @Override
+    public void forget(String id) {
         AfterLock after = new AfterLock();
         synchronized (lock) {
             Optional<Device> registered = registry.findById(id);
@@ -188,7 +191,8 @@ final class Enrollment {
      * Goes through {@link #adopt}, so pairing-free receivers at that address are absorbed as well.
      * Host names are resolved before the lock; one registered meanwhile is compared by name.
      */
-    Device attach(String host, String name, DeviceKind kind, String adapterId, Map<String, String> settings) {
+    @Override
+    public Device attach(String host, String name, DeviceKind kind, String adapterId, Map<String, String> settings) {
         List<Device> snapshot = registry.findAll();
         HostAddresses addresses = HostAddresses.resolve(
                 Stream.concat(Stream.of(host), snapshot.stream().map(Device::host)).toList(), resolver);
@@ -209,12 +213,14 @@ final class Enrollment {
     }
 
     /** Discovered devices that need the pairing flow. */
-    List<DiscoveredDevice> pairable() {
+    @Override
+    public List<DiscoveredDevice> pairable() {
         return discovered().stream().filter(found -> !pairingFree(found)).toList();
     }
 
     /** Pairing-free devices on the network that no registered device carries yet. */
-    List<DiscoveredDevice> addable() {
+    @Override
+    public List<DiscoveredDevice> addable() {
         return addable(discovered(), registry.findAll());
     }
 
@@ -226,7 +232,8 @@ final class Enrollment {
     }
 
     /** The setup page's "Add": merge into the matching device, or register a new one. */
-    Device addDiscovered(String adapterId, String host, int port) {
+    @Override
+    public Device addDiscovered(String adapterId, String host, int port) {
         DeviceAdapter adapter = adapters.get(adapterId);
         if (adapter == null) {
             throw new IllegalArgumentException(SWITCHED_OFF_PREFIX + adapterId + SWITCHED_OFF_SUFFIX);
@@ -313,7 +320,8 @@ final class Enrollment {
     }
 
     /** Moves every adapter of {@code source} into {@code target} and removes {@code source}. */
-    Device merge(String targetId, String sourceId) {
+    @Override
+    public Device merge(String targetId, String sourceId) {
         if (targetId.equals(sourceId)) {
             throw new IllegalArgumentException("Pick two different devices to merge");
         }
@@ -353,7 +361,8 @@ final class Enrollment {
     }
 
     /** Moves one adapter out of a device into a new device of its own. */
-    Device split(String id, String adapterId) {
+    @Override
+    public Device split(String id, String adapterId) {
         AfterLock after = new AfterLock();
         Device split;
         synchronized (lock) {

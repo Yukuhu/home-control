@@ -45,7 +45,7 @@ public class DeviceManager implements DeviceQueries, DeviceCommands, DeviceEnrol
     /** Validates, migrates and connects every registered device; see {@link Enrollment#start}. */
     @PostConstruct
     public void start() {
-        parts.enrollment().start();
+        parts.start();
     }
 
     @Override
@@ -108,11 +108,6 @@ public class DeviceManager implements DeviceQueries, DeviceCommands, DeviceEnrol
         return parts.enrollment().attach(host, name, kind, adapterId, settings);
     }
 
-    /** What a handle learned while connected; see {@link AdapterSettingsStore#updateAdapterSettings}. */
-    public void updateAdapterSettings(String id, String adapterId, Map<String, String> updates) {
-        parts.settings().updateAdapterSettings(id, adapterId, updates);
-    }
-
     @Override
     public ForegroundAppReporting foregroundAppReporting(String id) {
         return parts.queries().foregroundAppReporting(id);
@@ -143,10 +138,6 @@ public class DeviceManager implements DeviceQueries, DeviceCommands, DeviceEnrol
         return parts.queries().inputs(id);
     }
 
-    public List<DiscoveredDevice> discovered() {
-        return parts.enrollment().discovered();
-    }
-
     @Override
     public List<DiscoveredDevice> pairable() {
         return parts.enrollment().pairable();
@@ -165,7 +156,7 @@ public class DeviceManager implements DeviceQueries, DeviceCommands, DeviceEnrol
     /** The automatic merge; see {@link Enrollment#onDiscovered}. */
     @EventListener
     public void onDiscovered(DeviceDiscoveredEvent event) {
-        parts.enrollment().onDiscovered(event);
+        parts.onDiscovered(event);
     }
 
     @Override
@@ -186,6 +177,6 @@ public class DeviceManager implements DeviceQueries, DeviceCommands, DeviceEnrol
     @Override
     @PreDestroy
     public void close() {
-        parts.connections().closeAll();
+        parts.close();
     }
 }
