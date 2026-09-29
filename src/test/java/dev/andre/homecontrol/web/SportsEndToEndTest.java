@@ -3,7 +3,8 @@ package dev.andre.homecontrol.web;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
 import dev.andre.homecontrol.adapters.androidtv.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.sources.sports.calendar.FakeCalendarServer;
 import dev.andre.homecontrol.sources.sports.thesportsdb.FakeTheSportsDbServer;
 import dev.andre.homecontrol.storage.SecretStore;
@@ -86,7 +87,10 @@ class SportsEndToEndTest extends FullAppTest {
     int port;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
+
+    @Autowired
+    DeviceEnrollment enrollment;
 
     @Autowired
     CertificateStore certificates;
@@ -183,7 +187,7 @@ class SportsEndToEndTest extends FullAppTest {
 
         try (FakeRemoteServer shieldRemote = new FakeRemoteServer()) {
             certificates.loadOrCreate("shield-e2e");
-            devices.adopt(AndroidTvSettings.device("shield-e2e", "Shield", "127.0.0.1", shieldRemote.port(), null, Instant.now()));
+            enrollment.adopt(AndroidTvSettings.device("shield-e2e", "Shield", "127.0.0.1", shieldRemote.port(), null, Instant.now()));
             await().until(() -> devices.state("shield-e2e").connected());
             try {
                 // Step 2: before any secret, /setup is open to a stranger.
@@ -322,7 +326,7 @@ class SportsEndToEndTest extends FullAppTest {
                 assertThat(browserBodies).noneMatch(body -> body.contains(TOKEN) || body.contains("/private/")
                         || body.contains("api/v1/json") || body.contains(FakeTheSportsDbServer.PERSONAL_KEY));
             } finally {
-                devices.forget("shield-e2e");
+                enrollment.forget("shield-e2e");
             }
         }
     }

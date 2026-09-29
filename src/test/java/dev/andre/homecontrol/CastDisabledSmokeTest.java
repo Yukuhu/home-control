@@ -3,8 +3,9 @@ package dev.andre.homecontrol;
 import dev.andre.homecontrol.adapters.cast.CastAdapter;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.testsupport.ModulesOffTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -24,17 +25,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Smoke test for {@code home-control.cast.enabled=false}: the module is a home-control device add-on, not a build-time
  * flavour, so a {@code devices.json} that still carries a {@code cast} entry from before it was switched off must not
  * bring back any Cast capability or control. That an Android TV box keeps its own controls then is
- * {@code DeviceManagerTest.anEntryForAnAdapterThatIsSwitchedOffAddsNothing}: every module is off here, Android TV too.
+ * {@code DevicesTest.anEntryForAnAdapterThatIsSwitchedOffAddsNothing}: every module is off here, Android TV too.
  */
 class CastDisabledSmokeTest extends ModulesOffTest {
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
+
+    @Autowired
+    DeviceEnrollment enrollment;
 
     /** The modules-off context is shared: a device adopted here would stay for the next test class. */
     @AfterEach
     void forgetTheDevice() {
-        devices.forget("shield-c");
+        enrollment.forget("shield-c");
     }
 
     @Test
@@ -46,7 +50,7 @@ class CastDisabledSmokeTest extends ModulesOffTest {
     void aDeviceThatStillCarriesAStaleCastEntryHasNoCastCapabilitiesOrControls() throws Exception {
         Device shield = new Device("shield-c", "Shield C", DeviceKind.ANDROID_TV, "127.0.0.1",
                 Map.of("androidtv", Map.of(), "cast", Map.of("port", "8009")), Instant.now());
-        devices.adopt(shield);
+        enrollment.adopt(shield);
 
         assertThat(devices.capabilities("shield-c")).doesNotContain(Capability.CAST_RECEIVER);
 

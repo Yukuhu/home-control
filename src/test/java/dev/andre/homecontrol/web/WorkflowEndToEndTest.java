@@ -2,8 +2,8 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.RailStatus;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.*;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.workflows.FakeWorkflowServer;
 import dev.andre.homecontrol.sources.workflows.WorkflowStore;
@@ -88,7 +88,7 @@ class WorkflowEndToEndTest {
     }
 
     @Autowired MockMvc mvc;
-    @Autowired DeviceManager devices;
+    @Autowired DeviceEnrollment enrollment;
     @Autowired RecordingAdapter fakeDevices;
     @Autowired RailCache rails;
     @Autowired WorkflowStore workflows;
@@ -115,15 +115,15 @@ class WorkflowEndToEndTest {
                 login.removePassword(PASSWORD); // the login outlives the last workflow; the next test starts without one
             }
         } finally {
-            devices.forget(deviceId);
-            devices.forget("workflow-no-cast");
+            enrollment.forget(deviceId);
+            enrollment.forget("workflow-no-cast");
             fakeDevices.clear();
             upstream.close();
         }
     }
 
     private void adopt(String id, boolean cast) {
-        devices.adopt(new Device(id, id, DeviceKind.ANDROID_TV, "127.0.0.1",
+        enrollment.adopt(new Device(id, id, DeviceKind.ANDROID_TV, "127.0.0.1",
                 Map.of("workflow-test", Map.of("cast", Boolean.toString(cast))), Instant.now()));
     }
 

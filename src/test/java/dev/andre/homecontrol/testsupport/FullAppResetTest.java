@@ -1,8 +1,9 @@
 package dev.andre.homecontrol.testsupport;
 
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginRateLimiter;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.pinned.PinnedShortcuts;
@@ -37,7 +38,10 @@ class FullAppResetTest extends FullAppTest {
     ApplicationContext context;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
+
+    @Autowired
+    DeviceEnrollment enrollment;
 
     @Autowired
     LoginService login;
@@ -62,7 +66,7 @@ class FullAppResetTest extends FullAppTest {
 
     @Test
     void resetBringsTheApplicationBackToAFreshInstall() throws Exception {
-        devices.adopt(new Device("reset-probe", "Probe", DeviceKind.ANDROID_TV, "127.0.0.1",
+        enrollment.adopt(new Device("reset-probe", "Probe", DeviceKind.ANDROID_TV, "127.0.0.1",
                 Map.of("androidtv", Map.of()), Instant.now()));
         login.storeSecrets(Map.of("jellyfin.token", "0123456789abcdef"), PASSWORD, PASSWORD, new MockHttpServletRequest());
         for (int i = 0; i < 5; i++) {

@@ -9,9 +9,9 @@ import dev.andre.homecontrol.adapters.webos.WebOsAdapter;
 import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceStatus;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -118,7 +118,7 @@ class WebOsEndToEndTest {
     int port;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
 
     @Autowired
     DeviceRegistry registry;

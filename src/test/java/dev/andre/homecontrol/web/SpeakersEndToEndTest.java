@@ -6,12 +6,12 @@ import dev.andre.homecontrol.adapters.sonos.SonosDiscovery;
 import dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer;
 import dev.andre.homecontrol.adapters.upnp.UpnpDiscovery;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.SpeakerTopology;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import org.junit.jupiter.api.AfterAll;
@@ -110,7 +110,7 @@ class SpeakersEndToEndTest {
     MockMvc mockMvc;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
 
     @Autowired
     DeviceRegistry registry;

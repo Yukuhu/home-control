@@ -2,8 +2,9 @@ package dev.andre.homecontrol.e2e;
 
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
@@ -47,7 +48,10 @@ public abstract class E2eApplicationTest {
     protected int port;
 
     @Autowired
-    protected DeviceManager devices;
+    protected DeviceQueries devices;
+
+    @Autowired
+    protected DeviceEnrollment enrollment;
 
     @Autowired
     protected FakeDeviceAdapter fakeDevices;
@@ -74,13 +78,13 @@ public abstract class E2eApplicationTest {
     @AfterEach
     void cleanUp() {
         for (String id : new String[] {"living", "bedroom", "speaker"}) {
-            devices.forget(id);
+            enrollment.forget(id);
         }
         fakeDevices.clear();
     }
 
     protected void adopt(String id, String name, String caps, String fail) {
-        devices.adopt(new Device(id, name, DeviceKind.ANDROID_TV, "127.0.0.1",
+        enrollment.adopt(new Device(id, name, DeviceKind.ANDROID_TV, "127.0.0.1",
                 Map.of("e2e-fake", Map.of("caps", caps, "fail", fail)), Instant.now()));
     }
 
