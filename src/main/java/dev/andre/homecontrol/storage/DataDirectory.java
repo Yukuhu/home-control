@@ -18,6 +18,8 @@ public final class DataDirectory {
     public static final String SPORTS = "sports.json";
     public static final String PINNED = "pinned.json";
     public static final String YOUTUBE_QUOTA = "youtube-quota.json";
+    /** Present while {@code home-control.security.reset-login} is set and has run once. */
+    public static final String LOGIN_RESET = "login-reset.done";
 
     private final Path path;
 

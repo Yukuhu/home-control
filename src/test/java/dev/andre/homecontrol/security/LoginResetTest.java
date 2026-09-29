@@ -39,6 +39,26 @@ class LoginResetTest {
     }
 
     @Test
+    void theResetRunsOnceSoASettingLeftInPlaceKeepsTheNewPassword() {
+        start(false).putFirstSecrets(Map.of("jellyfin.token", "t"), new LoginCredential("h", "v1"));
+        start(true);
+
+        start(true).putFirstSecrets(Map.of("jellyfin.token", "t2"), new LoginCredential("h2", "v2"));
+        SecretStore restartedWithTheSettingStillSet = start(true);
+
+        assertThat(restartedWithTheSettingStillSet.login()).contains(new LoginCredential("h2", "v2"));
+        assertThat(restartedWithTheSettingStillSet.secret("jellyfin.token")).contains("t2");
+    }
+
+    @Test
+    void aStartWithoutTheSettingArmsTheResetAgain() {
+        start(true);
+        start(false).setLogin(new LoginCredential("h", "v1"));
+
+        assertThat(start(true).login()).isEmpty();
+    }
+
+    @Test
     void withoutTheSettingTheLoginStays() {
         start(false).putFirstSecrets(Map.of("jellyfin.token", "t"), new LoginCredential("h", "v1"));
 

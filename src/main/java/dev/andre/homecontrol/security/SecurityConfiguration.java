@@ -3,8 +3,6 @@ package dev.andre.homecontrol.security;
 import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.SecretKeySource;
 import dev.andre.homecontrol.storage.SecretStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,8 +15,6 @@ import java.time.Clock;
 @Configuration
 public class SecurityConfiguration {
 
-    private static final Logger log = LoggerFactory.getLogger(SecurityConfiguration.class);
-
     @Bean
     public SecureRandom secureRandom() {
         return new SecureRandom();
@@ -29,10 +25,7 @@ public class SecurityConfiguration {
     public SecretStore secretStore(DataDirectory data, SecurityProperties security, SecureRandom random) {
         SecretKeySource keys = new SecretKeySource(security.secret(), data.resolve(DataDirectory.SECRET_KEY), random);
         SecretStore store = new SecretStore(data.resolve(DataDirectory.SECRETS), keys, random);
-        if (security.resetLogin() && store.forgetLogin()) {
-            log.warn("home-control.security.reset-login is set: removed the login password and the credentials of the"
-                    + " connected content sources; unset it again, then set a new password and reconnect them");
-        }
+        LoginReset.apply(security.resetLogin(), store, data);
         return store;
     }
 
