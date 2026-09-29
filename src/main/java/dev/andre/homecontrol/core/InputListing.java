@@ -2,7 +2,10 @@ package dev.andre.homecontrol.core;
 
 import java.util.List;
 
-/** Implemented by handles whose device can list its inputs; empty while disconnected. */
+/**
+ * A connection that lists its device's inputs; empty while disconnected. Found with {@link DeviceHandle#feature};
+ * an adapter whose connections offer it declares {@link Capability#INPUTS}.
+ */
 public interface InputListing {
     List<TvInput> inputs();
 }
