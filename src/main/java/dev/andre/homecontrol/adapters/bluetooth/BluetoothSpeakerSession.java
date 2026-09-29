@@ -113,8 +113,10 @@ public class BluetoothSpeakerSession implements DeviceHandle {
                     muted = requestedMute;
                     whilePlaying("mute", () -> player.mute(requestedMute));
                 }
-                default -> throw new UnsupportedActionException(device.name()
-                        + " is a Bluetooth speaker and cannot handle " + action.getClass().getSimpleName());
+                case Action.PressKey _, Action.OpenAppLink _, Action.SelectInput _, Action.JoinGroup _,
+                     Action.LeaveGroup _, Action.CastLoad _, Action.CastMessage _ ->
+                        throw new UnsupportedActionException(device.name()
+                                + " is a Bluetooth speaker and cannot handle " + action.getClass().getSimpleName());
             }
         }
         pollNow();

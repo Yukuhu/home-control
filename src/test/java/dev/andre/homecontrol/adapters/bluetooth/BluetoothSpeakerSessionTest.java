@@ -348,11 +348,15 @@ class BluetoothSpeakerSessionTest {
         start();
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
 
-        var homeKey = new Action.PressKey(RemoteKey.HOME);
-        assertThatThrownBy(() -> session.execute(homeKey)).isInstanceOf(UnsupportedActionException.class);
-        var appLink = new Action.OpenAppLink(URI.create("https://youtube.com/watch?v=x"));
-        assertThatThrownBy(() -> session.execute(appLink))
-                .isInstanceOf(UnsupportedActionException.class);
+        List<Action> refused = List.of(new Action.PressKey(RemoteKey.HOME),
+                new Action.OpenAppLink(URI.create("https://youtube.com/watch?v=x")), new Action.SelectInput("HDMI_1"),
+                new Action.JoinGroup("RINCON_1"), new Action.LeaveGroup(), new Action.CastLoad("CC1AD845", Map.of()),
+                new Action.CastMessage("APP", "urn:x-cast:app", Map.of()));
+        for (Action action : refused) {
+            assertThatThrownBy(() -> session.execute(action))
+                    .isInstanceOf(UnsupportedActionException.class)
+                    .hasMessage("JBL Flip 5 is a Bluetooth speaker and cannot handle " + action.getClass().getSimpleName());
+        }
     }
 
     @Test
