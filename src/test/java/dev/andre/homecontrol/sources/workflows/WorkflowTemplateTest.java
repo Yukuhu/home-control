@@ -65,4 +65,30 @@ class WorkflowTemplateTest {
         assertThatThrownBy(() -> new WorkflowTemplate("https://media.example/?id={B}", variables))
                 .isInstanceOf(WorkflowException.class);
     }
+
+    @Test void callUrlTemplatesKeepTheirHostAndEncodeEveryValue() {
+        var template = new WorkflowTemplate("https://api.example/items/{id}/details?lang={lang}",
+                Set.of("id", "lang"), "call URL", WorkflowException.Stage.FETCH);
+        assertThat(template.references()).containsExactlyInAnyOrder("id", "lang");
+        var url = template.expand(Map.of("id", new WorkflowJson.Value("a/b@evil.example?x", false),
+                "lang", new WorkflowJson.Value("de & en", false)));
+        assertThat(url.getHost()).isEqualTo("api.example");
+        assertThat(url.getRawPath()).isEqualTo("/items/a%2Fb%40evil.example%3Fx/details");
+        assertThat(url.getRawQuery()).isEqualTo("lang=de%20%26%20en");
+    }
+
+    @Test void callUrlErrorsUseTheirLabelAndStage() {
+        assertThatThrownBy(() -> new WorkflowTemplate("https://{host}/x", Set.of("host"), "call URL",
+                WorkflowException.Stage.WORKFLOW))
+                .isInstanceOf(WorkflowException.class)
+                .hasMessage("Workflow: call URL placeholder must be in a path or query value");
+        var template = new WorkflowTemplate("https://api.example/{id}", Set.of("id"), "call URL", WorkflowException.Stage.FETCH);
+        assertThatThrownBy(() -> template.expand(Map.of("id", new WorkflowJson.Value("..", false))))
+                .hasMessage("Fetch JSON: dot path segment in call URL");
+    }
+
+    @Test void mediaTemplateMessagesAreUnchanged() {
+        assertThatThrownBy(() -> new WorkflowTemplate("https://media.example/{B}", Set.of("A")))
+                .hasMessage("Build media URL: unknown media URL placeholder: B");
+    }
 }
