@@ -1,8 +1,9 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer;
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceStatus;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.sources.jellyfin.FakeJellyfinServer;
 import dev.andre.homecontrol.testsupport.EventStreamReader;
 import dev.andre.homecontrol.testsupport.FullAppTest;
@@ -42,7 +43,10 @@ class SpeakerJellyfinEndToEndTest extends FullAppTest {
     int port;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
+
+    @Autowired
+    DeviceEnrollment enrollment;
 
     private final CookieManager cookies = new CookieManager();
     private final HttpClient browser = HttpClient.newBuilder().cookieHandler(cookies).build();
@@ -95,7 +99,7 @@ class SpeakerJellyfinEndToEndTest extends FullAppTest {
                      .respond("GET", "/Items/" + TRACK, 200, "item-track.json")
                      .respond("POST", "/Items/" + TRACK + "/PlaybackInfo", 200, "playback-info-audio.json");
              FakeUpnpRenderer speaker = new FakeUpnpRenderer()) {
-            devices.adopt(speaker.device(ID));
+            enrollment.adopt(speaker.device(ID));
             try {
                 HttpResponse<String> connected = send(browser, post("/setup/sources/jellyfin", Map.of(
                         "serverUrl", jellyfin.url().toString(), "mode", "password", "userName", "andre",
@@ -129,7 +133,7 @@ class SpeakerJellyfinEndToEndTest extends FullAppTest {
                 }
                 assertThat(browserBodies).noneMatch(body -> body.contains(ACCESS_TOKEN) || body.contains("ApiKey"));
             } finally {
-                devices.forget(ID);
+                enrollment.forget(ID);
             }
         }
     }

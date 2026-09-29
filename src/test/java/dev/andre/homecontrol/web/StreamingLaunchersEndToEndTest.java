@@ -3,7 +3,8 @@ package dev.andre.homecontrol.web;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
 import dev.andre.homecontrol.adapters.androidtv.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.sources.tmdb.FakeTmdbServer;
 import dev.andre.homecontrol.testsupport.FullAppTest;
 import dev.andre.homecontrol.testsupport.SharedFakes;
@@ -63,7 +64,10 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
     int port;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
+
+    @Autowired
+    DeviceEnrollment enrollment;
 
     @Autowired
     CertificateStore certificates;
@@ -127,7 +131,7 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
     void launchTrendingTitlesAndUpgradeThemWithPinnedLinks() throws Exception {
         try (FakeRemoteServer shieldRemote = new FakeRemoteServer()) {
             certificates.loadOrCreate("shield-e2e");
-            devices.adopt(AndroidTvSettings.device("shield-e2e", "Shield", "127.0.0.1", shieldRemote.port(), null, Instant.now()));
+            enrollment.adopt(AndroidTvSettings.device("shield-e2e", "Shield", "127.0.0.1", shieldRemote.port(), null, Instant.now()));
             await().atMost(Duration.ofSeconds(5)).until(() -> devices.state("shield-e2e").connected());
 
             try {
@@ -258,7 +262,7 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
                 assertThat(send(browser, getJson("/sources/pinned/rails/pinned")).statusCode()).isEqualTo(200);
                 assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(302);
             } finally {
-                devices.forget("shield-e2e");
+                enrollment.forget("shield-e2e");
             }
         }
     }

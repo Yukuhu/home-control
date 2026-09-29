@@ -5,10 +5,10 @@ import dev.andre.homecontrol.adapters.net.FakeWakeOnLanReceiver;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.adapters.tizen.FakeTizenServer;
 import dev.andre.homecontrol.adapters.tizen.TizenAdapter;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceStatus;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -105,7 +105,7 @@ class TizenEndToEndTest {
     int port;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
 
     @Autowired
     DeviceRegistry registry;

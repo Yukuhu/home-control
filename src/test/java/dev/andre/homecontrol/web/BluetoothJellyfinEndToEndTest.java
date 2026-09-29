@@ -6,9 +6,10 @@ import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezClient;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.FakeBluezClient;
 import dev.andre.homecontrol.adapters.bluetooth.player.FakeMpvScript;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceStatus;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.sources.jellyfin.FakeJellyfinServer;
 import dev.andre.homecontrol.testsupport.EventStreamReader;
 import org.junit.jupiter.api.AfterAll;
@@ -117,7 +118,10 @@ class BluetoothJellyfinEndToEndTest {
     int port;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
+
+    @Autowired
+    DeviceEnrollment enrollment;
 
     private final CookieManager cookies = new CookieManager();
     private final HttpClient browser = HttpClient.newBuilder().cookieHandler(cookies).build();
@@ -192,7 +196,7 @@ class BluetoothJellyfinEndToEndTest {
                      .respond("GET", "/Sessions", 200, "sessions.json")
                      .respond("GET", "/Items/" + TRACK, 200, "item-track.json")
                      .respond("POST", "/Items/" + TRACK + "/PlaybackInfo", 200, "playback-info-audio.json")) {
-            devices.adopt(new Device(ID, "JBL Flip 5", DeviceKind.BLUETOOTH, ADDRESS,
+            enrollment.adopt(new Device(ID, "JBL Flip 5", DeviceKind.BLUETOOTH, ADDRESS,
                     Map.of("bluetooth", new BluetoothSettings(ADDRESS, FakeBluezClient.ADAPTER, "").toMap()), Instant.now()));
             try {
                 HttpResponse<String> connected = send(browser, post("/setup/sources/jellyfin", Map.of(
@@ -226,7 +230,7 @@ class BluetoothJellyfinEndToEndTest {
                 listenToEvents(Duration.ofSeconds(3));
                 assertThat(browserBodies).noneMatch(body -> body.contains(ACCESS_TOKEN) || body.contains("ApiKey"));
             } finally {
-                devices.forget(ID);
+                enrollment.forget(ID);
             }
         }
         await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(anyFakeMpvAlive()).isFalse());

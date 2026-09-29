@@ -1,10 +1,11 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.adapters.androidtv.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.testsupport.EventStreamReader;
 import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,10 @@ class DeviceStateStreamEndToEndTest extends FullAppTest {
     int port;
 
     @Autowired
-    DeviceManager sessions;
+    DeviceQueries devices;
+
+    @Autowired
+    DeviceEnrollment enrollment;
 
     @Autowired
     CertificateStore certificates;
@@ -47,12 +51,12 @@ class DeviceStateStreamEndToEndTest extends FullAppTest {
         try (FakeRemoteServer fakeA = new FakeRemoteServer(); FakeRemoteServer fakeB = new FakeRemoteServer()) {
             certificates.loadOrCreate("shield-a");
             certificates.loadOrCreate("shield-b");
-            sessions.adopt(AndroidTvSettings.device("shield-a", "Shield A", "127.0.0.1", fakeA.port(),
+            enrollment.adopt(AndroidTvSettings.device("shield-a", "Shield A", "127.0.0.1", fakeA.port(),
                     null, Instant.now()));
-            sessions.adopt(AndroidTvSettings.device("shield-b", "Shield B", "127.0.0.1", fakeB.port(),
+            enrollment.adopt(AndroidTvSettings.device("shield-b", "Shield B", "127.0.0.1", fakeB.port(),
                     null, Instant.now()));
-            await().until(() -> sessions.state("shield-a").status() == DeviceStatus.CONNECTED);
-            await().until(() -> sessions.state("shield-b").status() == DeviceStatus.CONNECTED);
+            await().until(() -> devices.state("shield-a").status() == DeviceStatus.CONNECTED);
+            await().until(() -> devices.state("shield-b").status() == DeviceStatus.CONNECTED);
 
             HttpResponse<Stream<String>> response = http.send(
                     HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/events"))
@@ -84,8 +88,8 @@ class DeviceStateStreamEndToEndTest extends FullAppTest {
             if (events != null) {
                 events.awaitEnd(Duration.ofSeconds(5));
             }
-            sessions.forget("shield-a");
-            sessions.forget("shield-b");
+            enrollment.forget("shield-a");
+            enrollment.forget("shield-b");
         }
     }
 }

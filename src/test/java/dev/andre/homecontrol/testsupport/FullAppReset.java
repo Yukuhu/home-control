@@ -2,8 +2,9 @@ package dev.andre.homecontrol.testsupport;
 
 import dev.andre.homecontrol.adapters.androidtv.PairingService;
 import dev.andre.homecontrol.content.RailCache;
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.content.ContentSources;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginRateLimiter;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.pinned.PinnedShortcuts;
@@ -46,8 +47,8 @@ public final class FullAppReset implements AfterAllCallback {
     }
 
     public static void reset(ApplicationContext app) {
-        DeviceManager devices = app.getBean(DeviceManager.class);
-        devices.devices().forEach(device -> devices.forget(device.id()));
+        DeviceEnrollment enrollment = app.getBean(DeviceEnrollment.class);
+        app.getBean(DeviceQueries.class).devices().forEach(device -> enrollment.forget(device.id()));
 
         SecretStore secrets = app.getBean(SecretStore.class);
         app.getBean(LoginService.class).removeSecrets(secrets.accountCredentialNames());

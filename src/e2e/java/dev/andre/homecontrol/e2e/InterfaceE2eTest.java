@@ -143,7 +143,7 @@ class InterfaceE2eTest extends E2eApplicationTest {
 
     @BrowserTest
     void firstRunGuidesTheUserToConnectADevice(String browser) {
-        devices.devices().forEach(device -> devices.forget(device.id()));
+        devices.devices().forEach(device -> enrollment.forget(device.id()));
         try (BrowserSession session = open(browser)) {
             Page page = session.page();
             page.navigate("/");

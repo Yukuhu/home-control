@@ -5,8 +5,9 @@ import dev.andre.homecontrol.adapters.androidtv.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.adapters.cast.protocol.FakeCastReceiver;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.sources.youtube.FakeGoogleServer;
 import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRouteExecutor;
 import dev.andre.homecontrol.testsupport.FullAppTest;
@@ -73,7 +74,10 @@ class YouTubeEndToEndTest extends FullAppTest {
     int port;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
+
+    @Autowired
+    DeviceEnrollment enrollment;
 
     @Autowired
     CertificateStore certificates;
@@ -122,12 +126,12 @@ class YouTubeEndToEndTest extends FullAppTest {
              FakeCastReceiver kitchenCast = new FakeCastReceiver()) {
 
             certificates.loadOrCreate("shield");
-            devices.adopt(AndroidTvSettings.device("shield", "Shield", "127.0.0.1", shieldRemote.port(), null, Instant.now()));
+            enrollment.adopt(AndroidTvSettings.device("shield", "Shield", "127.0.0.1", shieldRemote.port(), null, Instant.now()));
 
             kitchenCast.appSpeaks(YouTubeLoungeRouteExecutor.RECEIVER_APP_ID, YouTubeLoungeRouteExecutor.MDX_NAMESPACE);
             ObjectNode mdxReply = (ObjectNode) MAPPER.readTree(FakeGoogleServer.fixture("cast-mdx-session-status.json"));
             kitchenCast.answerCustom(YouTubeLoungeRouteExecutor.MDX_NAMESPACE, mdxReply);
-            devices.adopt(new Device("kitchen", "Kitchen", DeviceKind.CAST, "127.0.0.1",
+            enrollment.adopt(new Device("kitchen", "Kitchen", DeviceKind.CAST, "127.0.0.1",
                     Map.of("cast", Map.of("port", String.valueOf(kitchenCast.port()))), Instant.now()));
             await().atMost(Duration.ofSeconds(5)).until(() -> devices.state("kitchen").connected());
 
@@ -282,8 +286,8 @@ class YouTubeEndToEndTest extends FullAppTest {
                     assertThat(output.getAll()).as("log carrying " + secret).doesNotContain(secret);
                 }
             } finally {
-                devices.forget("shield");
-                devices.forget("kitchen");
+                enrollment.forget("shield");
+                enrollment.forget("kitchen");
             }
         }
     }

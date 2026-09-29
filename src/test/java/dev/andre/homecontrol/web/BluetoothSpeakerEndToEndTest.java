@@ -4,8 +4,8 @@ import dev.andre.homecontrol.adapters.bluetooth.bluez.BluetoothDeviceInfo;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezClient;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.FakeBluezClient;
 import dev.andre.homecontrol.adapters.bluetooth.player.FakeMpvScript;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceRegistry;
-import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -104,7 +104,7 @@ class BluetoothSpeakerEndToEndTest {
     MockMvc mockMvc;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
 
     @Autowired
     DeviceRegistry registry;

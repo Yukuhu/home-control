@@ -6,11 +6,12 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.adapters.cast.protocol.CastIncoming;
 import dev.andre.homecontrol.adapters.cast.protocol.FakeCastReceiver;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.RemoteKey;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.testsupport.EventStreamReader;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /**
- * The Cast adapter through the real application: fake receiver ↔ CastSession ↔ DeviceManager ↔
+ * The Cast adapter through the real application: fake receiver ↔ CastSession ↔ the device beans ↔
  * planner ↔ HTTP and SSE. The fake is the in-process CASTV2 receiver from the adapter tests.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -61,7 +62,10 @@ class CastEndToEndTest {
     int port;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
+
+    @Autowired
+    DeviceEnrollment enrollment;
 
     @Autowired
     CertificateStore certificates;
@@ -88,7 +92,7 @@ class CastEndToEndTest {
     @Test
     void aCastOnlyDevicePlaysAPastedMediaLinkThroughTheDefaultMediaReceiver() throws Exception {
         try (FakeCastReceiver receiver = new FakeCastReceiver()) {
-            devices.adopt(castDevice("cast-e2e-play", receiver.port()));
+            enrollment.adopt(castDevice("cast-e2e-play", receiver.port()));
             try {
                 awaitReceiverStatus("cast-e2e-play");
 
@@ -105,7 +109,7 @@ class CastEndToEndTest {
                 assertThat(devices.state("cast-e2e-play").nowPlaying().title()).isEqualTo("bunny.mp4");
                 assertThat(devices.state("cast-e2e-play").nowPlaying().state()).isEqualTo(PlaybackState.PLAYING);
             } finally {
-                devices.forget("cast-e2e-play");
+                enrollment.forget("cast-e2e-play");
             }
         }
     }
@@ -114,7 +118,7 @@ class CastEndToEndTest {
     void volumeMuteAndStopReachTheReceiver() throws Exception {
         try (FakeCastReceiver receiver = new FakeCastReceiver()) {
             receiver.runApp(FakeCastReceiver.DEFAULT_MEDIA_RECEIVER, "Default Media Receiver");
-            devices.adopt(castDevice("cast-e2e-volume", receiver.port()));
+            enrollment.adopt(castDevice("cast-e2e-volume", receiver.port()));
             try {
                 await().until(() -> "Default Media Receiver".equals(devices.state("cast-e2e-volume").currentApp()));
 
@@ -128,7 +132,7 @@ class CastEndToEndTest {
                 await().until(() -> devices.state("cast-e2e-volume").currentApp() == null);
                 assertThat(post("/devices/cast-e2e-volume/key/HOME", "").statusCode()).isEqualTo(422);
             } finally {
-                devices.forget("cast-e2e-volume");
+                enrollment.forget("cast-e2e-volume");
             }
         }
     }
@@ -137,7 +141,7 @@ class CastEndToEndTest {
     void aMergedShieldSendsKeysOverRemoteV2AndVolumeOverCast() throws Exception {
         try (FakeRemoteServer remote = new FakeRemoteServer(); FakeCastReceiver receiver = new FakeCastReceiver()) {
             certificates.loadOrCreate("shield-e2e");
-            devices.adopt(AndroidTvSettings.device("shield-e2e", "Shield", "127.0.0.1", remote.port(), null, Instant.now())
+            enrollment.adopt(AndroidTvSettings.device("shield-e2e", "Shield", "127.0.0.1", remote.port(), null, Instant.now())
                     .withAdapter("cast", Map.of("port", String.valueOf(receiver.port()))));
             try {
                 await().until(() -> devices.state("shield-e2e").connected()
@@ -156,7 +160,7 @@ class CastEndToEndTest {
                 assertThat(devices.state("shield-e2e").nowPlaying().title()).isEqualTo("Song");
                 assertThat(devices.state("shield-e2e").status()).isEqualTo(DeviceStatus.CONNECTED);
             } finally {
-                devices.forget("shield-e2e");
+                enrollment.forget("shield-e2e");
             }
         }
     }
@@ -164,7 +168,7 @@ class CastEndToEndTest {
     @Test
     void theEventStreamCarriesNowPlayingWithTheDeviceId() throws Exception {
         try (FakeCastReceiver receiver = new FakeCastReceiver()) {
-            devices.adopt(castDevice("cast-e2e-sse", receiver.port()));
+            enrollment.adopt(castDevice("cast-e2e-sse", receiver.port()));
             EventStreamReader events = null;
             try {
                 awaitReceiverStatus("cast-e2e-sse");
@@ -192,7 +196,7 @@ class CastEndToEndTest {
                 if (events != null) {
                     events.awaitEnd(Duration.ofSeconds(5));
                 }
-                devices.forget("cast-e2e-sse");
+                enrollment.forget("cast-e2e-sse");
             }
         }
     }
@@ -200,7 +204,7 @@ class CastEndToEndTest {
     @Test
     void aReceiverThatGoesSilentShowsDisconnectedAndRecovers() throws Exception {
         try (FakeCastReceiver receiver = new FakeCastReceiver()) {
-            devices.adopt(castDevice("cast-e2e-silent", receiver.port()));
+            enrollment.adopt(castDevice("cast-e2e-silent", receiver.port()));
             try {
                 awaitReceiverStatus("cast-e2e-silent");
 
@@ -213,7 +217,7 @@ class CastEndToEndTest {
                 await().atMost(Duration.ofSeconds(15)).until(() -> devices.state("cast-e2e-silent").connected()
                         && devices.state("cast-e2e-silent").volumeLevel() == 70);
             } finally {
-                devices.forget("cast-e2e-silent");
+                enrollment.forget("cast-e2e-silent");
             }
         }
     }

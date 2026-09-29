@@ -6,8 +6,9 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.adapters.cast.protocol.CastIncoming;
 import dev.andre.homecontrol.adapters.cast.protocol.FakeCastReceiver;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.sources.jellyfin.FakeJellyfinServer;
 import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,10 @@ class JellyfinEndToEndTest extends FullAppTest {
     int port;
 
     @Autowired
-    DeviceManager devices;
+    DeviceQueries devices;
+
+    @Autowired
+    DeviceEnrollment enrollment;
 
     @Autowired
     CertificateStore certificates;
@@ -103,9 +107,9 @@ class JellyfinEndToEndTest extends FullAppTest {
              FakeCastReceiver kitchenCast = new FakeCastReceiver()) {
 
             certificates.loadOrCreate("shield-e2e");
-            devices.adopt(AndroidTvSettings.device("shield-e2e", "Shield", "127.0.0.1", shieldRemote.port(), null, Instant.now()));
+            enrollment.adopt(AndroidTvSettings.device("shield-e2e", "Shield", "127.0.0.1", shieldRemote.port(), null, Instant.now()));
             kitchenCast.appSpeaks("F007D354", "urn:x-cast:com.connectsdk");
-            devices.adopt(new Device("kitchen-e2e", "Kitchen", DeviceKind.CAST, "127.0.0.1",
+            enrollment.adopt(new Device("kitchen-e2e", "Kitchen", DeviceKind.CAST, "127.0.0.1",
                     Map.of("cast", Map.of("port", String.valueOf(kitchenCast.port()))), Instant.now()));
             try {
                 // Device-only: open without login.
@@ -238,8 +242,8 @@ class JellyfinEndToEndTest extends FullAppTest {
                         .isEqualTo(302);
                 assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(200);
             } finally {
-                devices.forget("shield-e2e");
-                devices.forget("kitchen-e2e");
+                enrollment.forget("shield-e2e");
+                enrollment.forget("kitchen-e2e");
             }
         }
     }
