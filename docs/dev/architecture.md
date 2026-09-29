@@ -10,9 +10,10 @@ root.
 
 | Package | Holds |
 | --- | --- |
+| `config` | The configuration root (`HomeControlProperties`), the list of modules that can be switched off (`Module`, `@ConditionalOnModule`), and `LegacyPropertyNames`, which keeps renamed configuration keys working. |
 | `core` | The domain model every other package builds on: devices, capabilities, actions and device states, and the adapter contract (`DeviceAdapter`, `DeviceHandle`). `core.content` holds content sources, items and rails; `core.playback` playable references, routes and the playback planner. It depends only on the JDK. |
 | `device` | `DeviceManager`: the known devices, their connections and state, merging what discovery finds, and sending commands to a device's adapters. `JsonFileDeviceRegistry` stores the paired devices in `devices.json`. |
-| `adapters` | One package per device protocol: `androidtv`, `cast`, `webos`, `tizen`, `upnp`, `sonos`, `bluetooth`. Each apart from `androidtv` is a module that can be switched off, with its wire protocol in a `protocol` subpackage where it has one. `adapters.net` (TLS, WebSockets, Wake-on-LAN) and `adapters.links` (content ids in service links) are shared. |
+| `adapters` | One package per device protocol: `androidtv`, `cast`, `webos`, `tizen`, `upnp`, `sonos`, `bluetooth`. Each is a module that can be switched off, with its wire protocol in a `protocol` subpackage where it has one. `adapters.net` (TLS, WebSockets, Wake-on-LAN) and `adapters.links` (content ids in service links) are shared. |
 | `discovery` | mDNS and SSDP discovery. |
 | `sources` | One package per content source: `jellyfin`, `youtube`, `tmdb`, `sports`, `pinned`, `workflows`. Each is a module that can be switched off. `sources.http` is shared: HTTP clients that connect only to vetted addresses and bound response bodies in size and time. |
 | `content` | The rail cache, search across sources, and source preferences. |
@@ -61,10 +62,10 @@ flowchart TD
 | Device adapters are independent of each other, apart from the shared `adapters.net`, `adapters.links` and `adapters.support`, and Sonos using `adapters.upnp.protocol` | strict |
 | `java.net.http`, Apache HttpClient 5, jmDNS and D-Bus are used only in `adapters`, `sources` and `discovery` | strict |
 | `..protocol..` packages depend on neither Spring nor any application package other than `adapters.net` and other protocol packages | frozen: 46 |
-| No cycles between the top-level packages | frozen: 6 |
-| `sources` does not depend on `adapters` | frozen: 6 |
+| No cycles between the top-level packages | frozen: 4 |
+| `sources` does not depend on `adapters` | frozen: 0 |
 | `adapters` depends on neither `sources` nor `web` | frozen: 1 |
-| `web` does not depend on `adapters` | frozen: 6 |
+| `web` does not depend on `adapters` | frozen: 0 |
 | `jakarta.servlet` is used only in `web`, `security`, controllers and controller advice | frozen: 24 |
 
 ## Frozen violations
@@ -98,7 +99,7 @@ The roadmap's measures, updated by each workstream that moves them.
 
 | Measure | Baseline (2026-09-27) | Now |
 | --- | --- | --- |
-| Frozen ArchUnit violations | 89 | 89 |
+| Frozen ArchUnit violations | 89 | 75 |
 | Largest class | 813 lines (`DeviceManager`) | 813 lines (`DeviceManager`) |
 | Summed test-class time | 495 s (one JVM) | 320 s (one JVM), 569 s (four JVMs) |
 | `test` task wall time | not measured | 3 min 27 s (four JVMs, 4 CPUs) |
