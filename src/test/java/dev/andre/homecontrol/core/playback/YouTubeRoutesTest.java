@@ -25,7 +25,7 @@ class YouTubeRoutesTest {
 
     @Test
     void androidTvOpensTheYouTubeApp() {
-        Route route = planner.plan(item, EnumSet.of(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME,
+        Route route = planner.plan(item, EnumSet.of(Capability.REMOTE_KEYS, Capability.VOLUME,
                 Capability.APP_LINK));
 
         assertThat(route).isEqualTo(new Route.OpenAppLink(WATCH, "youtube"));
@@ -35,7 +35,7 @@ class YouTubeRoutesTest {
     @Test
     void smartTvsUseTheSameAppLink() {
         // webOS and Tizen declare the same capabilities; their adapters translate the link to contentTarget / DIAL.
-        assertThat(planner.plan(lounge, EnumSet.of(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME,
+        assertThat(planner.plan(lounge, EnumSet.of(Capability.REMOTE_KEYS, Capability.VOLUME,
                 Capability.APP_LINK))).isEqualTo(new Route.OpenAppLink(WATCH, "youtube"));
     }
 
@@ -55,7 +55,7 @@ class YouTubeRoutesTest {
 
     @Test
     void aMergedShieldPrefersTheAppAndOffersLoungeNext() {
-        EnumSet<Capability> shield = EnumSet.of(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME,
+        EnumSet<Capability> shield = EnumSet.of(Capability.REMOTE_KEYS, Capability.VOLUME,
                 Capability.APP_LINK, Capability.CAST_RECEIVER);
 
         assertThat(planner.plan(lounge, shield)).isEqualTo(new Route.OpenAppLink(WATCH, "youtube"));

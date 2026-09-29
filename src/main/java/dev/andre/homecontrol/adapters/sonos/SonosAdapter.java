@@ -53,7 +53,7 @@ public class SonosAdapter implements DeviceAdapter, AdapterDiscovery {
 
     @Override
     public Set<Capability> capabilities(Device device) {
-        return EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME);
+        return EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME, Capability.GROUPING);
     }
 
     @Override

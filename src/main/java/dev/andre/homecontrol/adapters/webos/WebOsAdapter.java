@@ -83,7 +83,8 @@ public class WebOsAdapter implements WakeOnLanAdapter, AdapterDiscovery {
 
     @Override
     public Set<Capability> capabilities(Device device) {
-        return EnumSet.of(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME, Capability.APP_LINK);
+        return EnumSet.of(Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.VOLUME, Capability.INPUTS,
+                Capability.WAKE_ON_LAN);
     }
 
     /** Outside the device package: the session works, but a learned MAC address or key is not stored. */

@@ -95,7 +95,8 @@ class WebOsAdapterTest {
         WebOsAdapter adapter = adapter(notStarted(), properties(1));
 
         assertThat(adapter.capabilities(device()))
-                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME, Capability.APP_LINK);
+                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.VOLUME,
+                        Capability.INPUTS, Capability.WAKE_ON_LAN);
         assertThat(adapter).isInstanceOf(WakeOnLanAdapter.class);
         assertThat(adapter.id()).isEqualTo("webos");
         assertThat(adapter.kind()).isEqualTo(DeviceKind.WEBOS);

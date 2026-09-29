@@ -36,7 +36,8 @@ class SonosAdapterTest {
     void isAPairingFreeMediaRenderer() {
         assertThat(adapter.id()).isEqualTo("sonos");
         assertThat(adapter.kind()).isEqualTo(DeviceKind.SONOS);
-        assertThat(adapter.capabilities(null)).containsExactlyInAnyOrder(Capability.MEDIA_RENDERER, Capability.VOLUME);
+        assertThat(adapter.capabilities(null)).containsExactlyInAnyOrder(Capability.MEDIA_RENDERER, Capability.VOLUME,
+                Capability.GROUPING);
         assertThat(adapter.settingsFor(new DiscoveredDevice("sonos", "Kitchen", "10.0.0.71", 1400, Map.of("uuid", "RINCON_X"))))
                 .contains(Map.of("uuid", "RINCON_X", "port", "1400"));
         assertThat(adapter.settingsFor(new DiscoveredDevice("upnp", "Kitchen", "10.0.0.71", 1400, Map.of("uuid", "RINCON_X"))))

@@ -222,8 +222,7 @@ class DevicesTest {
             devices.start();
 
             assertThat(devices.queries().capabilities("shield-c"))
-                    .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME,
-                            Capability.APP_LINK);
+                    .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.ANDROID_APPS);
         }
     }
 
@@ -422,7 +421,7 @@ class DevicesTest {
         final Map<String, LearnedSettings> learned = new ConcurrentHashMap<>();
 
         WakingAdapter() {
-            super("waking", DeviceKind.WEBOS, false, false, Capability.REMOTE_KEYS, Capability.POWER);
+            super("waking", DeviceKind.WEBOS, false, false, Capability.REMOTE_KEYS);
         }
 
         @Override

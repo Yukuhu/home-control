@@ -67,8 +67,7 @@ class AndroidTvAdapterTest {
 
         assertThat(adapter(new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray()))
                 .capabilities(device))
-                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME,
-                        Capability.APP_LINK);
+                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.ANDROID_APPS);
     }
 
     @Test

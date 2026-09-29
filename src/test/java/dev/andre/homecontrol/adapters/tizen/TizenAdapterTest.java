@@ -92,7 +92,8 @@ class TizenAdapterTest {
         TizenAdapter adapter = adapter(notStarted(), properties(1));
 
         assertThat(adapter.capabilities(device()))
-                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME, Capability.APP_LINK);
+                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.VOLUME,
+                        Capability.WAKE_ON_LAN);
         assertThat(adapter.id()).isEqualTo("tizen");
         assertThat(adapter.kind()).isEqualTo(DeviceKind.TIZEN);
         assertThat(adapter).isInstanceOf(WakeOnLanAdapter.class);
