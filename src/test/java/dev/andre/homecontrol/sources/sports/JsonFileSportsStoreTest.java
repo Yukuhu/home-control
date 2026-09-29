@@ -89,7 +89,7 @@ class JsonFileSportsStoreTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"not json", "[]", "{\"version\":2}"})
+    @ValueSource(strings = {"not json", "[]", "{\"version\":0}"})
     void malformedFilesAreNamedErrors(String content) throws IOException {
         Files.writeString(file(), content);
 
@@ -98,6 +98,17 @@ class JsonFileSportsStoreTest {
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file().toString())
                 .hasMessageContaining("fix or delete it");
+    }
+
+    @Test
+    void theFileIsReadOnceAndThenServedFromMemory() throws IOException {
+        JsonFileSportsStore store = new JsonFileSportsStore(file());
+        store.save(SportsSettings.empty());
+        store.load();
+
+        Files.writeString(file(), "not json any more");
+
+        assertThat(store.load()).isEqualTo(SportsSettings.empty());
     }
 
     @Test
