@@ -52,6 +52,20 @@ class WorkflowTestServiceTest {
         verifyNoMoreInteractions(http);
     }
 
+    @Test void singleModeBuildsOneEntryFromTheSavedTileAndMasksTheUrl() {
+        var single = WorkflowFixtures.single(URI.create("https://api.example/one"));
+        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, new WorkflowDraft(single.name(),
+                single.enabled(), single.mode(), single.kind(), single.calls(), null,
+                new WorkflowDraft.Tile("Radio", "Live", null), single.cast()));
+        body("{\"id\":\"item1\",\"token\":\"secret-token\"}");
+        var result = service.test(id, 7, request);
+        assertThat(result.totalEntries()).isEqualTo(1);
+        var sample = result.samples().getFirst();
+        assertThat(sample.title()).isEqualTo("Radio");
+        assertThat(sample.subtitle()).isEqualTo("Live");
+        assertThat(sample.maskedUrl()).contains("id=item1", "token=•••").doesNotContain("secret-token");
+    }
+
     @Test void disabledSavedWorkflowCanBeTestedButConcurrentEditRejectsResult() {
         var d = saved.draft();
         saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, d.withEnabled(false));

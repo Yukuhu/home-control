@@ -65,6 +65,33 @@ class WorkflowMigrationTest {
                 .hasMessage("Workflow: call main: nothing uses this call");
     }
 
+    @Test void singleV1WithBothVariableScopesBecomesOneMainCallWithoutListing() {
+        String v1 = """
+                {"schemaVersion":1,"id":"w-0123456789ab","revision":2,"draft":{
+                  "name":"Radio","enabled":true,"mode":"SINGLE","kind":"VIDEO",
+                  "fetch":{"url":"https://api.example/ping","headers":[]},"listing":null,
+                  "tile":{"title":"Radio","subtitle":"Live","artwork":null},
+                  "variables":[{"name":"A","scope":"ROOT","pointer":"/id","sensitive":false},
+                               {"name":"C","scope":"ROOT","pointer":"/token","sensitive":true}],
+                  "cast":{"template":"https://media.example/play?id={A}&token={C}","mimeType":"video/mp4"}}}
+                """;
+        var migrated = codec.decode(v1);
+        var draft = migrated.draft();
+        assertThat(draft.calls()).singleElement().satisfies(call -> {
+            assertThat(call.name()).isEqualTo("main");
+            assertThat(call.variables()).containsExactly(new Variable("A", "/id", false), new Variable("C", "/token", true));
+        });
+        assertThat(draft.listing()).isNull();
+        assertThat(draft.tile()).isEqualTo(new Tile("Radio", "Live", null));
+        assertThat(codec.decode(codec.encode(migrated))).isEqualTo(migrated);
+    }
+
+    @Test void aNullHeaderEntryInV1IsRefusedAsUnparsable() {
+        String bad = GENERATED_V1.replace("\"headers\":[{\"name\":\"X-Filter\",\"value\":\"{\\\"a\\\":1}\"}]", "\"headers\":[null]");
+        assertThat(bad).contains("[null]");
+        assertThatThrownBy(() -> codec.decode(bad)).hasMessage("Workflow: definition could not be parsed");
+    }
+
     @Test void unknownVersionsAreRefused() {
         assertThatThrownBy(() -> codec.decode(GENERATED_V1.replace("\"schemaVersion\":1", "\"schemaVersion\":3")))
                 .hasMessage("Workflow: unsupported definition schema");

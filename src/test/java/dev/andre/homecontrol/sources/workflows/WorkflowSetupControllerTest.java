@@ -180,6 +180,20 @@ class WorkflowSetupControllerTest extends WebSliceTest {
         assertThat(captor.getValue().cast().template()).isEqualTo("https://media.example/new");
     }
 
+    @Test void typedHeaderValuesAreStoredAsLiteralTemplateText() throws Exception {
+        when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
+        mvc.perform(validPost().param("urlMode", "REPLACE").param("url", "https://new.example/source")
+                        .param("templateMode", "REPLACE").param("template", "https://media.example/new")
+                        .param("headersMode", "REPLACE").param("headers[0].name", "X-Filter")
+                        .param("headers[0].value", "{\"a\":1}"))
+                .andExpect(status().is3xxRedirection());
+        var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
+        verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
+        var value = captor.getValue().calls().getFirst().headers().getFirst().value();
+        assertThat(value).isEqualTo("{{\"a\":1}}");
+        assertThat(new WorkflowHeaderTemplate(value).expand(Map.of())).isEqualTo("{\"a\":1}");
+    }
+
     @Test void storageFailureAndUnauthorizedSaveNeverReturnSecrets() throws Exception {
         when(workflowStore.update(eq(id), eq(3L), any(), any())).thenThrow(new IllegalStateException("private-marker"));
         var result = mvc.perform(validPost().param("urlMode", "REPLACE").param("url", "https://private-url/x")
