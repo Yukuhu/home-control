@@ -12,7 +12,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Clock;
-import java.time.Duration;
 
 /**
  * The Bluetooth speaker module, off unless {@code home-control.bluetooth.enabled=true}. Only this

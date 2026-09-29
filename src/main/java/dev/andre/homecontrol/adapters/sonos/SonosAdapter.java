@@ -11,7 +11,6 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 
 import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;

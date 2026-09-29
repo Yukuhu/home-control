@@ -51,8 +51,9 @@ class RecordingStateListenerTest {
     @Test
     void awaitStatusFailsWhenTheStatusNeverComes() {
         states.accept(state(DeviceStatus.CONNECTED));
+        Duration timeout = Duration.ofMillis(200);
 
-        assertThatThrownBy(() -> states.awaitStatus(DeviceStatus.UNPAIRED, Duration.ofMillis(200)))
+        assertThatThrownBy(() -> states.awaitStatus(DeviceStatus.UNPAIRED, timeout))
                 .isInstanceOf(ConditionTimeoutException.class);
     }
 }

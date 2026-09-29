@@ -11,7 +11,6 @@ import dev.andre.homecontrol.core.PromptPairingResult;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 

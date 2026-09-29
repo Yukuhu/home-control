@@ -18,7 +18,6 @@ import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 
 import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;

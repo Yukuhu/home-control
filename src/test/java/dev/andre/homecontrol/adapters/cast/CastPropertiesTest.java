@@ -37,9 +37,13 @@ class CastPropertiesTest {
 
     @Test
     void theRecordItselfRejectsAStaleTimeoutNotAboveTheHeartbeat() {
-        assertThatThrownBy(() -> new CastProperties(true, Duration.ofSeconds(5), Duration.ofSeconds(5),
-                Duration.ofSeconds(1), Duration.ofSeconds(60), Duration.ofSeconds(5), Duration.ofSeconds(20),
-                Duration.ofSeconds(5)))
+        Duration heartbeatInterval = Duration.ofSeconds(5);
+        Duration reconnectInitialDelay = Duration.ofSeconds(1);
+        Duration reconnectMaxDelay = Duration.ofSeconds(60);
+        Duration loadTimeout = Duration.ofSeconds(20);
+
+        assertThatThrownBy(() -> new CastProperties(true, heartbeatInterval, heartbeatInterval,
+                reconnectInitialDelay, reconnectMaxDelay, heartbeatInterval, loadTimeout, heartbeatInterval))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must be greater than");
     }

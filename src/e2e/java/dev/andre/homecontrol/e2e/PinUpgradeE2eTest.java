@@ -2,10 +2,12 @@ package dev.andre.homecontrol.e2e;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Route;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.test.annotation.DirtiesContext;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 
@@ -62,6 +64,28 @@ class PinUpgradeE2eTest extends E2eApplicationTest {
             Locator pinnedRail = page.locator(".rail[data-rail='pinned/pinned']");
             assertThat(pinnedRail.locator("h2")).hasText("Pinned");
             assertThat(pinnedRail).containsText("Launcher Film");
+        }
+    }
+
+    @BrowserTest
+    void anInvalidPreviewAfterPinningShowsARouteFailure(String browser) {
+        try (BrowserSession session = open(browser)) {
+            Page page = openWithLauncherSheet(session);
+            assertThat(page.locator("#sheet-route")).hasText("Play on Living Room · Open the Netflix app (not this title)");
+            AtomicReference<Route> preview = new AtomicReference<>();
+            page.route("**/route-preview?*", preview::set);
+
+            page.locator("#sheet-pin-url").fill("https://www.netflix.com/de/title/80057281?s=a");
+            page.locator("#sheet-pin-submit").click();
+
+            assertThat(page.locator("#toast")).containsText("Pinned Launcher Film. It now opens directly.");
+            page.waitForCondition(() -> preview.get() != null);
+            assertThat(page.locator("#sheet-pin-submit")).isEnabled();
+            preview.get().fulfill(new Route.FulfillOptions()
+                    .setContentType("application/json").setBody("null"));
+            assertThat(page.locator("#sheet-route")).hasText("Cannot plan this right now");
+            assertThat(page.locator("#sheet-play")).isDisabled();
+            assertThat(page.locator("#sheet-pin-submit")).isEnabled();
         }
     }
 

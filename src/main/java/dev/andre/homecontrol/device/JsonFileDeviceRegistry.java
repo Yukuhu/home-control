@@ -23,6 +23,7 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
 
     private static final int VERSION = 3;
     private static final String DEVICES = "devices";
+    private static final String ADAPTERS = "adapters";
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     private final VersionedJsonFile<List<Device>> file;
@@ -42,10 +43,10 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
      */
     private static JsonNode withoutTvKeys(JsonNode array) {
         for (JsonNode device : array) {
-            if (device.path("adapters").path("webos") instanceof ObjectNode webos) {
+            if (device.path(ADAPTERS).path("webos") instanceof ObjectNode webos) {
                 webos.remove("clientKey");
             }
-            if (device.path("adapters").path("tizen") instanceof ObjectNode tizen) {
+            if (device.path(ADAPTERS).path("tizen") instanceof ObjectNode tizen) {
                 tizen.remove("token");
             }
         }
@@ -94,7 +95,7 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
         v2.set("name", v1.get("name"));
         v2.put("kind", "ANDROID_TV");
         v2.set("host", v1.get("host"));
-        v2.set("adapters", adapters);
+        v2.set(ADAPTERS, adapters);
         v2.set("lastSeen", v1.get("lastSeen"));
         return v2;
     }
