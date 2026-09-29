@@ -64,7 +64,7 @@ A workflow definition holds:
 - **Filters** (generated mode only): up to 16 rows and a switch for `ALL` or `ANY`. See [Filters](#filters).
 - **Tile:** in single mode, a saved title, subtitle and artwork, as today; single mode makes no refresh requests, so
   these stay saved text. In generated mode, the entry source's pointers, or for subtitle and artwork the name of a
-  Refresh-and-Play variable instead, so a picture can come from a different API. Title and ID never come from a
+  variable a refresh produces instead, so a picture can come from a different API. Title and ID never come from a
   variable (see [Refresh](#refresh)).
 - **Cast:** the media URL template and MIME type, unchanged.
 
@@ -89,16 +89,20 @@ It cannot be used by a `SHARED` call or a filter.
 
 ### Phases
 
-Each call's phase is derived at Save time and shown in the editor as a label:
+Each call's phase is derived from what uses it and shown in the editor as a label:
 
-- **Refresh and Play:** the call is needed, directly or through calls that depend on it, by the entry source, a
-  filter or a tile field.
-- **Play only:** the call is needed only by the Cast template.
+- **Runs at refresh:** the call is needed, directly or through calls that depend on it, only by the entry source, a
+  filter or a tile field. An artwork lookup is the typical case.
+- **Runs at Play:** the call is needed only by the Cast template.
+- **Runs at refresh and Play:** both. The entry source is always in this phase.
 - **Unused:** nothing refers to the call. Save rejects an unused call, so a definition never makes a request whose
-  result is ignored.
+  result is ignored. A stored definition may still contain one: a v1 single-tile workflow whose media URL uses no
+  mapping fetched its URL at Play anyway, so an unused call in a stored definition runs at Play, as before, until the
+  workflow is next saved.
 
-In single mode there is no refresh fetch, as today: single-tile metadata is saved text, so every call is Play only.
-The entry source is always Refresh and Play.
+In single mode there is no refresh fetch, as today: single-tile metadata is saved text, so every call runs at Play.
+
+A tile field may not name a variable marked sensitive: tile fields are public display text.
 
 ### Storage and migration
 
@@ -109,7 +113,7 @@ Save rejects a larger definition with "This workflow is too large to save; remov
 
 - A **v1** definition becomes a v2 definition with one `SHARED` call named `main`, which carries v1's URL, headers
   and root-scoped variables. In generated mode that call is the entry source, and v1's entry-scoped variables become
-  entry variables. Time zone is empty, and there are no date values or filters. The derived phases match v1's
+  entry variables. Braces in v1 header values are doubled, because they are now template syntax. Time zone is empty, and there are no date values or filters. The derived phases match v1's
   behaviour exactly.
 - The migrated definition is written as v2 on the next Save. Reading alone never rewrites it, following the rule that
   existing installs upgrade in place.
@@ -140,11 +144,11 @@ templates are expanded without encoding; a value containing CR, LF or another co
 
 Refresh applies to generated mode only; single mode reads saved metadata, as today.
 
-1. Run the Refresh-and-Play `SHARED` calls, including the entry source.
+1. Run the `SHARED` calls that run at refresh, including the entry source.
 2. Select entries from the entry source's array, then apply the filters. Keep the array's order.
-3. Apply the entry cap to the filtered list: **200**, or **50** when the workflow has an `ENTRY` call in the Refresh
-   and Play phase. More entries fail the refresh with "The list has N entries after filtering; the limit is 50."
-4. For each entry, run the Refresh-and-Play `ENTRY` calls.
+3. Apply the entry cap to the filtered list: **200**, or **50** when the workflow has an `ENTRY` call that runs at
+   refresh. More entries fail the refresh with "The list has N entries after filtering; the limit is 50."
+4. For each entry, run the `ENTRY` calls that run at refresh.
 5. Build tiles. **Stable ID and title always come from the entry source**, so a tile's identity never depends on a
    second API and tile IDs keep today's derivation. Subtitle and artwork may come from variables.
 
@@ -158,7 +162,7 @@ display fields are discarded.
 ### Play
 
 1. Check that the workflow is enabled, the revision matches and the device can Cast, as today.
-2. Run every `SHARED` call the Cast template needs, directly or indirectly, freshly. A Refresh-and-Play call runs
+2. Run every `SHARED` call the Cast template needs, directly or indirectly, freshly. A call that also ran at refresh runs
    again, so tokens are always fresh.
 3. In generated mode, find the pressed entry again by its stable ID in the fresh entry source, and **evaluate the
    filters again**. An entry that is gone, ambiguous, or no longer passes the filters fails with "This item is no
@@ -168,8 +172,8 @@ display fields are discarded.
 
 ### Test
 
-Test runs a refresh (in generated mode) and then the Play steps for up to five sample entries (once in single
-mode), without sending
+Test runs a refresh (in generated mode, with the refresh deadline) and then the Play steps for up to five sample
+entries (once in single mode, with the Play deadline), without sending
 anything to a device. It reports one line per call and entry, such as `images · entry "News" · HTTP 404`, together
 with the existing stages, the total entry count before and after filtering, and the masked sample URLs.
 
@@ -178,7 +182,7 @@ with the existing stages, the total entry count before and after filtering, and 
 | Limit | Value |
 |---|---|
 | Deadline per call (connect, redirects and body) | 10 s (was 15 s) |
-| Deadline per run | Play and Test 20 s; refresh 60 s |
+| Deadline per run | Play 20 s; refresh 60 s; Test uses each for its part |
 | Workflow fetches at once, across all workflows | 8 (was 4) |
 | Fetches at once for one refresh | 3 |
 | Fetches at once for one Play or Test | 4 |
