@@ -43,10 +43,13 @@ and `secret.key` were forced to disk before the rename. The other problems:
 
 ## Consequences
 
-- An upgraded install cannot be downgraded by swapping the image alone. The `<name>.v<n>.json` copies allow a manual
-  rollback, together with a copy of `secrets.json` from before the upgrade.
+- An upgraded install cannot be downgraded by swapping the image alone: an older image reads neither the new formats
+  nor the re-protected keystore. Only a copy of the whole data directory from before the upgrade rolls it back; the
+  `<name>.v<n>.json` copies are for inspection and a manual repair, and a copy of the keystore under its old password
+  is deliberately not kept.
 - A store no longer notices its file being changed behind its back. Edit files under `/data` only while the app is
   stopped.
 - `secrets.json` now also holds the TV pairing keys and the keystore password. Deleting it unpairs every TV, so a
-  forgotten login password is reset with `HOME_CONTROL_RESET_LOGIN=true` instead.
+  forgotten login password is reset with `HOME_CONTROL_RESET_LOGIN=true` instead. The reset runs once and is
+  remembered in `/data` until a start without the setting, so a setting left in place never removes a new password.
 - Installs that pair a TV get `secrets.json` and `secret.key` even without a login.

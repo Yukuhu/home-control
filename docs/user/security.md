@@ -26,11 +26,12 @@ useless without it. Once you start the app with `HOME_CONTROL_SECRET` set, chang
 that value stops the app from starting until the original value is restored — there is no
 partial recovery.
 
-**Forgotten login password:** start the app once with `HOME_CONTROL_RESET_LOGIN=true`. It
-removes the login password and the content sources' credentials, and logs that it did; the TV
-pairings stay. Remove the setting again, set a new password in **Setup → Account**, and
-reconnect your content sources. Do not delete `secrets.json` for this: it also holds the TV
-pairings.
+**Forgotten login password:** start the app with `HOME_CONTROL_RESET_LOGIN=true`. The first
+start with it removes the login password and the content sources' credentials, and logs that it
+did; the TV pairings stay. The reset runs only once, so a setting left in place does no harm, but
+remove it again: only a start without it allows another reset later. Then set a new password in
+**Setup → Account** and reconnect your content sources. Do not delete `secrets.json` for this:
+it also holds the TV pairings.
 
 Behind an HTTPS reverse proxy, set `HOME_CONTROL_SECURE_COOKIE=true` so the login cookie is
 marked `Secure`. If the proxy rewrites the `Host` header, also set
