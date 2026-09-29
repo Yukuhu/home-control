@@ -236,6 +236,8 @@ public final class WorkflowHttpClient implements AutoCloseable {
             throw failure(stage, "request timed out");
         } catch (ExecutionException e) {
             if (e.getCause() instanceof WorkflowException safe && safe.stage() == stage) throw safe;
+            // The socket's own timeout can fire a moment before this thread's wait does. Both mean the deadline passed.
+            if (operation.remaining() == 0) throw failure(stage, "request timed out");
             throw failure(stage, "request failed");
         }
     }
