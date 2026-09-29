@@ -145,6 +145,20 @@ public class SecretStore implements DeviceSecrets {
         }
     }
 
+    /**
+     * The way back from a forgotten login password: removes the login and every account credential in one write,
+     * keeping the device secrets, so no TV has to be paired again. True when there was anything to remove.
+     */
+    public synchronized boolean forgetLogin() {
+        if (credential == null && !hasAccountCredentials()) {
+            return false;
+        }
+        Map<String, String> next = new HashMap<>(secrets);
+        next.keySet().removeIf(SecretStore::isAccountCredential);
+        write(null, next);
+        return true;
+    }
+
     public synchronized boolean hasAccountCredentials() {
         return secrets.keySet().stream().anyMatch(SecretStore::isAccountCredential);
     }

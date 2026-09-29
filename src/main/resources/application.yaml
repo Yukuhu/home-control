@@ -138,6 +138,8 @@ home-control:
     login-attempts-per-address: 5
     login-attempts-total: 50
     login-window: 15m
+    # A forgotten login password: true removes it, and the content sources' credentials, at startup. TV pairings stay.
+    reset-login: ${HOME_CONTROL_RESET_LOGIN:false}
   workflows:
     enabled: ${HOME_CONTROL_WORKFLOWS_ENABLED:true}
     allow-loopback: ${HOME_CONTROL_WORKFLOWS_ALLOW_LOOPBACK:false}
