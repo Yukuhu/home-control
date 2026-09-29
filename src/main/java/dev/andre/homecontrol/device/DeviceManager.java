@@ -4,24 +4,16 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
-import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceCommands;
-import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceQueries;
-import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceSettings;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.SpeakerTopology;
 import dev.andre.homecontrol.core.TvInput;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
@@ -29,23 +21,15 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The one bean the rest of the application talks to about devices, delegating each call to the collaborator that
- * {@link Devices#assemble} wired for it. Its callers move onto the four {@code core} interfaces it implements, and
- * then it goes.
+ * What the callers not yet moved onto the four {@code core} interfaces still inject: it forwards each call to the
+ * {@link Devices} the application's configuration assembled, starts and closes. It goes once they have moved.
  */
-@Service
-public class DeviceManager implements DeviceQueries, DeviceCommands, DeviceEnrollment, DeviceSettings, AutoCloseable {
+public class DeviceManager implements DeviceQueries, DeviceCommands, DeviceEnrollment, DeviceSettings {
 
     private final Devices parts;
 
-    public DeviceManager(DeviceRegistry registry, List<DeviceAdapter> adapters, ApplicationEventPublisher events) {
-        this.parts = Devices.assemble(registry, adapters, events);
-    }
-
-    /** Validates, migrates and connects every registered device; see {@link Enrollment#start}. */
-    @PostConstruct
-    public void start() {
-        parts.start();
+    public DeviceManager(Devices parts) {
+        this.parts = parts;
     }
 
     @Override
@@ -153,11 +137,6 @@ public class DeviceManager implements DeviceQueries, DeviceCommands, DeviceEnrol
         return parts.enrollment().addDiscovered(adapterId, host, port);
     }
 
-    /** The automatic merge; see {@link Enrollment#onDiscovered}. */
-    @EventListener
-    public void onDiscovered(DeviceDiscoveredEvent event) {
-        parts.onDiscovered(event);
-    }
 
     @Override
     public Device merge(String targetId, String sourceId) {
@@ -167,11 +146,5 @@ public class DeviceManager implements DeviceQueries, DeviceCommands, DeviceEnrol
     @Override
     public Device split(String id, String adapterId) {
         return parts.enrollment().split(id, adapterId);
-    }
-
-    @Override
-    @PreDestroy
-    public void close() {
-        parts.close();
     }
 }
