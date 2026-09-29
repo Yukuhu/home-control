@@ -121,7 +121,7 @@ class DashboardPageTest extends WebSliceTest {
     void theDefaultDeviceIsPreferredOverTheFirstDeviceInTheList() throws Exception {
         Device living = device("living", "Living Room", Instant.now());
         Device bedroom = device("bedroom", "Bedroom", Instant.now());
-        // Living is first in the list DeviceManager returns, but the default is bedroom:
+        // Living is first in the list DeviceQueries returns, but the default is bedroom:
         // the selection must come from defaultDevice(), not from all.getFirst().
         given(devices.devices()).willReturn(List.of(living, bedroom));
         given(devices.defaultDevice()).willReturn(Optional.of(bedroom));

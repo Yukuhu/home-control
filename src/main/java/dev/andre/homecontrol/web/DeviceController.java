@@ -2,6 +2,7 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.KeyPress;
@@ -11,7 +12,6 @@ import dev.andre.homecontrol.core.playback.AppLinks;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.UnroutableException;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.PlaybackService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -26,17 +26,17 @@ import java.util.Locale;
 
 /**
  * Commands addressed to one device. Every failure is a plain-text reason the UI can toast.
- * Whether the device exists is decided once, by {@link DeviceManager}/{@link PlaybackService},
+ * Whether the device exists is decided once, by {@link DeviceCommands}/{@link PlaybackService},
  * which throw {@link DeviceNotFoundException} (404) for an unknown id.
  */
 @RestController
 public class DeviceController {
 
-    private final DeviceManager devices;
+    private final DeviceCommands commands;
     private final PlaybackService playback;
 
-    public DeviceController(DeviceManager devices, PlaybackService playback) {
-        this.devices = devices;
+    public DeviceController(DeviceCommands commands, PlaybackService playback) {
+        this.commands = commands;
         this.playback = playback;
     }
 
@@ -67,7 +67,7 @@ public class DeviceController {
         }
         Action action = new Action.PressKey(remoteKey, keyPress);
         for (int i = 0; i < repeat; i++) {
-            devices.execute(id, action);   // a failure stops here and maps to its status; nothing is retried
+            commands.execute(id, action);   // a failure stops here and maps to its status; nothing is retried
         }
         return ResponseEntity.noContent().build();
     }
@@ -132,7 +132,7 @@ public class DeviceController {
 
     /** Grouping changes the whole drawer (and other rooms' chips): let htmx reload the page. */
     private ResponseEntity<String> regroup(String id, Action action) {
-        devices.execute(id, action);
+        commands.execute(id, action);
         return ResponseEntity.noContent().header("HX-Refresh", "true").build();
     }
 
@@ -144,7 +144,7 @@ public class DeviceController {
 
     /** Volume, stop, pause/resume and inputs go straight to the adapters, not through the planner (spec §5.3). */
     private ResponseEntity<String> command(String id, Action action) {
-        devices.execute(id, action);
+        commands.execute(id, action);
         return ResponseEntity.noContent().build();
     }
 

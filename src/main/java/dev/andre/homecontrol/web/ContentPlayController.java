@@ -3,6 +3,7 @@ package dev.andre.homecontrol.web;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.ContentSources;
@@ -12,7 +13,6 @@ import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.UnroutableException;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.PlayAttempt;
 import dev.andre.homecontrol.playback.PlaybackService;
 import org.springframework.beans.factory.ObjectProvider;
@@ -41,12 +41,12 @@ public class ContentPlayController {
     private static final int MAX_SKIP = 8;
     private static final int MAX_SKIP_LENGTH = 64;
 
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
     private final ContentSources sources;
     private final PlaybackService playback;
     private final ObjectProvider<PinnedLinks> pinnedLinks;
 
-    public ContentPlayController(DeviceManager devices, ContentSources sources, PlaybackService playback,
+    public ContentPlayController(DeviceQueries devices, ContentSources sources, PlaybackService playback,
                                  ObjectProvider<PinnedLinks> pinnedLinks) {
         this.devices = devices;
         this.sources = sources;

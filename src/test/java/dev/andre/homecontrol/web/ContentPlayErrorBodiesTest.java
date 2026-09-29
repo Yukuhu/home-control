@@ -64,7 +64,7 @@ class ContentPlayErrorBodiesTest extends WebSliceTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
                 .andExpect(content().string("Too many or too long route keys to skip"));
 
-        verifyNoInteractions(devices, playback);
+        verifyNoInteractions(devices, commands, enrollment, deviceSettings, playback);
     }
 
     @Test

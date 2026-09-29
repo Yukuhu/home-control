@@ -30,8 +30,8 @@ class AccountSectionTest extends WebSliceTest {
     @BeforeEach
     void noDevices() {
         given(devices.devices()).willReturn(List.of());
-        given(devices.pairable()).willReturn(List.of());
-        given(devices.addable()).willReturn(List.of());
+        given(enrollment.pairable()).willReturn(List.of());
+        given(enrollment.addable()).willReturn(List.of());
     }
 
     private String setupPage() throws Exception {

@@ -4,10 +4,12 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.CodePairing;
 import dev.andre.homecontrol.core.CodePairingOutcome;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.core.DeviceSettings;
 import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.PromptPairing;
 import dev.andre.homecontrol.core.PromptPairingResult;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.DeepLinkTestProperties;
 import dev.andre.homecontrol.storage.StorageException;
 import org.slf4j.Logger;
@@ -39,7 +41,9 @@ public class SetupController {
     private static final String ERROR_ATTRIBUTE = "error";
 
     private final ObjectProvider<CodePairing> codePairings;
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
+    private final DeviceEnrollment enrollment;
+    private final DeviceSettings deviceSettings;
     private final List<PromptPairing> promptPairings;
 
     private final Duration deepLinkTestTimeout;
@@ -49,10 +53,13 @@ public class SetupController {
      * {@code promptPairings}: one per enabled smart-TV module; empty when none is.
      * {@code deepLinkTest}: its timeout is shown next to the "Test deep link" button.
      */
-    public SetupController(ObjectProvider<CodePairing> codePairings, DeviceManager devices,
+    public SetupController(ObjectProvider<CodePairing> codePairings, DeviceQueries devices,
+                           DeviceEnrollment enrollment, DeviceSettings deviceSettings,
                            List<PromptPairing> promptPairings, DeepLinkTestProperties deepLinkTest) {
         this.codePairings = codePairings;
         this.devices = devices;
+        this.enrollment = enrollment;
+        this.deviceSettings = deviceSettings;
         this.promptPairings = List.copyOf(promptPairings);
         this.deepLinkTestTimeout = deepLinkTest.timeout();
     }
@@ -146,7 +153,7 @@ public class SetupController {
         if (devices.device(id).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No device with id " + id);
         }
-        return refusable(model, () -> devices.setWakeOnLanMac(id, mac));
+        return refusable(model, () -> deviceSettings.setWakeOnLanMac(id, mac));
     }
 
     private Optional<CodePairing> codePairing() {
@@ -161,8 +168,8 @@ public class SetupController {
     private void populateSetupModel(Model model, boolean awaitingCode) {
         model.addAttribute("codePairing", codePairing().isPresent());
         model.addAttribute("awaitingCode", awaitingCode);
-        model.addAttribute("discovered", devices.pairable());
-        model.addAttribute("addable", devices.addable());
+        model.addAttribute("discovered", enrollment.pairable());
+        model.addAttribute("addable", enrollment.addable());
         List<Device> paired = devices.devices();
         model.addAttribute("paired", paired);
         model.addAttribute("promptPairings", promptPairings);
@@ -171,8 +178,8 @@ public class SetupController {
         model.addAttribute("promptInstructions", promptPairings.stream()
                 .collect(Collectors.toMap(PromptPairing::adapterId, PromptPairing::instructions, (first, second) -> first)));
         Map<String, String> wakeMacs = new LinkedHashMap<>();
-        paired.stream().filter(device -> devices.wakesOnLan(device.id()))
-                .forEach(device -> wakeMacs.put(device.id(), devices.wakeOnLanMac(device.id()).orElse("")));
+        paired.stream().filter(device -> deviceSettings.wakesOnLan(device.id()))
+                .forEach(device -> wakeMacs.put(device.id(), deviceSettings.wakeOnLanMac(device.id()).orElse("")));
         model.addAttribute("wakeMacs", wakeMacs);
         model.addAttribute("deepLinkTestable", paired.stream()
                 .map(Device::id)
@@ -183,23 +190,23 @@ public class SetupController {
 
     @PostMapping("/setup/forget")
     public String forget(@RequestParam String id) {
-        devices.forget(id);
+        enrollment.forget(id);
         return "redirect:/setup";
     }
 
     @PostMapping("/setup/add")
     public String add(@RequestParam String adapter, @RequestParam String host, @RequestParam int port, Model model) {
-        return refusable(model, () -> devices.addDiscovered(adapter, host, port));
+        return refusable(model, () -> enrollment.addDiscovered(adapter, host, port));
     }
 
     @PostMapping("/setup/merge")
     public String merge(@RequestParam String target, @RequestParam String source, Model model) {
-        return refusable(model, () -> devices.merge(target, source));
+        return refusable(model, () -> enrollment.merge(target, source));
     }
 
     @PostMapping("/setup/split")
     public String split(@RequestParam String id, @RequestParam String adapter, Model model) {
-        return refusable(model, () -> devices.split(id, adapter));
+        return refusable(model, () -> enrollment.split(id, adapter));
     }
 
     /** Refused before anything connects: adapters build the address of a device from its host. */

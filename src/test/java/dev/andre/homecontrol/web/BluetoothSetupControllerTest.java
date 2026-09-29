@@ -42,8 +42,8 @@ class BluetoothSetupControllerTest extends WebSliceTest {
     @BeforeEach
     void defaults() {
         given(devices.devices()).willReturn(List.of());
-        given(devices.pairable()).willReturn(List.of());
-        given(devices.addable()).willReturn(List.of());
+        given(enrollment.pairable()).willReturn(List.of());
+        given(enrollment.addable()).willReturn(List.of());
         given(bluetoothProperties.scanDuration()).willReturn(Duration.ofSeconds(10));
         given(bluetoothChecks.results()).willReturn(List.of(
                 new HostCheck("dbus-socket", "D-Bus system socket", true, "Found /run/dbus/system_bus_socket"),

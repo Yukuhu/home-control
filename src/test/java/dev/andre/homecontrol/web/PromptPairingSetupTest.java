@@ -40,13 +40,13 @@ class PromptPairingSetupTest extends WebSliceTest {
     @BeforeEach
     void noDevicesUnlessATestSaysOtherwise() {
         given(devices.devices()).willReturn(List.of());
-        given(devices.pairable()).willReturn(List.of());
-        given(devices.addable()).willReturn(List.of());
+        given(enrollment.pairable()).willReturn(List.of());
+        given(enrollment.addable()).willReturn(List.of());
     }
 
     @Test
     void aDiscoveredTvGetsAPromptPairingForm() throws Exception {
-        given(devices.pairable()).willReturn(List.of(new DiscoveredDevice("webos", "[LG] webOS TV", "192.168.1.60", 3000)));
+        given(enrollment.pairable()).willReturn(List.of(new DiscoveredDevice("webos", "[LG] webOS TV", "192.168.1.60", 3000)));
 
         String html = mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())
@@ -59,7 +59,7 @@ class PromptPairingSetupTest extends WebSliceTest {
 
     @Test
     void anAndroidTvDiscoveryKeepsTheCodePairingForm() throws Exception {
-        given(devices.pairable()).willReturn(List.of(new DiscoveredDevice("androidtv", "Shield", "192.168.1.50", 6466)));
+        given(enrollment.pairable()).willReturn(List.of(new DiscoveredDevice("androidtv", "Shield", "192.168.1.50", 6466)));
 
         String html = mockMvc.perform(get("/setup")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -116,9 +116,9 @@ class PromptPairingSetupTest extends WebSliceTest {
     @Test
     void theMacFieldAppearsOnlyForDevicesThatWakeOnLan() throws Exception {
         given(devices.devices()).willReturn(List.of(tv("tv"), tv("box")));
-        given(devices.wakesOnLan("tv")).willReturn(true);
-        given(devices.wakeOnLanMac("tv")).willReturn(Optional.of("A8:23:FE:01:02:03"));
-        given(devices.wakesOnLan("box")).willReturn(false);
+        given(deviceSettings.wakesOnLan("tv")).willReturn(true);
+        given(deviceSettings.wakeOnLanMac("tv")).willReturn(Optional.of("A8:23:FE:01:02:03"));
+        given(deviceSettings.wakesOnLan("box")).willReturn(false);
 
         mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())
@@ -135,13 +135,13 @@ class PromptPairingSetupTest extends WebSliceTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/setup"));
 
-        verify(devices).setWakeOnLanMac("tv", "a8-23-fe-01-02-03");
+        verify(deviceSettings).setWakeOnLanMac("tv", "a8-23-fe-01-02-03");
     }
 
     @Test
     void anInvalidMacShowsTheReason() throws Exception {
         given(devices.device("tv")).willReturn(Optional.of(tv("tv")));
-        willThrow(new IllegalArgumentException("Not a MAC address: nope")).given(devices).setWakeOnLanMac("tv", "nope");
+        willThrow(new IllegalArgumentException("Not a MAC address: nope")).given(deviceSettings).setWakeOnLanMac("tv", "nope");
 
         mockMvc.perform(post("/setup/devices/tv/mac").param("mac", "nope"))
                 .andExpect(status().isOk())
@@ -160,7 +160,7 @@ class PromptPairingSetupTest extends WebSliceTest {
     void theClientKeyNeverReachesThePage() throws Exception {
         given(devices.devices()).willReturn(List.of(new Device("tv", "LG", DeviceKind.WEBOS, "192.168.1.60",
                 Map.of("webos", Map.of("clientKey", "5f1c0d7e2b9a4c3d")), Instant.now())));
-        given(devices.wakesOnLan("tv")).willReturn(true);
+        given(deviceSettings.wakesOnLan("tv")).willReturn(true);
 
         mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())

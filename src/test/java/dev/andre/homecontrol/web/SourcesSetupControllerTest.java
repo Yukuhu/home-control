@@ -48,8 +48,8 @@ class SourcesSetupControllerTest extends WebSliceTest {
     @BeforeEach
     void defaults() {
         given(devices.devices()).willReturn(List.of());
-        given(devices.pairable()).willReturn(List.of());
-        given(devices.addable()).willReturn(List.of());
+        given(enrollment.pairable()).willReturn(List.of());
+        given(enrollment.addable()).willReturn(List.of());
 
         given(jellyfin.id()).willReturn("jellyfin");
         given(jellyfin.displayName()).willReturn("Jellyfin");

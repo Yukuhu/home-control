@@ -9,9 +9,12 @@ import dev.andre.homecontrol.content.SearchService;
 import dev.andre.homecontrol.content.SourcePreferencesService;
 import dev.andre.homecontrol.content.StoredRailPreferences;
 import dev.andre.homecontrol.core.CodePairing;
+import dev.andre.homecontrol.core.DeviceCommands;
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.core.DeviceSettings;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.SourcePreferences;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.DeepLinkTestProperties;
 import dev.andre.homecontrol.playback.DeepLinkTestService;
 import dev.andre.homecontrol.playback.PlaybackService;
@@ -65,7 +68,13 @@ import static org.mockito.BDDMockito.given;
 public abstract class WebSliceTest {
 
     @MockitoBean
-    protected DeviceManager devices;
+    protected DeviceQueries devices;
+    @MockitoBean
+    protected DeviceCommands commands;
+    @MockitoBean
+    protected DeviceEnrollment enrollment;
+    @MockitoBean
+    protected DeviceSettings deviceSettings;
     @MockitoBean
     protected CodePairing pairing;
     @MockitoBean
