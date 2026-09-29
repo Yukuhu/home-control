@@ -14,7 +14,6 @@ import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
-import dev.andre.homecontrol.core.DeviceStates;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Hosts;
@@ -45,7 +44,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -68,28 +66,8 @@ public class DeviceManager implements AutoCloseable {
     private final DeviceRegistry registry;
     private final Map<String, DeviceAdapter> adapters = new LinkedHashMap<>();
     private final ApplicationEventPublisher events;
-    /** device id → (adapter id → handle), in the device's adapter order. */
-    private final Map<String, Map<String, DeviceHandle>> handles = new ConcurrentHashMap<>();
-    /**
-     * device id → the states its adapters last reported. Each connect installs a fresh
-     * {@link Generation}, so a handle of a closed generation that reports late finds it replaced
-     * and is ignored. Written under {@link #lock}; each generation guards its own entries.
-     */
-    private final Map<String, Generation> reported = new ConcurrentHashMap<>();
-    /**
-     * Guards every write to {@link #handles} and {@link #reported} (via {@link #tryConnect},
-     * {@link #closeHandles}, {@link #adopt}, {@link #forget}, {@link #addDiscovered},
-     * {@link #onDiscovered}, {@link #merge}, {@link #split} and {@link #close}) so that an adopt
-     * racing another adopt, an adopt racing a forget, or a discovery merge on the mDNS thread
-     * racing any of them, can never leave two live handles for one device or a live handle
-     * for a device that {@link #forget} just deleted from the registry. The registry
-     * read-modify-writes of those methods — and of {@link #attach}, {@link #updateAdapterSettings}
-     * and {@link #setWakeOnLanMac} — run under it for the same reason.
-     * {@code adapter.connect} returns immediately (it never blocks), so holding this while
-     * calling it is safe. {@link #state}, {@link #states}, {@link #capabilities} and
-     * {@link #execute} read {@link #handles} without it — they only ever see either the old
-     * or the new value, both valid, so lock-free reads cost nothing here.
-     */
+    private final DeviceConnections connections;
+    /** Guards the registry's read-modify-writes, so an adopt racing a forget or a discovery merge sees one registry. */
     private final Object lock = new Object();
 
     public DeviceManager(DeviceRegistry registry, List<DeviceAdapter> adapters,
@@ -97,6 +75,7 @@ public class DeviceManager implements AutoCloseable {
         this.registry = registry;
         adapters.forEach(adapter -> this.adapters.put(adapter.id(), adapter));
         this.events = events;
+        this.connections = new DeviceConnections(this.adapters, events, this::updateAdapterSettings);
     }
 
     /**
@@ -159,8 +138,7 @@ public class DeviceManager implements AutoCloseable {
 
     /** The composed state of the device's adapters; an unknown or handle-less device reads as DISCONNECTED. */
     public DeviceState state(String id) {
-        Generation generation = reported.get(id);
-        return generation == null ? DeviceState.initial() : generation.composed();
+        return connections.state(id);
     }
 
     public Map<String, DeviceState> states() {
@@ -192,7 +170,7 @@ public class DeviceManager implements AutoCloseable {
     public void execute(String id, Action action) {
         Device device = registry.findById(id)
                 .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
-        Map<String, DeviceHandle> deviceHandles = handles.getOrDefault(id, Map.of());
+        Map<String, DeviceHandle> deviceHandles = connections.handles(id);
         if (action instanceof Action.Stop) {
             stopEverywhere(device, deviceHandles, action);
             return;
@@ -232,7 +210,7 @@ public class DeviceManager implements AutoCloseable {
     public Map<String, Object> query(String id, CastAppQuery query) {
         Device device = registry.findById(id)
                 .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
-        Map<String, DeviceHandle> deviceHandles = handles.getOrDefault(id, Map.of());
+        Map<String, DeviceHandle> deviceHandles = connections.handles(id);
         FallThrough failures = new FallThrough(device);
         for (String adapterId : device.adapters().keySet()) {
             DeviceHandle handle = deviceHandles.get(adapterId);
@@ -362,7 +340,7 @@ public class DeviceManager implements AutoCloseable {
                 return;
             }
             Device device = registered.get();
-            closeHandles(id);
+            connections.end(id).forEach(DeviceHandle::close);
             device.adapters().keySet().forEach(adapterId -> {
                 DeviceAdapter adapter = adapters.get(adapterId);
                 if (adapter != null) {
@@ -475,7 +453,7 @@ public class DeviceManager implements AutoCloseable {
 
     /** Grouping as seen by the first of the device's handles that knows it; empty otherwise. */
     public Optional<SpeakerTopology> speakerTopology(String id) {
-        return handles.getOrDefault(id, Map.of()).values().stream()
+        return connections.handles(id).values().stream()
                 .filter(GroupListing.class::isInstance)
                 .map(handle -> ((GroupListing) handle).speakerTopology())
                 .flatMap(Optional::stream)
@@ -484,7 +462,7 @@ public class DeviceManager implements AutoCloseable {
 
     /** Inputs from the first of the device's handles that lists any; empty when none does. */
     public List<TvInput> inputs(String id) {
-        return handles.getOrDefault(id, Map.of()).values().stream()
+        return connections.handles(id).values().stream()
                 .filter(InputListing.class::isInstance)
                 .map(handle -> ((InputListing) handle).inputs())
                 .filter(list -> !list.isEmpty())
@@ -627,7 +605,7 @@ public class DeviceManager implements AutoCloseable {
                 merged = merged.withAdapter(adapterId, entry.getValue());
             }
             // Credentials move with the settings, so the source is removed WITHOUT adapter.forget().
-            closeHandles(sourceId);
+            connections.end(sourceId).forEach(DeviceHandle::close);
             registry.delete(sourceId);
             registry.save(merged);
             connect(merged);
@@ -719,97 +697,14 @@ public class DeviceManager implements AutoCloseable {
         return DeviceMatching.uniqueId(registered, adapterId, host);
     }
 
-    /**
-     * Connects every one of the device's adapters, under {@link #lock} so this can never
-     * interleave with another {@link #tryConnect}/{@link #closeHandles} for the same or a
-     * different device. A failing adapter never leaves the device half-connected: its
-     * {@link RuntimeException} is caught and logged, whatever handles this call already
-     * opened for the device are closed, and the device is left with no handles at all —
-     * {@link #state} then reads it as DISCONNECTED — rather than failing {@link #start} and
-     * leaking those handles, or every other device's connect along with it. A DISCONNECTED
-     * state is then published for the device: its previous handle was closed and silenced
-     * first, so whatever that handle last published would otherwise stay on every screen.
-     */
+    /** (Re)connects every one of the device's adapters; see {@link DeviceConnections}. */
     private void connect(Device device) {
-        if (!tryConnect(device)) {
-            events.publishEvent(new DeviceStateChangedEvent(device.id(), DeviceState.initial()));
-        }
-    }
-
-    /** {@link #connect}'s locked part; false when an adapter failed and the device has no handles. */
-    private boolean tryConnect(Device device) {
-        synchronized (lock) {
-            closeHandles(device.id());
-            List<String> adapterIds = device.adapters().keySet().stream()
-                    .filter(adapters::containsKey)
-                    .toList();
-            Generation generation = new Generation(device.id(), adapterIds);
-            reported.put(device.id(), generation);
-            Map<String, DeviceHandle> deviceHandles = new LinkedHashMap<>();
-            for (String adapterId : adapterIds) {
-                try {
-                    deviceHandles.put(adapterId, adapters.get(adapterId).connect(device,
-                            state -> generation.report(adapterId, state),
-                            updates -> updateAdapterSettings(device.id(), adapterId, updates)));
-                } catch (RuntimeException e) {
-                    log.warn("Could not connect {} via the {} adapter; leaving it disconnected",
-                            device.id(), adapterId, e);
-                    reported.remove(device.id());
-                    deviceHandles.values().forEach(DeviceHandle::close);
-                    return false;
-                }
-            }
-            handles.put(device.id(), deviceHandles);
-            return true;
-        }
-    }
-
-    /**
-     * One connect of one device: adapter id → the state that adapter last reported, in the
-     * device's adapter order. Its own monitor guards the entries.
-     */
-    private final class Generation {
-
-        private final String deviceId;
-        private final Map<String, DeviceState> states = new LinkedHashMap<>();
-
-        Generation(String deviceId, List<String> adapterIds) {
-            this.deviceId = deviceId;
-            adapterIds.forEach(adapterId -> states.put(adapterId, DeviceState.initial()));
-        }
-
-        synchronized DeviceState composed() {
-            return DeviceStates.compose(List.copyOf(states.values()));
-        }
-
-        /**
-         * Publishes the composed state inside this monitor, so two adapters' updates reach SSE in
-         * the order they were composed.
-         */
-        synchronized void report(String adapterId, DeviceState state) {
-            if (reported.get(deviceId) != this) {
-                return; // a handle from a closed generation reporting late
-            }
-            states.put(adapterId, state);
-            events.publishEvent(new DeviceStateChangedEvent(deviceId, composed()));
-        }
-    }
-
-    private void closeHandles(String id) {
-        synchronized (lock) {
-            reported.remove(id);
-            Map<String, DeviceHandle> existing = handles.remove(id);
-            if (existing != null) {
-                existing.values().forEach(DeviceHandle::close);
-            }
-        }
+        connections.complete(connections.begin(device));
     }
 
     @Override
     @PreDestroy
     public void close() {
-        synchronized (lock) {
-            handles.keySet().forEach(this::closeHandles);
-        }
+        connections.closeAll();
     }
 }
