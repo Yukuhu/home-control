@@ -15,62 +15,116 @@ Account** once no connected source needs it.
 
 ### Dynamic workflows
 
-In **Setup → Workflows**, create a workflow when one JSON address can supply values for a
-direct media address. **One tile** shows a title you choose; ordinary Dashboard loading reads
-local metadata and fetches JSON only when you press Play. **Tiles from an entry array** reads an array during Dashboard refresh and makes a
-tile for each entry. Each enabled workflow has its own Dashboard row. Dashboard source settings
-can hide the source or a row and change the default 15-minute refresh interval.
+In **Setup → Workflows**, create a workflow when JSON from one or more web addresses can supply
+values for a direct media address. **One tile** shows a title you choose; ordinary Dashboard
+loading reads local metadata and makes no request. **Tiles from an entry array** reads an array
+during Dashboard refresh and makes a tile for each entry. Each enabled workflow has its own
+Dashboard row. Dashboard source settings can hide the source or a row and change the default
+15-minute refresh interval.
 
-For example, suppose the source URL returns:
+#### Calls
+
+A workflow is a list of calls, up to 8. Each call is one HTTP(S) GET that returns JSON. In the
+**Calls** section, each call is a card. Use **Add call** to add one, and Up, Down and Remove to
+change the order.
+
+- **Call name** — a short name such as `list` or `images`: lower-case letters, digits and `_`.
+- **Runs** — **Once** runs the call one time. **Once per entry** runs it for every entry, and is
+  offered only for tiles from an entry array.
+- **Source URL** and **Request headers** — the address and any headers the call sends.
+- **Add value** — a value to take from the response. Give it a name and a JSON Pointer. Pointers
+  can be empty to select the root; escape `/` as `~1` and `~` as `~0`. New values start
+  **Sensitive**; uncheck it only for values you want visible in Test results.
+
+A call can use the values of the calls above it as `{name}`. Put `{name}` in a path segment or
+query value of the URL, or in a header value. A value can never fill the host, so no response can
+send a credential to another server. Values are URL encoded for you. In a header value, write
+`{{` and `}}` for a literal `{` and `}`. Move a call up if it needs a value from a call below it.
+
+Each card says when the call runs:
+
+- **Runs at refresh** — only tiles use its values, for example an artwork lookup.
+- **Runs at Play** — only the media URL uses its values.
+- **Runs at refresh and Play** — both use them. The call that supplies the entries always runs at
+  both.
+
+The label appears after you Save. Save rejects a call that nothing uses. Calls that do not need
+each other run at the same time.
+
+#### Entries
+
+Under **Tiles**, **Entries come from** names the call whose response holds the array of entries.
+Set the array pointer, the entry ID pointer and the entry title pointer. **Add entry field**
+takes a value from each entry. **Subtitle** and **Artwork** can each be none, a field of the
+entry, or a value from a call, for example artwork found by a per-entry call. A sensitive value
+cannot be shown on a tile. The ID and the title always come from the entries.
+
+#### Example
+
+Suppose `https://api.example/channels` returns:
 
 ```json
 {
-  "auth": {"token": "example-token"},
   "channels": [
-    {"id": "news", "title": "News", "quality": "hd"},
-    {"id": "music", "title": "Music", "quality": "sd"}
+    {"id": "news", "title": "News"},
+    {"id": "music", "title": "Music"}
   ]
 }
 ```
 
-Choose **Tiles from an entry array**, set the array pointer to `/channels`, entry ID to `/id`,
-and title to `/title`. Add mappings `A` from the current entry at `/id`, `C` from the whole
-response at `/auth/token` (Sensitive), and `D` from the current entry at `/quality`. A media
-template such as `https://media.example/play?id={A}&token={C}&quality={D}` then uses the
-selected channel's stable ID and a fresh token when you press Play. JSON Pointers can also be
-empty to select the root; escape `/` as `~1` and `~` as `~0` within a pointer segment.
-New mappings start Sensitive; uncheck it only for values you want visible in Test results.
-Switching to one tile resets every mapping to Whole response, so review its pointer. Switching
-back to generated tiles requires choosing Current entry again for those mappings.
+- Call `list`, **Once**, source URL `https://api.example/channels`. **Entries come from** `list`,
+  array pointer `/channels`, ID `/id`, title `/title`. Add the entry field `channel` at `/id`.
+- Call `images`, **Once per entry**, source URL `https://images.example/lookup?channel={channel}`,
+  with the value `poster` at `/poster` (not Sensitive). Set **Artwork** to a value from a call,
+  named `poster`. It says **Runs at refresh**.
+- Call `stream`, **Once per entry**, source URL `https://api.example/stream?channel={channel}`,
+  with the value `token` at `/token` (Sensitive). It says **Runs at Play**.
+- The media template `https://media.example/play?id={channel}&token={token}` then uses the
+  selected channel and a fresh token when you press Play.
+
+If `images` fails for one entry, that tile shows no artwork and the refresh still succeeds. If a
+call that runs once fails, the refresh fails and the Dashboard keeps the last good tiles.
+
+#### Saving, testing and playing
 
 **Save** validates and encrypts the definition and never starts playback. Saving an enabled
 generated workflow can trigger its Dashboard catalog refresh, which requests the source; a
-single-tile Dashboard refresh stays local. The first Save creates the household login password, even for a public feed; later
-edits and Tests require login. Saved source URLs, header values, and media templates are hidden
-on the edit page. Choose **Keep** to retain them or **Replace** to enter new values. **Test**
-fetches once and shows up to five sample tiles with sensitive values and literal URL parts
-masked; it sends nothing to a device. Opening a Dashboard tile previews its route without a
-workflow fetch. **Play** fetches fresh JSON once, builds the media address, and sends a Cast
+single-tile Dashboard refresh stays local. The first Save creates the household login password,
+even for a public feed; later edits and Tests require login. Saved source URLs, header values,
+and media templates are hidden on the edit page. Choose **Keep** to retain them or **Replace**
+to enter new values. **Test** runs the calls once and shows up to five sample tiles with
+sensitive values and literal URL parts masked; it names the call that failed and sends nothing
+to a device. Opening a Dashboard tile previews its route without a workflow fetch. **Play** runs
+the calls the media address needs, again and freshly, builds the media address, and sends a Cast
 LOAD to the device selected in the play sheet. A failed Play does not retry automatically.
+
+Workflows saved by an earlier release are converted when they are read: their one request
+becomes a call named `main`, and the next Save stores the new format. A release from before this
+change cannot read a workflow saved since. A converted definition is a little longer, so one
+close to the size limit may need shortening before it saves again.
 
 The selected device needs a Cast receiver. Its Default Media Receiver must reach the direct
 media URL itself; Home Control does not proxy the media, add download headers, or guarantee
-that the receiver supports a particular codec. Workflows make one HTTP(S) JSON GET and one
-Cast action, with no scripts, pagination, or chained requests. Private LAN sources are allowed,
+that the receiver supports a particular codec. Workflows make HTTP(S) JSON GET calls and one
+Cast action, with no scripts or pagination. Private LAN sources are allowed,
 but loopback, link-local, multicast, and unspecified addresses are blocked by default. Set
 `HOME_CONTROL_WORKFLOWS_ALLOW_LOOPBACK=true` only when a feed on this same host is needed.
 `HOME_CONTROL_WORKFLOWS_ENABLED=false` removes the editor, source, Test and execution while
 retaining encrypted definitions and the login requirement.
 
-Default limits are 50 workflows, 32 mappings, 16 static request headers, 200 entries per
-generated catalog, a 2 MiB JSON response, 64 JSON nesting levels, and 16,384 characters per
-stored definition. Source and expanded media URLs are limited to 8,192 characters and pointers
-to 512. JSON numeric tokens are limited to 1,000 characters, and whole-number entry IDs to
-1,000 decimal digits after exponent expansion; extreme exponent IDs are rejected before
-expansion. Numeric values retain exact decimal precision, and numeric `1` and `1.0` identify
-the same entry while string `"1"` is distinct. Numeric mappings may use scientific notation.
-Connections time out after 5 seconds and the whole JSON fetch after 15 seconds; at
-most three same-origin redirects and four simultaneous workflow fetches are allowed.
+#### Limits
+
+Default limits are 50 workflows, 8 calls per workflow, 64 values per workflow, 16 static request
+headers per call, and 16,384 characters per stored definition. A catalog holds 200 entries, or 50
+when a per-entry call runs at refresh; a longer list fails the refresh. Each call is limited to a
+2 MiB JSON response, 64 JSON nesting levels and 10 seconds, a Play to 20 seconds and a refresh to
+60 seconds. Source and expanded media URLs are limited to 8,192 characters and pointers to 512.
+JSON numeric tokens are limited to 1,000 characters, and whole-number entry IDs to 1,000 decimal
+digits after exponent expansion; extreme exponent IDs are rejected before expansion. Numeric
+values retain exact decimal precision, and numeric `1` and `1.0` identify the same entry while
+string `"1"` is distinct. Numeric values may use scientific notation. Connections time out after 5 seconds; at most three
+same-origin redirects and eight simultaneous workflow calls are allowed. See
+[Configuration](configuration.md) for the timeouts you can change.
 
 ### Connecting Jellyfin
 
