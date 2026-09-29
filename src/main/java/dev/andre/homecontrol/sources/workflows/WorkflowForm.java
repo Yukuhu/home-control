@@ -8,6 +8,7 @@ import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
 /** MVC-only draft. Stored credentials never populate this object. */
 public final class WorkflowForm {
     public enum Replacement { KEEP, REPLACE }
+    public enum Scope { ROOT, ENTRY }
     public String name = "";
     public boolean enabled = true;
     public Mode mode = Mode.SINGLE;
@@ -57,17 +58,31 @@ public final class WorkflowForm {
         if (d.listing() != null) {
             Listing l = d.listing();
             form.arrayPointer = l.arrayPointer(); form.idPointer = l.idPointer(); form.titlePointer = l.titlePointer();
-            form.includeSubtitlePointer = l.subtitlePointer() != null;
-            form.includeArtworkPointer = l.artworkPointer() != null;
-            form.subtitlePointer = text(l.subtitlePointer()); form.artworkPointer = text(l.artworkPointer());
+            String subtitlePointer = pointer(l.subtitle());
+            String artworkPointer = pointer(l.artwork());
+            form.includeSubtitlePointer = subtitlePointer != null;
+            form.includeArtworkPointer = artworkPointer != null;
+            form.subtitlePointer = text(subtitlePointer); form.artworkPointer = text(artworkPointer);
         }
-        for (Variable v : d.variables()) {
-            VariableRow row = new VariableRow();
-            row.name = v.name(); row.scope = v.scope(); row.pointer = v.pointer(); row.sensitive = v.sensitive();
-            form.variables.add(row);
-        }
+        addRows(form, d.calls().getFirst().variables(), Scope.ROOT);
+        if (d.listing() != null) addRows(form, d.listing().variables(), Scope.ENTRY);
         // Header replacement starts empty; Keep retains the entire saved list in service memory.
         return form;
+    }
+
+    private static void addRows(WorkflowForm form, List<Variable> variables, Scope scope) {
+        for (Variable v : variables) {
+            VariableRow row = new VariableRow();
+            row.name = v.name(); row.scope = scope; row.pointer = v.pointer(); row.sensitive = v.sensitive();
+            form.variables.add(row);
+        }
+    }
+
+    private static String pointer(Field field) { return field == null ? null : field.pointer(); }
+
+    private List<Variable> rows(Scope scope) {
+        return variables.stream().filter(row -> row.scope == scope)
+                .map(row -> new Variable(row.name, row.pointer, row.sensitive)).toList();
     }
 
     public WorkflowDraft toDraft(WorkflowDefinition saved) {
@@ -75,20 +90,21 @@ public final class WorkflowForm {
                 || saved == null && (urlMode == Replacement.KEEP || templateMode == Replacement.KEEP || headersMode == Replacement.KEEP)) {
             throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "new workflows require replacement settings");
         }
-        String source = urlMode == Replacement.KEEP ? saved.draft().fetch().url() : url;
+        String source = urlMode == Replacement.KEEP ? saved.draft().calls().getFirst().url() : url;
         String media = templateMode == Replacement.KEEP ? saved.draft().cast().template() : template;
-        List<Header> requestHeaders = headersMode == Replacement.KEEP ? saved.draft().fetch().headers()
-                : headers.stream().map(row -> new Header(row.name, row.value)).toList();
-        return new WorkflowDraft(name, enabled, mode, kind, new Fetch(source, requestHeaders), listing(),
+        List<Header> requestHeaders = headersMode == Replacement.KEEP ? saved.draft().calls().getFirst().headers()
+                : headers.stream().map(row -> new Header(row.name, WorkflowHeaderTemplate.literal(row.value))).toList();
+        return new WorkflowDraft(name, enabled, mode, kind, 
+                List.of(new Call("main", CallScope.SHARED, source, requestHeaders, rows(Scope.ROOT))), listing(),
                 mode == Mode.SINGLE ? new Tile(title, optional(subtitle), optional(artwork)) : null,
-                variables.stream().map(row -> new Variable(row.name, row.scope, row.pointer, row.sensitive)).toList(),
                 new Cast(media, mimeType));
     }
 
     private Listing listing() {
         if (mode != Mode.GENERATED) return null;
-        return new Listing(arrayPointer, idPointer, titlePointer,
-                includeSubtitlePointer ? subtitlePointer : null, includeArtworkPointer ? artworkPointer : null);
+        return new Listing("main", arrayPointer, idPointer, titlePointer,
+                includeSubtitlePointer ? new Field(subtitlePointer, null) : null,
+                includeArtworkPointer ? new Field(artworkPointer, null) : null, rows(Scope.ENTRY));
     }
 
     public void clearSecrets() {

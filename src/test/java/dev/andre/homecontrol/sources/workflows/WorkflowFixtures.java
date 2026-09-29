@@ -25,18 +25,25 @@ public final class WorkflowFixtures {
 
     public static WorkflowDraft single(URI source) {
         return new WorkflowDraft("News", true, Mode.SINGLE, ContentKind.VIDEO,
-                new Fetch(source.toString(), List.of(new Header("Authorization", "Bearer saved-secret"))),
+                List.of(new Call("main", CallScope.SHARED, source.toString(),
+                        List.of(new Header("Authorization", "Bearer saved-secret")),
+                        List.of(new Variable("A", "/id", false), new Variable("C", "/token", true)))),
                 null, new Tile("News", null, null),
-                List.of(new Variable("A", Scope.ROOT, "/id", false),
-                        new Variable("C", Scope.ROOT, "/token", true)),
                 new Cast("https://media.example/play?id={A}&token={C}", "video/mp4"));
     }
 
     public static WorkflowDraft generated() {
-        WorkflowDraft single = single(URI.create("https://api.example/catalog"));
-        return new WorkflowDraft(single.name(), single.enabled(), Mode.GENERATED, single.kind(),
-                single.fetch(), new Listing("/items", "/id", "/title", null, null), null,
-                List.of(new Variable("A", Scope.ENTRY, "/id", false),
-                        new Variable("C", Scope.ROOT, "/token", true)), single.cast());
+        return new WorkflowDraft("News", true, Mode.GENERATED, ContentKind.VIDEO,
+                List.of(new Call("main", CallScope.SHARED, "https://api.example/catalog",
+                        List.of(new Header("Authorization", "Bearer saved-secret")),
+                        List.of(new Variable("C", "/token", true)))),
+                new Listing("main", "/items", "/id", "/title", null, null, List.of(new Variable("A", "/id", false))),
+                null, new Cast("https://media.example/play?id={A}&token={C}", "video/mp4"));
+    }
+
+    /** A single-tile workflow with the given calls and a media URL that uses none of their values. */
+    public static WorkflowDraft singleWith(List<Call> calls) {
+        return new WorkflowDraft("Calls", true, Mode.SINGLE, ContentKind.VIDEO, calls, null,
+                new Tile("Calls", null, null), new Cast("https://media.example/play", "video/mp4"));
     }
 }

@@ -60,9 +60,11 @@ class WorkflowCastRouteExecutorTest {
         try (var server = new FakeWorkflowServer()) {
             server.respond("/catalog", 200, "{\"token\":\"old-secret\",\"items\":[{\"id\":\"news\",\"title\":\"News\"}]}");
             var draft = WorkflowFixtures.generated();
+            var main = draft.calls().getFirst();
             draft = new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(),
-                    new WorkflowDraft.Fetch(server.url("/catalog").toString(), List.of()), draft.listing(), null,
-                    draft.variables(), new WorkflowDraft.Cast(server.url("/media").toString() + "?id={A}&token={C}", "video/mp4"));
+                    List.of(new WorkflowDraft.Call("main", WorkflowDraft.CallScope.SHARED, server.url("/catalog").toString(),
+                            List.of(), main.variables())), draft.listing(), null,
+                    new WorkflowDraft.Cast(server.url("/media").toString() + "?id={A}&token={C}", "video/mp4"));
             var generated = new WorkflowIntegrationFixture(draft);
             var properties = new WorkflowProperties(true, true, java.time.Duration.ofSeconds(5),
                     java.time.Duration.ofSeconds(15), 4, 2097152, 3);

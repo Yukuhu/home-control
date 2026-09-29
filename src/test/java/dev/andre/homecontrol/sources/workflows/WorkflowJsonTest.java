@@ -12,10 +12,11 @@ class WorkflowJsonTest {
     @Test void selectsEntriesAndMapsRootAndEntryValues() {
         var root = parse(WorkflowFixtures.CHANNELS);
         var draft = channels();
-        var entries = WorkflowJson.entries(draft, root);
+        var entries = WorkflowJson.entries(draft.listing(), root, 200);
         assertThat(entries).extracting(WorkflowJson.Entry::title).containsExactly("News", "Music");
         assertThat(entries).extracting(WorkflowJson.Entry::key).doesNotHaveDuplicates();
-        var values = WorkflowJson.values(draft.variables(), root, entries.getFirst().node());
+        var values = new java.util.HashMap<>(WorkflowJson.values(draft.calls().getFirst().variables(), root));
+        values.putAll(WorkflowJson.values(draft.listing().variables(), entries.getFirst().node()));
         assertThat(values)
                 .containsEntry("A", new WorkflowJson.Value("news", false))
                 .containsEntry("C", new WorkflowJson.Value("example-token", true))
@@ -24,8 +25,8 @@ class WorkflowJsonTest {
     }
 
     @Test void keysSurviveReorderTokenAndTitleChanges() {
-        var first = WorkflowJson.entries(channels(), parse(WorkflowFixtures.CHANNELS));
-        var changed = WorkflowJson.entries(channels(), parse(WorkflowFixtures.REORDERED_CHANNELS));
+        var first = WorkflowJson.entries(channels().listing(), parse(WorkflowFixtures.CHANNELS), 200);
+        var changed = WorkflowJson.entries(channels().listing(), parse(WorkflowFixtures.REORDERED_CHANNELS), 200);
         assertThat(changed.get(1).key()).isEqualTo(first.getFirst().key());
         assertThat(changed.getFirst().key()).isEqualTo(first.get(1).key());
         assertThat(WorkflowJson.stableKey(parse("\"1\"")))
@@ -40,9 +41,9 @@ class WorkflowJsonTest {
 
     @Test void pointerEscapesArrayIndexAndScalarsWork() {
         var root = parse("{\"a/b\":{\"~token\":true},\"streams\":[{\"quality\":12}]}");
-        var vars = java.util.List.of(new Variable("A", Scope.ROOT, "/a~1b/~0token", false),
-                new Variable("B", Scope.ROOT, "/streams/0/quality", false));
-        assertThat(WorkflowJson.values(vars, root, null))
+        var vars = java.util.List.of(new Variable("A", "/a~1b/~0token", false),
+                new Variable("B", "/streams/0/quality", false));
+        assertThat(WorkflowJson.values(vars, root))
                 .containsEntry("A", new WorkflowJson.Value("true", false))
                 .containsEntry("B", new WorkflowJson.Value("12", false));
     }
@@ -50,8 +51,8 @@ class WorkflowJsonTest {
     @Test void missingNullAndContainerMappingsFail() {
         var root = parse("{\"empty\":null,\"object\":{},\"array\":[]}");
         for (String pointer : new String[]{"/missing", "/empty", "/object", "/array"}) {
-            var mappings = java.util.List.of(new Variable("A", Scope.ROOT, pointer, false));
-            assertThatThrownBy(() -> WorkflowJson.values(mappings, root, null))
+            var mappings = java.util.List.of(new Variable("A", pointer, false));
+            assertThatThrownBy(() -> WorkflowJson.values(mappings, root))
                     .isInstanceOf(WorkflowException.class).hasMessageContaining("A");
         }
     }
@@ -60,7 +61,7 @@ class WorkflowJsonTest {
         var draft = channels();
         var duplicateIds = parse(
                 "{\"channels\":[{\"id\":1,\"title\":\"A\"},{\"id\":1.0,\"title\":\"B\"}]}");
-        assertThatThrownBy(() -> WorkflowJson.entries(draft, duplicateIds))
+        assertThatThrownBy(() -> WorkflowJson.entries(draft.listing(), duplicateIds, 200))
                 .isInstanceOf(WorkflowException.class).hasMessageContaining("ID");
         var items = new StringBuilder("{\"channels\":[");
         for (int i = 0; i < 201; i++) {
@@ -69,7 +70,7 @@ class WorkflowJsonTest {
         }
         items.append("]}");
         var oversizedCatalog = parse(items.toString());
-        assertThatThrownBy(() -> WorkflowJson.entries(draft, oversizedCatalog))
+        assertThatThrownBy(() -> WorkflowJson.entries(draft.listing(), oversizedCatalog, 200))
                 .isInstanceOf(WorkflowException.class);
     }
 
@@ -77,33 +78,30 @@ class WorkflowJsonTest {
         var draft = channels();
         var blankTitle = parse(
                 "{\"channels\":[{\"id\":\"a\",\"title\":\" \"}]}");
-        assertThatThrownBy(() -> WorkflowJson.entries(draft, blankTitle))
+        assertThatThrownBy(() -> WorkflowJson.entries(draft.listing(), blankTitle, 200))
                 .isInstanceOf(WorkflowException.class).hasMessageContaining("title");
-        var withArt = new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(), draft.fetch(),
-                new Listing("/channels", "/id", "/title", null, "/art"), null, draft.variables(), draft.cast());
+        var withArt = new Listing("main", "/channels", "/id", "/title", null, new Field("/art", null), java.util.List.of());
         assertThat(WorkflowJson.entries(withArt, parse(
-                "{\"channels\":[{\"id\":\"a\",\"title\":\"A\",\"art\":\"https://example.com/a?token=x\"}]}"))
+                "{\"channels\":[{\"id\":\"a\",\"title\":\"A\",\"art\":\"https://example.com/a?token=x\"}]}"), 200)
                 .getFirst().artwork()).isNull();
         assertThat(WorkflowJson.entries(withArt, parse(
-                "{\"channels\":[{\"id\":\"a\",\"title\":\"A\",\"art\":\"https://127.0.0.1/a\"}]}"))
+                "{\"channels\":[{\"id\":\"a\",\"title\":\"A\",\"art\":\"https://127.0.0.1/a\"}]}"), 200)
                 .getFirst().artwork()).isNull();
         assertThat(WorkflowJson.entries(withArt, parse(
-                "{\"channels\":[{\"id\":\"a\",\"title\":\"A\",\"art\":\"https://8.8.8.8/a\"}]}"))
+                "{\"channels\":[{\"id\":\"a\",\"title\":\"A\",\"art\":\"https://8.8.8.8/a\"}]}"), 200)
                 .getFirst().artwork()).isEqualTo(java.net.URI.create("https://8.8.8.8/a"));
     }
 
     @Test void generatedArtworkOmitsRootDotLocalNamesAndDocumentationIpv6() {
-        var draft = channels();
-        var withArt = new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(), draft.fetch(),
-                new Listing("/channels", "/id", "/title", null, "/art"), null, draft.variables(), draft.cast());
+        var withArt = new Listing("main", "/channels", "/id", "/title", null, new Field("/art", null), java.util.List.of());
         for (String host : new String[]{"feed.local.", "localhost.", "[2001:db8::1]"}) {
             var response = parse("{\"channels\":[{\"id\":\"a\",\"title\":\"A\",\"art\":\"https://"
                     + host + "/cover.png\"}]}");
-            assertThat(WorkflowJson.entries(withArt, response).getFirst().artwork()).isNull();
+            assertThat(WorkflowJson.entries(withArt, response, 200).getFirst().artwork()).isNull();
         }
         var publicResponse = parse("{\"channels\":[{\"id\":\"a\",\"title\":\"A\","
                 + "\"art\":\"https://[2606:4700::1111]/cover.png\"}]}");
-        assertThat(WorkflowJson.entries(withArt, publicResponse).getFirst().artwork())
+        assertThat(WorkflowJson.entries(withArt, publicResponse, 200).getFirst().artwork())
                 .isEqualTo(java.net.URI.create("https://[2606:4700::1111]/cover.png"));
     }
 
@@ -166,7 +164,7 @@ class WorkflowJsonTest {
         assertSelectFails(draft, "{\"items\":[]}", "entry array is missing or invalid");
         assertSelectFails(draft, "{\"channels\":{\"id\":\"a\"}}", "entry array is missing or invalid");
         assertSelectFails(draft, "{\"channels\":[" + "{\"id\":1,\"title\":\"A\"},".repeat(200)
-                + "{\"id\":2,\"title\":\"B\"}]}", "too many entries");
+                + "{\"id\":2,\"title\":\"B\"}]}", "the list has 201 entries; the limit is 200");
         assertSelectFails(draft, "{\"channels\":[{\"title\":\"A\"}]}", "entry 0 has invalid ID");
         assertSelectFails(draft, "{\"channels\":[{\"id\":\"\",\"title\":\"A\"}]}", "entry 0 has invalid ID");
         assertSelectFails(draft, "{\"channels\":[{\"id\":{\"x\":1},\"title\":\"A\"}]}", "entry 0 has invalid ID");
@@ -180,26 +178,25 @@ class WorkflowJsonTest {
         String atTheLimits = java.util.stream.IntStream.range(0, 200)
                 .mapToObj(i -> "{\"id\":" + i + ",\"title\":\"" + "x".repeat(120) + "\"}")
                 .collect(java.util.stream.Collectors.joining(",", "{\"channels\":[", "]}"));
-        assertThat(WorkflowJson.entries(draft, parse(atTheLimits))).hasSize(200);
+        assertThat(WorkflowJson.entries(draft.listing(), parse(atTheLimits), 200)).hasSize(200);
     }
 
     private static void assertSelectFails(WorkflowDraft draft, String json, String detail) {
         var root = parse(json);
-        assertThatThrownBy(() -> WorkflowJson.entries(draft, root)).as(json)
+        assertThatThrownBy(() -> WorkflowJson.entries(draft.listing(), root, 200)).as(json)
                 .isInstanceOf(WorkflowException.class)
                 .hasMessage("Choose entries: " + detail);
     }
 
     @Test void generatedEntriesKeepOnlyShortTextSubtitlesAndTextArtwork() {
-        var draft = channels();
-        var withExtras = new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(), draft.fetch(),
-                new Listing("/channels", "/id", "/title", "/sub", "/art"), null, draft.variables(), draft.cast());
+        var withExtras = new Listing("main", "/channels", "/id", "/title", new Field("/sub", null), new Field("/art", null),
+                java.util.List.of());
         var entries = WorkflowJson.entries(withExtras, parse("""
                 {"channels":[{"id":"a","title":"A","sub":"Live","art":"https://cdn.example.com/a.png"},
                              {"id":"b","title":"B","sub":7,"art":{"url":"https://cdn.example.com/b.png"}},
                              {"id":"c","title":"C","sub":"%s"},
                              {"id":"d","title":"D","sub":"%s"}]}
-                """.formatted("x".repeat(240), "x".repeat(241))));
+                """.formatted("x".repeat(240), "x".repeat(241))), 200);
         assertThat(entries).extracting(WorkflowJson.Entry::subtitle)
                 .containsExactly("Live", null, "x".repeat(240), null);
         assertThat(entries).extracting(WorkflowJson.Entry::artwork)
@@ -211,14 +208,14 @@ class WorkflowJsonTest {
         for (String json : new String[]{"{}", "{\"auth\":{\"token\":null}}", "{\"auth\":{\"token\":{}}}",
                 "{\"auth\":{\"token\":[\"t\"]}}"}) {
             var root = parse(json);
-            var variables = java.util.List.of(new Variable("C", Scope.ROOT, "/auth/token", true));
-            assertThatThrownBy(() -> WorkflowJson.values(variables, root, null))
+            var variables = java.util.List.of(new Variable("C", "/auth/token", true));
+            assertThatThrownBy(() -> WorkflowJson.values(variables, root))
                     .isInstanceOf(WorkflowException.class)
                     .hasMessage("Map fields: mapping C has no scalar value")
                     .extracting(e -> ((WorkflowException) e).stage()).isEqualTo(WorkflowException.Stage.MAP);
         }
-        var values = WorkflowJson.values(java.util.List.of(new Variable("B", Scope.ROOT, "/on", false)),
-                parse("{\"on\":true}"), null);
+        var values = WorkflowJson.values(java.util.List.of(new Variable("B", "/on", false)),
+                parse("{\"on\":true}"));
         assertThat(values).containsEntry("B", new WorkflowJson.Value("true", false));
     }
 
@@ -234,12 +231,13 @@ class WorkflowJsonTest {
         }
     }
 
-    @Test void singleModeUsesSavedDisplayAndKey() {
-        var draft = WorkflowFixtures.single(java.net.URI.create("https://api.example/catalog"));
-        var entries = WorkflowJson.entries(draft, parse("{}"));
-        assertThat(entries).hasSize(1);
-        assertThat(entries.getFirst().key()).isEqualTo("single");
-        assertThat(entries.getFirst().title()).isEqualTo("News");
+    @Test void theEntryLimitIsAParameter() {
+        var listing = channels().listing();
+        var root = parse(java.util.stream.IntStream.range(0, 51).mapToObj(i -> "{\"id\":" + i + ",\"title\":\"A\"}")
+                .collect(java.util.stream.Collectors.joining(",", "{\"channels\":[", "]}")));
+        assertThat(WorkflowJson.entries(listing, root, 51)).hasSize(51);
+        assertThatThrownBy(() -> WorkflowJson.entries(listing, root, 50)).isInstanceOf(WorkflowException.class)
+                .hasMessage("Choose entries: the list has 51 entries; the limit is 50");
     }
 
     @Test void rejectsExcessiveDepthAndTrailingDocuments() {
@@ -249,10 +247,10 @@ class WorkflowJsonTest {
     }
 
     @Test void numericIdentitiesKeepExactPrecisionAndRejectFractionalIds() {
-        var entries = WorkflowJson.entries(channels(), parse("""
+        var entries = WorkflowJson.entries(channels().listing(), parse("""
                 {"channels":[{"id":9007199254740992.0,"title":"A"},
                              {"id":9007199254740993.0,"title":"B"}]}
-                """));
+                """), 200);
         assertThat(entries).extracting(WorkflowJson.Entry::key).doesNotHaveDuplicates();
         assertThat(entries.get(1).key()).isEqualTo(WorkflowJson.stableKey(parse("9007199254740993")));
         var fractionalId = parse("1.0000000000000001");
@@ -264,7 +262,7 @@ class WorkflowJsonTest {
 
     @Test void numericMappingsKeepExactValuesWithoutExpandingExponents() {
         for (String number : new String[]{"9007199254740993.0", "1.0000000000000001", "1e100000000", "1e-100000000"}) {
-            var values = WorkflowJson.values(java.util.List.of(new Variable("A", Scope.ROOT, "", false)), parse(number), null);
+            var values = WorkflowJson.values(java.util.List.of(new Variable("A", "", false)), parse(number));
             String text = values.get("A").text();
             assertThat(text.length()).isLessThanOrEqualTo(32);
             assertThat(new java.math.BigDecimal(text)).isEqualByComparingTo(new java.math.BigDecimal(number));
@@ -293,10 +291,12 @@ class WorkflowJsonTest {
 
     private static WorkflowDraft channels() {
         var base = WorkflowFixtures.generated();
-        return new WorkflowDraft(base.name(), true, base.mode(), base.kind(), base.fetch(),
-                new Listing("/channels", "/id", "/title", null, null), null,
-                java.util.List.of(new Variable("A", Scope.ENTRY, "/id", false),
-                        new Variable("C", Scope.ROOT, "/auth/token", true),
-                        new Variable("D", Scope.ENTRY, "/quality", false)), base.cast());
+        var call = base.calls().getFirst();
+        return new WorkflowDraft(base.name(), true, base.mode(), base.kind(),
+                java.util.List.of(new Call("main", CallScope.SHARED, call.url(), call.headers(),
+                        java.util.List.of(new Variable("C", "/auth/token", true)))),
+                new Listing("main", "/channels", "/id", "/title", null, null,
+                        java.util.List.of(new Variable("A", "/id", false), new Variable("D", "/quality", false))),
+                null, base.cast());
     }
 }

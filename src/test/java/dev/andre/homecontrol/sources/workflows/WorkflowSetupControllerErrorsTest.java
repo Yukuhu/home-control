@@ -34,7 +34,7 @@ class WorkflowSetupControllerErrorsTest {
 
     /** A new single-tile workflow that passes validation, with mappings A and C. */
     private static WorkflowForm validNewForm() {
-        WorkflowForm form = WorkflowForm.from(new WorkflowDefinition(1, "w-0123456789ab", 1,
+        WorkflowForm form = WorkflowForm.from(new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, "w-0123456789ab", 1,
                 WorkflowFixtures.single(URI.create("https://api.example/catalog"))));
         form.urlMode = form.templateMode = form.headersMode = WorkflowForm.Replacement.REPLACE;
         form.url = "https://api.example/catalog";

@@ -78,18 +78,10 @@ public final class WorkflowJson {
         }
     }
 
-    public static List<Entry> entries(WorkflowDraft draft, JsonNode root) {
-        if (draft.mode() == Mode.SINGLE) {
-            Tile tile = draft.tile();
-            return List.of(new Entry("single", tile.title(), tile.subtitle(), artwork(tile.artwork()), root));
-        }
-        return generatedEntries(draft.listing(), root);
-    }
-
-    private static List<Entry> generatedEntries(Listing listing, JsonNode root) {
+    public static List<Entry> entries(Listing listing, JsonNode root, int limit) {
         JsonNode array = select(root, listing.arrayPointer());
         if (array == null || !array.isArray()) fail(WorkflowException.Stage.SELECT, "entry array is missing or invalid");
-        if (array.size() > 200) fail(WorkflowException.Stage.SELECT, "too many entries");
+        if (array.size() > limit) fail(WorkflowException.Stage.SELECT, "the list has " + array.size() + " entries; the limit is " + limit);
         List<Entry> entries = new ArrayList<>(array.size());
         Set<String> keys = new HashSet<>();
         for (int i = 0; i < array.size(); i++) entries.add(entry(listing, array.get(i), keys, i));
@@ -112,19 +104,24 @@ public final class WorkflowJson {
     }
 
     private static String subtitle(Listing listing, JsonNode node) {
-        JsonNode value = listing.subtitlePointer() == null ? null : select(node, listing.subtitlePointer());
+        JsonNode value = pointer(listing.subtitle()) == null ? null : select(node, listing.subtitle().pointer());
         return value != null && value.isTextual() && value.asText().length() <= 240 ? value.asText() : null;
     }
 
+    private static String pointer(Field field) {
+        return field == null ? null : field.pointer();
+    }
+
     private static URI artwork(Listing listing, JsonNode node) {
-        JsonNode value = listing.artworkPointer() == null ? null : select(node, listing.artworkPointer());
+        JsonNode value = pointer(listing.artwork()) == null ? null : select(node, listing.artwork().pointer());
         return value != null && value.isTextual() ? artwork(value.asText()) : null;
     }
 
-    public static Map<String, Value> values(List<Variable> variables, JsonNode root, JsonNode entry) {
+    /** Reads each variable from {@code context}, which is a call's response or one entry of the list. */
+    public static Map<String, Value> values(List<Variable> variables, JsonNode context) {
         Map<String, Value> values = new HashMap<>();
         for (Variable variable : variables) {
-            JsonNode node = select(variable.scope() == Scope.ROOT ? root : entry, variable.pointer());
+            JsonNode node = select(context, variable.pointer());
             if (node == null || node.isNull() || !(node.isTextual() || node.isNumber() || node.isBoolean())) {
                 fail(WorkflowException.Stage.MAP, "mapping " + variable.name() + " has no scalar value");
             }

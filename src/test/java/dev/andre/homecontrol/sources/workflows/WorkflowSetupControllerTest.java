@@ -28,7 +28,7 @@ class WorkflowSetupControllerTest extends WebSliceTest {
     WorkflowDefinition saved;
 
     @BeforeEach void setup() {
-        saved = new WorkflowDefinition(1, id, 3, WorkflowFixtures.single(URI.create("https://api.example/saved-secret")));
+        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 3, WorkflowFixtures.single(URI.create("https://api.example/saved-secret")));
         when(workflowStore.find(id)).thenReturn(Optional.of(saved));
         when(workflowStore.all()).thenReturn(List.of(saved));
         when(workflowStore.problems()).thenReturn(Map.of());
@@ -46,7 +46,7 @@ class WorkflowSetupControllerTest extends WebSliceTest {
 
     @ParameterizedTest @ValueSource(booleans = {false, true})
     void setupIncludesModeEditAndSavedRevisionTestWithoutFetching(boolean generated) throws Exception {
-        if (generated) when(workflowStore.all()).thenReturn(List.of(new WorkflowDefinition(1, id, 3, WorkflowFixtures.generated())));
+        if (generated) when(workflowStore.all()).thenReturn(List.of(new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 3, WorkflowFixtures.generated())));
         String html = mvc.perform(get("/setup")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         assertThat(html).contains(generated ? "Generated tiles" : "Single tile", ">Edit</a>", "/setup/workflows/" + id + "/test", "Fetches fresh data", "without playback")
                 .containsPattern("(?s)action=\"/setup/workflows/" + id + "/test\".*?name=\"expectedRevision\" value=\"3\"");
@@ -62,7 +62,7 @@ class WorkflowSetupControllerTest extends WebSliceTest {
                 .andExpect(status().is3xxRedirection());
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
         verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
-        assertThat(captor.getValue().variables().getFirst().sensitive()).isFalse();
+        assertThat(captor.getValue().calls().getFirst().variables().getFirst().sensitive()).isFalse();
     }
 
     @Test void savedEditorContainsKeepControlsAndNoStoredSecretsOrFetch() throws Exception {
@@ -84,9 +84,10 @@ class WorkflowSetupControllerTest extends WebSliceTest {
                 .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/setup/workflows/" + id));
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
         verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
-        assertThat(captor.getValue().fetch()).isEqualTo(saved.draft().fetch());
+        assertThat(captor.getValue().calls().getFirst().url()).isEqualTo(saved.draft().calls().getFirst().url());
+        assertThat(captor.getValue().calls().getFirst().headers()).isEqualTo(saved.draft().calls().getFirst().headers());
         assertThat(captor.getValue().cast().template()).isEqualTo(saved.draft().cast().template());
-        assertThat(captor.getValue().variables()).extracting(WorkflowDraft.Variable::name).containsExactly("C", "A");
+        assertThat(captor.getValue().calls().getFirst().variables()).extracting(WorkflowDraft.Variable::name).containsExactly("C", "A");
         verifyNoInteractions(workflowTests);
     }
 
@@ -126,14 +127,15 @@ class WorkflowSetupControllerTest extends WebSliceTest {
 
     @Test void optionalRootPointersRoundTripAndNoClientDefinitionAppearsInModel() {
         var draft = WorkflowFixtures.generated();
-        var definition = new WorkflowDefinition(1, id, 1, new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(),
-                draft.fetch(), new WorkflowDraft.Listing("/items", "/id", "/title", "", null), null, draft.variables(), draft.cast()));
+        var definition = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 1, new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(),
+                draft.calls(), new WorkflowDraft.Listing("main", "/items", "/id", "/title",
+                        new WorkflowDraft.Field("", null), null, draft.listing().variables()), null, draft.cast()));
         var form = WorkflowForm.from(definition);
         assertThat(form.includeSubtitlePointer).isTrue();
         assertThat(form.includeArtworkPointer).isFalse();
-        assertThat(form.toDraft(definition).listing().subtitlePointer()).isEmpty();
+        assertThat(form.toDraft(definition).listing().subtitle().pointer()).isEmpty();
         form.includeArtworkPointer = true;
-        assertThat(form.toDraft(definition).listing().artworkPointer()).isEmpty();
+        assertThat(form.toDraft(definition).listing().artwork().pointer()).isEmpty();
     }
 
     @Test void corruptBlankAndDotIdsAreReachableOnlyThroughCanonicalRecoveryTokens() throws Exception {
@@ -173,8 +175,8 @@ class WorkflowSetupControllerTest extends WebSliceTest {
                 .andExpect(status().is3xxRedirection());
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
         verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
-        assertThat(captor.getValue().fetch().url()).isEqualTo("https://new.example/source");
-        assertThat(captor.getValue().fetch().headers()).isEmpty();
+        assertThat(captor.getValue().calls().getFirst().url()).isEqualTo("https://new.example/source");
+        assertThat(captor.getValue().calls().getFirst().headers()).isEmpty();
         assertThat(captor.getValue().cast().template()).isEqualTo("https://media.example/new");
     }
 
@@ -204,9 +206,9 @@ class WorkflowSetupControllerTest extends WebSliceTest {
         var captor = org.mockito.ArgumentCaptor.forClass(WorkflowDraft.class);
         verify(workflowStore).update(eq(id), eq(3L), captor.capture(), any());
         assertThat(captor.getValue().enabled()).isFalse();
-        assertThat(captor.getValue().listing().subtitlePointer()).isEmpty();
-        assertThat(captor.getValue().listing().artworkPointer()).isNull();
-        assertThat(captor.getValue().variables().getFirst().sensitive()).isFalse();
+        assertThat(captor.getValue().listing().subtitle().pointer()).isEmpty();
+        assertThat(captor.getValue().listing().artwork()).isNull();
+        assertThat(captor.getValue().listing().variables().getFirst().sensitive()).isFalse();
     }
 
     @Test void requestHeadersCannotSupplyAnOmittedAllowedCheckbox() throws Exception {
