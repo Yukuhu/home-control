@@ -5,146 +5,167 @@ import dev.andre.homecontrol.security.LoginService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.net.InetAddress;
+import java.time.Duration;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class WorkflowTestServiceTest {
+    private static final WorkflowProperties PROPERTIES =
+            new WorkflowProperties(true, true, Duration.ofSeconds(5), Duration.ofSeconds(10), 8, 2097152, 3);
     final WorkflowStore store = mock(WorkflowStore.class);
     final LoginService login = mock(LoginService.class);
-    final WorkflowHttpClient http = mock(WorkflowHttpClient.class);
     final MockHttpServletRequest request = new MockHttpServletRequest();
-    final WorkflowTestService service = new WorkflowTestService(store, login, http);
     final String id = "w-0123456789ab";
     WorkflowDefinition saved;
 
     @BeforeEach void setup() {
-        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, WorkflowFixtures.generated());
         when(store.find(id)).thenAnswer(call -> Optional.of(saved));
         when(login.isAuthenticated(request)).thenReturn(true);
     }
 
-    @Test void authenticationAndRevisionAreCheckedBeforeAnyFetch() {
-        when(login.isAuthenticated(request)).thenReturn(false);
-        assertThatThrownBy(() -> service.test(id, 7, request)).isInstanceOf(LoginRequiredException.class);
-        verifyNoInteractions(store, http);
-        when(login.isAuthenticated(request)).thenReturn(true);
-        assertThatThrownBy(() -> service.test(id, 6, request)).isInstanceOf(WorkflowException.class);
-        verifyNoInteractions(http);
+    @Test void authenticationAndRevisionAreCheckedBeforeAnyFetch() throws Exception {
+        try (var server = new FakeWorkflowServer(); var http = client()) {
+            var runner = mock(WorkflowRunner.class);
+            var service = new WorkflowTestService(store, login, runner, http);
+            saved = definition(7, WorkflowFixtures.chain(server.url("/")));
+            when(login.isAuthenticated(request)).thenReturn(false);
+            assertThatThrownBy(() -> service.test(id, 7, request)).isInstanceOf(LoginRequiredException.class);
+            verifyNoInteractions(store, runner);
+            when(login.isAuthenticated(request)).thenReturn(true);
+            assertThatThrownBy(() -> service.test(id, 6, request)).isInstanceOf(WorkflowException.class);
+            verifyNoInteractions(runner);
+            assertThat(server.count("/list")).isZero();
+        }
     }
 
-    @Test void fetchesOnceCountsAllEntriesAndMasksFiveSamples() {
-        body("{\"token\":\"secret-token\",\"items\":[" + java.util.stream.IntStream.range(0, 8)
-                .mapToObj(i -> "{\"id\":\"item" + i + "\",\"title\":\"Title " + i + "\"}")
-                .collect(java.util.stream.Collectors.joining(",")) + "]}");
-        var result = service.test(id, 7, request);
-        assertThat(result.totalEntries()).isEqualTo(8);
-        assertThat(result.samples()).hasSize(5);
-        assertThat(result.samples().getFirst().title()).isEqualTo("Title 0");
-        assertThat(result.samples().getFirst().variables()).containsExactly("C = •••", "A = item0");
-        assertThat(result.samples().getFirst().maskedUrl()).contains("id=item0", "token=•••").doesNotContain("/play");
-        assertThat(result.toString()).doesNotContain("secret-token", "saved-secret", "api.example", "JsonNode");
-        verify(http).fetch(any(WorkflowHttpClient.Request.class));
-        verify(http, times(5)).checkMedia(any(URI.class));
-        verifyNoMoreInteractions(http);
+    @Test void generatedChainReportsRefreshPlayMaskedSamplesAndEntryProblems() throws Exception {
+        try (var server = new FakeWorkflowServer(); var http = client()) {
+            server.respond("/list", 200, "{\"token\":\"secret-token\",\"items\":[{\"id\":\"news\",\"title\":\"News\"},{\"id\":\"music\",\"title\":\"Music\"}]}");
+            server.respond("/images/news", 200, "{\"url\":\"https://images.example/news.png\"}");
+            server.respond("/images/music", 404, "{}");
+            server.respond("/stream/news", 200, "{\"path\":\"secret-path-news\"}");
+            server.respond("/stream/music", 200, "{\"path\":\"secret-path-music\"}");
+            var saved = save(WorkflowFixtures.chain(server.url("/")));
+            var result = service(http).test(saved.id(), saved.revision(), request);
+            assertThat(result.stages()).extracting(WorkflowTestService.StageView::name).containsExactly("Refresh", "Play");
+            assertThat(result.stages()).allMatch(WorkflowTestService.StageView::success);
+            assertThat(result.totalEntries()).isEqualTo(2);
+            assertThat(result.samples()).extracting(WorkflowTestService.SampleView::title).containsExactly("News", "Music");
+            assertThat(result.samples().getFirst().variables()).contains("token = •••", "path = •••", "id = news");
+            assertThat(result.warnings()).contains("Call images · entry \"Music\": server returned HTTP 404");
+            assertThat(result.toString()).doesNotContain("secret-token", "secret-path");
+        }
     }
 
-    @Test void singleModeBuildsOneEntryFromTheSavedTileAndMasksTheUrl() {
-        var single = WorkflowFixtures.single(URI.create("https://api.example/one"));
-        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, new WorkflowDraft(single.name(),
-                single.enabled(), single.mode(), single.kind(), single.calls(), null,
-                new WorkflowDraft.Tile("Radio", "Live", null), single.cast()));
-        body("{\"id\":\"item1\",\"token\":\"secret-token\"}");
-        var result = service.test(id, 7, request);
-        assertThat(result.totalEntries()).isEqualTo(1);
-        var sample = result.samples().getFirst();
-        assertThat(sample.title()).isEqualTo("Radio");
-        assertThat(sample.subtitle()).isEqualTo("Live");
-        assertThat(sample.maskedUrl()).contains("id=item1", "token=•••").doesNotContain("secret-token");
-    }
-
-    @Test void disabledSavedWorkflowCanBeTestedButConcurrentEditRejectsResult() {
-        var d = saved.draft();
-        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, d.withEnabled(false));
-        body("{\"token\":\"private\",\"items\":[]}");
-        assertThat(service.test(id, 7, request).totalEntries()).isZero();
-        when(http.fetch(any())).thenAnswer(call -> {
-            saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 8, saved.draft());
-            return "{\"items\":[]}".getBytes(StandardCharsets.UTF_8);
-        });
-        assertThatThrownBy(() -> service.test(id, 7, request)).isInstanceOf(WorkflowException.class);
-    }
-
-    @Test void errorsHaveStageContextWithoutUpstreamPayloadOrExceptionText() {
-        body("{\"private-json-token\":");
-        var result = service.test(id, 7, request);
-        assertThat(result.stages()).anySatisfy(stage -> {
-            assertThat(stage.name()).isEqualTo("Parse JSON");
-            assertThat(stage.success()).isFalse();
-        });
-        assertThat(result.toString()).doesNotContain("private-json-token");
-        when(http.fetch(any())).thenThrow(new RuntimeException("upstream-secret", new IllegalArgumentException("cause-secret")));
-        assertThat(service.test(id, 7, request).toString()).doesNotContain("upstream-secret", "cause-secret");
-    }
-
-    @Test void invalidSelectedArtworkProducesSafeWarningAndMappingFailuresStaySafe() {
-        var d = saved.draft();
-        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, new WorkflowDraft(d.name(), d.enabled(), d.mode(), d.kind(),
-                d.calls(), listing("/items", "/title", new WorkflowDraft.Field("/art", null), d), null, d.cast()));
-        body("{\"token\":\"private\",\"items\":[{\"id\":\"a\",\"title\":\"News\",\"art\":\"http://secret-art/token\"}]}");
-        var result = service.test(id, 7, request);
-        assertThat(result.warnings()).isNotEmpty();
-        assertThat(result.toString()).doesNotContain("secret-art", "private");
-        body("{\"items\":[{\"id\":\"a\",\"title\":\"News\"}]}");
-        assertThat(service.test(id, 7, request).stages()).anySatisfy(stage -> {
-            assertThat(stage.name()).isEqualTo("Map fields");
-            assertThat(stage.success()).isFalse();
-        });
-    }
-
-    @Test void invalidArrayPointerAndMediaFailureHaveSafeStageResults() {
-        var d = saved.draft();
-        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, new WorkflowDraft(d.name(), d.enabled(), d.mode(), d.kind(),
-                d.calls(), listing("invalid-pointer-private-marker", "/title", null, d), null, d.cast()));
-        body("{\"items\":[]}");
-        var result = service.test(id, 7, request);
-        assertThat(result.stages()).anySatisfy(stage -> {
-            assertThat(stage.name()).isEqualTo("Choose entries"); assertThat(stage.success()).isFalse();
-        });
-        assertThat(result.toString()).doesNotContain("private-marker");
-        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, WorkflowFixtures.generated());
-        body("{\"token\":\"token-secret\",\"items\":[{\"id\":\"a\",\"title\":\"News\"}]}");
-        doThrow(new RuntimeException("private-marker")).when(http).checkMedia(any());
-        var failed = service.test(id, 7, request);
-        assertThat(failed.samples()).isEmpty();
-        assertThat(failed.toString()).doesNotContain("private-marker", "token-secret");
-        assertThat(failed.stages()).anySatisfy(stage -> {
-            assertThat(stage.name()).isEqualTo("Build media URL"); assertThat(stage.success()).isFalse();
-        });
-    }
-
-    @Test void safeFailuresExplainHttpStatusBusyAdmissionMappingAndDuplicateEntry() {
-        for (String detail : List.of("server returned HTTP 403", "busy; try again later", "request timed out")) {
-            doThrow(new WorkflowException(WorkflowException.Stage.FETCH, detail)).when(http).fetch(any());
-            var result = service.test(id, 7, request);
-            assertThat(result.stages().getLast().message()).contains(detail);
+    @Test void aFailingSharedCallIsNamedAndLeavesNoSamples() throws Exception {
+        try (var server = new FakeWorkflowServer(); var http = client()) {
+            server.respond("/list", 500, "{}");
+            var saved = save(WorkflowFixtures.chain(server.url("/")));
+            var result = service(http).test(saved.id(), saved.revision(), request);
+            assertThat(result.stages()).last().satisfies(stage -> {
+                assertThat(stage.name()).isEqualTo("Call list");
+                assertThat(stage.success()).isFalse();
+                assertThat(stage.message()).isEqualTo("Call list: server returned HTTP 500");
+            });
             assertThat(result.samples()).isEmpty();
         }
-        reset(http);
-        body("{\"items\":[{\"id\":\"a\",\"title\":\"News\"}]}");
-        assertThat(service.test(id, 7, request).stages().getLast().message()).contains("mapping C has no scalar value");
-        body("{\"token\":\"private-token\",\"items\":[{\"id\":1,\"title\":\"A\"},{\"id\":1.0,\"title\":\"B\"}]}");
-        var result = service.test(id, 7, request);
-        assertThat(result.stages().getLast().message()).contains("entry 1 has duplicate ID");
-        assertThat(result.toString()).doesNotContain("private-token");
     }
 
-    void body(String body) { when(http.fetch(any())).thenReturn(body.getBytes(StandardCharsets.UTF_8)); }
+    @Test void countsAllEntriesButShowsAtMostFiveSamples() throws Exception {
+        try (var server = new FakeWorkflowServer(); var http = client()) {
+            server.respond("/list", 200, "{\"token\":\"t\",\"items\":[" + IntStream.range(0, 8)
+                    .mapToObj(i -> "{\"id\":\"e" + i + "\",\"title\":\"Title " + i + "\"}").collect(Collectors.joining(",")) + "]}");
+            for (int i = 0; i < 8; i++) {
+                server.respond("/images/e" + i, 200, "{\"url\":\"https://images.example/a.png\"}");
+                server.respond("/stream/e" + i, 200, "{\"path\":\"p" + i + "\"}");
+            }
+            var saved = save(WorkflowFixtures.chain(server.url("/")));
+            var result = service(http).test(saved.id(), saved.revision(), request);
+            assertThat(result.totalEntries()).isEqualTo(8);
+            assertThat(result.samples()).hasSize(5);
+            assertThat(server.count("/stream/e5")).isZero();
+        }
+    }
 
-    private static WorkflowDraft.Listing listing(String array, String title, WorkflowDraft.Field artwork, WorkflowDraft d) {
-        return new WorkflowDraft.Listing("main", array, "/id", title, null, artwork, d.listing().variables());
+    @Test void singleModeBuildsOneEntryFromTheSavedTileAndMasksTheUrl() throws Exception {
+        try (var server = new FakeWorkflowServer(); var http = client()) {
+            server.respond("/one", 200, "{\"id\":\"item1\",\"token\":\"secret-token\"}");
+            var single = WorkflowFixtures.single(server.url("/one"));
+            var saved = save(new WorkflowDraft(single.name(), single.enabled(), single.mode(), single.kind(),
+                    single.calls(), null, new WorkflowDraft.Tile("Radio", "Live", null), single.cast()));
+            var result = service(http).test(saved.id(), saved.revision(), request);
+            assertThat(result.stages()).extracting(WorkflowTestService.StageView::name).containsExactly("Play");
+            assertThat(result.totalEntries()).isEqualTo(1);
+            var sample = result.samples().getFirst();
+            assertThat(sample.title()).isEqualTo("Radio");
+            assertThat(sample.subtitle()).isEqualTo("Live");
+            assertThat(sample.maskedUrl()).contains("id=item1", "token=•••").doesNotContain("secret-token");
+        }
+    }
+
+    @Test void disabledSavedWorkflowCanBeTestedButConcurrentEditRejectsResult() throws Exception {
+        try (var server = new FakeWorkflowServer(); var http = client()) {
+            server.respond("/list", 200, "{\"token\":\"private\",\"items\":[]}");
+            saved = definition(7, WorkflowFixtures.chain(server.url("/")).withEnabled(false));
+            var service = service(http);
+            assertThat(service.test(id, 7, request).totalEntries()).isZero();
+            when(store.find(id)).thenReturn(Optional.of(saved), Optional.of(definition(8, saved.draft())));
+            assertThatThrownBy(() -> service.test(id, 7, request)).isInstanceOf(WorkflowException.class);
+        }
+    }
+
+    @Test void anUnexpectedExceptionGivesAGenericMessageWithoutItsText() {
+        var runner = mock(WorkflowRunner.class);
+        when(runner.refreshRun()).thenThrow(new IllegalStateException("upstream-secret", new IllegalArgumentException("cause-secret")));
+        saved = definition(7, WorkflowFixtures.chain(java.net.URI.create("https://api.example/")));
+        var result = new WorkflowTestService(store, login, runner, mock(WorkflowHttpClient.class)).test(id, 7, request);
+        assertThat(result.stages()).last().satisfies(stage -> {
+            assertThat(stage.name()).isEqualTo("Refresh");
+            assertThat(stage.success()).isFalse();
+        });
+        assertThat(result.toString()).doesNotContain("upstream-secret", "cause-secret");
+    }
+
+    @Test void aFailingMediaCheckIsReportedAsPlayWithoutTheAddressOrSecrets() throws Exception {
+        try (var server = new FakeWorkflowServer(); var real = client()) {
+            var http = mock(WorkflowHttpClient.class);
+            server.respond("/list", 200, "{\"token\":\"token-secret\",\"items\":[{\"id\":\"a\",\"title\":\"News\"}]}");
+            server.respond("/images/a", 200, "{}");
+            server.respond("/stream/a", 200, "{\"path\":\"path-secret\"}");
+            when(http.fetch(any(WorkflowHttpClient.Request.class), anyLong())).thenAnswer(call ->
+                    real.fetch(call.getArgument(0), call.getArgument(1)));
+            doThrow(new RuntimeException("private-marker")).when(http).checkMedia(any(), anyLong());
+            var saved = save(WorkflowFixtures.chain(server.url("/")));
+            var result = new WorkflowTestService(store, login, new WorkflowRunner(http, PROPERTIES), http)
+                    .test(saved.id(), saved.revision(), request);
+            assertThat(result.samples()).isEmpty();
+            assertThat(result.stages()).last().satisfies(stage -> {
+                assertThat(stage.name()).isEqualTo("Play");
+                assertThat(stage.success()).isFalse();
+            });
+            assertThat(result.toString()).doesNotContain("private-marker", "token-secret", "path-secret", "media.example");
+        }
+    }
+
+    private WorkflowDefinition save(WorkflowDraft draft) {
+        saved = definition(7, draft);
+        return saved;
+    }
+
+    private WorkflowDefinition definition(long revision, WorkflowDraft draft) {
+        return new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, revision, draft);
+    }
+
+    private WorkflowTestService service(WorkflowHttpClient http) {
+        return new WorkflowTestService(store, login, new WorkflowRunner(http, PROPERTIES), http);
+    }
+
+    private static WorkflowHttpClient client() {
+        return new WorkflowHttpClient(PROPERTIES,
+                new WorkflowUrlPolicy(true, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}));
     }
 }
