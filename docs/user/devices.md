@@ -13,8 +13,11 @@ device strip on the dashboard.
 
 The app stores its Remote v2 client certificate in `data/keystore.p12` and its
 paired-device registry in `data/devices.json`. **The certificate is the pairing
-credential** — losing it means the Shield must be paired again. Keep the whole
-data directory mounted persistently and keep any custom keystore password stable.
+credential** — losing it means the Shield must be paired again. The keystore's password is
+generated with it and kept encrypted in `data/secrets.json`, unless you set
+`HOME_CONTROL_ANDROIDTV_KEYSTORE_PASSWORD`; then keep that value stable. Keep the whole data
+directory mounted persistently. LG and Samsung TVs' pairing keys are kept in `data/secrets.json`
+too.
 
 Each device's current foreground package is shown on its chip in the device strip as
 connection context. Remote v2 does not expose a reliable way to derive a launchable deep link

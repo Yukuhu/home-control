@@ -9,8 +9,8 @@ device you choose.
 - **Content:** Jellyfin, YouTube, trending titles from TMDB, sport fixtures from calendars and TheSportsDB, pinned
   links, and dynamic workflows that turn a JSON API into tiles you can play. Netflix, Prime Video and DAZN titles open
   in their own apps.
-- **One container on your LAN:** Docker Compose or CasaOS, a phone-friendly web app, no cloud service. Connecting a
-  content source adds a login password.
+- **One container on your LAN:** Docker Compose or CasaOS, a phone-friendly web app, no cloud service. A login password,
+  set in Setup or with the first content source, guards it.
 
 ## Running
 
@@ -85,11 +85,11 @@ An older CasaOS deployment that had no volume mapping cannot recover data from a
 already discarded anonymous container. Pair once after installing this manifest;
 future container replacements and image updates will reuse the bind-mounted pairing.
 
-The default keystore password is stable and intentionally omitted from the CasaOS
-manifest. It protects the local PKCS12 file; it is not a web login or network
-authentication. If you set `HOME_CONTROL_ANDROIDTV_KEYSTORE_PASSWORD` yourself (older
-setups use `SHIELD_KEYSTORE_PASSWORD`, which still works), keep the same value for every
-redeployment.
+The keystore password is generated with the keystore and kept encrypted in
+`secrets.json`, so the CasaOS manifest sets none. It protects the local PKCS12 file; it is not a
+web login or network authentication. If you set `HOME_CONTROL_ANDROIDTV_KEYSTORE_PASSWORD`
+yourself (older setups use `SHIELD_KEYSTORE_PASSWORD`, which still works), keep the same value
+for every redeployment.
 
 ## First steps
 
