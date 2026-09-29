@@ -2,10 +2,12 @@ package dev.andre.homecontrol.testsupport;
 
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceCommands;
+import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceSettings;
+import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.security.LoginRateLimiter;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.pinned.PinnedShortcuts;
@@ -113,5 +115,20 @@ class FullAppResetTest extends FullAppTest {
         assertThat(context.getBeansOfType(DeviceCommands.class)).hasSize(1);
         assertThat(context.getBeansOfType(DeviceEnrollment.class)).hasSize(1);
         assertThat(context.getBeansOfType(DeviceSettings.class)).hasSize(1);
+    }
+
+    @Test
+    void aReceiverDiscoveryAnnouncesIsMergedIntoTheDeviceAtItsAddress() {
+        enrollment.adopt(new Device("listener-tv", "Listener TV", DeviceKind.ANDROID_TV, "127.0.0.1",
+                Map.of("androidtv", Map.of()), Instant.EPOCH));
+        try {
+            context.publishEvent(new DeviceDiscoveredEvent(
+                    new DiscoveredDevice("cast", "Listener TV", "127.0.0.1", 9, Map.of("id", "listener-cast"))));
+
+            assertThat(devices.device("listener-tv")).get().satisfies(device ->
+                    assertThat(device.hasAdapter("cast")).as("merged by the discovery listener").isTrue());
+        } finally {
+            enrollment.forget("listener-tv");
+        }
     }
 }
