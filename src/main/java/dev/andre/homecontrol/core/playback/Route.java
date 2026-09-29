@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /** The planner's answer: an executable route, or the reason there is none. Shown to the user before playing. */
-public sealed interface Route {
+public sealed interface Route permits DeviceRoute, DelegatedRoute, Route.Unroutable {
 
     /** A stable, browser-visible identifier; never contains a payload, which may carry a token. */
     String key();
@@ -32,7 +32,7 @@ public sealed interface Route {
         return describe();
     }
 
-    record OpenAppLink(URI uri, String service) implements Route {
+    record OpenAppLink(URI uri, String service) implements DeviceRoute {
         @Override
         public String key() {
             return "app-link";
@@ -43,6 +43,7 @@ public sealed interface Route {
             return true;
         }
 
+        @Override
         public Action action() {
             return new Action.OpenAppLink(uri);
         }
@@ -64,7 +65,12 @@ public sealed interface Route {
     }
 
     /** Deferred workflow execution, available only to Cast receivers. */
-    record WorkflowCast(String workflowId, long revision, String entryKey) implements Route {
+    record WorkflowCast(String workflowId, long revision, String entryKey) implements DelegatedRoute {
+        @Override
+        public String source() {
+            return "Workflows";
+        }
+
         @Override
         public String key() {
             return "workflow-cast";
@@ -74,7 +80,7 @@ public sealed interface Route {
     }
 
     /** Run a Cast receiver app and send it a LOAD (spec §5.3 rung 3). */
-    record Cast(String receiverAppId, Map<String, Object> load) implements Route {
+    record Cast(String receiverAppId, Map<String, Object> load) implements DeviceRoute {
         @Override
         public String key() {
             return "cast:" + receiverAppId;
@@ -88,6 +94,7 @@ public sealed interface Route {
             load = load == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(load));
         }
 
+        @Override
         public Action action() {
             return new Action.CastLoad(receiverAppId, load);
         }
@@ -107,7 +114,7 @@ public sealed interface Route {
 
     /** Run a Cast receiver app and send it a custom message (spec §5.3 rung 3). */
     record CastMessage(String receiverAppId, String namespace, Map<String, Object> message, String receiverLabel)
-            implements Route {
+            implements DeviceRoute {
         @Override
         public String key() {
             return "cast-message:" + receiverAppId;
@@ -117,6 +124,7 @@ public sealed interface Route {
             message = message == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(message));
         }
 
+        @Override
         public Action action() {
             return new Action.CastMessage(receiverAppId, namespace, message);
         }
@@ -133,7 +141,12 @@ public sealed interface Route {
     }
 
     /** Deferred VLC launch; credentials are resolved only when Play is pressed. */
-    record JellyfinVlc(String itemId) implements Route {
+    record JellyfinVlc(String itemId) implements DelegatedRoute {
+        @Override
+        public String source() {
+            return "Jellyfin";
+        }
+
         @Override
         public String key() {
             return "jellyfin-vlc";
@@ -148,7 +161,12 @@ public sealed interface Route {
     }
 
     /** Wake an Android TV and open Jellyfin as needed, then play through its fresh session. */
-    record JellyfinApp(String itemId, long startPositionTicks) implements Route {
+    record JellyfinApp(String itemId, long startPositionTicks) implements DelegatedRoute {
+        @Override
+        public String source() {
+            return "Jellyfin";
+        }
+
         @Override
         public String key() {
             return "jellyfin-app";
@@ -161,7 +179,12 @@ public sealed interface Route {
     }
 
     /** Tell a Jellyfin session to play. Android TV also checks power and foreground app at execution time. */
-    record JellyfinSession(String sessionId, String itemId, long startPositionTicks, String client) implements Route {
+    record JellyfinSession(String sessionId, String itemId, long startPositionTicks, String client) implements DelegatedRoute {
+        @Override
+        public String source() {
+            return "Jellyfin";
+        }
+
         @Override
         public String key() {
             return "jellyfin-session";
@@ -179,7 +202,12 @@ public sealed interface Route {
      * Start the video on a Cast receiver through its best-effort remote-control pairing. Executed by a
      * RouteExecutor, not an adapter; the device part goes through DeviceCommands.query.
      */
-    record YouTubeLounge(String videoId) implements Route {
+    record YouTubeLounge(String videoId) implements DelegatedRoute {
+        @Override
+        public String source() {
+            return "YouTube";
+        }
+
         @Override
         public String key() {
             return "youtube-lounge";
@@ -192,12 +220,13 @@ public sealed interface Route {
     }
 
     /** Hand a direct stream to a DLNA/UPnP/Sonos media renderer (spec §5.3 rung 4). */
-    record Render(URI url, String mimeType, String title, String subtitle) implements Route {
+    record Render(URI url, String mimeType, String title, String subtitle) implements DeviceRoute {
         @Override
         public String key() {
             return "render";
         }
 
+        @Override
         public Action action() {
             return new Action.PlayMedia(url, mimeType, title, subtitle);
         }
@@ -215,12 +244,13 @@ public sealed interface Route {
     }
 
     /** Play an audio stream with the server's own player on a local audio sink such as a Bluetooth speaker (spec §5.3 rung 5). */
-    record PlayLocally(URI url, String mimeType, String title, String subtitle) implements Route {
+    record PlayLocally(URI url, String mimeType, String title, String subtitle) implements DeviceRoute {
         @Override
         public String key() {
             return "local-audio";
         }
 
+        @Override
         public Action action() {
             return new Action.PlayMedia(url, mimeType, title, subtitle);
         }

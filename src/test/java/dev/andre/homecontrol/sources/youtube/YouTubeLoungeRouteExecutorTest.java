@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
-import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -150,8 +149,6 @@ class YouTubeLoungeRouteExecutorTest {
 
     @Test
     void executesOnlyLoungeRoutes() {
-        assertThat(executor.executes(new Route.YouTubeLounge("x"))).isTrue();
-        assertThat(executor.executes(new Route.OpenAppLink(URI.create("https://www.youtube.com/watch?v=x"), "youtube")))
-                .isFalse();
+        assertThat(executor.keys()).containsExactly("youtube-lounge");
     }
 }

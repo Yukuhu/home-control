@@ -3,6 +3,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 import dev.andre.homecontrol.core.*;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import dev.andre.homecontrol.core.playback.Route;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,7 +87,7 @@ class JellyfinVlcExecutorTest {
                   {"Id":"live","SupportsDirectPlay":true,"RequiresOpening":true}
                 ]}
                 """));
-        Route route = new Route.JellyfinVlc(ID);
+        DelegatedRoute route = new Route.JellyfinVlc(ID);
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("no direct stream");
         verifyNoInteractions(commands);
@@ -96,7 +97,7 @@ class JellyfinVlcExecutorTest {
     @Test
     void aFailedWakeNeverSendsAPlaybackLink() {
         when(devices.state("shield")).thenReturn(DeviceState.initial().withStatus(DeviceStatus.CONNECTED));
-        Route route = new Route.JellyfinVlc(ID);
+        DelegatedRoute route = new Route.JellyfinVlc(ID);
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("ready");
         verify(commands, never()).execute(anyString(), isA(Action.OpenAppLink.class));
@@ -106,7 +107,7 @@ class JellyfinVlcExecutorTest {
     void aFailedLinkWriteDoesNotLeakCredentialsOrRetryPlayback() {
         doThrow(new DeviceOfflineException("failed opening vlc://https://nas/?api_key=secret-token"))
                 .when(commands).execute(anyString(), isA(Action.OpenAppLink.class));
-        Route route = new Route.JellyfinVlc(ID);
+        DelegatedRoute route = new Route.JellyfinVlc(ID);
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(DeviceOfflineException.class).hasMessageNotContaining("secret-token")
                 .hasMessageNotContaining("api_key");
@@ -123,7 +124,7 @@ class JellyfinVlcExecutorTest {
             return json.readTree("{\"MediaType\":\"Video\"}");
         });
         var bounded = new JellyfinVlcExecutor(setup, client, devices, commands, Duration.ofMillis(100));
-        Route route = new Route.JellyfinVlc(ID);
+        DelegatedRoute route = new Route.JellyfinVlc(ID);
         try {
             assertThatThrownBy(() -> bounded.execute(route, shield))
                     .isInstanceOf(ActionFailedException.class).hasMessageContaining("in time");

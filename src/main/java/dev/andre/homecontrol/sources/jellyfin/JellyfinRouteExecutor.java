@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.RemoteKey;
+import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
 
@@ -17,6 +18,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -61,12 +63,12 @@ public class JellyfinRouteExecutor implements RouteExecutor {
     }
 
     @Override
-    public boolean executes(Route route) {
-        return route instanceof Route.JellyfinSession || route instanceof Route.JellyfinApp;
+    public Set<String> keys() {
+        return Set.of("jellyfin-session", "jellyfin-app");
     }
 
     @Override
-    public void execute(Route route, Device device) {
+    public void execute(DelegatedRoute route, Device device) {
         try {
             switch (route) {
                 case Route.JellyfinApp(var itemId, var startPositionTicks) ->

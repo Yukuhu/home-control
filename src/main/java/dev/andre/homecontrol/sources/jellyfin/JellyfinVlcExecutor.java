@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.LaunchedMedia;
 import dev.andre.homecontrol.core.RemoteKey;
+import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
 import org.slf4j.Logger;
@@ -22,6 +23,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -50,12 +52,12 @@ public class JellyfinVlcExecutor implements RouteExecutor {
     }
 
     @Override
-    public boolean executes(Route route) {
-        return route instanceof Route.JellyfinVlc;
+    public Set<String> keys() {
+        return Set.of("jellyfin-vlc");
     }
 
     @Override
-    public void execute(Route route, Device device) {
+    public void execute(DelegatedRoute route, Device device) {
         if (!(route instanceof Route.JellyfinVlc(var itemId))
                 || !devices.capabilities(device.id()).contains(Capability.ANDROID_APPS)) {
             throw new IllegalArgumentException("VLC needs an Android TV device");
