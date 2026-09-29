@@ -1,7 +1,10 @@
 package dev.andre.homecontrol.device;
 
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
+import dev.andre.homecontrol.core.DeviceHandle;
+import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DiscoveredDevice;
@@ -16,12 +19,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -122,6 +127,38 @@ class EnrollmentTest {
 
         assertThat(added.id()).isNotIn("a", "b");
         assertThat(wiring.registry().findById("a").orElseThrow().hasAdapter("cast")).isFalse();
+    }
+
+    @Test
+    void anAdapterWithoutDiscoveryAddsNothingAndStillConnects() {
+        DeviceAdapter plain = new DeviceAdapter() {
+            @Override
+            public String id() {
+                return "plain";
+            }
+
+            @Override
+            public DeviceKind kind() {
+                return DeviceKind.ANDROID_TV;
+            }
+
+            @Override
+            public Set<Capability> capabilities(Device device) {
+                return Set.of();
+            }
+
+            @Override
+            public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
+                return new StubAdapter.StubHandle(onChange);
+            }
+        };
+        Wiring wiring = wire(HostAddresses::lookup, plain);
+
+        wiring.enrollment().adopt(device("a", "plain", "10.0.0.5"));
+
+        assertThat(wiring.enrollment().discovered()).isEmpty();
+        assertThat(wiring.enrollment().addable()).isEmpty();
+        assertThat(wiring.connections().handles("a")).containsKey("plain");
     }
 
     @Test

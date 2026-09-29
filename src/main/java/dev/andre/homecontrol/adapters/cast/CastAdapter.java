@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.cast;
 
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Device;
@@ -17,7 +18,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /** Google Cast receivers: Chromecast, Cast TVs and speakers, the Shield's built-in Cast. */
-public class CastAdapter implements DeviceAdapter {
+public class CastAdapter implements DeviceAdapter, AdapterDiscovery {
 
     public static final String ADAPTER_ID = CastSettings.ADAPTER_ID;
 

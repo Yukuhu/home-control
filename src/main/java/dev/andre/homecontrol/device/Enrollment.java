@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.device;
 
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
@@ -43,9 +44,12 @@ final class Enrollment {
     private static final String NO_DEVICE_PREFIX = "No device with id ";
     private static final String SWITCHED_OFF_PREFIX = "The ";
     private static final String SWITCHED_OFF_SUFFIX = " module is switched off";
+    private static final String NOT_VISIBLE = "That device is no longer visible on the network";
 
     private final DeviceRegistry registry;
     private final Map<String, DeviceAdapter> adapters;
+    /** The adapters that take part in discovery and merging, by id; an adapter that is not one sees nothing. */
+    private final Map<String, AdapterDiscovery> discoveries = new LinkedHashMap<>();
     private final DeviceConnections connections;
     private final RegistryLock lock;
     private final ApplicationEventPublisher events;
@@ -59,6 +63,11 @@ final class Enrollment {
         this.lock = lock;
         this.events = events;
         this.resolver = resolver;
+        adapters.values().forEach(adapter -> {
+            if (adapter instanceof AdapterDiscovery discovery) {
+                discoveries.put(adapter.id(), discovery);
+            }
+        });
     }
 
     /** What one operation does to the connections and the screens once the registry lock is released. */
@@ -197,7 +206,7 @@ final class Enrollment {
     }
 
     List<DiscoveredDevice> discovered() {
-        return adapters.values().stream().flatMap(adapter -> adapter.discovered().stream()).toList();
+        return discoveries.values().stream().flatMap(discovery -> discovery.discovered().stream()).toList();
     }
 
     /** Discovered devices that need the pairing flow. */
@@ -223,11 +232,15 @@ final class Enrollment {
         if (adapter == null) {
             throw new IllegalArgumentException(SWITCHED_OFF_PREFIX + adapterId + SWITCHED_OFF_SUFFIX);
         }
-        DiscoveredDevice found = adapter.discovered().stream()
+        AdapterDiscovery discovery = discoveries.get(adapterId);
+        if (discovery == null) {
+            throw new IllegalArgumentException(NOT_VISIBLE);
+        }
+        DiscoveredDevice found = discovery.discovered().stream()
                 .filter(candidate -> candidate.host().equalsIgnoreCase(host) && candidate.port() == port)
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("That device is no longer visible on the network"));
-        Map<String, String> settings = adapter.settingsFor(found)
+                .orElseThrow(() -> new IllegalArgumentException(NOT_VISIBLE));
+        Map<String, String> settings = discovery.settingsFor(found)
                 .orElseThrow(() -> new IllegalArgumentException(found.name() + " has to be paired, not added"));
         AfterLock after = new AfterLock();
         Device device;
@@ -251,23 +264,23 @@ final class Enrollment {
      * Automatic merge (spec §5.1): only into an existing device, never creating one. A receiver
      * a registered device already carries by a stable identity (Cast's mDNS {@code id}) rather
      * than its address is re-pointed and reconnected when it answers at a new one — an adapter
-     * matches {@link DeviceAdapter#carries} on identity alone, so without this the device would
+     * matches {@link AdapterDiscovery#carries} on identity alone, so without this the device would
      * otherwise keep dialling the stale address forever and the receiver could never be re-added.
      */
     void onDiscovered(DeviceDiscoveredEvent event) {
         DiscoveredDevice found = event.device();
-        DeviceAdapter adapter = adapters.get(found.adapterId());
-        if (adapter == null) {
+        AdapterDiscovery discovery = discoveries.get(found.adapterId());
+        if (discovery == null) {
             return;
         }
-        Optional<Map<String, String>> settings = adapter.settingsFor(found);
+        Optional<Map<String, String>> settings = discovery.settingsFor(found);
         if (settings.isEmpty()) {
             return;
         }
         AfterLock after = new AfterLock();
         synchronized (lock) {
             List<Device> registered = registry.findAll();
-            Optional<Device> carrier = registered.stream().filter(device -> adapter.carries(device, found)).findFirst();
+            Optional<Device> carrier = registered.stream().filter(device -> discovery.carries(device, found)).findFirst();
             if (carrier.isPresent()) {
                 reconnectIfMoved(carrier.get(), found.adapterId(), settings.get(), after);
             } else {
@@ -332,7 +345,7 @@ final class Enrollment {
                     // Its pairing may be bound to the source's id (Android TV's is), so it stays where it is.
                     throw new IllegalArgumentException(SWITCHED_OFF_PREFIX + adapterId + SWITCHED_OFF_SUFFIX);
                 }
-                if (adapter.credentialsBoundToDeviceId()) {
+                if (boundToDeviceId(adapterId)) {
                     throw new IllegalArgumentException("Merge the other way round: the " + adapterId
                             + " pairing of " + source.name() + " only works under its own id");
                 }
@@ -365,7 +378,7 @@ final class Enrollment {
             if (adapter == null) {
                 throw new IllegalArgumentException(SWITCHED_OFF_PREFIX + adapterId + SWITCHED_OFF_SUFFIX);
             }
-            if (adapter.credentialsBoundToDeviceId()) {
+            if (boundToDeviceId(adapterId)) {
                 throw new IllegalArgumentException("The " + adapterId + " pairing belongs to " + device.name()
                         + " and cannot be split off; split the other connections instead");
             }
@@ -373,7 +386,8 @@ final class Enrollment {
             remaining.remove(adapterId);
             Device rest = new Device(device.id(), device.name(), device.kind(), device.host(), remaining, device.lastSeen());
             // A receiver merged in from another address takes that address with it.
-            String host = adapter.hostOf(device);
+            AdapterDiscovery discovery = discoveries.get(adapterId);
+            String host = discovery == null ? device.host() : discovery.hostOf(device);
             split = new Device(DeviceMatching.uniqueId(registry.findAll(), adapterId, host),
                     device.name() + " (" + adapterId + ")",
                     adapter.kind(), host,
@@ -388,8 +402,14 @@ final class Enrollment {
     }
 
     private boolean pairingFree(DiscoveredDevice found) {
-        DeviceAdapter adapter = adapters.get(found.adapterId());
-        return adapter != null && adapter.settingsFor(found).isPresent();
+        AdapterDiscovery discovery = discoveries.get(found.adapterId());
+        return discovery != null && discovery.settingsFor(found).isPresent();
+    }
+
+    /** True when the adapter keeps its pairing under the device id, so its entry never moves to another id. */
+    private boolean boundToDeviceId(String adapterId) {
+        AdapterDiscovery discovery = discoveries.get(adapterId);
+        return discovery != null && discovery.credentialsBoundToDeviceId();
     }
 
     /**
@@ -399,8 +419,8 @@ final class Enrollment {
      * automatically.
      */
     private boolean isRegistered(List<Device> registered, DiscoveredDevice found) {
-        DeviceAdapter adapter = adapters.get(found.adapterId());
-        return adapter != null && registered.stream().anyMatch(device -> adapter.carries(device, found));
+        AdapterDiscovery discovery = discoveries.get(found.adapterId());
+        return discovery != null && registered.stream().anyMatch(device -> discovery.carries(device, found));
     }
 
     /**
@@ -424,7 +444,7 @@ final class Enrollment {
             Optional<DiscoveredDevice> match = DeviceMatching.absorbable(result, entry.getValue(), others);
             if (match.isPresent()) {
                 result = result.withAdapter(entry.getKey(),
-                        adapters.get(entry.getKey()).settingsFor(match.get()).orElseThrow());
+                        discoveries.get(entry.getKey()).settingsFor(match.get()).orElseThrow());
             }
         }
         return result;

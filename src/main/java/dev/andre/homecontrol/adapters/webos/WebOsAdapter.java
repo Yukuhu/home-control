@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.webos;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.adapters.support.PairingKeys;
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Device;
@@ -34,7 +35,7 @@ import java.util.function.Consumer;
  * LG webOS TVs over SSAP (spec §4.1). The client key is a device secret, named by a reference in the device's adapter
  * settings. The registry is only read here; what a session learns is stored through the device manager.
  */
-public class WebOsAdapter implements WakeOnLanAdapter {
+public class WebOsAdapter implements WakeOnLanAdapter, AdapterDiscovery {
 
     public static final String ADAPTER_ID = WebOsSettings.ADAPTER_ID;
     public static final String SEARCH_TARGET = "urn:lge-com:service:webos-second-screen:1";

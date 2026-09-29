@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.e2e;
 
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Capability;
@@ -27,7 +28,7 @@ import java.util.function.Consumer;
  * controllable state/failure per device, driven entirely by the {@code caps}/{@code fail}
  * adapter settings a device is adopted with (see {@link E2eApplicationTest#adopt}).
  */
-public class FakeDeviceAdapter implements DeviceAdapter {
+public class FakeDeviceAdapter implements DeviceAdapter, AdapterDiscovery {
 
     public record Recorded(String deviceId, Action action) {
     }

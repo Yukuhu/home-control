@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.upnp;
 
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
@@ -21,7 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /** UPnP/DLNA media renderers (spec §4.1): TVs, AV receivers, Wi-Fi speakers. Pairing-free. */
-public class UpnpAdapter implements DeviceAdapter {
+public class UpnpAdapter implements DeviceAdapter, AdapterDiscovery {
 
     public static final String ADAPTER_ID = UpnpSettings.ADAPTER_ID;
 
