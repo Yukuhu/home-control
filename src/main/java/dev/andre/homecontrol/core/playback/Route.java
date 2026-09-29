@@ -12,6 +12,14 @@ import java.util.Optional;
 /** The planner's answer: an executable route, or the reason there is none. Shown to the user before playing. */
 public sealed interface Route {
 
+    /** A stable, browser-visible identifier; never contains a payload, which may carry a token. */
+    String key();
+
+    /** True when success only means "the device accepted it" (spec §5.3: the app may not be installed). */
+    default boolean optimistic() {
+        return false;
+    }
+
     String describe();
 
     /**
@@ -25,6 +33,15 @@ public sealed interface Route {
     }
 
     record OpenAppLink(URI uri, String service) implements Route {
+        @Override
+        public String key() {
+            return "app-link";
+        }
+
+        @Override
+        public boolean optimistic() {
+            return true;
+        }
 
         public Action action() {
             return new Action.OpenAppLink(uri);
@@ -48,11 +65,20 @@ public sealed interface Route {
 
     /** Deferred workflow execution, available only to Cast receivers. */
     record WorkflowCast(String workflowId, long revision, String entryKey) implements Route {
+        @Override
+        public String key() {
+            return "workflow-cast";
+        }
+
         @Override public String describe() { return "Cast with the Default Media Receiver"; }
     }
 
     /** Run a Cast receiver app and send it a LOAD (spec §5.3 rung 3). */
     record Cast(String receiverAppId, Map<String, Object> load) implements Route {
+        @Override
+        public String key() {
+            return "cast:" + receiverAppId;
+        }
 
         private static final Map<String, String> RECEIVER_NAMES = Map.of(
                 "CC1AD845", "the Default Media Receiver",
@@ -82,6 +108,11 @@ public sealed interface Route {
     /** Run a Cast receiver app and send it a custom message (spec §5.3 rung 3). */
     record CastMessage(String receiverAppId, String namespace, Map<String, Object> message, String receiverLabel)
             implements Route {
+        @Override
+        public String key() {
+            return "cast-message:" + receiverAppId;
+        }
+
         public CastMessage {
             message = message == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(message));
         }
@@ -103,11 +134,26 @@ public sealed interface Route {
 
     /** Deferred VLC launch; credentials are resolved only when Play is pressed. */
     record JellyfinVlc(String itemId) implements Route {
+        @Override
+        public String key() {
+            return "jellyfin-vlc";
+        }
+
+        @Override
+        public boolean optimistic() {
+            return true;
+        }
+
         @Override public String describe() { return "Open in VLC (from beginning; no Jellyfin progress tracking)"; }
     }
 
     /** Wake an Android TV and open Jellyfin as needed, then play through its fresh session. */
     record JellyfinApp(String itemId, long startPositionTicks) implements Route {
+        @Override
+        public String key() {
+            return "jellyfin-app";
+        }
+
         @Override
         public String describe() {
             return "Play in Jellyfin (wake device and open app if needed)";
@@ -116,6 +162,11 @@ public sealed interface Route {
 
     /** Tell a Jellyfin session to play. Android TV also checks power and foreground app at execution time. */
     record JellyfinSession(String sessionId, String itemId, long startPositionTicks, String client) implements Route {
+        @Override
+        public String key() {
+            return "jellyfin-session";
+        }
+
         @Override
         public String describe() {
             return client == null || client.isBlank()
@@ -130,6 +181,11 @@ public sealed interface Route {
      */
     record YouTubeLounge(String videoId) implements Route {
         @Override
+        public String key() {
+            return "youtube-lounge";
+        }
+
+        @Override
         public String describe() {
             return "Cast with the YouTube receiver (best effort)";
         }
@@ -137,6 +193,10 @@ public sealed interface Route {
 
     /** Hand a direct stream to a DLNA/UPnP/Sonos media renderer (spec §5.3 rung 4). */
     record Render(URI url, String mimeType, String title, String subtitle) implements Route {
+        @Override
+        public String key() {
+            return "render";
+        }
 
         public Action action() {
             return new Action.PlayMedia(url, mimeType, title, subtitle);
@@ -156,6 +216,10 @@ public sealed interface Route {
 
     /** Play an audio stream with the server's own player on a local audio sink such as a Bluetooth speaker (spec §5.3 rung 5). */
     record PlayLocally(URI url, String mimeType, String title, String subtitle) implements Route {
+        @Override
+        public String key() {
+            return "local-audio";
+        }
 
         public Action action() {
             return new Action.PlayMedia(url, mimeType, title, subtitle);
@@ -173,6 +237,11 @@ public sealed interface Route {
     }
 
     record Unroutable(String reason) implements Route {
+        @Override
+        public String key() {
+            return "unroutable";
+        }
+
         @Override
         public String describe() {
             return reason;

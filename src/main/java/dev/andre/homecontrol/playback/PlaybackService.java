@@ -14,7 +14,6 @@ import dev.andre.homecontrol.core.playback.PlayableResolver;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
-import dev.andre.homecontrol.core.playback.RouteKeys;
 import dev.andre.homecontrol.core.playback.UnroutableException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,7 +90,7 @@ public class PlaybackService {
     public PlayAttempt attempt(ContentItem item, String deviceId, Set<String> skip) {
         PlaybackPreview preview = preview(item, deviceId);
         Device device = preview.device();
-        List<Route> routes = preview.routes().stream().filter(route -> !skip.contains(RouteKeys.key(route))).toList();
+        List<Route> routes = preview.routes().stream().filter(route -> !skip.contains(route.key())).toList();
         if (routes.isEmpty()) {
             return new PlayAttempt.Unroutable(device, skip.isEmpty() ? preview.reason() : "no other way to play this");
         }

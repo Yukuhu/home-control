@@ -218,7 +218,7 @@ class PlaybackPlannerTest {
         assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)))
                 .isInstanceOf(Route.Cast.class);
         assertThat(configured.routes(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)))
-                .extracting(RouteKeys::key).containsExactly("cast:CC1AD845", "render");
+                .extracting(Route::key).containsExactly("cast:CC1AD845", "render");
     }
 
     @Test
@@ -234,7 +234,7 @@ class PlaybackPlannerTest {
         assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.LOCAL_AUDIO_SINK)))
                 .isInstanceOf(Route.Cast.class);
         assertThat(planner.routes(item(AUDIO), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)))
-                .extracting(RouteKeys::key).containsExactly("render", "local-audio");
+                .extracting(Route::key).containsExactly("render", "local-audio");
     }
 
     @Test
@@ -266,7 +266,7 @@ class PlaybackPlannerTest {
         List<Route> routes = planner.routes(item(STREAM, JELLYFIN_MESSAGE, LINK, OPEN_APP),
                 EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK, Capability.CAST_RECEIVER));
 
-        assertThat(routes).extracting(RouteKeys::key)
+        assertThat(routes).extracting(Route::key)
                 .containsExactly("jellyfin-session", "app-link", "cast-message:F007D354", "cast:CC1AD845");
         assertThat(planner.plan(item(STREAM, LINK), EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)))
                 .isEqualTo(routes.get(1));

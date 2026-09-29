@@ -13,7 +13,7 @@ class WorkflowCastStrategyTest {
         var strategy = new WorkflowCastStrategy();
         assertThat(strategy.route(item, Set.of(Capability.APP_LINK))).isEmpty();
         var route = strategy.route(item, Set.of(Capability.APP_LINK, Capability.CAST_RECEIVER)).orElseThrow();
-        assertThat(RouteKeys.key(route)).isEqualTo("workflow-cast");
+        assertThat(route.key()).isEqualTo("workflow-cast");
         assertThat(route.describe()).isEqualTo("Cast with the Default Media Receiver");
         var planner = new PlaybackPlanner(List.of(new AppLinkStrategy(), strategy, new CastStreamStrategy(),
                 new MediaRendererStrategy(), new LocalAudioSinkStrategy()));

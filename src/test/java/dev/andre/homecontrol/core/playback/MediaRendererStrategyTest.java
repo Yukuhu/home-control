@@ -47,7 +47,7 @@ class MediaRendererStrategyTest {
                 .toString();
 
         assertThat(printed).contains("http://h:8096/Audio/x/stream.flac?…").doesNotContain("secret-key");
-        assertThat(RouteKeys.key(new Route.Render(URI.create("http://h/a?ApiKey=secret-key"), "audio/flac", "T", null)))
+        assertThat(new Route.Render(URI.create("http://h/a?ApiKey=secret-key"), "audio/flac", "T", null).key())
                 .isEqualTo("render");
     }
 }
