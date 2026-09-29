@@ -40,11 +40,15 @@ class WorkflowE2eTest extends E2eApplicationTest {
     @Autowired WorkflowStore workflows;
     @Autowired LoginService login;
 
-    @AfterEach void clearWorkflows() {
-        if (workflows.all().isEmpty()) return;
-        var request = new MockHttpServletRequest();
-        org.assertj.core.api.Assertions.assertThat(login.authenticate(PASSWORD, request)).isTrue();
-        for (var definition : workflows.all()) workflows.remove(definition.id(), definition.revision(), request);
+    @AfterEach void clearWorkflowsAndTheLogin() {
+        if (!workflows.all().isEmpty()) {
+            var request = new MockHttpServletRequest();
+            org.assertj.core.api.Assertions.assertThat(login.authenticate(PASSWORD, request)).isTrue();
+            for (var definition : workflows.all()) workflows.remove(definition.id(), definition.revision(), request);
+        }
+        if (login.loginRequired()) {
+            login.removePassword(PASSWORD); // the login outlives the last workflow; the next test sets it again
+        }
     }
 
     private static FakeWorkflowServer upstream() {

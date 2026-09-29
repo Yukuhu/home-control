@@ -34,8 +34,9 @@ class LoginGatingE2eTest extends E2eApplicationTest {
     }
 
     @AfterEach
-    void removeTheSecret() {
+    void removeTheSecretAndTheLogin() {
         login.removeSecrets(List.of("e2e.token"));
+        login.removePassword(PASSWORD); // the login outlives the last secret; the next test sets it again
     }
 
     @BrowserTest
