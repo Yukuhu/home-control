@@ -46,13 +46,12 @@ public class PlaybackPlanner {
      * Reasons no strategy routed, one per distinct playable kind. An {@link PlayableRef.AppLink}
      * only ever fails here for lacking the capability: with {@link Capability#APP_LINK} present,
      * {@link RouteStrategies#appLink()} would already have routed it, so there is no "was not accepted" case.
-     * The same holds for {@link PlayableRef.CastLoad}/{@link PlayableRef.CastMessage}/
-     * {@link PlayableRef.YouTubeLounge}/{@link PlayableRef.StreamUrl} and {@link Capability#CAST_RECEIVER}:
-     * with it present, {@link YouTubeLoungeStrategy}/{@link RouteStrategies#castMessage()}/{@link RouteStrategies#castLoad()}/
-     * {@link RouteStrategies#castStream()} would already have routed it, so reaching here always means the capability is missing —
-     * except a {@link PlayableRef.StreamUrl} on a Cast receiver or media renderer whose strategy is absent or declined
-     * it, which reads "the stream was not accepted". Falls
-     * back to a generic reason when none applies (e.g. a planner without that strategy).
+     * The same holds for {@link PlayableRef.CastLoad}/{@link PlayableRef.CastMessage}/{@link PlayableRef.StreamUrl}
+     * and {@link Capability#CAST_RECEIVER}: with it present, {@link RouteStrategies#castMessage()}/
+     * {@link RouteStrategies#castLoad()}/{@link RouteStrategies#castStream()} would already have routed it, so reaching
+     * here always means the capability is missing — except a {@link PlayableRef.StreamUrl} on a Cast receiver or media
+     * renderer whose strategy is absent or declined it, which reads "the stream was not accepted". A {@link SourceRef}
+     * gives its own reason. Falls back to a generic reason when none applies (e.g. a planner without that strategy).
      */
     private static List<String> explain(ContentItem item, Set<Capability> capabilities) {
         Set<String> reasons = new LinkedHashSet<>();
@@ -70,15 +69,10 @@ public class PlaybackPlanner {
         return switch (ref) {
             case PlayableRef.AppLink _ when capabilities.contains(Capability.APP_LINK) -> Optional.empty();
             case PlayableRef.AppLink _ -> Optional.of("this device cannot open app links");
-            case PlayableRef.WorkflowCast _ -> Optional.of(NOT_CAST_RECEIVER);
             case PlayableRef.CastLoad _ -> Optional.of(NOT_CAST_RECEIVER);
             case PlayableRef.CastMessage _ -> Optional.of(NOT_CAST_RECEIVER);
-            case PlayableRef.YouTubeLounge _ -> Optional.of(NOT_CAST_RECEIVER);
             case PlayableRef.StreamUrl stream -> Optional.of(streamReason(stream, capabilities));
-            case PlayableRef.JellyfinItem _ -> Optional.of("Jellyfin is switched off on this server");
-            case PlayableRef.JellyfinSession _ -> Optional.of("the open Jellyfin app cannot be controlled");
-            case PlayableRef.JellyfinVlc _ -> Optional.of("VLC cannot be opened on this device");
-            case PlayableRef.JellyfinApp _ -> Optional.of("the Jellyfin app cannot be started on this device");
+            case SourceRef source -> Optional.of(source.unroutableReason());
         };
     }
 

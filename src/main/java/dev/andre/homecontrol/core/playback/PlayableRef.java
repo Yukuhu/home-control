@@ -8,10 +8,11 @@ import java.util.Map;
 
 /**
  * One way an item could be played. A source attaches every reference it can build; the
- * planner picks. Variants beyond {@link AppLink} are defined here so later sub-projects
- * conform to one contract, but only app links route in sub-project A (spec §5.2).
+ * planner picks (spec §5.2). The references every source shares are defined here; a source's
+ * own references are {@link SourceRef}s in its module.
  */
-public sealed interface PlayableRef {
+public sealed interface PlayableRef permits PlayableRef.AppLink, PlayableRef.StreamUrl, PlayableRef.CastLoad,
+        PlayableRef.CastMessage, SourceRef {
 
     /** Human word for the reference kind, used in "no route" explanations. */
     String kindLabel();
@@ -24,43 +25,10 @@ public sealed interface PlayableRef {
         }
     }
 
-    /** Opaque workflow identity; never contains a resolved URL or credentials. */
-    record WorkflowCast(String workflowId, long revision, String entryKey) implements PlayableRef {
-        @Override public String kindLabel() { return "workflow Cast"; }
-    }
-
     record CastLoad(String receiverAppId, Map<String, Object> payload) implements PlayableRef {
         @Override
         public String kindLabel() {
             return "cast";
-        }
-    }
-
-    record JellyfinItem(String serverId, String itemId, long resumeTicks) implements PlayableRef {
-        @Override
-        public String kindLabel() {
-            return "Jellyfin";
-        }
-    }
-
-    /** An open, controllable Jellyfin app on the device (spec §5.3 rung 1). Created at play time by a resolver. */
-    record JellyfinSession(String sessionId, String itemId, long startPositionTicks, String client) implements PlayableRef {
-        @Override
-        public String kindLabel() {
-            return "Jellyfin app";
-        }
-    }
-
-    /** Deferred VLC launch; credentials are resolved only when Play is pressed. */
-    record JellyfinVlc(String itemId) implements PlayableRef {
-        @Override public String kindLabel() { return "Open in VLC (from beginning; no Jellyfin progress tracking)"; }
-    }
-
-    /** A paired Android TV can open Jellyfin before a controllable session exists. */
-    record JellyfinApp(String itemId, long startPositionTicks) implements PlayableRef {
-        @Override
-        public String kindLabel() {
-            return "Jellyfin app";
         }
     }
 
@@ -87,18 +55,6 @@ public sealed interface PlayableRef {
         @Override
         public String toString() {
             return message.toString();
-        }
-    }
-
-    /**
-     * A video to start on a Cast receiver through the receiver's own remote-control pairing (an
-     * unofficial, best-effort interface). Created at play time by a resolver, only for devices whose
-     * switch is on.
-     */
-    record YouTubeLounge(String videoId) implements PlayableRef {
-        @Override
-        public String kindLabel() {
-            return "YouTube Cast";
         }
     }
 }

@@ -12,6 +12,7 @@ import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.UnroutableException;
+import dev.andre.homecontrol.sources.jellyfin.JellyfinRoute;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,7 +56,7 @@ class ContentPlayControllerTest extends WebSliceTest {
     @Test
     void playsASourceItemAndDescribesTheRoute() throws Exception {
         known();
-        given(playback.play(theItem, "shield")).willReturn(new Route.JellyfinSession("s1", "item-1", 0, "Android TV"));
+        given(playback.play(theItem, "shield")).willReturn(new JellyfinRoute.Session("s1", "item-1", 0, "Android TV"));
 
         mockMvc.perform(post("/devices/shield/play").param("source", "jellyfin").param("item", ITEM_ID))
                 .andExpect(status().isOk())

@@ -12,7 +12,6 @@ import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlayableResolver;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
-import dev.andre.homecontrol.core.playback.JellyfinSessionStrategy;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteStrategies;
 import dev.andre.homecontrol.playback.PlaybackService;
@@ -36,8 +35,8 @@ import static org.mockito.Mockito.*;
 class JellyfinPlayableResolverTest {
 
     private static final String ITEM_ID = "3f2a9c1e7b6d4e5f8a9b0c1d2e3f4a5b";
-    private static final PlayableRef.JellyfinItem WANTED =
-            new PlayableRef.JellyfinItem(FakeJellyfinServer.SERVER_ID, ITEM_ID, 6_120_000_000L);
+    private static final JellyfinPlayable.Item WANTED =
+            new JellyfinPlayable.Item(FakeJellyfinServer.SERVER_ID, ITEM_ID, 6_120_000_000L);
 
     private final JellyfinClient client = new JellyfinClient(new JellyfinProperties(true, Duration.ofSeconds(2),
             Duration.ofSeconds(5), 20, Duration.ofSeconds(30)));
@@ -110,7 +109,7 @@ class JellyfinPlayableResolverTest {
 
         assertThat(playback.attempt(item(WANTED), shield.id(), Set.of()))
                 .isInstanceOfSatisfying(PlayAttempt.Failed.class, failed -> {
-                    assertThat(failed.route()).isInstanceOf(Route.JellyfinApp.class);
+                    assertThat(failed.route()).isInstanceOf(JellyfinRoute.App.class);
                     assertThat(failed.remaining()).hasSize(1).allMatch(route -> route instanceof Route.CastMessage);
                 });
         verify(commands, never()).execute(anyString(), any());
@@ -132,7 +131,7 @@ class JellyfinPlayableResolverTest {
                 Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS));
 
         assertThat(resolution.playables()).containsExactly(
-                new PlayableRef.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", ITEM_ID, 6_120_000_000L, "Android TV"));
+                new JellyfinPlayable.Session("1d2c3b4a59687f6e5d4c3b2a19081726", ITEM_ID, 6_120_000_000L, "Android TV"));
     }
 
     @Test
@@ -144,7 +143,7 @@ class JellyfinPlayableResolverTest {
                 Set.of(Capability.APP_LINK, Capability.CAST_RECEIVER));
 
         assertThat(resolution.playables()).containsExactly(
-                new PlayableRef.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", ITEM_ID, 6_120_000_000L, "Android TV"));
+                new JellyfinPlayable.Session("1d2c3b4a59687f6e5d4c3b2a19081726", ITEM_ID, 6_120_000_000L, "Android TV"));
         assertThat(resolution.liveCapabilities()).containsExactly(Capability.JELLYFIN_CLIENT);
         assertThat(resolution.notes()).isEmpty();
         assertThat(fake.requests("GET", "/Items/" + ITEM_ID)).isEmpty();
@@ -204,7 +203,7 @@ class JellyfinPlayableResolverTest {
         fake.respond("POST", "/Items/" + trackId + "/PlaybackInfo", 200, "playback-info-audio.json");
         Device speaker = new Device("upnp-10-0-0-30", "Kitchen Speaker", DeviceKind.UPNP, "10.0.0.30",
                 Map.of("upnp", Map.of()), Instant.now());
-        PlayableRef.JellyfinItem track = new PlayableRef.JellyfinItem(FakeJellyfinServer.SERVER_ID, trackId, 0);
+        JellyfinPlayable.Item track = new JellyfinPlayable.Item(FakeJellyfinServer.SERVER_ID, trackId, 0);
         ContentItem song = new ContentItem(trackId, "jellyfin", ContentKind.TRACK, "Bunny Song", "The Rabbits", null, List.of(track));
 
         PlayableResolver.Resolution resolution = resolver.resolve(track, song, speaker,
@@ -225,7 +224,7 @@ class JellyfinPlayableResolverTest {
         fake.respond("POST", "/Items/" + trackId + "/PlaybackInfo", 200, "playback-info-audio.json");
         Device speaker = new Device("bluetooth-aa-bb-cc-dd-ee-ff", "JBL Flip 5", DeviceKind.BLUETOOTH, "AA:BB:CC:DD:EE:FF",
                 Map.of("bluetooth", Map.of()), Instant.now());
-        PlayableRef.JellyfinItem track = new PlayableRef.JellyfinItem(FakeJellyfinServer.SERVER_ID, trackId, 0);
+        JellyfinPlayable.Item track = new JellyfinPlayable.Item(FakeJellyfinServer.SERVER_ID, trackId, 0);
         ContentItem song = new ContentItem(trackId, "jellyfin", ContentKind.TRACK, "Bunny Song", "The Rabbits", null, List.of(track));
 
         PlayableResolver.Resolution resolution = resolver.resolve(track, song, speaker,
@@ -245,7 +244,7 @@ class JellyfinPlayableResolverTest {
         fake.respond("GET", "/Items/" + trackId, 200, "item-track.json");
         fake.respond("POST", "/Items/" + trackId + "/PlaybackInfo", 200, "playback-info-audio.json");
         Device speaker = new Device("mixed-1", "Mixed", DeviceKind.UPNP, "10.0.0.31", Map.of(), Instant.now());
-        PlayableRef.JellyfinItem track = new PlayableRef.JellyfinItem(FakeJellyfinServer.SERVER_ID, trackId, 0);
+        JellyfinPlayable.Item track = new JellyfinPlayable.Item(FakeJellyfinServer.SERVER_ID, trackId, 0);
         ContentItem song = new ContentItem(trackId, "jellyfin", ContentKind.TRACK, "Bunny Song", "The Rabbits", null, List.of(track));
 
         PlayableResolver.Resolution resolution = resolver.resolve(track, song, speaker,
@@ -292,7 +291,7 @@ class JellyfinPlayableResolverTest {
         given(setup.settings()).willReturn(Optional.of(settings()));
         given(setup.connection()).willReturn(Optional.of(new JellyfinConnection(
                 URI.create("http://nas:8096"), FakeJellyfinServer.ACCESS_TOKEN, "hc-test-device", FakeJellyfinServer.USER_ID)));
-        PlayableRef.JellyfinItem otherServer = new PlayableRef.JellyfinItem("other-server", ITEM_ID, 0);
+        JellyfinPlayable.Item otherServer = new JellyfinPlayable.Item("other-server", ITEM_ID, 0);
 
         assertThat(resolver.resolve(otherServer, item(otherServer), kitchen, Set.of(Capability.CAST_RECEIVER)).notes())
                 .containsExactly("this item is from a different Jellyfin server");

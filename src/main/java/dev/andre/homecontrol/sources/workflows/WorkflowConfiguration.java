@@ -4,9 +4,13 @@ import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.RailPreferences;
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.content.ContentChangedEvent;
+import dev.andre.homecontrol.core.playback.RefStrategy;
+import dev.andre.homecontrol.core.playback.RouteStrategy;
+import dev.andre.homecontrol.core.playback.Rung;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.beans.factory.ObjectProvider;
@@ -55,6 +59,12 @@ public class WorkflowConfiguration {
                                                                       DeviceQueries devices, DeviceCommands commands,
                                                                       RailPreferences preferences) {
         return new WorkflowCastRouteExecutor(store, runner, devices, commands, preferences);
+    }
+
+    /** Pure planning: credentials and media addresses are resolved only by the route executor. */
+    @Bean public RouteStrategy workflowCastStrategy() {
+        return RefStrategy.of(Rung.CAST_APP, Capability.CAST_RECEIVER, WorkflowCastRef.class,
+                (ref, item) -> new WorkflowCastRoute(ref.workflowId(), ref.revision(), ref.entryKey()));
     }
 
     @Bean public ContentChanges workflowContentChanges(WorkflowCatalogs catalogs, ObjectProvider<RailCache> rails) {

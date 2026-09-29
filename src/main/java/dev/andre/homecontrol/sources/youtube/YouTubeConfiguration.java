@@ -3,8 +3,12 @@ package dev.andre.homecontrol.sources.youtube;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.content.RailCache;
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.core.playback.RefStrategy;
+import dev.andre.homecontrol.core.playback.RouteStrategy;
+import dev.andre.homecontrol.core.playback.Rung;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
@@ -128,6 +132,13 @@ public class YouTubeConfiguration {
     public YouTubeLoungeRouteExecutor youTubeLoungeRouteExecutor(DeviceCommands commands, LoungeClient lounge,
                                                                  YouTubeSetupService setup) {
         return new YouTubeLoungeRouteExecutor(commands, lounge, setup);
+    }
+
+    /** A video the Lounge resolver attached, on a Cast receiver. App links still come first. */
+    @Bean
+    public RouteStrategy youTubeLoungeStrategy() {
+        return RefStrategy.of(Rung.CAST_APP, Capability.CAST_RECEIVER, YouTubeLoungeRef.class,
+                (lounge, item) -> new YouTubeLoungeRoute(lounge.videoId()));
     }
 
     /** After either grant, clear both cache layers and look up the newly authorized channel. */

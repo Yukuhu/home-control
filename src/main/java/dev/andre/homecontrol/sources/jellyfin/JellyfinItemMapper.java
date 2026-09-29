@@ -2,7 +2,6 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
-import dev.andre.homecontrol.core.playback.PlayableRef;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
@@ -57,7 +56,7 @@ public final class JellyfinItemMapper {
         JsonNode userData = item.path("UserData");
         long position = Math.max(0, userData.path("PlaybackPositionTicks").asLong(0));
         return Optional.of(new ContentItem(id, JellyfinSettings.SOURCE_ID, kind, title, subtitle, artwork(item),
-                List.of(new PlayableRef.JellyfinItem(item.path("ServerId").asString(""), id, position)),
+                List.of(new JellyfinPlayable.Item(item.path("ServerId").asString(""), id, position)),
                 progress(item, userData)));
     }
 

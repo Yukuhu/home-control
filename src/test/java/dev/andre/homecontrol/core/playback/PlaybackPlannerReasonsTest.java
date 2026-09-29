@@ -23,6 +23,19 @@ class PlaybackPlannerReasonsTest {
 
     private final PlaybackPlanner planner = new PlaybackPlanner(List.of());
 
+    /** A source's own reference, as a module outside core would define it. */
+    private record LocalRef() implements SourceRef {
+        @Override
+        public String kindLabel() {
+            return "local";
+        }
+
+        @Override
+        public String unroutableReason() {
+            return "the local player is not running";
+        }
+    }
+
     private String reason(PlayableRef ref, Set<Capability> capabilities) {
         Route route = planner.plan(new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null, List.of(ref)),
                 capabilities).first();
@@ -42,12 +55,10 @@ class PlaybackPlannerReasonsTest {
     void everyCastReferenceNeedsACastReceiver() {
         Set<Capability> none = EnumSet.noneOf(Capability.class);
 
-        assertThat(reason(new PlayableRef.WorkflowCast("wf", 1, "entry"), none)).isEqualTo(NOT_CAST_RECEIVER);
         assertThat(reason(new PlayableRef.CastLoad("F007D354", Map.of()), none)).isEqualTo(NOT_CAST_RECEIVER);
         assertThat(reason(new PlayableRef.CastMessage(new Action.CastMessage("F007D354", "urn:x-cast:x", Map.of()),
                 "a receiver"), none))
                 .isEqualTo(NOT_CAST_RECEIVER);
-        assertThat(reason(new PlayableRef.YouTubeLounge("abc"), none)).isEqualTo(NOT_CAST_RECEIVER);
     }
 
     @Test
@@ -63,22 +74,15 @@ class PlaybackPlannerReasonsTest {
     }
 
     @Test
-    void everyJellyfinReferenceNamesWhatIsMissing() {
-        Set<Capability> all = EnumSet.allOf(Capability.class);
-
-        assertThat(reason(new PlayableRef.JellyfinItem("srv", "item-1", 0), all))
-                .isEqualTo("Jellyfin is switched off on this server");
-        assertThat(reason(new PlayableRef.JellyfinSession("s", "item-1", 0, "Android TV"), all))
-                .isEqualTo("the open Jellyfin app cannot be controlled");
-        assertThat(reason(new PlayableRef.JellyfinVlc("item-1"), all)).isEqualTo("VLC cannot be opened on this device");
-        assertThat(reason(new PlayableRef.JellyfinApp("item-1", 0), all))
-                .isEqualTo("the Jellyfin app cannot be started on this device");
+    void aSourceReferenceGivesItsOwnReason() {
+        assertThat(reason(new LocalRef(), EnumSet.allOf(Capability.class))).isEqualTo("the local player is not running");
     }
 
     @Test
     void theSameReasonIsGivenOnce() {
         ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
-                List.of(new PlayableRef.YouTubeLounge("a"), new PlayableRef.CastLoad("F007D354", Map.of()), VIDEO));
+                List.of(new PlayableRef.CastMessage(new Action.CastMessage("F007D354", "urn:x-cast:x", Map.of()), "a receiver"),
+                        new PlayableRef.CastLoad("F007D354", Map.of()), VIDEO));
 
         assertThat(planner.plan(item, EnumSet.noneOf(Capability.class)).first())
                 .isEqualTo(new Route.Unroutable(NOT_CAST_RECEIVER + "; this device cannot play a direct stream"));

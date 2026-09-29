@@ -9,12 +9,9 @@ import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceSettings;
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.ContentSources;
-import dev.andre.homecontrol.core.playback.JellyfinSessionStrategy;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.RouteStrategies;
 import dev.andre.homecontrol.core.playback.RouteStrategy;
-import dev.andre.homecontrol.core.playback.YouTubeLoungeStrategy;
-import dev.andre.homecontrol.core.playback.WorkflowCastStrategy;
 import dev.andre.homecontrol.device.Devices;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.discovery.MdnsBrowser;
@@ -101,21 +98,6 @@ public class HomeControlConfiguration {
     @Bean
     public RouteStrategy localSinkStrategy() {
         return RouteStrategies.localSink();
-    }
-
-    @Bean
-    public RouteStrategy jellyfinSessionStrategy() {
-        return new JellyfinSessionStrategy();
-    }
-
-    @Bean
-    public RouteStrategy youTubeLoungeStrategy() {
-        return new YouTubeLoungeStrategy();
-    }
-
-    @Bean
-    public RouteStrategy workflowCastStrategy() {
-        return new WorkflowCastStrategy();
     }
 
     /** The one mDNS browser every adapter's discovery shares (spec §7). */

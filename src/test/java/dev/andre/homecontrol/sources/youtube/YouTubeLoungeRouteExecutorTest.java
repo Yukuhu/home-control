@@ -7,7 +7,6 @@ import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.core.playback.Route;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +33,7 @@ import static org.mockito.Mockito.verify;
 
 class YouTubeLoungeRouteExecutorTest {
 
-    private static final Route.YouTubeLounge ROUTE = new Route.YouTubeLounge("aqz-KE-bpKQ");
+    private static final YouTubeLoungeRoute ROUTE = new YouTubeLoungeRoute("aqz-KE-bpKQ");
     private static final CastAppQuery MDX_STATUS = new CastAppQuery("233637DE", "urn:x-cast:com.google.youtube.mdx",
             Map.of("type", "getMdxSessionStatus"), "mdxSessionStatus");
     private static final String REMOTE = "4f1c2d3e-5a6b-4c7d-8e9f-0a1b2c3d4e5f";

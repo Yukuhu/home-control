@@ -4,7 +4,6 @@ import dev.andre.homecontrol.core.*;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.playback.DelegatedRoute;
-import dev.andre.homecontrol.core.playback.Route;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -49,7 +48,7 @@ class JellyfinVlcExecutorTest {
 
     @Test
     void opensOriginalMkvWithDeviceFacingAddressAndEncodedCredentialsOnce() {
-        executor.execute(new Route.JellyfinVlc(ID), shield);
+        executor.execute(new JellyfinRoute.Vlc(ID), shield);
         verify(commands).execute("shield", new Action.OpenAppLink(URI.create(
                 "vlc://https://nas.lan/jellyfin/Videos/" + ID + "/stream?static=true&mediaSourceId=source%2B1&api_key=secret%2B%26token")));
         verify(commands, times(1)).execute(anyString(), any());
@@ -62,7 +61,7 @@ class JellyfinVlcExecutorTest {
                  "ParentIndexNumber":1,"IndexNumber":1,"RunTimeTicks":34200000000}
                 """.formatted(ID)));
 
-        executor.execute(new Route.JellyfinVlc(ID), shield);
+        executor.execute(new JellyfinRoute.Vlc(ID), shield);
 
         var sent = org.mockito.ArgumentCaptor.forClass(Action.class);
         verify(commands).execute(eq("shield"), sent.capture());
@@ -72,7 +71,7 @@ class JellyfinVlcExecutorTest {
 
     @Test
     void launchesWithoutAHintWhenJellyfinGivesTheItemNoName() {
-        executor.execute(new Route.JellyfinVlc(ID), shield);
+        executor.execute(new JellyfinRoute.Vlc(ID), shield);
 
         var sent = org.mockito.ArgumentCaptor.forClass(Action.class);
         verify(commands).execute(eq("shield"), sent.capture());
@@ -87,7 +86,7 @@ class JellyfinVlcExecutorTest {
                   {"Id":"live","SupportsDirectPlay":true,"RequiresOpening":true}
                 ]}
                 """));
-        DelegatedRoute route = new Route.JellyfinVlc(ID);
+        DelegatedRoute route = new JellyfinRoute.Vlc(ID);
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("no direct stream");
         verifyNoInteractions(commands);
@@ -97,7 +96,7 @@ class JellyfinVlcExecutorTest {
     @Test
     void aFailedWakeNeverSendsAPlaybackLink() {
         when(devices.state("shield")).thenReturn(DeviceState.initial().withStatus(DeviceStatus.CONNECTED));
-        DelegatedRoute route = new Route.JellyfinVlc(ID);
+        DelegatedRoute route = new JellyfinRoute.Vlc(ID);
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("ready");
         verify(commands, never()).execute(anyString(), isA(Action.OpenAppLink.class));
@@ -107,7 +106,7 @@ class JellyfinVlcExecutorTest {
     void aFailedLinkWriteDoesNotLeakCredentialsOrRetryPlayback() {
         doThrow(new DeviceOfflineException("failed opening vlc://https://nas/?api_key=secret-token"))
                 .when(commands).execute(anyString(), isA(Action.OpenAppLink.class));
-        DelegatedRoute route = new Route.JellyfinVlc(ID);
+        DelegatedRoute route = new JellyfinRoute.Vlc(ID);
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(DeviceOfflineException.class).hasMessageNotContaining("secret-token")
                 .hasMessageNotContaining("api_key");
@@ -124,7 +123,7 @@ class JellyfinVlcExecutorTest {
             return json.readTree("{\"MediaType\":\"Video\"}");
         });
         var bounded = new JellyfinVlcExecutor(setup, client, devices, commands, Duration.ofMillis(100));
-        DelegatedRoute route = new Route.JellyfinVlc(ID);
+        DelegatedRoute route = new JellyfinRoute.Vlc(ID);
         try {
             assertThatThrownBy(() -> bounded.execute(route, shield))
                     .isInstanceOf(ActionFailedException.class).hasMessageContaining("in time");
@@ -139,7 +138,7 @@ class JellyfinVlcExecutorTest {
     @Test
     void aDeviceThatRunsNoAndroidAppsIsRefused() {
         when(devices.capabilities("shield")).thenReturn(Set.of(Capability.REMOTE_KEYS, Capability.APP_LINK));
-        var route = new Route.JellyfinVlc(ID);
+        var route = new JellyfinRoute.Vlc(ID);
 
         assertThatThrownBy(() -> executor.execute(route, shield)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(commands);

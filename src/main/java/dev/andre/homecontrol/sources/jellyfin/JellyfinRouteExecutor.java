@@ -11,7 +11,6 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.playback.DelegatedRoute;
-import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
 
 import java.net.URI;
@@ -71,9 +70,9 @@ public class JellyfinRouteExecutor implements RouteExecutor {
     public void execute(DelegatedRoute route, Device device) {
         try {
             switch (route) {
-                case Route.JellyfinApp(var itemId, var startPositionTicks) ->
+                case JellyfinRoute.App(var itemId, var startPositionTicks) ->
                         sessions.playNow(prepare(device), itemId, startPositionTicks);
-                case Route.JellyfinSession(var sessionId, var itemId, var startPositionTicks, _) -> {
+                case JellyfinRoute.Session(var sessionId, var itemId, var startPositionTicks, _) -> {
                     String id = hasAndroidTvRemote(device) ? prepare(device) : sessionId;
                     sessions.playNow(id, itemId, startPositionTicks);
                 }

@@ -1,7 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.playback.ContentItem;
-import dev.andre.homecontrol.core.playback.PlayableRef;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -77,7 +76,7 @@ class JellyfinFixtureContractTest {
                         .contains("?tag=");
             }
             assertThat(item.playables()).hasSize(1);
-            PlayableRef.JellyfinItem playable = (PlayableRef.JellyfinItem) item.playables().getFirst();
+            JellyfinPlayable.Item playable = (JellyfinPlayable.Item) item.playables().getFirst();
             assertThat(playable.serverId()).isEqualTo(FakeJellyfinServer.SERVER_ID);
             assertThat(playable.itemId()).isEqualTo(item.id());
             assertThat(playable.resumeTicks()).isGreaterThanOrEqualTo(0L);

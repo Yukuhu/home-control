@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.ServiceLinks;
+import dev.andre.homecontrol.sources.jellyfin.JellyfinPlayable;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -40,7 +41,7 @@ class PinOffersTest {
         PlayableRef.AppLink netflixHome = new PlayableRef.AppLink(ServiceLinks.appHome("netflix").orElseThrow(), "netflix");
 
         assertThat(PinOffers.offer(item("tmdb", "movie-1", netflixTitle))).isEmpty();
-        assertThat(PinOffers.offer(item("jellyfin", "i", new PlayableRef.JellyfinItem("s", "i", 0)))).isEmpty();
+        assertThat(PinOffers.offer(item("jellyfin", "i", new JellyfinPlayable.Item("s", "i", 0)))).isEmpty();
         assertThat(PinOffers.offer(item("tmdb", "movie-1", netflixHome,
                 new PlayableRef.StreamUrl(URI.create("http://nas.local/x.mp4"), "video/mp4")))).isEmpty();
     }

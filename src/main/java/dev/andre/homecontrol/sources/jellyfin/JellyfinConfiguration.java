@@ -4,6 +4,7 @@ import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.core.playback.RouteStrategy;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
@@ -63,5 +64,10 @@ public class JellyfinConfiguration {
     public JellyfinRouteExecutor jellyfinRouteExecutor(JellyfinSessions sessions, DeviceQueries devices,
                                                        DeviceCommands commands, JellyfinProperties properties) {
         return new JellyfinRouteExecutor(sessions, devices, commands, properties.startupTimeout());
+    }
+
+    @Bean
+    public RouteStrategy jellyfinSessionStrategy() {
+        return new JellyfinSessionStrategy();
     }
 }

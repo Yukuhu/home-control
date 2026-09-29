@@ -1,6 +1,9 @@
 package dev.andre.homecontrol.core.playback;
 
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.sources.jellyfin.JellyfinRoute;
+import dev.andre.homecontrol.sources.workflows.WorkflowCastRoute;
+import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRoute;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -15,20 +18,20 @@ class RouteKeyTest {
 
     private static final Route.OpenAppLink APP_LINK =
             new Route.OpenAppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube");
-    private static final Route.JellyfinVlc VLC = new Route.JellyfinVlc("item-1");
+    private static final JellyfinRoute.Vlc VLC = new JellyfinRoute.Vlc("item-1");
 
     /** Every route, each with a payload that must never reach its key. */
     private static Map<Route, String> keys() {
         Map<Route, String> keys = new LinkedHashMap<>();
         keys.put(APP_LINK, "app-link");
-        keys.put(new Route.WorkflowCast("workflow-1", 3, "entry"), "workflow-cast");
+        keys.put(new WorkflowCastRoute("workflow-1", 3, "entry"), "workflow-cast");
         keys.put(new Route.Cast("CC1AD845", Map.of("contentId", "http://nas/a.mp4?ApiKey=tok")), "cast:CC1AD845");
         keys.put(new Route.CastMessage(new Action.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
                 Map.of("command", "PlayNow", "accessToken", "tok")), "the Jellyfin receiver"), "cast-message:F007D354");
-        keys.put(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV"), "jellyfin-session");
+        keys.put(new JellyfinRoute.Session("s1", "item-1", 600L, "Android TV"), "jellyfin-session");
         keys.put(VLC, "jellyfin-vlc");
-        keys.put(new Route.JellyfinApp("item-1", 0L), "jellyfin-app");
-        keys.put(new Route.YouTubeLounge("abc"), "youtube-lounge");
+        keys.put(new JellyfinRoute.App("item-1", 0L), "jellyfin-app");
+        keys.put(new YouTubeLoungeRoute("abc"), "youtube-lounge");
         keys.put(new Route.Render(URI.create("http://nas/a.mp3?ApiKey=tok"), "audio/mpeg", "A", null), "render");
         keys.put(new Route.PlayLocally(URI.create("http://nas/a.mp3?ApiKey=tok"), "audio/mpeg", "A", null), "local-audio");
         keys.put(new Route.Unroutable("no route"), "unroutable");

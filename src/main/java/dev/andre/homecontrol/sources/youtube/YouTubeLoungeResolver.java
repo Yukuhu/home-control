@@ -34,6 +34,6 @@ public class YouTubeLoungeResolver implements PlayableResolver {
             return new Resolution(List.of(link), Set.of(), List.of());
         }
         String videoId = YouTubeVideoIds.fromUrl(link.uri()).orElseThrow();
-        return new Resolution(List.of(link, new PlayableRef.YouTubeLounge(videoId)), Set.of(), List.of());
+        return new Resolution(List.of(link, new YouTubeLoungeRef(videoId)), Set.of(), List.of());
     }
 }

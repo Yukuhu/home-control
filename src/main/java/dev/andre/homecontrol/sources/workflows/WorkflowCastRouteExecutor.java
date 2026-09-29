@@ -11,7 +11,6 @@ import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.CastLoads;
 import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import dev.andre.homecontrol.core.playback.PlayableRef;
-import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
 import java.util.Set;
 
@@ -37,7 +36,7 @@ public final class WorkflowCastRouteExecutor implements RouteExecutor {
     }
 
     @Override public void execute(DelegatedRoute route, Device device) {
-        if (!(route instanceof Route.WorkflowCast(var workflowId, var revision, var entryKey))) throw new IllegalArgumentException("Not a workflow route");
+        if (!(route instanceof WorkflowCastRoute(var workflowId, var revision, var entryKey))) throw new IllegalArgumentException("Not a workflow route");
         try {
             requireSource();
             requireCast(device);
