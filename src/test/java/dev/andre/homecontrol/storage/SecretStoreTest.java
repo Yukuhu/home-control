@@ -161,6 +161,20 @@ class SecretStoreTest {
     }
 
     @Test
+    void forgettingTheLoginRemovesItAndTheAccountCredentialsButKeepsDeviceSecrets() {
+        SecretStore store = store(null);
+        store.putDeviceSecret("device.androidtv.keystore-password", "p");
+        store.putFirstSecrets(Map.of("jellyfin.token", "t"), new LoginCredential("h", "v1"));
+
+        assertThat(store.forgetLogin()).isTrue();
+
+        SecretStore reopened = store(null);
+        assertThat(reopened.login()).isEmpty();
+        assertThat(reopened.names()).containsExactly("device.androidtv.keystore-password");
+        assertThat(reopened.forgetLogin()).isFalse();
+    }
+
+    @Test
     void aLoginIsSetAndRemovedOnPurpose() {
         SecretStore store = store(null);
         var second = new LoginCredential("h2", "v2");
