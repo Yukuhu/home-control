@@ -24,7 +24,6 @@ import dev.andre.homecontrol.core.playback.PlayableResolver;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
-import dev.andre.homecontrol.core.playback.RouteKeys;
 import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.core.playback.YouTubeLoungeStrategy;
 import org.junit.jupiter.api.Test;
@@ -236,7 +235,7 @@ class PlaybackServiceTest {
 
         PlaybackPreview preview = service.preview(item, "shield");
 
-        assertThat(preview.routes()).extracting(RouteKeys::key).containsExactly("app-link", "cast:CC1AD845");
+        assertThat(preview.routes()).extracting(Route::key).containsExactly("app-link", "cast:CC1AD845");
         assertThat(preview.reason()).isNull();
         verify(commands, never()).execute(any(), any());
     }
@@ -269,8 +268,8 @@ class PlaybackServiceTest {
         PlayAttempt attempt = service.attempt(item, "shield", Set.of());
 
         assertThat(attempt).isInstanceOfSatisfying(PlayAttempt.Played.class, played -> {
-            assertThat(RouteKeys.key(played.route())).isEqualTo("app-link");
-            assertThat(played.remaining()).extracting(RouteKeys::key).containsExactly("cast:CC1AD845");
+            assertThat(played.route().key()).isEqualTo("app-link");
+            assertThat(played.remaining()).extracting(Route::key).containsExactly("cast:CC1AD845");
         });
         verify(commands).execute("shield", new Action.OpenAppLink(uri));
     }
@@ -290,8 +289,8 @@ class PlaybackServiceTest {
         PlayAttempt attempt = service.attempt(item, "shield", Set.of());
 
         assertThat(attempt).isInstanceOfSatisfying(PlayAttempt.Failed.class, failed -> {
-            assertThat(RouteKeys.key(failed.route())).isEqualTo("app-link");
-            assertThat(failed.remaining()).extracting(RouteKeys::key).containsExactly("cast:CC1AD845");
+            assertThat(failed.route().key()).isEqualTo("app-link");
+            assertThat(failed.remaining()).extracting(Route::key).containsExactly("cast:CC1AD845");
             assertThat(failed.cause()).hasMessage("Shield refused to open the link");
         });
         verify(commands, never()).execute(eq("shield"), any(Action.CastLoad.class));
@@ -436,7 +435,7 @@ class PlaybackServiceTest {
 
         assertThat(service.attempt(item, "shield", Set.of()))
                 .isInstanceOfSatisfying(PlayAttempt.Failed.class, failed -> {
-                    assertThat(RouteKeys.key(failed.route())).isEqualTo("app-link");
+                    assertThat(failed.route().key()).isEqualTo("app-link");
                     assertThat(failed.remaining()).containsExactly(new Route.YouTubeLounge("aqz-KE-bpKQ"));
                 });
         verify(executor, never()).execute(any(), any());

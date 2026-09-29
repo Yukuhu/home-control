@@ -38,7 +38,7 @@ public class PlaybackPlanner {
         for (RouteStrategy strategy : strategies) {
             strategy.route(item, capabilities)
                     .filter(route -> !(route instanceof Route.Unroutable))
-                    .filter(route -> keys.add(RouteKeys.key(route)))
+                    .filter(route -> keys.add(route.key()))
                     .ifPresent(routes::add);
         }
         return routes;
