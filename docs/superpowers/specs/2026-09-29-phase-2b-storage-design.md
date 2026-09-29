@@ -69,23 +69,30 @@ This serves the roadmap's goals of fewer bugs and races, and code that is easy t
   - `JsonFileSourceSettings`, `JsonFileDeviceRegistry`, `JsonFilePinStore`, `JsonFileSportsStore` and `QuotaLedger`,
     through `VersionedJsonFile`;
   - `SecretStore` and `SecretKeySource`, as today;
-  - `CertificateStore` for `keystore.p12`, which writes directly today.
+  - `CertificateStore` for `keystore.p12`, which writes directly today. It moves from `adapters.androidtv.protocol`
+    to `adapters.androidtv`: it stores credentials rather than speaking the wire protocol, and the protocol packages may
+    not use `storage`. That also removes its four frozen violations.
 - **`storage.VersionedJsonFile<T>`**, held by each JSON store:
-  - `VersionedJsonFile(Path file, JsonMapper mapper, Class<T> type, int version, Supplier<T> empty,
-    Map<Integer, UnaryOperator<ObjectNode>> steps)`. Each step turns version `n` into `n + 1` as a JSON tree.
+  - `VersionedJsonFile(Path file, String description, int version, Supplier<T> empty, Function<JsonNode, T> reader,
+    Function<T, ObjectNode> writer)`. The reader and writer convert between the document and the store's type: a
+    record bound with Jackson, or the store's own lenient parsing where it skips bad entries with a warning (pins,
+    sports).
+  - `migrate(int from, UnaryOperator<JsonNode> step)` registers the step from version `from` to `from + 1`, as a JSON
+    tree. `versionOf(ToIntFunction<JsonNode>)` replaces the default version lookup (the `version` field) for files
+    that predate it.
   - `synchronized T read()`: the cached snapshot. The file is loaded once. A missing file gives `empty`, without
     writing.
   - `synchronized T update(UnaryOperator<T> change)`: applies the change to the snapshot, writes the result through
-    `AtomicFiles` (pretty-printed, with `"version": <current>` added), then replaces the snapshot.
+    `AtomicFiles` (pretty-printed, with `"version": <current>` first), then replaces the snapshot.
   - `synchronized void write(T value)` for a store that replaces its whole document.
-  - **Loading** reads the tree and takes `version` (a bare array counts as version 2, for `devices.json`).
-    - A newer version fails: `"<file> was written by a newer Home Control (version N); upgrade Home Control or restore
-      a backup"`.
+  - `synchronized void delete()` removes the file and forgets the snapshot, for the shared test context.
+  - **Loading** reads the tree and takes its version.
+    - A newer version fails: `"<description> in <file> was written by a newer Home Control (version N); upgrade Home
+      Control or restore a backup"`.
     - An older version runs each step in turn, copies the original once to `<name>.v<n>.json` beside it, and writes
       the migrated document.
-    - Unreadable JSON fails with `StorageException` naming the file, as the stores do today.
-  - The record is bound with Jackson. Stores map their domain types to small records only where the file's shape is
-    not their domain type.
+    - Unreadable JSON, a missing step or a reader that rejects the document fails with `StorageException("Could not
+      read <description> in <file>; fix or delete it")`.
 - **Adoption:**
 
   | File | Version before → after | Change |
@@ -93,7 +100,7 @@ This serves the roadmap's goals of fewer bugs and races, and code that is easy t
   | `pinned.json` | 1 → 1 | Onto `VersionedJsonFile`; same JSON. |
   | `sports.json` | 1 → 1 | Onto `VersionedJsonFile`; same JSON; its validation messages stay. |
   | `youtube-quota.json` | 1 → 1 | Onto `VersionedJsonFile`. It keeps its own policy: an unreadable file is moved aside and the count starts from zero, and a file from an earlier day starts fresh. |
-  | `devices.json` | 2 (a bare array) → 3 | `{"version": 3, "devices": [...]}`. The per-element v1 → v2 migration runs inside the step, as today. |
+  | `devices.json` | 1 or 2 (both bare arrays) → 3 | `{"version": 3, "devices": [...]}`. A bare array with an element that has no `kind` is version 1, otherwise 2. Step 1 → 2 is today's per-element migration; step 2 → 3 wraps the array. The backup is `devices.v1.json` or `devices.v2.json`. |
   | `sources.json` | 1 → 2 | Section 2. |
 
 - **The device registry is cached and written through.** `findAll` reads the snapshot, and `save`/`delete` update it.
@@ -105,7 +112,9 @@ This serves the roadmap's goals of fewer bugs and races, and code that is easy t
     naming the device id.
   - This removes `device`'s imports of `adapters.androidtv` and `adapters.cast`.
 - **Tests and caching.** A store no longer notices its file being changed or deleted behind its back. `FullAppReset`
-  resets through the stores' operations instead of deleting their files.
+  resets through the stores' operations instead of deleting their files: pins and sports through their services,
+  `sources.json` and the quota through a `reset()` that calls `VersionedJsonFile.delete()`, secrets through
+  `removeSecrets` and `removeLogin`.
 
 ### 2. Typed sections in `sources.json`
 
@@ -123,10 +132,14 @@ This serves the roadmap's goals of fewer bugs and races, and code that is easy t
     flat one in the same update.
   - A switched-off module's section stays in `unmigrated` until the module is on.
 - **API** (`storage.JsonFileSourceSettings`):
-  - `<T> Optional<T> get(String sourceId, Class<T> type, Function<Map<String, String>, T> fromVersionOne)`;
+  - `<T> Optional<T> get(String sourceId, Class<T> type, Function<Map<String, String>, Optional<T>> fromVersionOne)`
+    (a flat section the source cannot use reads as "not connected" and is dropped);
   - `void put(String sourceId, Object settings)`;
   - `void remove(String sourceId)`, which removes the typed and the unmigrated section;
-  - `preferences()` and `putPreferences` keep their format and behaviour.
+  - `preferences()` and `putPreferences` keep their format and behaviour;
+  - `reset()` deletes the file, for the shared test context.
+
+  Top-level keys the store does not know are no longer kept: the version now says which keys a file has.
 
   A section that does not bind fails with `StorageException("Could not read the <id> settings in <file>; …")`.
 - `toMap()` goes from `JellyfinSettings`, `YouTubeSettings` and `TmdbSettings`. `fromMap` becomes `fromVersionOne`,
@@ -135,7 +148,10 @@ This serves the roadmap's goals of fewer bugs and races, and code that is easy t
 ### 3. Two kinds of secrets, device keys, the keystore password and the login
 
 - **Kinds.** A secret whose name starts with `device.` is a device secret; every other name is an account credential.
-  `SecretStore`'s name pattern allows up to 128 characters, and the `secrets.json` format is unchanged.
+  The `secrets.json` format and the name pattern are unchanged; the longest device secret name has 40 characters.
+- **`core.DeviceSecrets`**, implemented by `SecretStore`, is all an adapter sees: `deviceSecret(name)`,
+  `putDeviceSecret(name, value)` and `removeDeviceSecrets(names)`, each refusing a name without the `device.` prefix,
+  and `newReference()` for a `keyRef`. Device secrets never involve the login, so `LoginService` has no part in them.
 - **`SecretStore`:**
   - `putSecrets(values)` requires a login only if a value is an account credential;
   - `putFirstSecrets(values, login)` stays, for the first account credential;
@@ -146,12 +162,12 @@ This serves the roadmap's goals of fewer bugs and races, and code that is easy t
   The invariant is: account credentials exist only while a login exists.
 - **`LoginService`:**
   - `storeSecrets` is unchanged for account credentials.
-  - New `storeDeviceSecret(name, value)` and `removeDeviceSecrets(names)` need no login or request.
   - New `setPassword(password, confirmation, request)`: allowed only when no login exists. It checks the password with
     `checkNewPassword`, creates the login, starts this browser's session and notifies listeners.
   - New `removePassword(current, request)`: the current password is rate-limited like every guess, and a wrong one is
     `WrongPasswordException`. It is refused with `IllegalStateException` while `hasAccountCredentials()`, naming the
-    connected sources. Otherwise it removes the login, ends every session and notifies listeners.
+    connected sources. Otherwise it removes the login and notifies listeners. Sessions need no ending: without a
+    login every browser is let in, and a session's version no longer matches any later password.
   - `removeSecrets` never removes the login.
 - **Web.**
   - `POST /setup/password/set` and `POST /setup/password/remove` sit next to the existing `/setup/password`. The
@@ -176,14 +192,19 @@ This serves the roadmap's goals of fewer bugs and races, and code that is easy t
   - **Configured:** when it is set, by the new name, `SHIELD_KEYSTORE_PASSWORD` or a file, that password is used
     exactly as today.
   - **Otherwise,** `AndroidTvConfiguration` builds `CertificateStore` with the device secret
-    `device.androidtv.keystore-password`. When it is missing:
-    - with no `keystore.p12`: it generates 32 random bytes (Base64) and stores them;
-    - with a `keystore.p12`: it opens the keystore with `shield`, the old default, re-saves it under a new generated
-      password through `AtomicFiles`, and stores the new password.
-    - If the keystore does not open with `shield`, startup fails: `"keystore.p12 does not open with the old default
-      password; set home-control.androidtv.keystore-password to the password it was created with"`.
-  - `compose.yaml` drops `HOME_CONTROL_ANDROIDTV_KEYSTORE_PASSWORD: change-me`. The docs say existing installs keep
-    whatever they set.
+    `device.androidtv.keystore-password`, generating 32 random bytes (Base64) and storing them first when it is
+    missing. The store asks for its password only when it first opens or writes an existing or new keystore, so an
+    install that never pairs an Android TV gets no secret; an existing keystore is opened, and re-protected if needed,
+    at startup.
+    - When a `keystore.p12` exists and does not open with that password, it is opened with each shipped default in
+      turn, `shield` (`application.yaml`) and `change-me` (`compose.yaml`), and re-saved under the stored password
+      through `AtomicFiles`. Storing the password first and re-protecting on every start where it does not open makes
+      a crash between the two steps harmless.
+    - If the keystore opens with none of them, startup fails: `"keystore.p12 does not open with the stored password or
+      an old default; set home-control.androidtv.keystore-password to the password it was created with, or delete
+      keystore.p12 and pair the Android TV devices again"`.
+  - `compose.yaml` drops `HOME_CONTROL_ANDROIDTV_KEYSTORE_PASSWORD: change-me`. An install that keeps the line keeps
+    its password; one that drops it has its keystore re-protected under a generated one.
 
 ## Testing
 
@@ -207,14 +228,15 @@ This serves the roadmap's goals of fewer bugs and races, and code that is easy t
   - the login survives removing the last secret;
   - `setPassword` only works without a login, and `removePassword` checks the password and is refused while accounts
     exist;
-  - sessions end on removal.
+  - a session from before the removal does not count once a new password is set.
 - **webOS/Tizen migration:** a v2 `devices.json` fixture with a webOS key and a Tizen token. After start, the keys are
   device secrets and gone from the file. Merge keeps the webOS pairing working, and forget removes the secret.
 - **Keystore:**
-  - a fixture keystore under `shield` is re-protected, and its pairing still loads;
+  - a keystore under `shield`, and one under `change-me`, is re-protected, and its pairing still loads;
+  - a stored password whose keystore is still under `shield` (a crash between the two steps) is re-protected;
   - a configured password is used unchanged;
   - a keystore that does not open fails with the named message;
-  - a fresh install generates a password.
+  - a fresh install gets a password with its first keystore, and none before.
 - **Web:** the Account section's three states, set and remove password, the refusal while accounts are connected,
   the rate limit and cross-origin refusal.
 - **End to end:** `LoginGatingTest`'s cases that relied on the login disappearing with the last secret now assert
