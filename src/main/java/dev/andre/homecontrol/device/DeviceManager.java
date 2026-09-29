@@ -26,6 +26,8 @@ import dev.andre.homecontrol.core.MacAddress;
 import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.WakeOnLanAdapter;
+import dev.andre.homecontrol.storage.DataDirectory;
+import dev.andre.homecontrol.storage.StorageException;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -98,9 +100,47 @@ public class DeviceManager implements AutoCloseable {
         this.events = events;
     }
 
+    /**
+     * Checks every entry of a running adapter before anything connects, so a bad one stops startup. Then brings each
+     * device's settings up to date and connects it. An entry of a switched-off module is left as it is until its
+     * module is on.
+     */
     @PostConstruct
     public void start() {
-        registry.findAll().forEach(this::connect);
+        List<Device> registered = registry.findAll();
+        registered.forEach(this::validate);
+        registered.forEach(device -> connect(migrate(device)));
+    }
+
+    private void validate(Device device) {
+        for (String adapterId : device.adapters().keySet()) {
+            DeviceAdapter adapter = adapters.get(adapterId);
+            if (adapter == null) {
+                continue;
+            }
+            try {
+                adapter.validate(device);
+            } catch (IllegalArgumentException e) {
+                throw new StorageException("Invalid device record " + device.id() + " in " + DataDirectory.DEVICES
+                        + ": " + e.getMessage() + "; fix or delete it", e);
+            }
+        }
+    }
+
+    private Device migrate(Device device) {
+        synchronized (lock) {
+            Device migrated = device;
+            for (String adapterId : device.adapters().keySet()) {
+                DeviceAdapter adapter = adapters.get(adapterId);
+                if (adapter != null) {
+                    migrated = adapter.migrate(migrated);
+                }
+            }
+            if (!migrated.equals(device)) {
+                registry.save(migrated);
+            }
+            return migrated;
+        }
     }
 
     public List<Device> devices() {

@@ -88,6 +88,15 @@ public class AndroidTvAdapter implements DeviceAdapter {
     }
 
     @Override
+    public void validate(Device device) {
+        try {
+            AndroidTvSettings.of(device);
+        } catch (IllegalArgumentException _) {
+            throw new IllegalArgumentException("androidtv port must be an integer between 1 and 65535");
+        }
+    }
+
+    @Override
     public List<DiscoveredDevice> discovered() {
         return discovery.devices();
     }

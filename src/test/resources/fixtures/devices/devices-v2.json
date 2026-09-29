@@ -1,0 +1,1 @@
+[{"id":"shield-1","name":"Living Room Shield","kind":"ANDROID_TV","host":"192.168.1.20","adapters":{"androidtv":{"port":"6466"},"cast":{"host":"192.168.1.20","port":"8009","castId":"abc"}},"lastSeen":"2026-09-20T10:00:00Z"}]

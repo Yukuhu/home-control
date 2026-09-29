@@ -2,6 +2,7 @@ package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvAdapter;
 import dev.andre.homecontrol.storage.DataDirectory;
+import dev.andre.homecontrol.storage.StorageException;
 import dev.andre.homecontrol.testsupport.TestCredentials;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvProperties;
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvSettings;
@@ -158,6 +159,55 @@ class DeviceManagerTest {
     }
 
     /** Cast switched off: an Android TV box whose devices.json still carries a cast entry keeps its own controls. */
+    @Test
+    void anEntryItsAdapterRejectsStopsStartupNamingTheDevice() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        registry.save(new Device("bad-port", "Bad", DeviceKind.ANDROID_TV, "10.0.0.9",
+                Map.of("androidtv", Map.of("port", "70000")), Instant.now()));
+
+        try (DeviceManager manager = manager(registry, certificates())) {
+            assertThatThrownBy(manager::start)
+                    .isInstanceOf(StorageException.class)
+                    .hasMessage("Invalid device record bad-port in devices.json: androidtv port must be an integer"
+                            + " between 1 and 65535; fix or delete it");
+        }
+    }
+
+    @Test
+    void anEntryOfASwitchedOffAdapterIsNotValidated() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        registry.save(new Device("bad-port", "Bad", DeviceKind.ANDROID_TV, "10.0.0.9",
+                Map.of("androidtv", Map.of("port", "70000")), Instant.now()));
+
+        try (DeviceManager manager = new DeviceManager(registry, List.of(), publisher)) {
+            manager.start();
+
+            assertThat(manager.devices()).extracting(Device::id).containsExactly("bad-port");
+        }
+    }
+
+    @Test
+    void aDeviceAnAdapterMigratesIsSavedBeforeItConnects() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        registry.save(new Device("old", "Old", DeviceKind.WEBOS, "10.0.0.9", Map.of("probe", Map.of("legacy", "1")),
+                Instant.now()));
+        StubAdapter migrating = new StubAdapter("probe", DeviceKind.WEBOS, false, false) {
+            @Override
+            public Device migrate(Device device) {
+                return device.withAdapter("probe", Map.of("current", "1"));
+            }
+        };
+
+        try (DeviceManager manager = new DeviceManager(registry, List.of(migrating), publisher)) {
+            manager.start();
+
+            assertThat(migrating.handles.get("old")).isNotNull();
+        }
+
+        assertThat(new JsonFileDeviceRegistry(dir.resolve("devices.json")).findById("old")).get()
+                .extracting(device -> device.adapterSettings("probe")).isEqualTo(Map.of("current", "1"));
+    }
+
     @Test
     void anEntryForAnAdapterThatIsSwitchedOffAddsNothing() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));

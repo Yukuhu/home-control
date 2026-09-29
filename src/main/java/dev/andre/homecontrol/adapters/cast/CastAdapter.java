@@ -67,6 +67,15 @@ public class CastAdapter implements DeviceAdapter {
         return CastSettings.hostOf(device);
     }
 
+    @Override
+    public void validate(Device device) {
+        try {
+            CastSettings.of(device);
+        } catch (IllegalArgumentException _) {
+            throw new IllegalArgumentException("cast port must be an integer between 1 and 65535");
+        }
+    }
+
     /** The mDNS {@code id} survives an address change; otherwise the receiver's own address decides. */
     @Override
     public boolean carries(Device device, DiscoveredDevice found) {
