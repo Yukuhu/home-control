@@ -1,9 +1,11 @@
-package dev.andre.homecontrol.adapters.androidtv.protocol;
+package dev.andre.homecontrol.adapters.androidtv;
 
+import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
+import dev.andre.homecontrol.storage.AtomicFiles;
 import dev.andre.homecontrol.storage.StorageException;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
@@ -94,11 +96,11 @@ public class CertificateStore {
         }
     }
 
+    /** Through {@link AtomicFiles}: the keystore holds the client keys, so it is owner-only and never half written. */
     private void write(KeyStore keyStore) throws GeneralSecurityException, IOException {
-        Files.createDirectories(file.toAbsolutePath().getParent());
-        try (OutputStream out = Files.newOutputStream(file)) {
-            keyStore.store(out, password);
-        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        keyStore.store(out, password);
+        AtomicFiles.write(file, out.toByteArray(), true);
     }
 
     private KeyStore openOrEmpty() throws GeneralSecurityException, IOException {

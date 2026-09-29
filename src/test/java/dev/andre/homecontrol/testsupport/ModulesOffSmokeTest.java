@@ -2,7 +2,7 @@ package dev.andre.homecontrol.testsupport;
 
 import dev.andre.homecontrol.adapters.androidtv.AndroidTvAdapter;
 import dev.andre.homecontrol.adapters.androidtv.PairingService;
-import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
+import dev.andre.homecontrol.adapters.androidtv.CertificateStore;
 import dev.andre.homecontrol.adapters.bluetooth.BluetoothSpeakerAdapter;
 import dev.andre.homecontrol.adapters.cast.CastAdapter;
 import dev.andre.homecontrol.adapters.sonos.SonosAdapter;

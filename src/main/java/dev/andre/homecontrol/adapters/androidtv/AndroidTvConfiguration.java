@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
-import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.device.DeviceManager;

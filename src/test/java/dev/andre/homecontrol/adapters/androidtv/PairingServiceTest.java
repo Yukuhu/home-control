@@ -3,7 +3,6 @@ package dev.andre.homecontrol.adapters.androidtv;
 import dev.andre.homecontrol.core.CodePairingOutcome;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
-import dev.andre.homecontrol.adapters.androidtv.protocol.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakePairingServer;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RefusingPairingServer;
 import dev.andre.homecontrol.device.DeviceManager;
