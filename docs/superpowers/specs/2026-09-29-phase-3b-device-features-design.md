@@ -67,7 +67,7 @@ Each adapter declares what its sessions carry out:
 | --- | --- |
 | Android TV | `REMOTE_KEYS`, `APP_LINK`, `ANDROID_APPS` |
 | webOS | `REMOTE_KEYS`, `APP_LINK`, `VOLUME`, `INPUTS`, `WAKE_ON_LAN` |
-| Tizen | `REMOTE_KEYS`, `APP_LINK`, `VOLUME`, `WAKE_ON_LAN` |
+| Tizen | `REMOTE_KEYS`, `APP_LINK`, `WAKE_ON_LAN` |
 | Cast | `CAST_RECEIVER`, `VOLUME` |
 | UPnP | `MEDIA_RENDERER`, `VOLUME` |
 | Sonos | `MEDIA_RENDERER`, `VOLUME`, `GROUPING` |

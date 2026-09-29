@@ -87,12 +87,11 @@ class TizenAdapterTest {
     }
 
     @Test
-    void declaresKeysPowerVolumeAndAppLinks() {
+    void declaresKeysAppLinksAndWakeOnLan() {
         TizenAdapter adapter = adapter(notStarted(), properties(1));
 
         assertThat(adapter.capabilities(device()))
-                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.VOLUME,
-                        Capability.WAKE_ON_LAN);
+                .containsExactlyInAnyOrder(Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.WAKE_ON_LAN);
         assertThat(adapter.id()).isEqualTo("tizen");
         assertThat(adapter.kind()).isEqualTo(DeviceKind.TIZEN);
         assertThat(adapter.settingsFor(new DiscoveredDevice("tizen", "Samsung", "127.0.0.1", 8002))).isEmpty();

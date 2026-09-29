@@ -79,7 +79,7 @@ public class TizenAdapter implements DeviceAdapter, AdapterDiscovery {
 
     @Override
     public Set<Capability> capabilities(Device device) {
-        return EnumSet.of(Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.VOLUME, Capability.WAKE_ON_LAN);
+        return EnumSet.of(Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.WAKE_ON_LAN);
     }
 
     /** Outside the device package: the session works, but a learned MAC address or token is not stored. */
