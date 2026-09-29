@@ -90,7 +90,7 @@ public final class WorkflowStore {
                 throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "workflow limit reached");
             }
             String id = newId(current.keys);
-            created = new WorkflowDefinition(1, id, 1, draft);
+            created = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 1, draft);
             String encoded = codec.encode(created);
             login.storeSecrets(Map.of(secretName(id), encoded), password, confirmation, request);
             snapshot = current.withCreated(created);
@@ -113,7 +113,7 @@ public final class WorkflowStore {
                 requireLogin(request);
                 Snapshot current = snapshot;
                 WorkflowDefinition previous = currentDefinition(current, id, expectedRevision);
-                updated = new WorkflowDefinition(1, id, nextRevision(previous.revision()), draft);
+                updated = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, nextRevision(previous.revision()), draft);
                 String encoded = codec.encode(updated);
                 login.storeSecrets(Map.of(key, encoded), null, null, request);
                 snapshot = current.withUpdated(updated);
@@ -138,9 +138,8 @@ public final class WorkflowStore {
                 Snapshot current = snapshot;
                 WorkflowDefinition previous = currentDefinition(current, id, expectedRevision);
                 WorkflowDraft draft = previous.draft();
-                WorkflowDraft changedDraft = new WorkflowDraft(draft.name(), enabled, draft.mode(), draft.kind(),
-                        draft.fetch(), draft.listing(), draft.tile(), draft.variables(), draft.cast());
-                WorkflowDefinition updated = new WorkflowDefinition(1, id, nextRevision(previous.revision()), changedDraft);
+                WorkflowDraft changedDraft = draft.withEnabled(enabled);
+                WorkflowDefinition updated = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, nextRevision(previous.revision()), changedDraft);
                 String encoded = codec.encode(updated);
                 login.storeSecrets(Map.of(key, encoded), null, null, request);
                 snapshot = current.withUpdated(updated);

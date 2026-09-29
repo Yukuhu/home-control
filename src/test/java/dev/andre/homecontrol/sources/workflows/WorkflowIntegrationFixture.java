@@ -20,7 +20,7 @@ final class WorkflowIntegrationFixture {
     }
 
     WorkflowIntegrationFixture(WorkflowDraft draft) {
-        definition = new WorkflowDefinition(1, ID, 1, draft);
+        definition = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, ID, 1, draft);
         var secrets = mock(SecretStore.class);
         var login = mock(LoginService.class);
         when(secrets.names()).thenReturn(java.util.Set.of("workflow." + ID));

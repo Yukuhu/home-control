@@ -17,8 +17,10 @@ class WorkflowPointerAndPreviewTest {
 
     private static WorkflowDraft withPointer(String pointer) {
         WorkflowDraft draft = WorkflowFixtures.single(URI.create("https://api.example/catalog"));
-        return new WorkflowDraft(draft.name(), draft.enabled(), draft.mode(), draft.kind(), draft.fetch(),
-                draft.listing(), draft.tile(), List.of(new Variable("A", Scope.ROOT, pointer, false)),
+        return new WorkflowDraft(draft.name(), draft.enabled(), draft.mode(), draft.kind(),
+                List.of(new Call("main", CallScope.SHARED, draft.calls().getFirst().url(), List.of(),
+                        List.of(new Variable("A", pointer, false)))),
+                draft.listing(), draft.tile(),
                 new Cast("https://media.example/play", "video/mp4"));
     }
 

@@ -7,6 +7,7 @@ import dev.andre.homecontrol.security.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import static dev.andre.homecontrol.sources.workflows.WorkflowException.Stage;
@@ -39,27 +40,37 @@ public final class WorkflowTestService {
         int total = 0;
         Stage active = Stage.FETCH;
         try {
-            byte[] body = http.fetch(new WorkflowHttpClient.Request(saved.draft().fetch().url(), saved.draft().fetch().headers()));
+            byte[] body = http.fetch(WorkflowRunner.request(saved.draft().calls().getFirst(), java.util.Set.of(), java.util.Map.of()));
             stages.add(ok(Stage.FETCH)); active = Stage.PARSE;
             var root = WorkflowJson.parse(body);
             stages.add(ok(Stage.PARSE)); active = Stage.SELECT;
-            var entries = WorkflowJson.entries(saved.draft(), root);
-            total = entries.size(); stages.add(ok(Stage.SELECT));
             var draft = saved.draft();
-            if (draft.mode() == WorkflowDraft.Mode.GENERATED && draft.listing().artworkPointer() != null) {
+            var first = draft.calls().getFirst();
+            var entries = draft.mode() == WorkflowDraft.Mode.SINGLE
+                    ? List.of(new WorkflowJson.Entry("single", draft.tile().title(), draft.tile().subtitle(),
+                            WorkflowJson.artwork(draft.tile().artwork()), root))
+                    : WorkflowJson.entries(draft.listing(), root, WorkflowRunner.ENTRY_LIMIT);
+            total = entries.size(); stages.add(ok(Stage.SELECT));
+            if (draft.mode() == WorkflowDraft.Mode.GENERATED && draft.listing().artwork() != null
+                    && draft.listing().artwork().pointer() != null) {
                 boolean omitted = entries.stream().anyMatch(entry -> {
-                    var selected = entry.node().at(draft.listing().artworkPointer());
+                    var selected = entry.node().at(draft.listing().artwork().pointer());
                     return entry.artwork() == null && !selected.isMissingNode() && !selected.isNull();
                 });
                 if (omitted) warnings.add("Some artwork was omitted because it is not a public HTTPS image address without credentials.");
             }
             active = Stage.BUILD;
-            var template = new WorkflowTemplate(draft.cast().template(), draft.variables().stream()
+            var allVariables = new ArrayList<>(first.variables());
+            if (draft.mode() == WorkflowDraft.Mode.GENERATED) allVariables.addAll(draft.listing().variables());
+            var template = new WorkflowTemplate(draft.cast().template(), allVariables.stream()
                     .map(WorkflowDraft.Variable::name).collect(Collectors.toSet()));
             for (var entry : entries.stream().limit(5).toList()) {
                 active = Stage.MAP;
-                var values = WorkflowJson.values(draft.variables(), root, entry.node());
-                var masked = draft.variables().stream().map(variable -> variable.name() + " = "
+                var values = new HashMap<>(WorkflowJson.values(first.variables(), root));
+                if (draft.mode() == WorkflowDraft.Mode.GENERATED) {
+                    values.putAll(WorkflowJson.values(draft.listing().variables(), entry.node()));
+                }
+                var masked = allVariables.stream().map(variable -> variable.name() + " = "
                         + (variable.sensitive() ? "•••" : values.get(variable.name()).text())).toList();
                 active = Stage.BUILD;
                 http.checkMedia(template.expand(values));

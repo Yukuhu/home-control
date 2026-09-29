@@ -22,7 +22,7 @@ class WorkflowTestServiceTest {
     WorkflowDefinition saved;
 
     @BeforeEach void setup() {
-        saved = new WorkflowDefinition(1, id, 7, WorkflowFixtures.generated());
+        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, WorkflowFixtures.generated());
         when(store.find(id)).thenAnswer(call -> Optional.of(saved));
         when(login.isAuthenticated(request)).thenReturn(true);
     }
@@ -44,7 +44,7 @@ class WorkflowTestServiceTest {
         assertThat(result.totalEntries()).isEqualTo(8);
         assertThat(result.samples()).hasSize(5);
         assertThat(result.samples().getFirst().title()).isEqualTo("Title 0");
-        assertThat(result.samples().getFirst().variables()).containsExactly("A = item0", "C = •••");
+        assertThat(result.samples().getFirst().variables()).containsExactly("C = •••", "A = item0");
         assertThat(result.samples().getFirst().maskedUrl()).contains("id=item0", "token=•••").doesNotContain("/play");
         assertThat(result.toString()).doesNotContain("secret-token", "saved-secret", "api.example", "JsonNode");
         verify(http).fetch(any(WorkflowHttpClient.Request.class));
@@ -54,12 +54,11 @@ class WorkflowTestServiceTest {
 
     @Test void disabledSavedWorkflowCanBeTestedButConcurrentEditRejectsResult() {
         var d = saved.draft();
-        saved = new WorkflowDefinition(1, id, 7, new WorkflowDraft(d.name(), false, d.mode(), d.kind(),
-                d.fetch(), d.listing(), d.tile(), d.variables(), d.cast()));
+        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, d.withEnabled(false));
         body("{\"token\":\"private\",\"items\":[]}");
         assertThat(service.test(id, 7, request).totalEntries()).isZero();
         when(http.fetch(any())).thenAnswer(call -> {
-            saved = new WorkflowDefinition(1, id, 8, saved.draft());
+            saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 8, saved.draft());
             return "{\"items\":[]}".getBytes(StandardCharsets.UTF_8);
         });
         assertThatThrownBy(() -> service.test(id, 7, request)).isInstanceOf(WorkflowException.class);
@@ -79,9 +78,8 @@ class WorkflowTestServiceTest {
 
     @Test void invalidSelectedArtworkProducesSafeWarningAndMappingFailuresStaySafe() {
         var d = saved.draft();
-        saved = new WorkflowDefinition(1, id, 7, new WorkflowDraft(d.name(), d.enabled(), d.mode(), d.kind(),
-                d.fetch(), new WorkflowDraft.Listing("/items", "/id", "/title", null, "/art"), null,
-                d.variables(), d.cast()));
+        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, new WorkflowDraft(d.name(), d.enabled(), d.mode(), d.kind(),
+                d.calls(), listing("/items", "/title", new WorkflowDraft.Field("/art", null), d), null, d.cast()));
         body("{\"token\":\"private\",\"items\":[{\"id\":\"a\",\"title\":\"News\",\"art\":\"http://secret-art/token\"}]}");
         var result = service.test(id, 7, request);
         assertThat(result.warnings()).isNotEmpty();
@@ -95,16 +93,15 @@ class WorkflowTestServiceTest {
 
     @Test void invalidArrayPointerAndMediaFailureHaveSafeStageResults() {
         var d = saved.draft();
-        saved = new WorkflowDefinition(1, id, 7, new WorkflowDraft(d.name(), d.enabled(), d.mode(), d.kind(),
-                d.fetch(), new WorkflowDraft.Listing("invalid-pointer-private-marker", "/id", "/title", null, null), null,
-                d.variables(), d.cast()));
+        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, new WorkflowDraft(d.name(), d.enabled(), d.mode(), d.kind(),
+                d.calls(), listing("invalid-pointer-private-marker", "/title", null, d), null, d.cast()));
         body("{\"items\":[]}");
         var result = service.test(id, 7, request);
         assertThat(result.stages()).anySatisfy(stage -> {
             assertThat(stage.name()).isEqualTo("Choose entries"); assertThat(stage.success()).isFalse();
         });
         assertThat(result.toString()).doesNotContain("private-marker");
-        saved = new WorkflowDefinition(1, id, 7, WorkflowFixtures.generated());
+        saved = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 7, WorkflowFixtures.generated());
         body("{\"token\":\"token-secret\",\"items\":[{\"id\":\"a\",\"title\":\"News\"}]}");
         doThrow(new RuntimeException("private-marker")).when(http).checkMedia(any());
         var failed = service.test(id, 7, request);
@@ -132,4 +129,8 @@ class WorkflowTestServiceTest {
     }
 
     void body(String body) { when(http.fetch(any())).thenReturn(body.getBytes(StandardCharsets.UTF_8)); }
+
+    private static WorkflowDraft.Listing listing(String array, String title, WorkflowDraft.Field artwork, WorkflowDraft d) {
+        return new WorkflowDraft.Listing("main", array, "/id", title, null, artwork, d.listing().variables());
+    }
 }

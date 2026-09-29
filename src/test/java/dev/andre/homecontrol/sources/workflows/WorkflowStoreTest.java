@@ -113,8 +113,8 @@ class WorkflowStoreTest {
         String futureId = "w-bbbbbbbbbbbb";
         String mismatchId = "w-cccccccccccc";
         String malformedKey = "workflow.damaged-record";
-        String future = new WorkflowCodec().encode(new WorkflowDefinition(1, futureId, 1, draft()))
-                .replace("\"schemaVersion\":1", "\"schemaVersion\":99");
+        String future = new WorkflowCodec().encode(new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, futureId, 1, draft()))
+                .replace("\"schemaVersion\":2", "\"schemaVersion\":99");
         secrets.putSecrets(Map.of("workflow." + corruptId, "{bad", "workflow." + futureId, future,
                 "workflow." + mismatchId, new WorkflowCodec().encode(saved), malformedKey, "broken",
                 "jellyfin.token", "another-source"));
@@ -197,7 +197,7 @@ class WorkflowStoreTest {
         WorkflowDefinition saved = first();
         int eventCount = events.size();
         WorkflowDraft invalid = new WorkflowDraft(draft().name(), true, draft().mode(), draft().kind(),
-                draft().fetch(), draft().listing(), draft().tile(), draft().variables(),
+                draft().calls(), draft().listing(), draft().tile(),
                 new WorkflowDraft.Cast("https://media.example/too-bad/{Missing}", "video/mp4"));
         String id = saved.id();
         long revision = saved.revision();

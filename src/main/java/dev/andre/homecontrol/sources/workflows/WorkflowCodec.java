@@ -24,11 +24,12 @@ public final class WorkflowCodec {
         checkLength(encoded);
         try {
             JsonNode node = JSON.readTree(encoded);
-            if (node == null || !node.isObject() || !node.path("schemaVersion").isInt()
-                    || node.path("schemaVersion").intValue() != 1) {
-                throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "unsupported definition schema");
-            }
-            WorkflowDefinition definition = JSON.treeToValue(node, WorkflowDefinition.class);
+            if (node == null || !node.isObject() || !node.path("schemaVersion").isInt()) throw unsupported();
+            WorkflowDefinition definition = switch (node.path("schemaVersion").intValue()) {
+                case 1 -> WorkflowMigration.toV2(JSON.treeToValue(node, WorkflowMigration.V1Definition.class));
+                case WorkflowDefinition.SCHEMA_VERSION -> JSON.treeToValue(node, WorkflowDefinition.class);
+                default -> throw unsupported();
+            };
             validate(definition);
             return definition;
         } catch (WorkflowException e) {
@@ -38,17 +39,19 @@ public final class WorkflowCodec {
         }
     }
 
+    private static WorkflowException unsupported() {
+        return new WorkflowException(WorkflowException.Stage.WORKFLOW, "unsupported definition schema");
+    }
+
     private static void validate(WorkflowDefinition definition) {
-        if (definition == null || definition.schemaVersion() != 1) {
-            throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "unsupported definition schema");
-        }
+        if (definition == null || definition.schemaVersion() != WorkflowDefinition.SCHEMA_VERSION) throw unsupported();
         if (definition.id() == null || !definition.id().matches("w-[0-9a-f]{12}")) {
             throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "invalid definition ID");
         }
         if (definition.revision() <= 0) {
             throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "invalid definition revision");
         }
-        WorkflowValidator.validate(definition.draft());
+        WorkflowValidator.validateStored(definition.draft());
     }
 
     private static void checkLength(String encoded) {

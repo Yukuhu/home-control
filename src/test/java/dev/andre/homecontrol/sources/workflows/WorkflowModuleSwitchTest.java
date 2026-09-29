@@ -65,7 +65,7 @@ class WorkflowModuleSwitchTest {
     }
 
     @Test void contentChangeInvalidatesCatalogAndRailBeforeNormalListenerAndAvoidsConstructionCycle() {
-        var definition = new WorkflowDefinition(1, WorkflowIntegrationFixture.ID, 1,
+        var definition = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, WorkflowIntegrationFixture.ID, 1,
                 WorkflowFixtures.generated());
         when(secrets.names()).thenReturn(Set.of("workflow." + definition.id()));
         when(secrets.secret("workflow." + definition.id())).thenReturn(Optional.of(new WorkflowCodec().encode(definition)));

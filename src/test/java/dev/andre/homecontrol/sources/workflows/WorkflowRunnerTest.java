@@ -12,7 +12,7 @@ import static org.mockito.Mockito.*;
 class WorkflowRunnerTest {
     @Test void catalogFetchesOnceAndDoesNotEvaluateMissingMediaMappings() {
         var client = mock(WorkflowHttpClient.class);
-        var definition = new WorkflowDefinition(1, WorkflowIntegrationFixture.ID, 1, WorkflowFixtures.generated());
+        var definition = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, WorkflowIntegrationFixture.ID, 1, WorkflowFixtures.generated());
         when(client.fetch(any(WorkflowHttpClient.Request.class))).thenReturn(bytes("{\"items\":[{\"id\":\"news\",\"title\":\"News\"}]}"));
         var entries = new WorkflowRunner(client).catalog(definition);
         assertThat(entries).hasSize(1);
@@ -24,7 +24,7 @@ class WorkflowRunnerTest {
 
     @Test void resolveUsesFreshTokenAndStableEntryAfterReorderingAndChecksMediaOnce() {
         var client = mock(WorkflowHttpClient.class);
-        var definition = new WorkflowDefinition(1, WorkflowIntegrationFixture.ID, 1, WorkflowFixtures.generated());
+        var definition = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, WorkflowIntegrationFixture.ID, 1, WorkflowFixtures.generated());
         when(client.fetch(any(WorkflowHttpClient.Request.class))).thenReturn(
                 bytes("{\"token\":\"old-secret\",\"items\":[{\"id\":\"news\",\"title\":\"News\"}]}"),
                 bytes("{\"token\":\"fresh-secret\",\"items\":[{\"id\":\"other\",\"title\":\"Other\"},{\"id\":\"news\",\"title\":\"New News\"}]}"));
@@ -41,7 +41,7 @@ class WorkflowRunnerTest {
 
     @Test void duplicateDisappearedAndMissingMappingsFailBeforeMediaValidation() {
         var client = mock(WorkflowHttpClient.class);
-        var definition = new WorkflowDefinition(1, WorkflowIntegrationFixture.ID, 1, WorkflowFixtures.generated());
+        var definition = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, WorkflowIntegrationFixture.ID, 1, WorkflowFixtures.generated());
         var runner = new WorkflowRunner(client);
         when(client.fetch(any())).thenReturn(bytes("{\"items\":[{\"id\":\"news\",\"title\":\"News\"}]}"));
         var key = runner.catalog(definition).getFirst().key();
@@ -58,9 +58,9 @@ class WorkflowRunnerTest {
         try (var server = new FakeWorkflowServer()) {
             server.respond("/json", 200, "{\"id\":\"news\",\"token\":\"secret\"}");
             var draft = WorkflowFixtures.single(server.url("/json"));
-            draft = new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(), draft.fetch(), null,
-                    draft.tile(), draft.variables(), new WorkflowDraft.Cast(server.url("/media").toString() + "?id={A}&token={C}", "audio/aac"));
-            var definition = new WorkflowDefinition(1, WorkflowIntegrationFixture.ID, 1, draft);
+            draft = new WorkflowDraft(draft.name(), true, draft.mode(), draft.kind(), draft.calls(), null,
+                    draft.tile(), new WorkflowDraft.Cast(server.url("/media").toString() + "?id={A}&token={C}", "audio/aac"));
+            var definition = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, WorkflowIntegrationFixture.ID, 1, draft);
             var properties = new WorkflowProperties(true, true, Duration.ofSeconds(5), Duration.ofSeconds(15), 4, 2097152, 3);
             try (var client = new WorkflowHttpClient(properties, new WorkflowUrlPolicy(true, InetAddress::getAllByName))) {
                 var media = new WorkflowRunner(client).resolve(definition, "single");
