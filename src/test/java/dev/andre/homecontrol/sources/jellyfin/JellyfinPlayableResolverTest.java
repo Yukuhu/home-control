@@ -44,8 +44,7 @@ class JellyfinPlayableResolverTest {
     private final JellyfinSetupService setup = mock(JellyfinSetupService.class);
     private final JellyfinSessions sessions = new JellyfinSessions(client, setup, JellyfinSessions::resolve);
     private final JellyfinStreams streams = new JellyfinStreams(client);
-    private final JellyfinPlayableResolver resolver = new JellyfinPlayableResolver(setup, sessions, client, streams,
-            adapter -> true);
+    private final JellyfinPlayableResolver resolver = new JellyfinPlayableResolver(setup, sessions, client, streams);
     private FakeJellyfinServer fake;
 
     @AfterEach
@@ -86,7 +85,7 @@ class JellyfinPlayableResolverTest {
         Device shield = device("Shield", "10.0.0.5").withAdapter("androidtv", Map.of());
 
         PlayableResolver.Resolution resolution = resolver.resolve(WANTED, item(WANTED), shield,
-                Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS));
+                Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS, Capability.ANDROID_APPS));
 
         assertThat(resolution.playables()).hasSize(1);
         assertThat(resolution.playables().getFirst().kindLabel()).isEqualTo("Jellyfin app");
@@ -103,7 +102,8 @@ class JellyfinPlayableResolverTest {
         DeviceCommands commands = mock(DeviceCommands.class);
         given(devices.device(shield.id())).willReturn(Optional.of(shield));
         given(devices.state(shield.id())).willReturn(DeviceState.unpaired());
-        given(devices.capabilities(shield.id())).willReturn(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS, Capability.CAST_RECEIVER));
+        given(devices.capabilities(shield.id())).willReturn(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS,
+                Capability.ANDROID_APPS, Capability.CAST_RECEIVER));
         PlaybackService playback = new PlaybackService(devices, commands,
                 new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), new CastMessageStrategy())),
                 List.of(resolver), List.of(new JellyfinRouteExecutor(sessions, devices, commands, Duration.ofSeconds(1))));
@@ -125,11 +125,10 @@ class JellyfinPlayableResolverTest {
     @Test
     void aDeviceWhoseAndroidTvModuleIsOffGetsNoNativeRoute() throws IOException {
         connected();
-        JellyfinPlayableResolver withoutAndroidTv = new JellyfinPlayableResolver(setup, sessions, client, streams,
-                adapter -> !"androidtv".equals(adapter));
         Device merged = device("Living Room", "192.168.1.50").withAdapter("androidtv", Map.of()).withAdapter("webos", Map.of());
 
-        PlayableResolver.Resolution resolution = withoutAndroidTv.resolve(WANTED, item(WANTED), merged,
+        // With the module off only webOS declares anything: keys and app links, but no Android apps.
+        PlayableResolver.Resolution resolution = resolver.resolve(WANTED, item(WANTED), merged,
                 Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS));
 
         assertThat(resolution.playables()).containsExactly(

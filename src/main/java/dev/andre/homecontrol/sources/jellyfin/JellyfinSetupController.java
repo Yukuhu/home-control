@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
@@ -80,7 +81,7 @@ public class JellyfinSetupController {
     @PostMapping("/setup/sources/jellyfin/players")
     public String player(@RequestParam String device, @RequestParam String player, RedirectAttributes redirect) {
         try {
-            if (devices.device(device).filter(d -> d.hasAdapter("androidtv")).isEmpty()) {
+            if (!devices.capabilities(device).contains(Capability.ANDROID_APPS)) {
                 throw new IllegalArgumentException("Choose a paired Shield or Android TV device");
             }
             JellyfinSettings.Player selected = switch (player) {

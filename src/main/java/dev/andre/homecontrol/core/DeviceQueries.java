@@ -28,9 +28,6 @@ public interface DeviceQueries {
     /** The best foreground-app reporting among the device's adapters; {@code NONE} for an unknown id. */
     ForegroundAppReporting foregroundAppReporting(String id);
 
-    /** Whether the adapter's module is switched on: a device's entry for it in devices.json does not say so. */
-    boolean adapterEnabled(String adapterId);
-
     /** Grouping as seen by the first of the device's handles that knows it; empty otherwise. */
     Optional<SpeakerTopology> speakerTopology(String id);
 

@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -37,6 +38,8 @@ class JellyfinVlcExecutorTest {
         when(setup.settings()).thenReturn(Optional.of(settings));
         when(setup.connection()).thenReturn(Optional.of(new JellyfinConnection(settings.serverUrl(), "secret+&token", "hc", ID)));
         when(devices.state("shield")).thenReturn(DeviceState.initial().withStatus(DeviceStatus.CONNECTED).withPower(true));
+        when(devices.capabilities("shield")).thenReturn(Set.of(Capability.REMOTE_KEYS, Capability.APP_LINK,
+                Capability.ANDROID_APPS));
         when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree("{\"MediaType\":\"Video\"}"));
         when(client.post(any(), eq("/Items/" + ID + "/PlaybackInfo"), anyMap(), any())).thenReturn(json.readTree("""
                 {"MediaSources":[{"Id":"source+1","Container":"mkv","SupportsDirectPlay":true}]}
@@ -86,7 +89,7 @@ class JellyfinVlcExecutorTest {
         Route route = new Route.JellyfinVlc(ID);
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("no direct stream");
-        verifyNoInteractions(devices, commands);
+        verifyNoInteractions(commands);
     }
 
     @Test
@@ -124,9 +127,18 @@ class JellyfinVlcExecutorTest {
             assertThatThrownBy(() -> bounded.execute(route, shield))
                     .isInstanceOf(ActionFailedException.class).hasMessageContaining("in time");
             assertThat(cancelled.await(1, TimeUnit.SECONDS)).isTrue();
-            verifyNoInteractions(devices, commands);
+            verifyNoInteractions(commands);
         } finally {
             releaseLookup.countDown();
         }
+    }
+
+    @Test
+    void aDeviceThatRunsNoAndroidAppsIsRefused() {
+        when(devices.capabilities("shield")).thenReturn(Set.of(Capability.REMOTE_KEYS, Capability.APP_LINK));
+        var route = new Route.JellyfinVlc(ID);
+
+        assertThatThrownBy(() -> executor.execute(route, shield)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(commands);
     }
 }

@@ -5,7 +5,6 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlayableResolver;
-import java.util.function.Predicate;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
@@ -22,16 +21,13 @@ public class JellyfinPlayableResolver implements PlayableResolver {
     private final JellyfinSessions sessions;
     private final JellyfinClient client;
     private final JellyfinStreams streams;
-    private final Predicate<String> adapterEnabled;
 
-    /** {@code adapterEnabled}: whether an adapter's module is switched on ({@code DeviceQueries.adapterEnabled}). */
     public JellyfinPlayableResolver(JellyfinSetupService setup, JellyfinSessions sessions, JellyfinClient client,
-                                    JellyfinStreams streams, Predicate<String> adapterEnabled) {
+                                    JellyfinStreams streams) {
         this.setup = setup;
         this.sessions = sessions;
         this.client = client;
         this.streams = streams;
-        this.adapterEnabled = adapterEnabled;
     }
 
     @Override
@@ -51,8 +47,8 @@ public class JellyfinPlayableResolver implements PlayableResolver {
                 && !wanted.serverId().equalsIgnoreCase(settings.get().serverId())) {
             return Resolution.note("this item is from a different Jellyfin server");
         }
-        boolean nativeApp = device.hasAdapter("androidtv") && adapterEnabled.test("androidtv")
-                && capabilities.contains(Capability.APP_LINK) && capabilities.contains(Capability.REMOTE_KEYS);
+        boolean nativeApp = capabilities.containsAll(Set.of(Capability.ANDROID_APPS, Capability.APP_LINK,
+                Capability.REMOTE_KEYS));
         List<PlayableRef> playables = new ArrayList<>();
         Set<Capability> liveCapabilities = nativeApp ? Set.of(Capability.JELLYFIN_CLIENT) : Set.of();
         List<String> notes = new ArrayList<>();
