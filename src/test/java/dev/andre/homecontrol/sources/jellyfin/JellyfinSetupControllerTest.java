@@ -30,8 +30,6 @@ class JellyfinSetupControllerTest extends WebSliceTest {
 
     @Test
     void savesPlayerOnlyForAKnownAndroidTvAndRejectsUnknownPlayers() throws Exception {
-        var shield = new dev.andre.homecontrol.core.Device("shield", "Shield", dev.andre.homecontrol.core.DeviceKind.ANDROID_TV,
-                "10.0.0.5", Map.of("androidtv", Map.of()), java.time.Instant.EPOCH);
         given(devices.capabilities("shield")).willReturn(java.util.Set.of(Capability.REMOTE_KEYS,
                 Capability.ANDROID_APPS));
         var settings = new JellyfinSettings(URI.create("http://nas:8096"), URI.create("http://nas:8096"),
