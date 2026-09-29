@@ -313,15 +313,6 @@ final class Enrollment {
         log.info("{} receiver for {} answered at a new address; reconnecting", adapterId, device.name());
     }
 
-    /**
-     * Receivers resolved while the context was still starting were published before
-     * {@link #onDiscovered} was registered as a listener; {@link DiscoveryCatchUp} gives them the
-     * same automatic merge once the application is ready.
-     */
-    void mergeVisibleReceivers() {
-        addable().forEach(found -> onDiscovered(new DeviceDiscoveredEvent(found)));
-    }
-
     /** Moves every adapter of {@code source} into {@code target} and removes {@code source}. */
     Device merge(String targetId, String sourceId) {
         if (targetId.equals(sourceId)) {

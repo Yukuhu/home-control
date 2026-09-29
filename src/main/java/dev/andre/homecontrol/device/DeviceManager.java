@@ -177,11 +177,6 @@ public class DeviceManager implements AutoCloseable {
         enrollment.onDiscovered(event);
     }
 
-    /** Merges receivers seen during startup, for {@link DiscoveryCatchUp}. */
-    public void mergeVisibleReceivers() {
-        enrollment.mergeVisibleReceivers();
-    }
-
     /** Moves every adapter of {@code source} into {@code target} and removes {@code source}. */
     public Device merge(String targetId, String sourceId) {
         return enrollment.merge(targetId, sourceId);

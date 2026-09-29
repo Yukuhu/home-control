@@ -2,6 +2,8 @@ package dev.andre.homecontrol.discovery.ssdp;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -78,6 +80,8 @@ public class SsdpDiscovery implements AutoCloseable {
         this.http = http;
     }
 
+    /** Starts listening once the application is ready, so no discovery event reaches the context before its listeners exist. */
+    @EventListener(ApplicationReadyEvent.class)
     public void start() {
         if (!properties.enabled()) {
             log.info("SSDP discovery is disabled; add smart TVs by address");
