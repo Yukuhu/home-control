@@ -2,8 +2,8 @@ package dev.andre.homecontrol.adapters.androidtv;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceSecrets;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.MdnsBrowser;
 import dev.andre.homecontrol.storage.DataDirectory;
 import org.springframework.context.annotation.Bean;
@@ -38,7 +38,8 @@ public class AndroidTvConfiguration {
     }
 
     @Bean
-    public PairingService pairingService(CertificateStore certificates, DeviceManager devices, DataDirectory data) {
-        return new PairingService(certificates, devices, data);
+    public PairingService pairingService(CertificateStore certificates, DeviceEnrollment enrollment,
+                                         DataDirectory data) {
+        return new PairingService(certificates, enrollment, data);
     }
 }

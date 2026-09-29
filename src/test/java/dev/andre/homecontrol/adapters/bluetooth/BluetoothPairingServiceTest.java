@@ -1,11 +1,12 @@
 package dev.andre.homecontrol.adapters.bluetooth;
 
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluetoothDeviceInfo;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.FakeBluezClient;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
-import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -38,9 +39,10 @@ class BluetoothPairingServiceTest {
     private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
     private final FakeBluezClient bluez = new FakeBluezClient();
-    private final DeviceManager devices = mock(DeviceManager.class);
+    private final DeviceQueries devices = mock(DeviceQueries.class);
+    private final DeviceEnrollment enrollment = mock(DeviceEnrollment.class);
     private final BluetoothProperties properties = BluetoothProperties.defaults();
-    private final BluetoothPairingService service = new BluetoothPairingService(bluez, devices, properties, CLOCK);
+    private final BluetoothPairingService service = new BluetoothPairingService(bluez, devices, enrollment, properties, CLOCK);
 
     @BeforeEach
     void setUp() {
@@ -79,12 +81,12 @@ class BluetoothPairingServiceTest {
     @Test
     void aConfiguredAdapterIsUsed() {
         bluez.addAdapter("hci1", "00:1A:7D:DA:71:99", true);
-        BluetoothPairingService withAdapter = new BluetoothPairingService(bluez, devices,
+        BluetoothPairingService withAdapter = new BluetoothPairingService(bluez, devices, enrollment,
                 properties.withAdapter("hci1"), CLOCK);
         withAdapter.scan();
         assertThat(bluez.calls()).contains("discover 00:1A:7D:DA:71:99 10s");
 
-        BluetoothPairingService missing = new BluetoothPairingService(bluez, devices,
+        BluetoothPairingService missing = new BluetoothPairingService(bluez, devices, enrollment,
                 properties.withAdapter("hci7"), CLOCK);
         BluetoothScan scan = missing.scan();
         assertThat(scan.error()).contains("Adapter hci7 not found").contains("hci0 (00:1A:7D:DA:71:13)");
@@ -108,7 +110,7 @@ class BluetoothPairingServiceTest {
         assertThat(result.device().lastSeen()).isEqualTo(NOW);
 
         ArgumentCaptor<Device> captor = ArgumentCaptor.forClass(Device.class);
-        verify(devices).adopt(captor.capture());
+        verify(enrollment).adopt(captor.capture());
         assertThat(captor.getValue()).isEqualTo(result.device());
     }
 
@@ -133,7 +135,7 @@ class BluetoothPairingServiceTest {
                 .isInstanceOf(BluetoothSetupException.class)
                 .hasMessage("Phone is not a speaker or headphones (no A2DP audio sink)");
         assertThat(bluez.calls()).isEmpty();
-        verify(devices, never()).adopt(any());
+        verify(enrollment, never()).adopt(any());
     }
 
     @Test
@@ -143,14 +145,14 @@ class BluetoothPairingServiceTest {
                 .isInstanceOf(BluetoothSetupException.class)
                 .hasMessage("JBL Flip 5 is not a speaker or headphones (no A2DP audio sink)");
         assertThat(bluez.calls()).endsWith("remove AA:BB:CC:DD:EE:FF");
-        verify(devices, never()).adopt(any());
+        verify(enrollment, never()).adopt(any());
     }
 
     @Test
     void acceptsASpeakerWhoseServicesStayUnknown() throws Exception {
         bluez.known("AA:BB:CC:DD:EE:FF", "Mystery Speaker");
         BluetoothPairing result = service.pair("AA:BB:CC:DD:EE:FF");
-        verify(devices).adopt(any());
+        verify(enrollment).adopt(any());
         assertThat(result.warning()).isNull();
     }
 
@@ -160,7 +162,7 @@ class BluetoothPairingServiceTest {
         bluez.failNext("pair", PAIRING_REJECTED, "Authentication Rejected");
         assertThatThrownBy(() -> service.pair("AA:BB:CC:DD:EE:FF"))
                 .isInstanceOf(BluetoothSetupException.class).hasMessageContaining("refused pairing");
-        verify(devices, never()).adopt(any());
+        verify(enrollment, never()).adopt(any());
     }
 
     @Test
@@ -174,7 +176,7 @@ class BluetoothPairingServiceTest {
         bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").uuids(A2DP_SINK);
         bluez.failNext("connect", UNREACHABLE, "br-connection-page-timeout");
         BluetoothPairing result = service.pair("AA:BB:CC:DD:EE:FF");
-        verify(devices).adopt(any());
+        verify(enrollment).adopt(any());
         assertThat(result.warning()).startsWith("Paired JBL Flip 5, but it did not connect: The speaker did not answer");
     }
 
@@ -239,14 +241,14 @@ class BluetoothPairingServiceTest {
 
         ArgumentCaptor<Device> captor = ArgumentCaptor.forClass(Device.class);
         service.setAudioDevice("bluetooth-aa-bb-cc-dd-ee-ff", "pulse/bluez_output.AA_BB_CC_DD_EE_FF.1");
-        verify(devices).adopt(captor.capture());
+        verify(enrollment).adopt(captor.capture());
         assertThat(captor.getValue().adapterSettings("bluetooth"))
                 .containsEntry("audioDevice", "pulse/bluez_output.AA_BB_CC_DD_EE_FF.1");
 
-        Mockito.reset(devices);
+        Mockito.reset(devices, enrollment);
         when(devices.device("bluetooth-aa-bb-cc-dd-ee-ff")).thenReturn(Optional.of(registered));
         service.setAudioDevice("bluetooth-aa-bb-cc-dd-ee-ff", "");
-        verify(devices).adopt(captor.capture());
+        verify(enrollment).adopt(captor.capture());
         assertThat(captor.getValue().adapterSettings("bluetooth")).doesNotContainKey("audioDevice");
 
         assertThatThrownBy(() -> service.setAudioDevice("bluetooth-aa-bb-cc-dd-ee-ff", "bad device"))
@@ -267,7 +269,7 @@ class BluetoothPairingServiceTest {
 
         BluetoothPairing result = service.pair("AA:BB:CC:DD:EE:FF");
 
-        verify(devices).adopt(any());
+        verify(enrollment).adopt(any());
         assertThat(result.warning()).contains("no Bluetooth audio service").contains("PipeWire");
     }
 

@@ -1,10 +1,11 @@
 package dev.andre.homecontrol.adapters.webos;
 
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.PromptPairingResult;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
 import dev.andre.homecontrol.testsupport.InMemoryDeviceSecrets;
@@ -31,7 +32,8 @@ import static org.mockito.Mockito.when;
 
 class WebOsPairingTest {
 
-    private final DeviceManager devices = mock(DeviceManager.class);
+    private final DeviceQueries devices = mock(DeviceQueries.class);
+    private final DeviceEnrollment enrollment = mock(DeviceEnrollment.class);
     private final SsdpDiscovery ssdp = new SsdpDiscovery(new SsdpProperties(false, "127.0.0.1", 1900, 0,
             Duration.ofSeconds(60), 2));
     private final InMemoryDeviceSecrets secrets = new InMemoryDeviceSecrets();
@@ -41,7 +43,7 @@ class WebOsPairingTest {
     @SuppressWarnings("unchecked")
     void setUp() throws IOException {
         tv = new FakeSsapServer(false);
-        when(devices.attach(any(), any(), any(), any(), any())).thenAnswer(call -> new Device("webos-127-0-0-1",
+        when(enrollment.attach(any(), any(), any(), any(), any())).thenAnswer(call -> new Device("webos-127-0-0-1",
                 call.getArgument(1), call.getArgument(2), call.getArgument(0),
                 Map.of(call.getArgument(3), (Map<String, String>) call.getArgument(4)), Instant.now()));
     }
@@ -56,18 +58,18 @@ class WebOsPairingTest {
                 Duration.ofSeconds(2), Duration.ofSeconds(2),
                 Duration.ofSeconds(pairingTimeoutSeconds), Duration.ofSeconds(1), Duration.ofSeconds(2),
                 Duration.ofSeconds(0)),
-                ssdp, devices, secrets);
+                ssdp, devices, enrollment, secrets);
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, String> attachedSettings() {
         ArgumentCaptor<Map<String, String>> settings = ArgumentCaptor.forClass(Map.class);
-        verify(devices).attach(eq("127.0.0.1"), any(), eq(DeviceKind.WEBOS), eq("webos"), settings.capture());
+        verify(enrollment).attach(eq("127.0.0.1"), any(), eq(DeviceKind.WEBOS), eq("webos"), settings.capture());
         return settings.getValue();
     }
 
     @Test
-    void anAcceptedPromptStoresTheClientKeyThroughTheDeviceManager() throws IOException {
+    void anAcceptedPromptStoresTheClientKeyThroughEnrollment() throws IOException {
         tv.setPrompt(FakeSsapServer.Prompt.ACCEPT);
 
         PromptPairingResult result = pairing(tv.port(), 2).pair("127.0.0.1", "Living Room TV");
@@ -94,7 +96,7 @@ class WebOsPairingTest {
     void withoutANameItUsesTheModelName() throws IOException {
         pairing(tv.port(), 2).pair("127.0.0.1", " ");
 
-        verify(devices).attach(eq("127.0.0.1"), eq("LG OLED55C9PLA"), eq(DeviceKind.WEBOS), eq("webos"), anyMap());
+        verify(enrollment).attach(eq("127.0.0.1"), eq("LG OLED55C9PLA"), eq(DeviceKind.WEBOS), eq("webos"), anyMap());
     }
 
     @Test
@@ -105,7 +107,7 @@ class WebOsPairingTest {
 
         assertThat(result).isInstanceOfSatisfying(PromptPairingResult.Declined.class,
                 declined -> assertThat(declined.reason()).contains("declined"));
-        verify(devices, never()).attach(anyString(), anyString(), any(), anyString(), anyMap());
+        verify(enrollment, never()).attach(anyString(), anyString(), any(), anyString(), anyMap());
     }
 
     @Test
@@ -116,7 +118,7 @@ class WebOsPairingTest {
 
         assertThat(result).isInstanceOfSatisfying(PromptPairingResult.Failed.class,
                 failed -> assertThat(failed.reason()).contains("within 1 seconds"));
-        verify(devices, never()).attach(anyString(), anyString(), any(), anyString(), anyMap());
+        verify(enrollment, never()).attach(anyString(), anyString(), any(), anyString(), anyMap());
     }
 
     @Test

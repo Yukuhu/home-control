@@ -5,7 +5,8 @@ import dev.andre.homecontrol.adapters.bluetooth.player.MpvLauncher;
 import dev.andre.homecontrol.adapters.bluetooth.player.ProcessMpvLauncher;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,8 +43,10 @@ public class BluetoothConfiguration {
     }
 
     @Bean
-    public BluetoothPairingService bluetoothPairingService(BluezClient bluez, DeviceManager devices, BluetoothProperties properties) {
-        return new BluetoothPairingService(bluez, devices, properties);
+    public BluetoothPairingService bluetoothPairingService(BluezClient bluez, DeviceQueries devices,
+                                                           DeviceEnrollment enrollment,
+                                                           BluetoothProperties properties) {
+        return new BluetoothPairingService(bluez, devices, enrollment, properties);
     }
 
     @Bean

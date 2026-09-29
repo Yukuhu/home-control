@@ -1,9 +1,9 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.CodePairing;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.testsupport.ModulesOffTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AndroidTvModuleSwitchTest extends ModulesOffTest {
 
     @Autowired
-    DeviceManager devices;
+    DeviceEnrollment enrollment;
 
     @Test
     void theModuleLeavesNoBeans() {
@@ -42,13 +42,13 @@ class AndroidTvModuleSwitchTest extends ModulesOffTest {
 
     @Test
     void aDeviceWithAnAndroidTvEntryStillRenders() throws Exception {
-        devices.adopt(new Device("old-shield", "Old Shield", DeviceKind.ANDROID_TV, "127.0.0.1",
+        enrollment.adopt(new Device("old-shield", "Old Shield", DeviceKind.ANDROID_TV, "127.0.0.1",
                 Map.of("androidtv", Map.of()), Instant.now()));
         try {
             mockMvc.perform(get("/").param("device", "old-shield")).andExpect(status().isOk());
             mockMvc.perform(get("/setup")).andExpect(status().isOk());
         } finally {
-            devices.forget("old-shield");
+            enrollment.forget("old-shield");
         }
     }
 }
