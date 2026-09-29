@@ -2,12 +2,14 @@ package dev.andre.homecontrol.adapters.tizen;
 
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
+import dev.andre.homecontrol.adapters.support.PairingKeys;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.LearnedSettings;
@@ -37,14 +39,19 @@ public class TizenAdapter implements WakeOnLanAdapter {
     private final SsdpDiscovery ssdp;
     private final DeviceRegistry registry;
     private final WakeOnLan wakeOnLan;
+    private final DeviceSecrets secrets;
+    private final PairingKeys keys;
     private final HttpClient http;
     private final Map<String, TizenSession> sessions = new ConcurrentHashMap<>();
 
-    public TizenAdapter(TizenProperties properties, SsdpDiscovery ssdp, DeviceRegistry registry, WakeOnLan wakeOnLan) {
+    public TizenAdapter(TizenProperties properties, SsdpDiscovery ssdp, DeviceRegistry registry, WakeOnLan wakeOnLan,
+                        DeviceSecrets secrets) {
         this.properties = properties;
         this.ssdp = ssdp;
         this.registry = registry;
         this.wakeOnLan = wakeOnLan;
+        this.secrets = secrets;
+        this.keys = TizenSettings.keys(secrets);
         this.http = InsecureTls.httpClient(properties.connectTimeout());
         // A TV that just woke announces itself: poll now instead of at the next interval.
         // Plain string comparison: SSDP listeners must not block on DNS.
@@ -84,11 +91,22 @@ public class TizenAdapter implements WakeOnLanAdapter {
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange, LearnedSettings learned) {
         AtomicReference<TizenSession> self = new AtomicReference<>();
         TizenSession session = new TizenSession(device, properties, TizenTimings.from(properties), http, registry,
-                learned, wakeOnLan, onChange, () -> sessions.remove(device.id(), self.get()));
+                learned, secrets, wakeOnLan, onChange, () -> sessions.remove(device.id(), self.get()));
         self.set(session);
         sessions.put(device.id(), session);
         session.start();
         return session;
+    }
+
+    /** Moves a token still in devices.json into a device secret. Idempotent, and safe to rerun after a crash. */
+    @Override
+    public Device migrate(Device device) {
+        return keys.migrate(device, TizenSettings.LEGACY_TOKEN);
+    }
+
+    @Override
+    public void forget(Device device) {
+        keys.forget(device);
     }
 
     @Override

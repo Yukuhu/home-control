@@ -4,6 +4,7 @@ import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -18,12 +19,12 @@ public class TizenConfiguration {
 
     @Bean
     public TizenAdapter tizenAdapter(TizenProperties properties, SsdpDiscovery ssdp, DeviceRegistry registry,
-                                     WakeOnLan wakeOnLan) {
-        return new TizenAdapter(properties, ssdp, registry, wakeOnLan);
+                                     WakeOnLan wakeOnLan, DeviceSecrets secrets) {
+        return new TizenAdapter(properties, ssdp, registry, wakeOnLan, secrets);
     }
 
     @Bean
-    public TizenPairing tizenPairing(TizenProperties properties, DeviceManager devices) {
-        return new TizenPairing(properties, devices);
+    public TizenPairing tizenPairing(TizenProperties properties, DeviceManager devices, DeviceSecrets secrets) {
+        return new TizenPairing(properties, devices, secrets);
     }
 }

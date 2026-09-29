@@ -1,0 +1,2 @@
+[{"id":"lg-1","name":"LG","kind":"WEBOS","host":"192.168.1.30","adapters":{"webos":{"clientKey":"lg-client-key","macAddress":"aa:bb:cc:dd:ee:ff"}},"lastSeen":"2026-09-20T10:00:00Z"},
+ {"id":"sam-1","name":"Samsung","kind":"TIZEN","host":"192.168.1.31","adapters":{"tizen":{"paired":"true","token":"sam-token"}},"lastSeen":"2026-09-20T10:00:00Z"}]

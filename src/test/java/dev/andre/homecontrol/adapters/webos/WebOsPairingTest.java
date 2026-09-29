@@ -7,13 +7,16 @@ import dev.andre.homecontrol.core.PromptPairingResult;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
+import dev.andre.homecontrol.testsupport.InMemoryDeviceSecrets;
 import java.time.Duration;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +34,7 @@ class WebOsPairingTest {
     private final DeviceManager devices = mock(DeviceManager.class);
     private final SsdpDiscovery ssdp = new SsdpDiscovery(new SsdpProperties(false, "127.0.0.1", 1900, 0,
             Duration.ofSeconds(60), 2));
+    private final InMemoryDeviceSecrets secrets = new InMemoryDeviceSecrets();
     private FakeSsapServer tv;
 
     @BeforeEach
@@ -52,7 +56,14 @@ class WebOsPairingTest {
                 Duration.ofSeconds(2), Duration.ofSeconds(2),
                 Duration.ofSeconds(pairingTimeoutSeconds), Duration.ofSeconds(1), Duration.ofSeconds(2),
                 Duration.ofSeconds(0)),
-                ssdp, devices);
+                ssdp, devices, secrets);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, String> attachedSettings() {
+        ArgumentCaptor<Map<String, String>> settings = ArgumentCaptor.forClass(Map.class);
+        verify(devices).attach(eq("127.0.0.1"), any(), eq(DeviceKind.WEBOS), eq("webos"), settings.capture());
+        return settings.getValue();
     }
 
     @Test
@@ -62,8 +73,21 @@ class WebOsPairingTest {
         PromptPairingResult result = pairing(tv.port(), 2).pair("127.0.0.1", "Living Room TV");
 
         assertThat(result).isInstanceOf(PromptPairingResult.Paired.class);
-        verify(devices).attach("127.0.0.1", "Living Room TV", DeviceKind.WEBOS, "webos",
-                Map.of("clientKey", FakeSsapServer.CLIENT_KEY));
+        Map<String, String> settings = attachedSettings();
+        assertThat(settings).containsOnlyKeys("keyRef");
+        assertThat(secrets.deviceSecret(WebOsSettings.secretName(settings.get("keyRef")))).contains(FakeSsapServer.CLIENT_KEY);
+    }
+
+    @Test
+    void repairingTheSameTvReusesItsReference() throws IOException {
+        when(devices.devices()).thenReturn(List.of(new Device("webos-127-0-0-1", "LG", DeviceKind.WEBOS, "127.0.0.1",
+                Map.of("webos", Map.of("keyRef", "0123456789abcdef")), Instant.now())));
+        tv.setPrompt(FakeSsapServer.Prompt.ACCEPT);
+
+        pairing(tv.port(), 2).pair("127.0.0.1", "Living Room TV");
+
+        assertThat(attachedSettings()).isEqualTo(Map.of("keyRef", "0123456789abcdef"));
+        assertThat(secrets.all()).containsOnlyKeys("device.webos.0123456789abcdef.client-key");
     }
 
     @Test

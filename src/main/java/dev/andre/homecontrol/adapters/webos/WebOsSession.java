@@ -8,6 +8,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.InputListing;
@@ -44,7 +45,8 @@ import java.util.function.UnaryOperator;
  * accepts the key: then it is UNPAIRED and only re-pairing helps (connecting again would re-prompt).
  *
  * <p>Settings are read from the registry (the MAC may be typed in while connected) but written only
- * through {@link LearnedSettings}, i.e. by the device manager under its lock.
+ * through {@link LearnedSettings}, i.e. by the device manager under its lock. A client key the TV hands out goes to
+ * the device secrets, under the reference the settings already name.
  *
  * <p>Threading: connect, loss and reconnect run on one scheduler thread; commands run on the
  * caller's thread against the current connection and never wait for a reconnect; subscription
@@ -61,6 +63,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
     private final HttpClient http;
     private final DeviceRegistry registry;
     private final LearnedSettings learned;
+    private final DeviceSecrets secrets;
     private final WakeOnLan wakeOnLan;
     private final Consumer<DeviceState> onChange;
     private final Runnable onClose;
@@ -79,16 +82,18 @@ public class WebOsSession implements DeviceHandle, InputListing {
     private Duration backoff;                   // scheduler thread only
     private ScheduledFuture<?> pendingConnect;  // scheduler thread only
 
-    // Package-private, built only by WebOsAdapter: nine distinct collaborator types, nothing to group.
+    // Package-private, built only by WebOsAdapter: ten distinct collaborator types, nothing to group.
     @SuppressWarnings("java:S107")
     WebOsSession(Device device, WebOsProperties properties, WebOsTimings timings, HttpClient http, DeviceRegistry registry,
-                 LearnedSettings learned, WakeOnLan wakeOnLan, Consumer<DeviceState> onChange, Runnable onClose) {
+                 LearnedSettings learned, DeviceSecrets secrets, WakeOnLan wakeOnLan, Consumer<DeviceState> onChange,
+                 Runnable onClose) {
         this.device = device;
         this.properties = properties;
         this.timings = timings;
         this.http = http;
         this.registry = registry;
         this.learned = learned;
+        this.secrets = secrets;
         this.wakeOnLan = wakeOnLan;
         this.onChange = onChange;
         this.onClose = onClose;
@@ -263,7 +268,8 @@ public class WebOsSession implements DeviceHandle, InputListing {
         if (closed || connection.get() != null) {
             return;
         }
-        String clientKey = WebOsSettings.of(current()).clientKey();
+        WebOsSettings settings = WebOsSettings.of(current(), secrets);
+        String clientKey = settings.clientKey();
         if (clientKey == null) {
             update(ignored -> DeviceState.unpaired());
             return;
@@ -286,7 +292,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
             }
             backoff = initialBackoff();
             if (!key.equals(clientKey)) {
-                learned.store(Map.of(WebOsSettings.CLIENT_KEY, key));
+                secrets.putDeviceSecret(WebOsSettings.secretName(settings.keyRef()), key); // a key implies a reference
             }
             update(s -> s.withStatus(DeviceStatus.CONNECTED).withPower(true));
             subscribeToState(opened);
@@ -340,7 +346,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
         try {
             WebOsPayloads.macAddress(opened.request(SsapUris.CONNECTION_INFO, SsapMessages.empty()), device.host())
                     .ifPresent(mac -> {
-                        WebOsSettings settings = WebOsSettings.of(current());
+                        WebOsSettings settings = WebOsSettings.of(current(), secrets);
                         if (!settings.macAddressManual() && !mac.equals(settings.macAddress())) {
                             learned.store(Map.of(WakeOnLanAdapter.MAC_ADDRESS, mac));
                         }

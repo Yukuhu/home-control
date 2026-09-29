@@ -7,6 +7,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.KeyPress;
@@ -59,6 +60,7 @@ public class TizenSession implements DeviceHandle {
     private final DialClient dial;
     private final DeviceRegistry registry;
     private final LearnedSettings learned;
+    private final DeviceSecrets secrets;
     private final WakeOnLan wakeOnLan;
     private final Consumer<DeviceState> onChange;
     private final Runnable onClose;
@@ -75,10 +77,11 @@ public class TizenSession implements DeviceHandle {
     private Duration handshakeBackoff;  // scheduler thread only; null while no handshake went unanswered
     private long connectNotBefore;      // scheduler thread only; System.nanoTime()
 
-    // Package-private, built only by TizenAdapter: nine distinct collaborator types, nothing to group.
+    // Package-private, built only by TizenAdapter: ten distinct collaborator types, nothing to group.
     @SuppressWarnings("java:S107")
     TizenSession(Device device, TizenProperties properties, TizenTimings timings, HttpClient http, DeviceRegistry registry,
-                 LearnedSettings learned, WakeOnLan wakeOnLan, Consumer<DeviceState> onChange, Runnable onClose) {
+                 LearnedSettings learned, DeviceSecrets secrets, WakeOnLan wakeOnLan, Consumer<DeviceState> onChange,
+                 Runnable onClose) {
         this.device = device;
         this.properties = properties;
         this.timings = timings;
@@ -87,6 +90,7 @@ public class TizenSession implements DeviceHandle {
         this.dial = new DialClient(http, properties);
         this.registry = registry;
         this.learned = learned;
+        this.secrets = secrets;
         this.wakeOnLan = wakeOnLan;
         this.onChange = onChange;
         this.onClose = onClose;
@@ -246,7 +250,7 @@ public class TizenSession implements DeviceHandle {
     }
 
     private boolean connect() {
-        TizenSettings settings = TizenSettings.of(current());
+        TizenSettings settings = TizenSettings.of(current(), secrets);
         if (!settings.paired()) {
             stopped = true;
             update(ignored -> DeviceState.unpaired());
@@ -268,8 +272,7 @@ public class TizenSession implements DeviceHandle {
                     closeIfCurrent(opened);
                     return false;
                 }
-                opened.token().filter(token -> !token.equals(settings.token()))
-                        .ifPresent(token -> learned.store(Map.of(TizenSettings.TOKEN_KEY, token)));
+                opened.token().filter(token -> !token.equals(settings.token())).ifPresent(this::storeToken);
                 opened.requestInstalledApps();
                 return true;
             }
@@ -322,9 +325,21 @@ public class TizenSession implements DeviceHandle {
         return null;
     }
 
+    /** A token the TV issued: stored as a device secret, under a new reference if the device has none yet. */
+    private void storeToken(String token) {
+        String keyRef = TizenSettings.of(current(), secrets).keyRef();
+        if (keyRef == null) {
+            keyRef = DeviceSecrets.newReference();
+            TizenSettings.keys(secrets).store(keyRef, token);
+            learned.store(Map.of(TizenSettings.KEY_REF, keyRef));
+        } else {
+            TizenSettings.keys(secrets).store(keyRef, token);
+        }
+    }
+
     private void learnMacAddress(TizenDeviceInfo info) {
         info.macAddress().ifPresent(mac -> {
-            TizenSettings settings = TizenSettings.of(current());
+            TizenSettings settings = TizenSettings.of(current(), secrets);
             if (!settings.macAddressManual() && !mac.equals(settings.macAddress())) {
                 learned.store(Map.of(WakeOnLanAdapter.MAC_ADDRESS, mac));
             }

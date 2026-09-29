@@ -1,8 +1,10 @@
 package dev.andre.homecontrol.adapters.webos;
 
 import dev.andre.homecontrol.adapters.net.InsecureTls;
+import dev.andre.homecontrol.adapters.support.PairingKeys;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.PromptPairing;
 import dev.andre.homecontrol.core.PromptPairingResult;
 import dev.andre.homecontrol.device.DeviceManager;
@@ -14,7 +16,7 @@ import java.time.Duration;
 import java.util.Map;
 
 /**
- * "Accept the request on your TV": registers without a key and stores the key the TV hands out.
+ * "Accept the request on your TV": registers without a key and stores the key the TV hands out as a device secret.
  * The MAC address is not collected here; the session learns it right after connecting.
  */
 public class WebOsPairing implements PromptPairing {
@@ -24,12 +26,14 @@ public class WebOsPairing implements PromptPairing {
     private final WebOsProperties properties;
     private final SsdpDiscovery ssdp;
     private final DeviceManager devices;
+    private final PairingKeys keys;
     private final HttpClient http;
 
-    public WebOsPairing(WebOsProperties properties, SsdpDiscovery ssdp, DeviceManager devices) {
+    public WebOsPairing(WebOsProperties properties, SsdpDiscovery ssdp, DeviceManager devices, DeviceSecrets secrets) {
         this.properties = properties;
         this.ssdp = ssdp;
         this.devices = devices;
+        this.keys = WebOsSettings.keys(secrets);
         this.http = InsecureTls.httpClient(properties.connectTimeout());
     }
 
@@ -55,8 +59,9 @@ public class WebOsPairing implements PromptPairing {
         try {
             connection = SsapConnection.open(http, host, properties, reason -> { });
             String key = connection.register(null, properties.pairingTimeout());
+            String keyRef = keys.storePaired(devices.devices(), host, key);
             Device device = devices.attach(host, deviceName(connection, host, name), DeviceKind.WEBOS,
-                    WebOsAdapter.ADAPTER_ID, Map.of(WebOsSettings.CLIENT_KEY, key));
+                    WebOsAdapter.ADAPTER_ID, Map.of(WebOsSettings.KEY_REF, keyRef));
             return new PromptPairingResult.Paired(device);
         } catch (SsapPairingException e) {
             return switch (e.reason()) {
