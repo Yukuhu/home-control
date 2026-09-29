@@ -24,17 +24,22 @@ Dashboard row. Dashboard source settings can hide the source or a row and change
 
 #### Calls
 
-A workflow is a list of calls, up to 8. Each call is one HTTP(S) GET that returns JSON. In the
+A workflow is a list of calls, up to 8. A single tile that plays a fixed media address needs no
+call at all; a workflow that generates tiles needs at least one, the call that supplies the
+entries. Each call is one HTTP(S) GET that returns JSON. In the
 **Calls** section, each call is a card. Use **Add call** to add one, and Up, Down and Remove to
 change the order.
 
 - **Call name** — a short name such as `list` or `images`: lower-case letters, digits and `_`.
 - **Runs** — **Once** runs the call one time. **Once per entry** runs it for every entry, and is
   offered only for tiles from an entry array.
-- **Source URL** and **Request headers** — the address and any headers the call sends.
-- **Add value** — a value to take from the response. Give it a name and a JSON Pointer. Pointers
-  can be empty to select the root; escape `/` as `~1` and `~` as `~0`. New values start
-  **Sensitive**; uncheck it only for values you want visible in Test results.
+- **Source URL** and **Request headers** — the address and any headers the call sends. On a
+  saved call, choose **Keep saved URL** or **Replace URL**, and **Keep saved headers** or
+  **Replace headers**.
+- **Add value** — a value to take from the response. Fill in **Variable name** and **JSON
+  Pointer**. Pointers can be empty to select the root; escape `/` as `~1` and `~` as `~0`. New
+  values start checked as **Sensitive value**; uncheck it only for values you want visible in
+  Test results.
 
 A call can use the values of the calls above it as `{name}`. Put `{name}` in a path segment or
 query value of the URL, or in a header value. A value can never fill the host, so no response can
@@ -75,10 +80,10 @@ Suppose `https://api.example/channels` returns:
 - Call `list`, **Once**, source URL `https://api.example/channels`. **Entries come from** `list`,
   array pointer `/channels`, ID `/id`, title `/title`. Add the entry field `channel` at `/id`.
 - Call `images`, **Once per entry**, source URL `https://images.example/lookup?channel={channel}`,
-  with the value `poster` at `/poster` (not Sensitive). Set **Artwork** to a value from a call,
+  with the value `poster` at `/poster` (not a sensitive value). Set **Artwork** to a value from a call,
   named `poster`. It says **Runs at refresh**.
 - Call `stream`, **Once per entry**, source URL `https://api.example/stream?channel={channel}`,
-  with the value `token` at `/token` (Sensitive). It says **Runs at Play**.
+  with the value `token` at `/token` (a sensitive value). It says **Runs at Play**.
 - The media template `https://media.example/play?id={channel}&token={token}` then uses the
   selected channel and a fresh token when you press Play.
 
@@ -91,8 +96,9 @@ call that runs once fails, the refresh fails and the Dashboard keeps the last go
 generated workflow can trigger its Dashboard catalog refresh, which requests the source; a
 single-tile Dashboard refresh stays local. The first Save creates the household login password,
 even for a public feed; later edits and Tests require login. Saved source URLs, header values,
-and media templates are hidden on the edit page. Choose **Keep** to retain them or **Replace**
-to enter new values. **Test** runs the calls once and shows up to five sample tiles with
+and media templates are hidden on the edit page. Choose **Keep saved URL**, **Keep saved
+headers** or **Keep saved template** to retain them, or **Replace URL**, **Replace headers** or
+**Replace template** to enter new values. **Test** runs the calls once and shows up to five sample tiles with
 sensitive values and literal URL parts masked; it names the call that failed and sends nothing
 to a device. Opening a Dashboard tile previews its route without a workflow fetch. **Play** runs
 the calls the media address needs, again and freshly, builds the media address, and sends a Cast
@@ -122,9 +128,9 @@ when a per-entry call runs at refresh; a longer list fails the refresh. Each cal
 JSON numeric tokens are limited to 1,000 characters, and whole-number entry IDs to 1,000 decimal
 digits after exponent expansion; extreme exponent IDs are rejected before expansion. Numeric
 values retain exact decimal precision, and numeric `1` and `1.0` identify the same entry while
-string `"1"` is distinct. Numeric values may use scientific notation. Connections time out after 5 seconds; at most three
-same-origin redirects and eight simultaneous workflow calls are allowed. See
-[Configuration](configuration.md) for the timeouts you can change.
+string `"1"` is distinct. Numeric values may use scientific notation. Connections time out after 5
+seconds; at most three same-origin redirects and eight simultaneous workflow calls are allowed.
+See [Configuration](configuration.md) for the timeouts you can change.
 
 ### Connecting Jellyfin
 
