@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.core.playback;
 
+import dev.andre.homecontrol.core.Action;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -42,8 +43,8 @@ class PlayableRefTest {
 
     @Test
     void aCastMessagePrintsNeitherItsPayloadNorAToken() {
-        var message = new PlayableRef.CastMessage("ABCD1234", "urn:x-cast:com.example.play",
-                Map.of("url", "https://media.example.com/live?token=secret-token"), "Example");
+        var message = new PlayableRef.CastMessage(new Action.CastMessage("ABCD1234", "urn:x-cast:com.example.play",
+                Map.of("url", "https://media.example.com/live?token=secret-token")), "Example");
 
         assertThat(message.toString())
                 .isEqualTo("CastMessage[receiverAppId=ABCD1234, namespace=urn:x-cast:com.example.play]")
@@ -53,14 +54,15 @@ class PlayableRefTest {
     @Test
     void aCastMessageKeepsAnUnmodifiableCopyOfItsPayload() {
         Map<String, Object> payload = new HashMap<>(Map.of("channel", "news"));
-        var message = new PlayableRef.CastMessage("ABCD1234", "urn:x-cast:com.example.play", payload, "Example");
+        var message = new PlayableRef.CastMessage(
+                new Action.CastMessage("ABCD1234", "urn:x-cast:com.example.play", payload), "Example");
 
         payload.put("channel", "sports");
 
-        assertThat(message.message()).containsExactly(Map.entry("channel", "news"));
-        Map<String, Object> kept = message.message();
+        assertThat(message.message().message()).containsExactly(Map.entry("channel", "news"));
+        Map<String, Object> kept = message.message().message();
         assertThatThrownBy(() -> kept.put("x", "y")).isInstanceOf(UnsupportedOperationException.class);
-        assertThat(new PlayableRef.CastMessage("ABCD1234", "urn:x-cast:com.example.play", null, "Example").message())
-                .isEmpty();
+        assertThat(new PlayableRef.CastMessage(new Action.CastMessage("ABCD1234", "urn:x-cast:com.example.play", null),
+                "Example").message().message()).isEmpty();
     }
 }

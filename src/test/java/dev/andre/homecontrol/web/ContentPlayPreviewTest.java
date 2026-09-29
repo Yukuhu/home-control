@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
@@ -210,8 +211,9 @@ class ContentPlayPreviewTest extends WebSliceTest {
     @Test
     void noSecretReachesTheBrowser() throws Exception {
         known();
-        Route.CastMessage message = new Route.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
-                Map.of("accessToken", "tok-123"), "the Jellyfin receiver");
+        Route.CastMessage message = new Route.CastMessage(
+                new Action.CastMessage("F007D354", "urn:x-cast:com.connectsdk", Map.of("accessToken", "tok-123")),
+                "the Jellyfin receiver");
         given(playback.preview(theItem, "living")).willReturn(new PlaybackPreview(living, List.of(message), null));
 
         String body = mockMvc.perform(get("/devices/living/route-preview").param("source", "jellyfin").param("item", ITEM_ID))

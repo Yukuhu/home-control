@@ -17,6 +17,6 @@ public class CastMessageStrategy implements RouteStrategy {
                 .filter(PlayableRef.CastMessage.class::isInstance)
                 .map(PlayableRef.CastMessage.class::cast)
                 .findFirst()
-                .map(m -> new Route.CastMessage(m.receiverAppId(), m.namespace(), m.message(), m.receiverLabel()));
+                .map(m -> new Route.CastMessage(m.message(), m.receiverLabel()));
     }
 }

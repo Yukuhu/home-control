@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.core.playback;
 
+import dev.andre.homecontrol.core.Action;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -22,8 +23,8 @@ class RouteKeyTest {
         keys.put(APP_LINK, "app-link");
         keys.put(new Route.WorkflowCast("workflow-1", 3, "entry"), "workflow-cast");
         keys.put(new Route.Cast("CC1AD845", Map.of("contentId", "http://nas/a.mp4?ApiKey=tok")), "cast:CC1AD845");
-        keys.put(new Route.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
-                Map.of("command", "PlayNow", "accessToken", "tok"), "the Jellyfin receiver"), "cast-message:F007D354");
+        keys.put(new Route.CastMessage(new Action.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
+                Map.of("command", "PlayNow", "accessToken", "tok")), "the Jellyfin receiver"), "cast-message:F007D354");
         keys.put(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV"), "jellyfin-session");
         keys.put(VLC, "jellyfin-vlc");
         keys.put(new Route.JellyfinApp("item-1", 0L), "jellyfin-app");

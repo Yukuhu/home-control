@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.core.playback;
 
+import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;
 import org.junit.jupiter.api.Test;
 
@@ -43,7 +44,8 @@ class PlaybackPlannerReasonsTest {
 
         assertThat(reason(new PlayableRef.WorkflowCast("wf", 1, "entry"), none)).isEqualTo(NOT_CAST_RECEIVER);
         assertThat(reason(new PlayableRef.CastLoad("F007D354", Map.of()), none)).isEqualTo(NOT_CAST_RECEIVER);
-        assertThat(reason(new PlayableRef.CastMessage("F007D354", "urn:x-cast:x", Map.of(), "a receiver"), none))
+        assertThat(reason(new PlayableRef.CastMessage(new Action.CastMessage("F007D354", "urn:x-cast:x", Map.of()),
+                "a receiver"), none))
                 .isEqualTo(NOT_CAST_RECEIVER);
         assertThat(reason(new PlayableRef.YouTubeLounge("abc"), none)).isEqualTo(NOT_CAST_RECEIVER);
     }

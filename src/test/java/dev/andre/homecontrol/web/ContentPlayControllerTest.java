@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
@@ -68,7 +69,8 @@ class ContentPlayControllerTest extends WebSliceTest {
     void previewsTheRouteWithoutPlaying() throws Exception {
         known();
         given(playback.plan(theItem, "shield"))
-                .willReturn(new Route.CastMessage("F007D354", "urn:x-cast:com.connectsdk", Map.of(), "the Jellyfin receiver"));
+                .willReturn(new Route.CastMessage(new Action.CastMessage("F007D354", "urn:x-cast:com.connectsdk", Map.of()),
+                        "the Jellyfin receiver"));
 
         mockMvc.perform(get("/devices/shield/route").param("source", "jellyfin").param("item", ITEM_ID))
                 .andExpect(status().isOk())

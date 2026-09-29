@@ -52,8 +52,8 @@ class JellyfinCastMessagesTest {
 
         PlayableRef.CastMessage playable = JellyfinCastMessages.playable(unstable, "t", item, 0, "Kitchen");
 
-        assertThat(playable.receiverAppId()).isEqualTo("6F511C87");
-        assertThat(playable.namespace()).isEqualTo("urn:x-cast:com.connectsdk");
+        assertThat(playable.message().receiverAppId()).isEqualTo("6F511C87");
+        assertThat(playable.message().namespace()).isEqualTo("urn:x-cast:com.connectsdk");
         assertThat(playable.receiverLabel()).isEqualTo("the Jellyfin receiver");
     }
 }

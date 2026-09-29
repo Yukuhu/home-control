@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import tools.jackson.databind.JsonNode;
 
@@ -49,7 +50,7 @@ public final class JellyfinCastMessages {
 
     public static PlayableRef.CastMessage playable(JellyfinSettings settings, String accessToken, JsonNode item,
                                                    long startPositionTicks, String receiverName) {
-        return new PlayableRef.CastMessage(settings.castReceiverId(), NAMESPACE,
-                playNow(settings, accessToken, item, startPositionTicks, receiverName), RECEIVER_LABEL);
+        return new PlayableRef.CastMessage(new Action.CastMessage(settings.castReceiverId(), NAMESPACE,
+                playNow(settings, accessToken, item, startPositionTicks, receiverName)), RECEIVER_LABEL);
     }
 }

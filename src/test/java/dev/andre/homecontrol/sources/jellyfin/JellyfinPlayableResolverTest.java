@@ -161,12 +161,12 @@ class JellyfinPlayableResolverTest {
 
         assertThat(resolution.playables()).hasSize(1);
         PlayableRef.CastMessage message = (PlayableRef.CastMessage) resolution.playables().get(0);
-        assertThat(message.receiverAppId()).isEqualTo("F007D354");
-        assertThat(message.namespace()).isEqualTo("urn:x-cast:com.connectsdk");
-        assertThat(message.message()).containsEntry("accessToken", FakeJellyfinServer.ACCESS_TOKEN)
+        assertThat(message.message().receiverAppId()).isEqualTo("F007D354");
+        assertThat(message.message().namespace()).isEqualTo("urn:x-cast:com.connectsdk");
+        assertThat(message.message().message()).containsEntry("accessToken", FakeJellyfinServer.ACCESS_TOKEN)
                 .containsEntry("receiverName", "Kitchen");
         @SuppressWarnings("unchecked")
-        Map<String, Object> options = (Map<String, Object>) message.message().get("options");
+        Map<String, Object> options = (Map<String, Object>) message.message().message().get("options");
         assertThat(options).containsEntry("startPositionTicks", 6_120_000_000L);
 
         // The direct stream is unreachable from a Cast device (the receiver message always wins in the

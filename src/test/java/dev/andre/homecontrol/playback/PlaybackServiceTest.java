@@ -379,8 +379,9 @@ class PlaybackServiceTest {
         Device castDevice = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9", Map.of("cast", Map.of()), Instant.now());
         given(devices.device("kitchen")).willReturn(Optional.of(castDevice));
         given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
-        PlayableRef.CastMessage message = new PlayableRef.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
-                Map.of("command", "PlayNow"), "the Jellyfin receiver");
+        PlayableRef.CastMessage message = new PlayableRef.CastMessage(
+                new Action.CastMessage("F007D354", "urn:x-cast:com.connectsdk", Map.of("command", "PlayNow")),
+                "the Jellyfin receiver");
         ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null, List.of(message));
 
         Route route = castMessageService.play(item, "kitchen");
