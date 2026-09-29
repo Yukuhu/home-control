@@ -48,12 +48,15 @@ class WorkflowRunnerTest {
         var runner = new WorkflowRunner(client, PROPERTIES);
         when(client.fetch(any(), anyLong())).thenReturn(bytes("{\"token\":\"t\",\"items\":[{\"id\":\"news\",\"title\":\"News\"}]}"));
         var key = runner.catalog(definition).getFirst().key();
-        for (String body : List.of("{\"token\":\"t\",\"items\":[]}",
-                "{\"token\":\"t\",\"items\":[{\"id\":\"news\",\"title\":\"News\"},{\"id\":\"news\",\"title\":\"Duplicate\"}]}",
-                "{\"items\":[{\"id\":\"news\",\"title\":\"News\"}]}")) {
+        var cases = java.util.Map.of(
+                "{\"token\":\"t\",\"items\":[]}", "no longer available",
+                "{\"token\":\"t\",\"items\":[{\"id\":\"news\",\"title\":\"News\"},{\"id\":\"news\",\"title\":\"Duplicate\"}]}", "has duplicate ID",
+                "{\"items\":[{\"id\":\"news\",\"title\":\"News\"}]}", "mapping C");
+        cases.forEach((body, expected) -> {
             when(client.fetch(any(), anyLong())).thenReturn(bytes(body));
-            assertThatThrownBy(() -> runner.resolve(definition, key)).isInstanceOf(WorkflowException.class);
-        }
+            assertThatThrownBy(() -> runner.resolve(definition, key)).isInstanceOf(WorkflowException.class)
+                    .hasMessageContaining(expected);
+        });
         verify(client, never()).checkMedia(any(), anyLong());
     }
 
@@ -124,6 +127,26 @@ class WorkflowRunnerTest {
             assertThat(refresh.entries()).extracting(WorkflowRunner.CatalogEntry::artwork).containsOnlyNulls();
             assertThat(refresh.artworkOmitted()).isTrue();
             assertThat(refresh.problems()).containsExactly("Call images \u00b7 entry \"Music\": server returned HTTP 404");
+        }
+    }
+
+    @Test void anUnexpectedFailureInOneTileFallsBackWithoutExposingItsText() throws Exception {
+        try (var server = new FakeWorkflowServer(); var http = loopbackClient()) {
+            list(server, "t-1");
+            server.respond("/images/news", 200, "{\"url\":\"https://images.example/news.png\"}");
+            var real = new WorkflowCalls(http);
+            try (var _ = mockConstruction(WorkflowCalls.class, (calls, context) -> when(calls.run(any(), any(), any(), any(), any()))
+                    .thenAnswer(call -> {
+                        if ("Music".equals(call.getArgument(4))) throw new IllegalStateException("boom-secret");
+                        return real.run(call.getArgument(0), call.getArgument(1), call.getArgument(2), call.getArgument(3), call.getArgument(4));
+                    }))) {
+                var refresh = new WorkflowRunner(http, PROPERTIES).refresh(chain(server),
+                        new WorkflowCalls.Run(Duration.ofSeconds(10), 3));
+                assertThat(refresh.entries()).extracting(WorkflowRunner.CatalogEntry::title).containsExactly("News", "Music");
+                assertThat(refresh.entries().getFirst().artwork()).isNotNull();
+                assertThat(refresh.entries().getLast().artwork()).isNull();
+                assertThat(refresh.problems()).containsExactly("Entry \"Music\": could not be read");
+            }
         }
     }
 
