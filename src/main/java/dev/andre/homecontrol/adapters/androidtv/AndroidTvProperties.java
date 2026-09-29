@@ -7,10 +7,13 @@ import org.springframework.boot.convert.DurationUnit;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 
-/** {@code home-control.androidtv.*}: the keystore password and the connection's waits. */
+/**
+ * {@code home-control.androidtv.*}: the keystore password (generated and kept in secrets.json when empty) and the
+ * connection's waits.
+ */
 @ConfigurationProperties("home-control.androidtv")
 public record AndroidTvProperties(@DefaultValue("true") boolean enabled,
-                                  @DefaultValue("shield") String keystorePassword,
+                                  String keystorePassword,
                                   @DefaultValue("10s") @DurationUnit(ChronoUnit.SECONDS) Duration staleTimeout,
                                   @DefaultValue("1s") @DurationUnit(ChronoUnit.SECONDS) Duration reconnectInitialDelay,
                                   @DefaultValue("60s") @DurationUnit(ChronoUnit.SECONDS) Duration reconnectMaxDelay) {

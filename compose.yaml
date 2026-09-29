@@ -14,11 +14,13 @@ services:
     # hand it over with `sudo chown -R 1000:1000 data`.
     volumes:
       - ./data:/data
-    environment:
-      HOME_CONTROL_ANDROIDTV_KEYSTORE_PASSWORD: change-me
-      # The app listens on 8080 by default. Spring Boot reads SERVER_PORT, so
-      # uncommenting this is all that is needed under host networking:
-      # SERVER_PORT: 9090
+    # The Android TV keystore password is generated and kept encrypted in ./data/secrets.json. An install that
+    # set HOME_CONTROL_ANDROIDTV_KEYSTORE_PASSWORD here before keeps working: keep that setting, or drop it and
+    # a keystore made with the old default change-me is re-protected under a generated password.
+    # The app listens on 8080 by default. Spring Boot reads SERVER_PORT, so uncommenting this is all that is
+    # needed under host networking:
+    # environment:
+    #   SERVER_PORT: 9090
     restart: unless-stopped
 
 # Bridge-mode alternative (no discovery, manual address entry only):
