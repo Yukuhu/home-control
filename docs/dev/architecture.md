@@ -70,6 +70,10 @@ package sees devices.
 | `web` does not depend on `adapters` | frozen: 0 |
 | `jakarta.servlet` is used only in `web`, `security`, controllers and controller advice | frozen: 24 |
 
+`src/test/java/dev/andre/homecontrol/TestArchitectureTest.java` checks one rule on the tests: tests under `core` do
+not use `sources`. A source's own types are tested in its module; tests that need every module, such as the route
+keys and the application's preference ladder, sit in `playback`.
+
 ## Frozen violations
 
 A frozen rule records the violations it had when it was frozen in `src/test/archunit-store/`. It fails only on new
