@@ -204,6 +204,69 @@ class LoginControllerTest {
     }
 
     @Test
+    void settingAPasswordReportsSuccessAndIsNotAGuess() {
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        assertThat(controller.setPassword("household password", "household password", request, redirect))
+                .isEqualTo("redirect:/setup");
+
+        verify(login).setPassword("household password", "household password", request);
+        assertThat(flash(redirect)).containsEntry("loginMessage",
+                "Password set. Every browser now needs it to open Home Control.");
+        assertThat(limiter.blockedFor(ADDRESS)).isEmpty();
+    }
+
+    @Test
+    void aRejectedNewPasswordIsShown() {
+        willThrow(new PasswordRejectedException("The two passwords do not match"))
+                .given(login).setPassword("household password", "different", request);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        controller.setPassword("household password", "different", request, redirect);
+
+        assertThat(flash(redirect)).containsEntry("loginError", "The two passwords do not match");
+    }
+
+    @Test
+    void removingThePasswordReportsSuccessAndClearsTheAddress() {
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        assertThat(controller.removePassword("household password", request, redirect)).isEqualTo("redirect:/setup");
+
+        verify(login).removePassword("household password");
+        assertThat(flash(redirect)).containsEntry("loginMessage",
+                "Password removed. Anyone on your network can open Home Control.");
+        assertThat(limiter.blockedFor(ADDRESS)).isEmpty();
+    }
+
+    @Test
+    void aWrongCurrentPasswordIsAGuessAndTheNextRemovalWaits() {
+        willThrow(new WrongPasswordException("The current password is wrong")).given(login).removePassword("guess");
+        RedirectAttributesModelMap first = new RedirectAttributesModelMap();
+
+        controller.removePassword("guess", request, first);
+
+        assertThat(flash(first)).containsEntry("loginError", "The current password is wrong");
+        RedirectAttributesModelMap second = new RedirectAttributesModelMap();
+        controller.removePassword("household password", request, second);
+        assertThat(flash(second)).containsEntry("loginError", "Too many attempts. Try again in 15 minutes.");
+        verify(login, times(1)).removePassword(any());
+    }
+
+    @Test
+    void aRefusalWhileAccountsAreConnectedIsNotAGuess() {
+        willThrow(new PasswordRejectedException("Disconnect Jellyfin first: its credentials need the login password"))
+                .given(login).removePassword("household password");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        controller.removePassword("household password", request, redirect);
+
+        assertThat(flash(redirect)).containsEntry("loginError",
+                "Disconnect Jellyfin first: its credentials need the login password");
+        assertThat(limiter.blockedFor(ADDRESS)).isEmpty();
+    }
+
+    @Test
     void anUnexpectedFailureWhileChangingThePasswordIsNotAGuess() {
         willThrow(new IllegalStateException("disk gone")).given(login).changePassword("old", "new", "new", request);
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();

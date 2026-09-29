@@ -77,7 +77,8 @@ class LoginGatingTest extends FullAppTest {
     @Test
     void crossOriginRequestsAreRefusedBeforeAnyLoginExists() throws Exception {
         for (String path : new String[] {"/devices/nope/key/HOME", "/devices;x/nope/key/HOME", "/%64evices/nope/key/HOME",
-                "/setup/forget", "/setup;x/forget", "/login", "/logout", "/setup/password"}) {
+                "/setup/forget", "/setup;x/forget", "/login", "/logout", "/setup/password", "/setup/password/set",
+                "/setup/password/remove"}) {
             mockMvc.perform(post(URI.create(path)).header("Sec-Fetch-Site", "cross-site"))
                     .andExpect(status().isForbidden());
             mockMvc.perform(post(URI.create(path)).header("Host", "localhost").header("Origin", "http://evil.example"))

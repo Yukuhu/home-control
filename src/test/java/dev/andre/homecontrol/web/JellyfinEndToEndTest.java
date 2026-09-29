@@ -232,6 +232,11 @@ class JellyfinEndToEndTest extends FullAppTest {
                 assertThat(send(browser, post("/setup/sources/jellyfin/disconnect", Map.of())).statusCode()).isEqualTo(302);
                 assertThat(jellyfin.requests("POST", "/Sessions/Logout")).isNotEmpty();
                 assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(302);
+                assertThat(send(stranger, post("/setup/password/remove", Map.of("current", LOGIN))).statusCode())
+                        .isEqualTo(401);
+                assertThat(send(browser, post("/setup/password/remove", Map.of("current", LOGIN))).statusCode())
+                        .isEqualTo(302);
+                assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(200);
             } finally {
                 devices.forget("shield-e2e");
                 devices.forget("kitchen-e2e");
