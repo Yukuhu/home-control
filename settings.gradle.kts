@@ -1,1 +1,1 @@
-rootProject.name = "shield-remote"
+rootProject.name = "home-control"

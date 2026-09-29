@@ -135,7 +135,7 @@ Playing a Jellyfin item on a device tries, in order:
 
 Install Jellyfin for Android TV and sign in on the Shield once. If the app asks you to choose a
 user each time, configure its automatic login on the TV. Startup waits up to
-`home-control.jellyfin.startup-timeout-seconds` (30 by default); a failure explains whether the
+`home-control.jellyfin.startup-timeout` (`30s` by default); a failure explains whether the
 Shield could not connect, did not wake, or Jellyfin did not become ready. Playback is sent once
 and is not queued for later. Unconfirmed wake and launch commands are retried during the startup
 budget, including after a remote reconnect; playback itself is never retried. Startup logs show

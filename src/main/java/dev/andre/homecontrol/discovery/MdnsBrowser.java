@@ -69,7 +69,7 @@ public class MdnsBrowser implements AutoCloseable {
 
     record InterfaceAddress(InetAddress address, boolean up, boolean multicast, boolean loopback) {}
 
-    /** Created by {@code HomeControlConfiguration} from {@code shield.discovery-enabled}. */
+    /** Created by {@code HomeControlConfiguration} from {@code home-control.discovery.enabled}. */
     public MdnsBrowser(boolean enabled) {
         this.enabled = enabled;
     }

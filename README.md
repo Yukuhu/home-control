@@ -87,8 +87,9 @@ future container replacements and image updates will reuse the bind-mounted pair
 
 The default keystore password is stable and intentionally omitted from the CasaOS
 manifest. It protects the local PKCS12 file; it is not a web login or network
-authentication. If you set `SHIELD_KEYSTORE_PASSWORD` yourself, keep the same value
-for every redeployment.
+authentication. If you set `HOME_CONTROL_ANDROIDTV_KEYSTORE_PASSWORD` yourself (older
+setups use `SHIELD_KEYSTORE_PASSWORD`, which still works), keep the same value for every
+redeployment.
 
 ## First steps
 

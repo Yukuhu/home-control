@@ -34,9 +34,10 @@ context per test JVM.
 ## Module switches
 
 A test that checks a module switched off extends `testsupport.ModulesOffTest`: one application context with every
-module that can be switched off switched off (Android TV cannot be), shared by all such tests. It checks that its
-module leaves no bean, setup section, route or file behind (`dataDir()`), and `ModulesOffSmokeTest` that the
-application starts that way. The same rules as for web slices apply (`SharedContextRulesTest`). A test of another
+module in `config.Module` switched off, shared by all such tests. It checks that its module leaves no bean, setup
+section, route or file behind (`dataDir()`), and `ModulesOffSmokeTest` that the application starts that way. A new
+module added to `config.Module` is switched off there, and checked by `noSwitchableModuleNeedsAnotherModulesBean`,
+without further changes. The same rules as for web slices apply (`SharedContextRulesTest`). A test of another
 combination, such as sports on with TheSportsDB off, keeps a `@SpringBootTest` of its own and is named in
 `SharedContextRulesTest.OWN_CONTEXT`.
 
