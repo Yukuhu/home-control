@@ -2,21 +2,17 @@ package dev.andre.homecontrol.sources.pinned;
 
 import dev.andre.homecontrol.core.playback.AppLinks;
 import dev.andre.homecontrol.core.playback.ContentKind;
-import dev.andre.homecontrol.storage.StorageException;
+import dev.andre.homecontrol.storage.VersionedJsonFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -27,10 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/**
- * Pinned shortcuts, in a small JSON file written atomically via a temp file and rename — the same
- * pattern as the device registry and the source settings file.
- */
+/** Pinned shortcuts in pinned.json, version 1: read once, then served from memory and written through. */
 public class JsonFilePinStore {
 
     private static final String SUBTITLE = "subtitle";
@@ -39,37 +32,33 @@ public class JsonFilePinStore {
     private static final Logger log = LoggerFactory.getLogger(JsonFilePinStore.class);
 
     private static final int VERSION = 1;
-    private static final String VERSION_KEY = "version";
     private static final String UPGRADE_OF_KEY = "upgradeOf";
     private static final Pattern ID = Pattern.compile("^p-[0-9a-f]{12}$");
     private static final Pattern UPGRADE_OF =
             Pattern.compile("^[a-z0-9][a-z0-9._-]{0,63}/[A-Za-z0-9._:-]{1,128}$");
     private static final int MAX_TITLE = 120;
 
-    private final JsonMapper mapper = JsonMapper.builder().build();
-    private final Path file;
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
-    public JsonFilePinStore(Path file) {
-        this.file = file;
+    private final VersionedJsonFile<List<Pin>> file;
+
+    public JsonFilePinStore(Path path) {
+        this.file = new VersionedJsonFile<>(path, "pinned shortcuts", VERSION, List::of,
+                JsonFilePinStore::readPins, JsonFilePinStore::writePins);
     }
 
     public synchronized List<Pin> load() {
-        if (!Files.exists(file)) {
-            return List.of();
-        }
-        JsonNode root;
-        try {
-            root = mapper.readTree(Files.readAllBytes(file));
-        } catch (IOException | JacksonException e) {
-            throw new StorageException("Could not read pinned shortcuts in " + file + "; fix or delete it", e);
-        }
-        if (root == null || !root.isObject()) {
-            throw new StorageException("Could not read pinned shortcuts in " + file + "; fix or delete it", null);
-        }
-        int version = root.path(VERSION_KEY).isIntegralNumber() ? root.path(VERSION_KEY).asInt() : -1;
-        if (version != VERSION) {
-            String reason = version > VERSION ? "; it was written by a newer Home Control" : "";
-            throw new StorageException("Could not read pinned shortcuts in " + file + reason + "; fix or delete it", null);
+        return file.read();
+    }
+
+    public synchronized void save(List<Pin> pins) {
+        file.write(List.copyOf(pins));
+    }
+
+    /** Valid entries in file order; an invalid one is skipped with a warning, a repeated id keeps its first entry. */
+    private static List<Pin> readPins(JsonNode root) {
+        if (!root.isObject()) {
+            throw new IllegalArgumentException("document must be a JSON object");
         }
         List<Pin> pins = new ArrayList<>();
         Set<String> seenIds = new HashSet<>();
@@ -81,10 +70,10 @@ public class JsonFilePinStore {
                 pins.add(pin);
             }
         }
-        return pins;
+        return List.copyOf(pins);
     }
 
-    private Pin parsePin(JsonNode entry, int index) {
+    private static Pin parsePin(JsonNode entry, int index) {
         String id = entry.path("id").asString("");
         if (!ID.matcher(id).matches()) {
             log.warn("Skipping pinned shortcut at index {}: invalid or missing id", index);
@@ -146,9 +135,8 @@ public class JsonFilePinStore {
         }
     }
 
-    public synchronized void save(List<Pin> pins) {
-        ObjectNode root = mapper.createObjectNode();
-        root.put(VERSION_KEY, VERSION);
+    private static ObjectNode writePins(List<Pin> pins) {
+        ObjectNode root = MAPPER.createObjectNode();
         ArrayNode pinsNode = root.putArray("pins");
         for (Pin pin : pins) {
             ObjectNode node = pinsNode.addObject();
@@ -162,24 +150,7 @@ public class JsonFilePinStore {
             putOrNull(node, UPGRADE_OF_KEY, pin.upgradeOf());
             node.put("createdAt", pin.createdAt().toString());
         }
-
-        Path parent = file.toAbsolutePath().getParent();
-        Path temp = null;
-        try {
-            Files.createDirectories(parent);
-            temp = Files.createTempFile(parent, "pinned", ".json");
-            Files.write(temp, mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(root));
-            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException | JacksonException e) {
-            if (temp != null) {
-                try {
-                    Files.deleteIfExists(temp);
-                } catch (IOException _) {
-                    // Cleanup error; let the original exception propagate
-                }
-            }
-            throw new StorageException("Could not write pinned shortcuts to " + file, e);
-        }
+        return root;
     }
 
     /** Optional fields are always written, as JSON null when absent. */

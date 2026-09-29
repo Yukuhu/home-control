@@ -1,21 +1,17 @@
 package dev.andre.homecontrol.sources.sports;
 
 import dev.andre.homecontrol.core.content.StreamingProviders;
-import dev.andre.homecontrol.storage.StorageException;
+import dev.andre.homecontrol.storage.VersionedJsonFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -24,7 +20,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** {@code sports.json}: calendars, the TheSportsDB key kind and competitions. Never the calendar URL. */
+/**
+ * {@code sports.json}, version 1: calendars, the TheSportsDB key kind and competitions, never the calendar URL. Read
+ * once, then served from memory and written through.
+ */
 public class JsonFileSportsStore {
 
     private static final String TIME_ZONE = "timeZone";
@@ -37,7 +36,6 @@ public class JsonFileSportsStore {
     private static final Logger log = LoggerFactory.getLogger(JsonFileSportsStore.class);
 
     private static final int VERSION = 1;
-    private static final String VERSION_KEY = "version";
     private static final Pattern CALENDAR_ID = Pattern.compile("^c-[0-9a-f]{12}$");
     private static final Pattern LEAGUE_ID = Pattern.compile("^\\d{1,9}$");
     private static final int MAX_LABEL = 80;
@@ -45,35 +43,27 @@ public class JsonFileSportsStore {
     private static final int MAX_NAME = 120;
     private static final int MAX_FIELD = 60;
 
-    private final JsonMapper mapper = JsonMapper.builder().build();
-    private final Path file;
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
-    public JsonFileSportsStore(Path file) {
-        this.file = file;
+    private final VersionedJsonFile<SportsSettings> file;
+
+    public JsonFileSportsStore(Path path) {
+        this.file = new VersionedJsonFile<>(path, "sports settings", VERSION, SportsSettings::empty,
+                JsonFileSportsStore::readSettings, JsonFileSportsStore::writeSettings);
     }
 
     public synchronized SportsSettings load() {
-        if (!Files.exists(file)) {
-            return SportsSettings.empty();
-        }
-        JsonNode root;
-        try {
-            root = mapper.readTree(Files.readAllBytes(file));
-        } catch (IOException | JacksonException e) {
-            throw new StorageException("Could not read sports settings in " + file + "; fix or delete it", e);
-        }
-        if (root == null || !root.isObject()) {
-            throw new StorageException("Could not read sports settings in " + file + "; fix or delete it", null);
-        }
-        int version = root.path(VERSION_KEY).isIntegralNumber() ? root.path(VERSION_KEY).asInt() : -1;
-        if (version > VERSION) {
-            throw new StorageException(
-                    "Sports settings in " + file + " were written by a newer Home Control; fix or delete it", null);
-        }
-        if (version != VERSION) {
-            throw new StorageException("Could not read sports settings in " + file + "; fix or delete it", null);
-        }
+        return file.read();
+    }
 
+    public synchronized void save(SportsSettings settings) {
+        file.write(settings);
+    }
+
+    private static SportsSettings readSettings(JsonNode root) {
+        if (!root.isObject()) {
+            throw new IllegalArgumentException("document must be a JSON object");
+        }
         String timeZone = timeZone(root.path(TIME_ZONE));
         List<SportsSettings.CalendarEntry> calendars = calendars(root.path("calendars"));
 
@@ -100,7 +90,7 @@ public class JsonFileSportsStore {
     }
 
     /** Valid entries in file order; a repeated id keeps its first entry. */
-    private List<SportsSettings.CalendarEntry> calendars(JsonNode entries) {
+    private static List<SportsSettings.CalendarEntry> calendars(JsonNode entries) {
         List<SportsSettings.CalendarEntry> calendars = new ArrayList<>();
         Set<String> seenCalendarIds = new HashSet<>();
         int index = 0;
@@ -115,7 +105,7 @@ public class JsonFileSportsStore {
     }
 
     /** Valid entries in file order; a repeated league id keeps its first entry. */
-    private List<SportsSettings.CompetitionEntry> competitions(JsonNode entries) {
+    private static List<SportsSettings.CompetitionEntry> competitions(JsonNode entries) {
         List<SportsSettings.CompetitionEntry> competitions = new ArrayList<>();
         Set<String> seenLeagueIds = new HashSet<>();
         int index = 0;
@@ -129,7 +119,7 @@ public class JsonFileSportsStore {
         return competitions;
     }
 
-    private SportsSettings.CalendarEntry parseCalendar(JsonNode entry, int index) {
+    private static SportsSettings.CalendarEntry parseCalendar(JsonNode entry, int index) {
         String id = entry.path("id").asString("");
         String label = entry.path("label").asString("").strip();
         String host = entry.path("host").asString("").strip();
@@ -143,7 +133,7 @@ public class JsonFileSportsStore {
         return new SportsSettings.CalendarEntry(id, label, host, provider, addedAt);
     }
 
-    private SportsSettings.CompetitionEntry parseCompetition(JsonNode entry, int index) {
+    private static SportsSettings.CompetitionEntry parseCompetition(JsonNode entry, int index) {
         String leagueId = entry.path("leagueId").asString("");
         if (!LEAGUE_ID.matcher(leagueId).matches()) {
             log.warn("Skipping sports competition at index {}: invalid leagueId", index);
@@ -203,9 +193,8 @@ public class JsonFileSportsStore {
         }
     }
 
-    public synchronized void save(SportsSettings settings) {
-        ObjectNode root = mapper.createObjectNode();
-        root.put(VERSION_KEY, VERSION);
+    private static ObjectNode writeSettings(SportsSettings settings) {
+        ObjectNode root = MAPPER.createObjectNode();
         putOrNull(root, TIME_ZONE, settings.timeZone());
         ArrayNode calendarsNode = root.putArray("calendars");
         for (SportsSettings.CalendarEntry entry : settings.calendars()) {
@@ -217,7 +206,7 @@ public class JsonFileSportsStore {
         for (SportsSettings.CompetitionEntry entry : settings.competitions()) {
             writeCompetition(competitionsNode.addObject(), entry);
         }
-        writeAtomically(root);
+        return root;
     }
 
     private static void writeCalendar(ObjectNode node, SportsSettings.CalendarEntry entry) {
@@ -243,32 +232,6 @@ public class JsonFileSportsStore {
             node.putNull(name);
         } else {
             node.put(name, value);
-        }
-    }
-
-    /** Writes a temp file next to the target and moves it into place, so readers never see half a file. */
-    private void writeAtomically(ObjectNode root) {
-        Path parent = file.toAbsolutePath().getParent();
-        Path temp = null;
-        try {
-            Files.createDirectories(parent);
-            temp = Files.createTempFile(parent, "sports", ".json");
-            Files.write(temp, mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(root));
-            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException | JacksonException e) {
-            deleteQuietly(temp);
-            throw new StorageException("Could not write sports settings to " + file, e);
-        }
-    }
-
-    private static void deleteQuietly(Path temp) {
-        if (temp == null) {
-            return;
-        }
-        try {
-            Files.deleteIfExists(temp);
-        } catch (IOException _) {
-            // Cleanup error; let the original exception propagate
         }
     }
 }

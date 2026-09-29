@@ -72,7 +72,7 @@ class JsonFileSportsStoreEdgeCaseTest {
 
         assertThatThrownBy(() -> store.save(empty))
                 .isInstanceOf(StorageException.class)
-                .hasMessage("Could not write sports settings to " + file());
+                .hasMessageStartingWith("Could not write sports settings to " + file() + ";");
         try (var files = Files.list(dir)) {
             assertThat(files.map(p -> p.getFileName().toString())).containsExactly("sports.json");
         }

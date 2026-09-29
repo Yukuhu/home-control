@@ -96,7 +96,7 @@ class JsonFilePinStoreTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"not json", "[]", "{\"version\":2,\"pins\":[]}"})
+    @ValueSource(strings = {"not json", "[]", "{\"pins\":[]}"})
     void malformedFilesAreNamedErrors(String content) throws IOException {
         Path file = dir.resolve("pinned.json");
         Files.writeString(file, content);
@@ -106,11 +106,39 @@ class JsonFilePinStoreTest {
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("fix or delete it");
+    }
 
-        if (content.contains("\"version\":2")) {
-            assertThatThrownBy(() -> new JsonFilePinStore(file).load())
-                    .hasMessageContaining("newer Home Control");
-        }
+    @Test
+    void aNewerVersionNamesTheReason() throws IOException {
+        Path file = dir.resolve("pinned.json");
+        Files.writeString(file, "{\"version\":2,\"pins\":[]}");
+
+        assertThatThrownBy(() -> new JsonFilePinStore(file).load())
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining(file.toString())
+                .hasMessageContaining("newer Home Control");
+    }
+
+    @Test
+    void anOlderVersionWithoutAMigrationIsUnreadable() throws IOException {
+        Path file = dir.resolve("pinned.json");
+        Files.writeString(file, "{\"version\":0,\"pins\":[]}");
+
+        assertThatThrownBy(() -> new JsonFilePinStore(file).load())
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining("fix or delete it");
+    }
+
+    @Test
+    void theFileIsReadOnceAndThenServedFromMemory() throws IOException {
+        Path file = dir.resolve("pinned.json");
+        JsonFilePinStore store = new JsonFilePinStore(file);
+        store.save(List.of());
+        store.load();
+
+        Files.writeString(file, "not json any more");
+
+        assertThat(store.load()).isEmpty();
     }
 
     @Test
