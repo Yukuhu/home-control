@@ -9,6 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
 
@@ -46,15 +49,16 @@ public final class WorkflowPlan {
     private WorkflowPlan(WorkflowDraft draft) {
         this.draft = draft;
         index();
-        Map<String, Integer> position = new HashMap<>();
-        for (int i = 0; i < draft.calls().size(); i++) position.put(draft.calls().get(i).name(), i);
+        Map<String, Integer> position = IntStream.range(0, draft.calls().size()).boxed()
+                .collect(Collectors.toMap(i -> draft.calls().get(i).name(), i -> i, (first, last) -> last));
         for (Call call : draft.calls()) link(call, position);
         castUses = new WorkflowTemplate(draft.cast().template(), owners.keySet()).references();
         checkDisplayFields();
         refresh = draft.mode() == Mode.GENERATED ? closure(refreshRoots()) : Set.of();
         play = closure(playRoots());
-        Set<String> unused = new HashSet<>();
-        for (Call call : draft.calls()) if (!refresh.contains(call.name()) && !play.contains(call.name())) unused.add(call.name());
+        Set<String> unused = draft.calls().stream().map(Call::name)
+                .filter(name -> !refresh.contains(name) && !play.contains(name))
+                .collect(Collectors.toCollection(HashSet::new));
         Set<String> playRoots = new HashSet<>(play);
         playRoots.addAll(unused);
         playRun = closure(playRoots);
@@ -116,24 +120,23 @@ public final class WorkflowPlan {
     }
 
     private Set<String> displayVariables() {
-        Set<String> names = new HashSet<>();
-        if (draft.listing() == null) return names;
-        for (Field field : new Field[]{draft.listing().subtitle(), draft.listing().artwork()}) {
-            if (field != null && field.variable() != null) names.add(field.variable());
-        }
-        return names;
+        if (draft.listing() == null) return new HashSet<>();
+        return Stream.of(draft.listing().subtitle(), draft.listing().artwork())
+                .filter(field -> field != null && field.variable() != null)
+                .map(Field::variable)
+                .collect(Collectors.toCollection(HashSet::new));
     }
 
     private Set<String> refreshRoots() {
         Set<String> roots = new HashSet<>();
         roots.add(draft.listing().call());
-        for (String name : displayVariables()) roots.add(owners.get(name));
+        displayVariables().stream().map(owners::get).forEach(roots::add);
         return roots;
     }
 
     private Set<String> playRoots() {
         Set<String> roots = new HashSet<>();
-        for (String name : castUses) roots.add(owners.get(name));
+        castUses.stream().map(owners::get).forEach(roots::add);
         if (draft.mode() == Mode.GENERATED) roots.add(draft.listing().call());
         return roots;
     }

@@ -112,8 +112,7 @@ public final class WorkflowForm {
 
     public WorkflowDraft toDraft(WorkflowDefinition saved) {
         if (templateMode == null || (saved == null && templateMode == Replacement.KEEP)) throw keepWithoutSaved();
-        List<Call> built = new ArrayList<>();
-        for (CallRow row : calls) built.add(call(row, saved));
+        List<Call> built = calls.stream().map(row -> call(row, saved)).toList();
         String media = templateMode == Replacement.KEEP ? saved.draft().cast().template() : template;
         return new WorkflowDraft(name, enabled, mode, kind, built, listing(),
                 mode == Mode.SINGLE ? new Tile(title, optional(subtitle), optional(artwork)) : null,
