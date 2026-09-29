@@ -313,11 +313,12 @@ class DeviceManagerMergeTest {
     }
 
     @Test
-    void receiversResolvedBeforeTheApplicationWasReadyAreMergedOnceItIs() {
+    void aReceiverAnnouncedAfterStartupIsMergedByTheListener() {
         registry.save(shield());
+        manager.start();
         cast.visible.add(receiver("SHIELD", "10.0.0.5"));
 
-        manager.mergeVisibleReceivers();
+        manager.onDiscovered(new DeviceDiscoveredEvent(receiver("SHIELD", "10.0.0.5")));
 
         assertThat(registry.findById("10-0-0-5").orElseThrow().hasAdapter("cast")).isTrue();
         assertThat(manager.addable()).isEmpty();

@@ -1,9 +1,10 @@
 package dev.andre.homecontrol.discovery;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 
 import javax.jmdns.JmDNS;
 import javax.jmdns.ServiceEvent;
@@ -84,7 +85,11 @@ public class MdnsBrowser implements AutoCloseable {
         }
     }
 
-    @PostConstruct
+    /**
+     * Starts listening once the application is ready, so no discovery event reaches the context before its listeners
+     * exist. A standalone browser (the opt-in multicast test) calls it directly.
+     */
+    @EventListener(ApplicationReadyEvent.class)
     public synchronized void start() {
         if (jmdns != null) {
             return;

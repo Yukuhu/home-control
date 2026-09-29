@@ -9,7 +9,8 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties(SsdpProperties.class)
 public class SsdpConfiguration {
 
-    @Bean(initMethod = "start", destroyMethod = "close")
+    /** Starts itself once the application is ready; see {@link SsdpDiscovery#start}. */
+    @Bean(destroyMethod = "close")
     public SsdpDiscovery ssdpDiscovery(SsdpProperties properties) {
         return new SsdpDiscovery(properties);
     }
