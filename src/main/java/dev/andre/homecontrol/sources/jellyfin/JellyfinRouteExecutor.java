@@ -3,13 +3,14 @@ package dev.andre.homecontrol.sources.jellyfin;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
-import dev.andre.homecontrol.device.DeviceManager;
 
 import java.net.URI;
 import java.time.Duration;
@@ -34,22 +35,25 @@ public class JellyfinRouteExecutor implements RouteExecutor {
     // Remote v2 package launch, also used by androidtvremote2's send_launch_app_command.
     private static final URI APP_LINK = URI.create("market://launch?id=" + PACKAGE);
     private final JellyfinSessions sessions;
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
+    private final DeviceCommands commands;
     private final Duration startupTimeout;
     private final long retryNanos;
     private final Duration pauseStep;
 
-    public JellyfinRouteExecutor(JellyfinSessions sessions, DeviceManager devices, Duration startupTimeout) {
-        this(sessions, devices, startupTimeout, RETRY, PAUSE_STEP);
+    public JellyfinRouteExecutor(JellyfinSessions sessions, DeviceQueries devices, DeviceCommands commands,
+                                 Duration startupTimeout) {
+        this(sessions, devices, commands, startupTimeout, RETRY, PAUSE_STEP);
     }
 
-    JellyfinRouteExecutor(JellyfinSessions sessions, DeviceManager devices, Duration startupTimeout,
-                          Duration retry, Duration pauseStep) {
+    JellyfinRouteExecutor(JellyfinSessions sessions, DeviceQueries devices, DeviceCommands commands,
+                          Duration startupTimeout, Duration retry, Duration pauseStep) {
         if (startupTimeout.isNegative() || startupTimeout.isZero()) {
             throw new IllegalArgumentException("Jellyfin startup timeout must be positive");
         }
         this.sessions = sessions;
         this.devices = devices;
+        this.commands = commands;
         this.startupTimeout = startupTimeout;
         this.retryNanos = retry.toNanos();
         this.pauseStep = pauseStep;
@@ -166,7 +170,7 @@ public class JellyfinRouteExecutor implements RouteExecutor {
         progress.stage = "wake confirmation";
         if (System.nanoTime() >= progress.nextCommand) {
             log.info("Sending WAKEUP for Jellyfin on {}", device.id());
-            devices.execute(device.id(), new Action.PressKey(RemoteKey.WAKEUP));
+            commands.execute(device.id(), new Action.PressKey(RemoteKey.WAKEUP));
             progress.nextCommand = System.nanoTime() + retryNanos;
         }
     }
@@ -177,7 +181,7 @@ public class JellyfinRouteExecutor implements RouteExecutor {
         progress.stage = "Jellyfin foreground app";
         if (System.nanoTime() >= progress.nextCommand) {
             log.info("Sending Jellyfin app launch on {} via {}", device.id(), APP_LINK);
-            devices.execute(device.id(), new Action.OpenAppLink(APP_LINK));
+            commands.execute(device.id(), new Action.OpenAppLink(APP_LINK));
             progress.nextCommand = System.nanoTime() + retryNanos;
         }
     }

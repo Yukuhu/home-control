@@ -1,9 +1,10 @@
 package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.content.RailPreferences;
+import dev.andre.homecontrol.core.DeviceCommands;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.*;
 import dev.andre.homecontrol.core.playback.*;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,8 @@ import static org.mockito.Mockito.*;
 class WorkflowCastRouteExecutorTest {
     private final WorkflowIntegrationFixture fixture = new WorkflowIntegrationFixture(false);
     private final WorkflowRunner runner = mock(WorkflowRunner.class);
-    private final DeviceManager devices = mock(DeviceManager.class);
+    private final DeviceQueries devices = mock(DeviceQueries.class);
+    private final DeviceCommands commands = mock(DeviceCommands.class);
     private final RailPreferences preferences = mock(RailPreferences.class);
     private final Device tv = new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.1", Map.of(), Instant.now());
     private final Route.WorkflowCast route = new Route.WorkflowCast(ID, 1, "single");
@@ -36,13 +38,13 @@ class WorkflowCastRouteExecutorTest {
         when(preferences.sourceEnabled("workflows")).thenReturn(true);
         when(devices.capabilities("tv")).thenReturn(Set.of(Capability.CAST_RECEIVER));
         when(runner.resolve(fixture.definition, "single")).thenReturn(media);
-        executor = new WorkflowCastRouteExecutor(fixture.store, runner, devices, preferences);
+        executor = new WorkflowCastRouteExecutor(fixture.store, runner, devices, commands, preferences);
     }
 
     @Test void sendsOneDefaultReceiverLoadWithFreshUrlMimeAndTitle() {
         executor.execute(route, tv);
         var action = ArgumentCaptor.forClass(Action.class);
-        verify(devices).execute(eq("tv"), action.capture());
+        verify(commands).execute(eq("tv"), action.capture());
         var cast = (Action.CastLoad) action.getValue();
         assertThat(cast.receiverAppId()).isEqualTo("CC1AD845");
         assertThat(cast.load()).containsEntry("autoplay", true);
@@ -69,9 +71,9 @@ class WorkflowCastRouteExecutorTest {
                 var source = new WorkflowContentSource(generated.store, realRunner,
                         new WorkflowCatalogs(generated.store), preferences);
                 var item = source.rail(ID).items().getFirst();
-                var cast = new WorkflowCastRouteExecutor(generated.store, realRunner, devices, preferences);
+                var cast = new WorkflowCastRouteExecutor(generated.store, realRunner, devices, commands, preferences);
                 when(devices.device("tv")).thenReturn(Optional.of(tv));
-                var playback = new PlaybackService(devices, new PlaybackPlanner(List.of(new WorkflowCastStrategy())),
+                var playback = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowCastStrategy())),
                         List.of(), List.of(cast));
                 assertThat(source.item(item.id())).contains(item);
                 assertThat(playback.plan(item, "tv")).isInstanceOf(Route.WorkflowCast.class);
@@ -80,7 +82,7 @@ class WorkflowCastRouteExecutorTest {
                 server.respond("/catalog", 200, "{\"token\":\"fresh-secret\",\"items\":[{\"id\":\"other\",\"title\":\"Other\"},{\"id\":\"news\",\"title\":\"Fresh News\"}]}");
                 assertThat(playback.attempt(item, "tv", Set.of())).isInstanceOf(PlayAttempt.Played.class);
                 var action = ArgumentCaptor.forClass(Action.class);
-                verify(devices).execute(eq("tv"), action.capture());
+                verify(commands).execute(eq("tv"), action.capture());
                 @SuppressWarnings("unchecked") var payload = (Map<String, Object>) ((Action.CastLoad) action.getValue()).load().get("media");
                 assertThat(payload).containsEntry("contentUrl", server.url("/media") + "?id=news&token=fresh-secret");
                 assertThat(payload.toString()).doesNotContain("old-secret");
@@ -90,7 +92,7 @@ class WorkflowCastRouteExecutorTest {
                 // A subsequent user retry fetches again; a missing entry never sends another command.
                 server.respond("/catalog", 200, "{\"token\":\"secret\",\"items\":[]}");
                 assertThat(playback.attempt(item, "tv", Set.of())).isInstanceOf(PlayAttempt.Failed.class);
-                verify(devices, times(1)).execute(any(), any());
+                verify(commands, times(1)).execute(any(), any());
             }
         }
     }
@@ -104,11 +106,11 @@ class WorkflowCastRouteExecutorTest {
         var realRunner = new WorkflowRunner(client);
         var source = new WorkflowContentSource(generated.store, realRunner, new WorkflowCatalogs(generated.store), preferences);
         var item = source.rail(ID).items().getFirst();
-        var cast = new WorkflowCastRouteExecutor(generated.store, realRunner, devices, preferences);
+        var cast = new WorkflowCastRouteExecutor(generated.store, realRunner, devices, commands, preferences);
         when(devices.device("tv")).thenReturn(Optional.of(tv));
-        var playback = new PlaybackService(devices, new PlaybackPlanner(List.of(new WorkflowCastStrategy())), List.of(), List.of(cast));
+        var playback = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowCastStrategy())), List.of(), List.of(cast));
         assertThat(playback.attempt(item, "tv", Set.of())).isInstanceOf(PlayAttempt.Failed.class);
-        verify(devices, never()).execute(any(), any());
+        verify(commands, never()).execute(any(), any());
         verify(client, never()).checkMedia(any());
     }
 
@@ -119,7 +121,7 @@ class WorkflowCastRouteExecutorTest {
         when(preferences.sourceEnabled("workflows")).thenReturn(false);
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(ActionFailedException.class);
         verifyNoInteractions(runner);
-        verify(devices, never()).execute(any(), any());
+        verify(commands, never()).execute(any(), any());
     }
 
     @Test void staleDisabledAndDeletedWorkflowsNeverFetchOrSend() {
@@ -131,18 +133,18 @@ class WorkflowCastRouteExecutorTest {
         fixture.store.remove(ID, 3, fixture.request);
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(ActionFailedException.class);
         verifyNoInteractions(runner);
-        verify(devices, never()).execute(any(), any());
+        verify(commands, never()).execute(any(), any());
     }
 
     @Test void fetchFailureBecomesFailedAttemptAndNeverSends() {
         when(runner.resolve(any(), any())).thenThrow(new WorkflowException(WorkflowException.Stage.FETCH, "request failed"));
         when(devices.device("tv")).thenReturn(Optional.of(tv));
-        var service = new PlaybackService(devices, new PlaybackPlanner(List.of(new WorkflowCastStrategy())), List.of(), List.of(executor));
+        var service = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowCastStrategy())), List.of(), List.of(executor));
         var item = new ContentItem(ID, "workflows", ContentKind.VIDEO, "News", null, null,
                 List.of(new PlayableRef.WorkflowCast(ID, 1, "single")));
         assertThat(service.attempt(item, "tv", Set.of())).isInstanceOfSatisfying(PlayAttempt.Failed.class,
                 failed -> assertThat(failed.cause()).hasMessageContaining("Fetch JSON"));
-        verify(devices, never()).execute(any(), any());
+        verify(commands, never()).execute(any(), any());
     }
 
     @Test void editsDuringResolutionCancelDispatch() throws Exception {
@@ -161,7 +163,7 @@ class WorkflowCastRouteExecutorTest {
             } finally { release.countDown(); }
             assertThatThrownBy(() -> play.get(5, TimeUnit.SECONDS)).hasCauseInstanceOf(ActionFailedException.class);
         }
-        verify(devices, never()).execute(any(), any());
+        verify(commands, never()).execute(any(), any());
     }
 
     @Test void sourceDisabledDuringResolutionCancelsDispatch() {
@@ -170,7 +172,7 @@ class WorkflowCastRouteExecutorTest {
             return media;
         });
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(ActionFailedException.class);
-        verify(devices, never()).execute(any(), any());
+        verify(commands, never()).execute(any(), any());
     }
 
     @Test void capabilityRemovedDuringResolutionCancelsDispatch() {
@@ -179,17 +181,17 @@ class WorkflowCastRouteExecutorTest {
             return media;
         });
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(UnsupportedActionException.class);
-        verify(devices, never()).execute(any(), any());
+        verify(commands, never()).execute(any(), any());
     }
 
     @Test void receiverFailuresAreRedactedAndOfflineUnsupportedTypesArePreserved() {
         doThrow(new ActionFailedException("Receiver refused https://media.example/?token=secret-marker"))
-                .when(devices).execute(any(), any());
+                .when(commands).execute(any(), any());
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(ActionFailedException.class)
                 .hasMessageNotContaining("secret-marker").hasMessageNotContaining("media.example");
-        doThrow(new DeviceOfflineException("offline")).when(devices).execute(any(), any());
+        doThrow(new DeviceOfflineException("offline")).when(commands).execute(any(), any());
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(DeviceOfflineException.class);
-        doThrow(new UnsupportedActionException("unsupported")).when(devices).execute(any(), any());
+        doThrow(new UnsupportedActionException("unsupported")).when(commands).execute(any(), any());
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(UnsupportedActionException.class);
     }
 }

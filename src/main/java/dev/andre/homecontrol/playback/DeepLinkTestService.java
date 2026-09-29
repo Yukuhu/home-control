@@ -4,13 +4,14 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.device.DeviceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -41,13 +42,15 @@ public class DeepLinkTestService {
     private static final String CHECK_THE_SCREEN =
             " No adapter can see which video plays: check the screen for the test video.";
 
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
+    private final DeviceCommands commands;
     private final DeepLinkTestProperties properties;
     /** device id → the running test's queue of state events; one test per device at a time. */
     private final Map<String, BlockingQueue<DeviceState>> watching = new ConcurrentHashMap<>();
 
-    public DeepLinkTestService(DeviceManager devices, DeepLinkTestProperties properties) {
+    public DeepLinkTestService(DeviceQueries devices, DeviceCommands commands, DeepLinkTestProperties properties) {
         this.devices = devices;
+        this.commands = commands;
         this.properties = properties;
     }
 
@@ -73,7 +76,7 @@ public class DeepLinkTestService {
         }
         try {
             try {
-                devices.execute(deviceId, new Action.OpenAppLink(properties.youtubeUrl()));
+                commands.execute(deviceId, new Action.OpenAppLink(properties.youtubeUrl()));
             } catch (ActionFailedException | DeviceNotFoundException | DeviceOfflineException
                      | UnsupportedActionException e) {
                 // Written for the user: the device and what it could not do.

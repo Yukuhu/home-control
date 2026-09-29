@@ -2,7 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
@@ -37,10 +37,10 @@ public class JellyfinSetupAdvice {
     private final ObjectProvider<JellyfinSetupService> setup;
     private final ObjectProvider<LoginService> login;
     private final ObjectProvider<JellyfinSessions> sessions;
-    private final ObjectProvider<DeviceManager> devices;
+    private final ObjectProvider<DeviceQueries> devices;
 
     public JellyfinSetupAdvice(ObjectProvider<JellyfinSetupService> setup, ObjectProvider<LoginService> login,
-                               ObjectProvider<JellyfinSessions> sessions, ObjectProvider<DeviceManager> devices) {
+                               ObjectProvider<JellyfinSessions> sessions, ObjectProvider<DeviceQueries> devices) {
         this.setup = setup;
         this.login = login;
         this.sessions = sessions;
@@ -83,9 +83,9 @@ public class JellyfinSetupAdvice {
                 sessionsError = e.getMessage();
             }
         }
-        DeviceManager deviceManager = devices.getIfAvailable();
-        List<DeviceOption> deviceOptions = deviceManager == null ? List.of()
-                : deviceManager.devices().stream().map(d -> new DeviceOption(d.id(), d.name(), d.hasAdapter("androidtv"),
+        DeviceQueries registered = devices.getIfAvailable();
+        List<DeviceOption> deviceOptions = registered == null ? List.of()
+                : registered.devices().stream().map(d -> new DeviceOption(d.id(), d.name(), d.hasAdapter("androidtv"),
                         s.player(d.id()).name().toLowerCase(java.util.Locale.ROOT))).toList();
         return new View(true, s.serverName(), s.serverVersion(), s.serverUrl().toString(),
                 s.deviceServerUrl().toString(), s.userName(),

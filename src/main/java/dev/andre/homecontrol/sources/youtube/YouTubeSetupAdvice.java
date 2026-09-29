@@ -3,7 +3,7 @@ package dev.andre.homecontrol.sources.youtube;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.Capability;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
@@ -58,11 +58,11 @@ public class YouTubeSetupAdvice {
     private final ObjectProvider<LoginService> login;
     private final ObjectProvider<QuotaLedger> ledger;
     private final ObjectProvider<YouTubePlaylists> playlists;
-    private final ObjectProvider<DeviceManager> devices;
+    private final ObjectProvider<DeviceQueries> devices;
 
     public YouTubeSetupAdvice(ObjectProvider<YouTubeSetupService> setup, ObjectProvider<LoginService> login,
                               ObjectProvider<QuotaLedger> ledger, ObjectProvider<YouTubePlaylists> playlists,
-                              ObjectProvider<DeviceManager> devices) {
+                              ObjectProvider<DeviceQueries> devices) {
         this.setup = setup;
         this.login = login;
         this.ledger = ledger;
@@ -88,12 +88,12 @@ public class YouTubeSetupAdvice {
 
     /** Every registered Cast receiver, in the device list's order. */
     private List<LoungeDeviceView> loungeDevices(YouTubeSettings settings) {
-        DeviceManager manager = devices.getIfAvailable();
-        if (manager == null) {
+        DeviceQueries registered = devices.getIfAvailable();
+        if (registered == null) {
             return List.of();
         }
-        return manager.devices().stream()
-                .filter(device -> manager.capabilities(device.id()).contains(Capability.CAST_RECEIVER))
+        return registered.devices().stream()
+                .filter(device -> registered.capabilities(device.id()).contains(Capability.CAST_RECEIVER))
                 .map(device -> new LoungeDeviceView(device.id(), device.name(),
                         settings.loungeDevices().contains(device.id())))
                 .toList();

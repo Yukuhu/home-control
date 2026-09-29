@@ -3,11 +3,11 @@ package dev.andre.homecontrol.sources.youtube;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.Route;
-import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ class YouTubeLoungeRouteExecutorTest {
 
     private final Device kitchen = new Device("kitchen", "Kitchen", DeviceKind.CAST, "10.0.0.9",
             Map.of("cast", Map.of()), Instant.now());
-    private final DeviceManager devices = mock(DeviceManager.class);
+    private final DeviceCommands commands = mock(DeviceCommands.class);
     private final YouTubeSetupService setup = mock(YouTubeSetupService.class);
     private final AtomicReference<YouTubeSettings> settings = new AtomicReference<>();
     private FakeGoogleServer fake;
@@ -62,7 +62,7 @@ class YouTubeLoungeRouteExecutorTest {
             settings.set(invocation.getArgument(0));
             return null;
         }).given(setup).save(any());
-        executor = new YouTubeLoungeRouteExecutor(devices,
+        executor = new YouTubeLoungeRouteExecutor(commands,
                 new LoungeClient(new YouTubeHttp(fake.properties()), fake.properties().loungeBaseUrl()), setup);
     }
 
@@ -73,7 +73,7 @@ class YouTubeLoungeRouteExecutorTest {
 
     @Test
     void castsThroughTheLounge() {
-        given(devices.query("kitchen", MDX_STATUS)).willReturn(mdxReply());
+        given(commands.query("kitchen", MDX_STATUS)).willReturn(mdxReply());
 
         executor.execute(ROUTE, kitchen);
 
@@ -83,14 +83,14 @@ class YouTubeLoungeRouteExecutorTest {
         assertThat(binds.getFirst().query()).containsEntry("RID", "1");
         assertThat(binds.get(1).query()).containsEntry("RID", "2");
         assertThat(binds.get(1).form()).containsEntry("req0_videoId", "aqz-KE-bpKQ");
-        verify(devices).query("kitchen", MDX_STATUS);
+        verify(commands).query("kitchen", MDX_STATUS);
         verify(setup, never()).save(any());
     }
 
     @Test
     void aRemoteIdIsCreatedOnceAndReused() {
         settings.set(YouTubeSettings.EMPTY.withLoungeDevice("kitchen", true));
-        given(devices.query("kitchen", MDX_STATUS)).willReturn(mdxReply());
+        given(commands.query("kitchen", MDX_STATUS)).willReturn(mdxReply());
 
         executor.execute(ROUTE, kitchen);
 
@@ -106,7 +106,7 @@ class YouTubeLoungeRouteExecutorTest {
 
     @Test
     void receiverProblemsAreExplicit() {
-        given(devices.query("kitchen", MDX_STATUS)).willThrow(
+        given(commands.query("kitchen", MDX_STATUS)).willThrow(
                 new ActionFailedException("Kitchen did not answer in time when asked to answer mdxSessionStatus"));
 
         assertThatThrownBy(() -> executor.execute(ROUTE, kitchen))
@@ -115,7 +115,7 @@ class YouTubeLoungeRouteExecutorTest {
                 .hasMessageContaining("did not answer in time when asked to answer mdxSessionStatus")
                 .hasMessageEndingWith("switch YouTube Cast off for this device in Setup.");
 
-        willReturn(Map.of("type", "mdxSessionStatus", "data", Map.of())).given(devices).query("kitchen", MDX_STATUS);
+        willReturn(Map.of("type", "mdxSessionStatus", "data", Map.of())).given(commands).query("kitchen", MDX_STATUS);
 
         assertThatThrownBy(() -> executor.execute(ROUTE, kitchen))
                 .isInstanceOf(ActionFailedException.class)
@@ -127,19 +127,19 @@ class YouTubeLoungeRouteExecutorTest {
     @Test
     void offlineAndUnsupportedPassThrough() {
         DeviceOfflineException offline = new DeviceOfflineException("Kitchen is not connected");
-        given(devices.query(eq("kitchen"), any())).willThrow(offline);
+        given(commands.query(eq("kitchen"), any())).willThrow(offline);
 
         assertThatThrownBy(() -> executor.execute(ROUTE, kitchen)).isSameAs(offline);
 
         UnsupportedActionException unsupported = new UnsupportedActionException("Kitchen is not a Cast receiver");
-        willThrow(unsupported).given(devices).query(eq("kitchen"), any());
+        willThrow(unsupported).given(commands).query(eq("kitchen"), any());
 
         assertThatThrownBy(() -> executor.execute(ROUTE, kitchen)).isSameAs(unsupported);
     }
 
     @Test
     void loungeFailuresAreExplicit() {
-        given(devices.query("kitchen", MDX_STATUS)).willReturn(mdxReply());
+        given(commands.query("kitchen", MDX_STATUS)).willReturn(mdxReply());
         fake.respond("POST", "/lounge/bc/bind", FakeGoogleServer.Canned.json(401, "{}"));
 
         assertThatThrownBy(() -> executor.execute(ROUTE, kitchen))

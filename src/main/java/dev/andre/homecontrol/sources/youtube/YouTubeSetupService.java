@@ -2,7 +2,7 @@ package dev.andre.homecontrol.sources.youtube;
 
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
@@ -47,7 +47,7 @@ public class YouTubeSetupService {
     private final QuotaLedger ledger;
     private final ObjectProvider<YouTubeContentSource> source;
     private final ObjectProvider<YouTubePlaylists> playlists;
-    private final ObjectProvider<DeviceManager> devices;
+    private final ObjectProvider<DeviceQueries> devices;
 
     // Eleven distinct collaborators, four resolved lazily (the account and content source beans depend on this one).
     @SuppressWarnings("java:S107")
@@ -55,7 +55,7 @@ public class YouTubeSetupService {
                                GoogleOAuthClient oauth, GoogleTokens tokens, YouTubeAuthorizationService authorization,
                                ObjectProvider<YouTubeAccount> account, QuotaLedger ledger,
                                ObjectProvider<YouTubeContentSource> source, ObjectProvider<YouTubePlaylists> playlists,
-                               ObjectProvider<DeviceManager> devices) {
+                               ObjectProvider<DeviceQueries> devices) {
         this.secrets = secrets;
         this.login = login;
         this.sourceSettings = sourceSettings;
@@ -207,13 +207,13 @@ public class YouTubeSetupService {
         if (deviceId == null || deviceId.isBlank()) {
             throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Choose a device");
         }
-        DeviceManager manager = devices.getIfAvailable();
-        Optional<Device> device = manager == null ? Optional.empty() : manager.device(deviceId);
+        DeviceQueries registered = devices.getIfAvailable();
+        Optional<Device> device = registered == null ? Optional.empty() : registered.device(deviceId);
         if (enabled) {
             if (device.isEmpty()) {
                 throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "No device with id " + deviceId);
             }
-            if (!manager.capabilities(deviceId).contains(Capability.CAST_RECEIVER)) {
+            if (!registered.capabilities(deviceId).contains(Capability.CAST_RECEIVER)) {
                 throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Only Cast devices can use YouTube Cast");
             }
         }

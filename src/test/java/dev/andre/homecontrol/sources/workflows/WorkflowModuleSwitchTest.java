@@ -3,10 +3,11 @@ package dev.andre.homecontrol.sources.workflows;
 import dev.andre.homecontrol.content.ContentProperties;
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.RailPreferences;
+import dev.andre.homecontrol.core.DeviceCommands;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.content.ContentChangedEvent;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.ContentSource;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.SecretStore;
 import dev.andre.homecontrol.testsupport.ModulesOffTest;
@@ -33,7 +34,8 @@ class WorkflowModuleSwitchTest {
     private final ApplicationContextRunner context = new ApplicationContextRunner()
             .withBean(SecretStore.class, () -> secrets)
             .withBean(LoginService.class, () -> mock(LoginService.class))
-            .withBean(DeviceManager.class, () -> mock(DeviceManager.class))
+            .withBean(DeviceQueries.class, () -> mock(DeviceQueries.class))
+            .withBean(DeviceCommands.class, () -> mock(DeviceCommands.class))
             .withBean(RailPreferences.class, () -> preferences)
             .withUserConfiguration(WorkflowConfiguration.class, WorkflowSetupController.class, WorkflowSetupAdvice.class, WorkflowTestService.class);
 
