@@ -46,12 +46,12 @@ class LiveEventRoutingTest {
         ContentItem item = liveEvent(List.of(new PlayableRef.AppLink(URI.create("https://www.dazn.com/"), "dazn")));
         Set<Capability> capabilities = Set.of(Capability.REMOTE_KEYS, Capability.APP_LINK);
 
-        Route route = planner().plan(item, capabilities);
+        Route route = planner().plan(item, capabilities).first();
 
         assertThat(route).isEqualTo(new Route.OpenAppLink(URI.create("https://www.dazn.com/"), "dazn"));
         assertThat(route.describe()).isEqualTo("Open the DAZN app (not this title)");
         assertThat(route.describe(item.kind())).isEqualTo("Open the DAZN app (not this event)");
-        assertThat(planner().routes(item, capabilities)).containsExactly(route);
+        assertThat(planner().plan(item, capabilities).routes()).containsExactly(route);
     }
 
     @Test
@@ -59,7 +59,7 @@ class LiveEventRoutingTest {
         URI link = URI.create("https://www.dazn.com/de-DE/fixture/ContentId:1a2b3c4d5e6f7g8h9i0j");
         ContentItem item = liveEvent(List.of(new PlayableRef.AppLink(link, "dazn")));
 
-        Route route = planner().plan(item, Set.of(Capability.APP_LINK));
+        Route route = planner().plan(item, Set.of(Capability.APP_LINK)).first();
 
         assertThat(route.describe()).isEqualTo("Open in the DAZN app");
     }
@@ -68,18 +68,18 @@ class LiveEventRoutingTest {
     void anUnmappedEventHasNothingToPlay() {
         ContentItem item = liveEvent(List.of());
 
-        Route route = planner().plan(item, Set.of(Capability.APP_LINK));
+        Route route = planner().plan(item, Set.of(Capability.APP_LINK)).first();
 
         assertThat(route).isEqualTo(new Route.Unroutable("This item has nothing playable"));
-        assertThat(planner().routes(item, Set.of(Capability.APP_LINK))).isEmpty();
+        assertThat(planner().plan(item, Set.of(Capability.APP_LINK)).routes()).isEmpty();
     }
 
     @Test
     void devicesWithoutAppLinksExplainWhy() {
         ContentItem item = liveEvent(List.of(new PlayableRef.AppLink(URI.create("https://www.dazn.com/"), "dazn")));
 
-        Route noAppLink = planner().plan(item, Set.of(Capability.CAST_RECEIVER, Capability.VOLUME));
-        Route noneAtAll = planner().plan(item, Set.of(Capability.MEDIA_RENDERER));
+        Route noAppLink = planner().plan(item, Set.of(Capability.CAST_RECEIVER, Capability.VOLUME)).first();
+        Route noneAtAll = planner().plan(item, Set.of(Capability.MEDIA_RENDERER)).first();
 
         assertThat(noAppLink).isInstanceOf(Route.Unroutable.class);
         assertThat(((Route.Unroutable) noAppLink).reason()).contains("cannot open app links");
@@ -104,10 +104,10 @@ class LiveEventRoutingTest {
         ContentItem future = new ContentItem("v1", "sports", ContentKind.LIVE_EVENT, "Title", null, null, playables,
                 null, Instant.parse("2099-01-01T00:00:00Z"), Instant.parse("2099-01-01T02:00:00Z"));
 
-        Route videoRoute = planner().plan(video, capabilities);
+        Route videoRoute = planner().plan(video, capabilities).first();
         for (ContentItem item : List.of(past, present, future)) {
-            assertThat(planner().plan(item, capabilities)).isEqualTo(videoRoute);
-            assertThat(planner().routes(item, capabilities)).isEqualTo(planner().routes(video, capabilities));
+            assertThat(planner().plan(item, capabilities).first()).isEqualTo(videoRoute);
+            assertThat(planner().plan(item, capabilities).routes()).isEqualTo(planner().plan(video, capabilities).routes());
         }
     }
 
@@ -163,17 +163,17 @@ class LiveEventRoutingTest {
                 null, null, playables);
 
         for (ContentItem item : List.of(event, video)) {
-            Route route = planner().plan(item, capabilities);
+            Route route = planner().plan(item, capabilities).first();
             assertThat(route.describe()).as(item.kind() + ": " + expectedDescribeContains).contains(expectedDescribeContains);
-            assertThat(planner().routes(item, capabilities)).as(item.kind().toString()).hasSize(expectedRouteCount);
+            assertThat(planner().plan(item, capabilities).routes()).as(item.kind().toString()).hasSize(expectedRouteCount);
         }
 
         // Routing itself never special-cases the kind: the event and the video get the identical
         // route (already asserted above via expectedRouteCount/expectedDescribeContains on both).
         // Only Route#describe(ContentKind) does, naming an "event" instead of a "title" for an
         // app-home link, and only for that one wording — everything else stays the same.
-        Route eventRoute = planner().plan(event, capabilities);
-        Route videoRoute = planner().plan(video, capabilities);
+        Route eventRoute = planner().plan(event, capabilities).first();
+        Route videoRoute = planner().plan(video, capabilities).first();
         assertThat(eventRoute).isEqualTo(videoRoute);
         String videoDescribe = videoRoute.describe();
         String expectedEventDescribe = videoDescribe.contains("(not this title)")

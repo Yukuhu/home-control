@@ -25,7 +25,7 @@ class PlaybackPlannerReasonsTest {
 
     private String reason(PlayableRef ref, Set<Capability> capabilities) {
         Route route = planner.plan(new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null, List.of(ref)),
-                capabilities);
+                capabilities).first();
         assertThat(route).isInstanceOf(Route.Unroutable.class);
         return ((Route.Unroutable) route).reason();
     }
@@ -80,7 +80,7 @@ class PlaybackPlannerReasonsTest {
         ContentItem item = new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null,
                 List.of(new PlayableRef.YouTubeLounge("a"), new PlayableRef.CastLoad("F007D354", Map.of()), VIDEO));
 
-        assertThat(planner.plan(item, EnumSet.noneOf(Capability.class)))
+        assertThat(planner.plan(item, EnumSet.noneOf(Capability.class)).first())
                 .isEqualTo(new Route.Unroutable(NOT_CAST_RECEIVER + "; this device cannot play a direct stream"));
     }
 }

@@ -17,8 +17,8 @@ class WorkflowCastStrategyTest {
         assertThat(route.describe()).isEqualTo("Cast with the Default Media Receiver");
         var planner = new PlaybackPlanner(List.of(new AppLinkStrategy(), strategy, new CastStreamStrategy(),
                 new MediaRendererStrategy(), new LocalAudioSinkStrategy()));
-        assertThat(planner.routes(item, Set.of(Capability.APP_LINK, Capability.CAST_RECEIVER))).containsExactly(route);
-        assertThat(planner.plan(item, Set.of(Capability.APP_LINK))).isInstanceOfSatisfying(Route.Unroutable.class,
+        assertThat(planner.plan(item, Set.of(Capability.APP_LINK, Capability.CAST_RECEIVER)).routes()).containsExactly(route);
+        assertThat(planner.plan(item, Set.of(Capability.APP_LINK)).first()).isInstanceOfSatisfying(Route.Unroutable.class,
                 missing -> assertThat(missing.reason()).contains("not a Cast receiver"));
     }
 }

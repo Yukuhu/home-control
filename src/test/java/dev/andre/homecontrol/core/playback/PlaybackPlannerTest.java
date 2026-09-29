@@ -47,7 +47,7 @@ class PlaybackPlannerTest {
         URI uri = URI.create("https://www.youtube.com/watch?v=abc");
 
         Route route = planner.plan(item(new PlayableRef.AppLink(uri, "youtube")),
-                EnumSet.of(Capability.REMOTE_KEYS, Capability.APP_LINK));
+                EnumSet.of(Capability.REMOTE_KEYS, Capability.APP_LINK)).first();
 
         assertThat(route).isEqualTo(new Route.OpenAppLink(uri, "youtube"));
         assertThat(route.describe()).isEqualTo("Open in the YouTube app");
@@ -56,7 +56,7 @@ class PlaybackPlannerTest {
     @Test
     void explainsWhyAnAppLinkCannotReachADeviceWithoutTheCapability() {
         Route route = planner.plan(item(new PlayableRef.AppLink(URI.create("https://x"), "web")),
-                EnumSet.of(Capability.MEDIA_RENDERER));
+                EnumSet.of(Capability.MEDIA_RENDERER)).first();
 
         assertThat(route).isInstanceOfSatisfying(Route.Unroutable.class,
                 unroutable -> assertThat(unroutable.reason()).contains("cannot open app links"));
@@ -64,14 +64,14 @@ class PlaybackPlannerTest {
 
     @Test
     void anUnresolvedJellyfinItemMeansTheSourceIsSwitchedOff() {
-        assertThat(planner.plan(item(new PlayableRef.JellyfinItem("srv", "item-1", 0)), EnumSet.allOf(Capability.class)))
+        assertThat(planner.plan(item(new PlayableRef.JellyfinItem("srv", "item-1", 0)), EnumSet.allOf(Capability.class)).first())
                 .isEqualTo(new Route.Unroutable("Jellyfin is switched off on this server"));
     }
 
     @Test
     void anOpenJellyfinAppComesFirst() {
         Route route = planner.plan(item(LINK, JELLYFIN_MESSAGE, STREAM, OPEN_APP),
-                EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK, Capability.CAST_RECEIVER));
+                EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK, Capability.CAST_RECEIVER)).first();
 
         assertThat(route).isEqualTo(new Route.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV"));
         assertThat(route.describe()).isEqualTo("Play in the open Jellyfin app (Android TV)");
@@ -80,7 +80,7 @@ class PlaybackPlannerTest {
 
     @Test
     void aSessionReferenceWithoutTheLiveCapabilityDoesNotRoute() {
-        assertThat(planner.plan(item(OPEN_APP), EnumSet.of(Capability.APP_LINK)))
+        assertThat(planner.plan(item(OPEN_APP), EnumSet.of(Capability.APP_LINK)).first())
                 .isEqualTo(new Route.Unroutable("the open Jellyfin app cannot be controlled"));
     }
 
@@ -88,14 +88,14 @@ class PlaybackPlannerTest {
     void jellyfinFallsBackFromSessionToReceiverToStream() {
         ContentItem resolved = item(JELLYFIN_MESSAGE, STREAM);
 
-        assertThat(planner.plan(resolved, EnumSet.of(Capability.CAST_RECEIVER))).isInstanceOf(Route.CastMessage.class);
-        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER)))
+        assertThat(planner.plan(resolved, EnumSet.of(Capability.CAST_RECEIVER)).first()).isInstanceOf(Route.CastMessage.class);
+        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER)).first())
                 .isInstanceOfSatisfying(Route.Cast.class, cast -> assertThat(cast.receiverAppId()).isEqualTo("CC1AD845"));
     }
 
     @Test
     void castsACastLoadToACastReceiver() {
-        Route route = planner.plan(item(JELLYFIN_LOAD), EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME));
+        Route route = planner.plan(item(JELLYFIN_LOAD), EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME)).first();
 
         assertThat(route).isEqualTo(new Route.Cast("F007D354", JELLYFIN_LOAD.payload()));
         assertThat(route.describe()).isEqualTo("Cast with the Jellyfin receiver");
@@ -104,7 +104,7 @@ class PlaybackPlannerTest {
 
     @Test
     void castsACustomMessageBeforeACastLoadOrAStream() {
-        Route route = planner.plan(item(STREAM, JELLYFIN_LOAD, JELLYFIN_MESSAGE), EnumSet.of(Capability.CAST_RECEIVER));
+        Route route = planner.plan(item(STREAM, JELLYFIN_LOAD, JELLYFIN_MESSAGE), EnumSet.of(Capability.CAST_RECEIVER)).first();
 
         assertThat(route).isEqualTo(new Route.CastMessage(new Action.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
                 JELLYFIN_MESSAGE.message().message()), "the Jellyfin receiver"));
@@ -119,21 +119,21 @@ class PlaybackPlannerTest {
     void loungeNeedsACastReceiver() {
         PlaybackPlanner withLounge = new PlaybackPlanner(List.of(new AppLinkStrategy(), new YouTubeLoungeStrategy()));
 
-        assertThat(withLounge.plan(item(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")), EnumSet.of(Capability.APP_LINK)))
+        assertThat(withLounge.plan(item(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")), EnumSet.of(Capability.APP_LINK)).first())
                 .isEqualTo(new Route.Unroutable("this device is not a Cast receiver"));
-        assertThat(withLounge.plan(item(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")), EnumSet.of(Capability.CAST_RECEIVER)))
+        assertThat(withLounge.plan(item(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")), EnumSet.of(Capability.CAST_RECEIVER)).first())
                 .isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ"));
     }
 
     @Test
     void aCustomMessageNeedsACastReceiver() {
-        assertThat(planner.plan(item(JELLYFIN_MESSAGE), EnumSet.of(Capability.APP_LINK)))
+        assertThat(planner.plan(item(JELLYFIN_MESSAGE), EnumSet.of(Capability.APP_LINK)).first())
                 .isInstanceOfSatisfying(Route.Unroutable.class, u -> assertThat(u.reason()).contains("this device is not a Cast receiver"));
     }
 
     @Test
     void castsAStreamThroughTheDefaultMediaReceiverWithTheItemTitle() {
-        Route route = planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER));
+        Route route = planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER)).first();
 
         assertThat(route).isEqualTo(new Route.Cast("CC1AD845", CastLoads.defaultMediaReceiver(STREAM, "Title")));
         assertThat(route.describe()).isEqualTo("Cast with the Default Media Receiver");
@@ -142,7 +142,7 @@ class PlaybackPlannerTest {
 
     @Test
     void aCastRouteNeverPrintsTheStreamUrlItLoads() {
-        Route route = planner.plan(item(STREAM_WITH_KEY), EnumSet.of(Capability.CAST_RECEIVER));
+        Route route = planner.plan(item(STREAM_WITH_KEY), EnumSet.of(Capability.CAST_RECEIVER)).first();
 
         assertThat(route).isInstanceOf(Route.Cast.class);
         assertThat(route.toString()).isEqualTo("Cast[receiverAppId=CC1AD845]").doesNotContain("tok-2");
@@ -153,17 +153,17 @@ class PlaybackPlannerTest {
     void followsSpecOrderAppLinkThenCastLoadThenStream() {
         ContentItem everything = item(STREAM, JELLYFIN_LOAD, LINK);
 
-        assertThat(planner.plan(everything, EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)))
+        assertThat(planner.plan(everything, EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)).first())
                 .isEqualTo(new Route.OpenAppLink(LINK.uri(), "youtube"));
-        assertThat(planner.plan(everything, EnumSet.of(Capability.CAST_RECEIVER)))
+        assertThat(planner.plan(everything, EnumSet.of(Capability.CAST_RECEIVER)).first())
                 .isEqualTo(new Route.Cast("F007D354", JELLYFIN_LOAD.payload()));
-        assertThat(planner.plan(item(STREAM, LINK), EnumSet.of(Capability.CAST_RECEIVER)))
+        assertThat(planner.plan(item(STREAM, LINK), EnumSet.of(Capability.CAST_RECEIVER)).first())
                 .isInstanceOfSatisfying(Route.Cast.class, cast -> assertThat(cast.receiverAppId()).isEqualTo("CC1AD845"));
     }
 
     @Test
     void explainsWhyCastAndStreamsCannotReachADeviceWithoutCast() {
-        Route route = planner.plan(item(JELLYFIN_LOAD, STREAM), EnumSet.of(Capability.REMOTE_KEYS, Capability.APP_LINK));
+        Route route = planner.plan(item(JELLYFIN_LOAD, STREAM), EnumSet.of(Capability.REMOTE_KEYS, Capability.APP_LINK)).first();
 
         assertThat(route).isInstanceOfSatisfying(Route.Unroutable.class, unroutable -> assertThat(unroutable.reason())
                 .contains("this device is not a Cast receiver")
@@ -175,27 +175,27 @@ class PlaybackPlannerTest {
         PlaybackPlanner configured = new dev.andre.homecontrol.HomeControlConfiguration().playbackPlanner();
         ContentItem everything = item(STREAM, JELLYFIN_LOAD, LINK);
 
-        assertThat(configured.plan(everything, EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)))
+        assertThat(configured.plan(everything, EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)).first())
                 .isInstanceOf(Route.OpenAppLink.class);
-        assertThat(configured.plan(everything, EnumSet.of(Capability.CAST_RECEIVER)))
+        assertThat(configured.plan(everything, EnumSet.of(Capability.CAST_RECEIVER)).first())
                 .isEqualTo(new Route.Cast("F007D354", JELLYFIN_LOAD.payload()));
-        assertThat(configured.plan(item(JELLYFIN_LOAD, JELLYFIN_MESSAGE), EnumSet.of(Capability.CAST_RECEIVER)))
+        assertThat(configured.plan(item(JELLYFIN_LOAD, JELLYFIN_MESSAGE), EnumSet.of(Capability.CAST_RECEIVER)).first())
                 .isInstanceOf(Route.CastMessage.class);
-        assertThat(configured.plan(item(LINK, OPEN_APP), EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK)))
+        assertThat(configured.plan(item(LINK, OPEN_APP), EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK)).first())
                 .isInstanceOf(Route.JellyfinSession.class);
     }
 
     @Test
     void aMediaRendererGetsTheStream() {
-        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME)))
+        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME)).first())
                 .isInstanceOfSatisfying(Route.Render.class, render -> assertThat(render.url()).isEqualTo(STREAM.url()));
     }
 
     @Test
     void castComesBeforeTheMediaRenderer() {
-        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)))
+        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)).first())
                 .isInstanceOfSatisfying(Route.Cast.class, cast -> assertThat(cast.receiverAppId()).isEqualTo("CC1AD845"));
-        assertThat(planner.plan(item(STREAM, LINK), EnumSet.of(Capability.APP_LINK, Capability.MEDIA_RENDERER)))
+        assertThat(planner.plan(item(STREAM, LINK), EnumSet.of(Capability.APP_LINK, Capability.MEDIA_RENDERER)).first())
                 .isInstanceOf(Route.OpenAppLink.class);
     }
 
@@ -203,10 +203,10 @@ class PlaybackPlannerTest {
     void explainsThatAStreamWasNotAcceptedByARenderer() {
         PlaybackPlanner withoutRenderers = new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy()));
 
-        assertThat(withoutRenderers.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER)))
+        assertThat(withoutRenderers.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER)).first())
                 .isInstanceOfSatisfying(Route.Unroutable.class,
                         unroutable -> assertThat(unroutable.reason()).contains("the stream was not accepted"));
-        assertThat(withoutRenderers.plan(item(STREAM), EnumSet.of(Capability.REMOTE_KEYS)))
+        assertThat(withoutRenderers.plan(item(STREAM), EnumSet.of(Capability.REMOTE_KEYS)).first())
                 .isInstanceOfSatisfying(Route.Unroutable.class,
                         unroutable -> assertThat(unroutable.reason()).contains("this device cannot play a direct stream"));
     }
@@ -215,40 +215,40 @@ class PlaybackPlannerTest {
     void theApplicationsPlannerEndsWithTheMediaRenderer() {
         PlaybackPlanner configured = new dev.andre.homecontrol.HomeControlConfiguration().playbackPlanner();
 
-        assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER))).isInstanceOf(Route.Render.class);
-        assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)))
+        assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER)).first()).isInstanceOf(Route.Render.class);
+        assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)).first())
                 .isInstanceOf(Route.Cast.class);
-        assertThat(configured.routes(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)))
+        assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)).routes())
                 .extracting(Route::key).containsExactly("cast:CC1AD845", "render");
     }
 
     @Test
     void aLocalAudioSinkGetsTheAudioStream() {
-        assertThat(planner.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK, Capability.VOLUME)))
+        assertThat(planner.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK, Capability.VOLUME)).first())
                 .isInstanceOfSatisfying(Route.PlayLocally.class, local -> assertThat(local.url()).isEqualTo(AUDIO.url()));
     }
 
     @Test
     void everyOtherRungComesFirst() {
-        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)))
+        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)).first())
                 .isInstanceOf(Route.Render.class);
-        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.LOCAL_AUDIO_SINK)))
+        assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.LOCAL_AUDIO_SINK)).first())
                 .isInstanceOf(Route.Cast.class);
-        assertThat(planner.routes(item(AUDIO), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)))
+        assertThat(planner.plan(item(AUDIO), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)).routes())
                 .extracting(Route::key).containsExactly("render", "local-audio");
     }
 
     @Test
     void explainsVideoOnABluetoothSpeaker() {
-        assertThat(planner.plan(item(VIDEO), EnumSet.of(Capability.LOCAL_AUDIO_SINK, Capability.VOLUME)))
+        assertThat(planner.plan(item(VIDEO), EnumSet.of(Capability.LOCAL_AUDIO_SINK, Capability.VOLUME)).first())
                 .isInstanceOfSatisfying(Route.Unroutable.class,
                         unroutable -> assertThat(unroutable.reason()).contains("a Bluetooth speaker plays audio streams only"));
 
         PlaybackPlanner withoutLocalAudio = new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy()));
-        assertThat(withoutLocalAudio.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK)))
+        assertThat(withoutLocalAudio.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK)).first())
                 .isInstanceOfSatisfying(Route.Unroutable.class,
                         unroutable -> assertThat(unroutable.reason()).contains("the stream was not accepted"));
-        assertThat(withoutLocalAudio.plan(item(AUDIO), EnumSet.of(Capability.REMOTE_KEYS)))
+        assertThat(withoutLocalAudio.plan(item(AUDIO), EnumSet.of(Capability.REMOTE_KEYS)).first())
                 .isInstanceOfSatisfying(Route.Unroutable.class,
                         unroutable -> assertThat(unroutable.reason()).contains("this device cannot play a direct stream"));
     }
@@ -257,31 +257,31 @@ class PlaybackPlannerTest {
     void theApplicationsPlannerEndsWithTheLocalAudioSink() {
         PlaybackPlanner configured = new dev.andre.homecontrol.HomeControlConfiguration().playbackPlanner();
 
-        assertThat(configured.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK))).isInstanceOf(Route.PlayLocally.class);
-        assertThat(configured.plan(item(AUDIO), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)))
+        assertThat(configured.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK)).first()).isInstanceOf(Route.PlayLocally.class);
+        assertThat(configured.plan(item(AUDIO), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)).first())
                 .isInstanceOf(Route.Render.class);
     }
 
     @Test
     void listsEveryApplicableRouteInSpecOrder() {
-        List<Route> routes = planner.routes(item(STREAM, JELLYFIN_MESSAGE, LINK, OPEN_APP),
-                EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK, Capability.CAST_RECEIVER));
+        List<Route> routes = planner.plan(item(STREAM, JELLYFIN_MESSAGE, LINK, OPEN_APP),
+                EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK, Capability.CAST_RECEIVER)).routes();
 
         assertThat(routes).extracting(Route::key)
                 .containsExactly("jellyfin-session", "app-link", "cast-message:F007D354", "cast:CC1AD845");
-        assertThat(planner.plan(item(STREAM, LINK), EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)))
+        assertThat(planner.plan(item(STREAM, LINK), EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)).first())
                 .isEqualTo(routes.get(1));
     }
 
     @Test
     void noApplicableRouteIsAnEmptyListNotUnroutable() {
-        assertThat(planner.routes(item(LINK), EnumSet.of(Capability.MEDIA_RENDERER))).isEmpty();
-        assertThat(planner.routes(item(), EnumSet.allOf(Capability.class))).isEmpty();
+        assertThat(planner.plan(item(LINK), EnumSet.of(Capability.MEDIA_RENDERER)).routes()).isEmpty();
+        assertThat(planner.plan(item(), EnumSet.allOf(Capability.class)).routes()).isEmpty();
     }
 
     @Test
     void anItemWithNothingPlayableIsUnroutable() {
-        Route route = planner.plan(item(), Set.of(Capability.APP_LINK));
+        Route route = planner.plan(item(), Set.of(Capability.APP_LINK)).first();
 
         assertThat(route).isEqualTo(new Route.Unroutable("This item has nothing playable"));
     }
@@ -294,7 +294,7 @@ class PlaybackPlannerTest {
         RouteStrategy second = (i, caps) -> Optional.of(new Route.OpenAppLink(secondUri, "dazn"));
         PlaybackPlanner ordered = new PlaybackPlanner(List.of(first, second));
 
-        assertThat(ordered.plan(item(new PlayableRef.AppLink(firstUri, "netflix")), Set.of(Capability.APP_LINK)))
+        assertThat(ordered.plan(item(new PlayableRef.AppLink(firstUri, "netflix")), Set.of(Capability.APP_LINK)).first())
                 .isEqualTo(new Route.OpenAppLink(firstUri, "netflix"));
     }
 
@@ -302,7 +302,7 @@ class PlaybackPlannerTest {
     void fallsBackToAGenericReasonWhenNoSpecificOneApplies() {
         PlaybackPlanner none = new PlaybackPlanner(List.of());
 
-        assertThat(none.plan(item(new PlayableRef.AppLink(URI.create("https://x"), "web")), Set.of(Capability.APP_LINK)))
+        assertThat(none.plan(item(new PlayableRef.AppLink(URI.create("https://x"), "web")), Set.of(Capability.APP_LINK)).first())
                 .isEqualTo(new Route.Unroutable("no route to this device"));
     }
 
@@ -310,21 +310,21 @@ class PlaybackPlannerTest {
     void serviceLinksRouteByCapabilityNotBrand() {
         PlayableRef.AppLink netflixTitle = ServiceLinks.appLink(URI.create("https://www.netflix.com/de/title/80057281?s=a"));
 
-        Route routable = planner.plan(item(netflixTitle), EnumSet.of(Capability.APP_LINK));
+        Route routable = planner.plan(item(netflixTitle), EnumSet.of(Capability.APP_LINK)).first();
         assertThat(routable).isEqualTo(new Route.OpenAppLink(netflixTitle.uri(), netflixTitle.service()));
 
         Route unroutable = planner.plan(item(netflixTitle),
-                EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER, Capability.REMOTE_KEYS));
+                EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER, Capability.REMOTE_KEYS)).first();
         assertThat(unroutable).isInstanceOfSatisfying(Route.Unroutable.class,
                 r -> assertThat(r.reason()).contains("cannot open app links"));
 
         PlayableRef.AppLink primeHome = ServiceLinks.appLink(ServiceLinks.appHome("primevideo").orElseThrow());
 
-        Route primeRoutable = planner.plan(item(primeHome), EnumSet.of(Capability.APP_LINK));
+        Route primeRoutable = planner.plan(item(primeHome), EnumSet.of(Capability.APP_LINK)).first();
         assertThat(primeRoutable).isEqualTo(new Route.OpenAppLink(primeHome.uri(), primeHome.service()));
 
         Route primeUnroutable = planner.plan(item(primeHome),
-                EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER, Capability.REMOTE_KEYS));
+                EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER, Capability.REMOTE_KEYS)).first();
         assertThat(primeUnroutable).isInstanceOfSatisfying(Route.Unroutable.class,
                 r -> assertThat(r.reason()).contains("cannot open app links"));
     }
