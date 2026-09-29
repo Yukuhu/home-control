@@ -2,8 +2,9 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.core.DeviceCommands;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginService;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -48,19 +49,20 @@ public class JellyfinConfiguration {
     @Bean
     public JellyfinPlayableResolver jellyfinPlayableResolver(JellyfinSetupService setup, JellyfinSessions sessions,
                                                               JellyfinClient client, JellyfinStreams streams,
-                                                              DeviceManager devices) {
+                                                              DeviceQueries devices) {
         return new JellyfinPlayableResolver(setup, sessions, client, streams, devices::adapterEnabled);
     }
 
     @Bean
-    public JellyfinVlcExecutor jellyfinVlcExecutor(JellyfinSetupService setup, JellyfinClient client, DeviceManager devices,
+    public JellyfinVlcExecutor jellyfinVlcExecutor(JellyfinSetupService setup, JellyfinClient client,
+                                                   DeviceQueries devices, DeviceCommands commands,
                                                    JellyfinProperties properties) {
-        return new JellyfinVlcExecutor(setup, client, devices, properties.startupTimeout());
+        return new JellyfinVlcExecutor(setup, client, devices, commands, properties.startupTimeout());
     }
 
     @Bean
-    public JellyfinRouteExecutor jellyfinRouteExecutor(JellyfinSessions sessions, DeviceManager devices,
-                                                       JellyfinProperties properties) {
-        return new JellyfinRouteExecutor(sessions, devices, properties.startupTimeout());
+    public JellyfinRouteExecutor jellyfinRouteExecutor(JellyfinSessions sessions, DeviceQueries devices,
+                                                       DeviceCommands commands, JellyfinProperties properties) {
+        return new JellyfinRouteExecutor(sessions, devices, commands, properties.startupTimeout());
     }
 }

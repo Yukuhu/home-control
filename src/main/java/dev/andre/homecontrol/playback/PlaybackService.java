@@ -3,8 +3,10 @@ package dev.andre.homecontrol.playback;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.PlayableRef;
@@ -14,7 +16,6 @@ import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
 import dev.andre.homecontrol.core.playback.RouteKeys;
 import dev.andre.homecontrol.core.playback.UnroutableException;
-import dev.andre.homecontrol.device.DeviceManager;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,24 +30,26 @@ import java.util.Set;
 @Service
 public class PlaybackService {
 
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
+    private final DeviceCommands commands;
     private final PlaybackPlanner planner;
     private final List<PlayableResolver> resolvers;
     private final List<RouteExecutor> executors;
 
-    public PlaybackService(DeviceManager devices, PlaybackPlanner planner) {
-        this(devices, planner, List.of(), List.of());
+    public PlaybackService(DeviceQueries devices, DeviceCommands commands, PlaybackPlanner planner) {
+        this(devices, commands, planner, List.of(), List.of());
     }
 
     @Autowired
-    public PlaybackService(DeviceManager devices, PlaybackPlanner planner,
+    public PlaybackService(DeviceQueries devices, DeviceCommands commands, PlaybackPlanner planner,
                            ObjectProvider<PlayableResolver> resolvers, ObjectProvider<RouteExecutor> executors) {
-        this(devices, planner, resolvers.orderedStream().toList(), executors.orderedStream().toList());
+        this(devices, commands, planner, resolvers.orderedStream().toList(), executors.orderedStream().toList());
     }
 
-    public PlaybackService(DeviceManager devices, PlaybackPlanner planner,
+    public PlaybackService(DeviceQueries devices, DeviceCommands commands, PlaybackPlanner planner,
                            List<PlayableResolver> resolvers, List<RouteExecutor> executors) {
         this.devices = devices;
+        this.commands = commands;
         this.planner = planner;
         this.resolvers = List.copyOf(resolvers);
         this.executors = List.copyOf(executors);
@@ -145,11 +148,11 @@ public class PlaybackService {
 
     private void execute(Route route, Device device) {
         switch (route) {
-            case Route.OpenAppLink open -> devices.execute(device.id(), open.action());
-            case Route.Cast cast -> devices.execute(device.id(), cast.action());
-            case Route.CastMessage message -> devices.execute(device.id(), message.action());
-            case Route.Render render -> devices.execute(device.id(), render.action());
-            case Route.PlayLocally local -> devices.execute(device.id(), local.action());
+            case Route.OpenAppLink open -> commands.execute(device.id(), open.action());
+            case Route.Cast cast -> commands.execute(device.id(), cast.action());
+            case Route.CastMessage message -> commands.execute(device.id(), message.action());
+            case Route.Render render -> commands.execute(device.id(), render.action());
+            case Route.PlayLocally local -> commands.execute(device.id(), local.action());
             case Route.JellyfinSession _ -> executeJellyfin(route, device);
             case Route.JellyfinVlc _ -> executeJellyfin(route, device);
             case Route.JellyfinApp _ -> executeJellyfin(route, device);

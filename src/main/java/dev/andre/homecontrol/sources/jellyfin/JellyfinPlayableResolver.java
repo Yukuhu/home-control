@@ -24,7 +24,7 @@ public class JellyfinPlayableResolver implements PlayableResolver {
     private final JellyfinStreams streams;
     private final Predicate<String> adapterEnabled;
 
-    /** {@code adapterEnabled}: whether an adapter's module is switched on ({@code DeviceManager.adapterEnabled}). */
+    /** {@code adapterEnabled}: whether an adapter's module is switched on ({@code DeviceQueries.adapterEnabled}). */
     public JellyfinPlayableResolver(JellyfinSetupService setup, JellyfinSessions sessions, JellyfinClient client,
                                     JellyfinStreams streams, Predicate<String> adapterEnabled) {
         this.setup = setup;

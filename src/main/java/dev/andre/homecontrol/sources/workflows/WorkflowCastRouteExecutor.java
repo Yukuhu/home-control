@@ -5,25 +5,28 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.CastLoads;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
-import dev.andre.homecontrol.device.DeviceManager;
 
 /** Resolves fresh credentials only on Play, then serializes final dispatch with definition mutations. */
 public final class WorkflowCastRouteExecutor implements RouteExecutor {
     private final WorkflowStore store;
     private final WorkflowRunner runner;
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
+    private final DeviceCommands commands;
     private final RailPreferences preferences;
 
-    public WorkflowCastRouteExecutor(WorkflowStore store, WorkflowRunner runner, DeviceManager devices,
-                                     RailPreferences preferences) {
+    public WorkflowCastRouteExecutor(WorkflowStore store, WorkflowRunner runner, DeviceQueries devices,
+                                     DeviceCommands commands, RailPreferences preferences) {
         this.store = store;
         this.runner = runner;
         this.devices = devices;
+        this.commands = commands;
         this.preferences = preferences;
     }
 
@@ -47,7 +50,7 @@ public final class WorkflowCastRouteExecutor implements RouteExecutor {
                 requireSource();
                 requireCast(device);
                 try {
-                    devices.execute(device.id(), action);
+                    commands.execute(device.id(), action);
                 } catch (ActionFailedException _) {
                     // A receiver can echo the secret media URL in its error reason.
                     throw new ActionFailedException("Workflow: Cast receiver could not start playback");

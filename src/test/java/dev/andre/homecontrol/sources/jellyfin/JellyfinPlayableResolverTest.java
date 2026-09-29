@@ -4,7 +4,9 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
@@ -13,7 +15,6 @@ import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.JellyfinSessionStrategy;
 import dev.andre.homecontrol.core.playback.CastMessageStrategy;
 import dev.andre.homecontrol.core.playback.Route;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.PlaybackService;
 import dev.andre.homecontrol.playback.PlayAttempt;
 import org.junit.jupiter.api.AfterEach;
@@ -98,25 +99,26 @@ class JellyfinPlayableResolverTest {
         connected();
         fake.respondJson("GET", "/Sessions", 200, "[]");
         Device shield = device("Shield", "10.0.0.5").withAdapter("androidtv", Map.of()).withAdapter("cast", Map.of());
-        DeviceManager devices = mock(DeviceManager.class);
+        DeviceQueries devices = mock(DeviceQueries.class);
+        DeviceCommands commands = mock(DeviceCommands.class);
         given(devices.device(shield.id())).willReturn(Optional.of(shield));
         given(devices.state(shield.id())).willReturn(DeviceState.unpaired());
         given(devices.capabilities(shield.id())).willReturn(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS, Capability.CAST_RECEIVER));
-        PlaybackService playback = new PlaybackService(devices,
+        PlaybackService playback = new PlaybackService(devices, commands,
                 new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), new CastMessageStrategy())),
-                List.of(resolver), List.of(new JellyfinRouteExecutor(sessions, devices, Duration.ofSeconds(1))));
+                List.of(resolver), List.of(new JellyfinRouteExecutor(sessions, devices, commands, Duration.ofSeconds(1))));
 
         assertThat(playback.attempt(item(WANTED), shield.id(), Set.of()))
                 .isInstanceOfSatisfying(PlayAttempt.Failed.class, failed -> {
                     assertThat(failed.route()).isInstanceOf(Route.JellyfinApp.class);
                     assertThat(failed.remaining()).hasSize(1).allMatch(route -> route instanceof Route.CastMessage);
                 });
-        verify(devices, never()).execute(anyString(), any());
+        verify(commands, never()).execute(anyString(), any());
 
         assertThat(playback.attempt(item(WANTED), shield.id(), Set.of("jellyfin-app")))
                 .isInstanceOfSatisfying(PlayAttempt.Played.class,
                         played -> assertThat(played.route()).isInstanceOf(Route.CastMessage.class));
-        verify(devices).execute(eq(shield.id()), isA(Action.CastMessage.class));
+        verify(commands).execute(eq(shield.id()), isA(Action.CastMessage.class));
     }
 
     /** A merged device whose webOS entry offers keys and app links is no Android TV while that module is off. */

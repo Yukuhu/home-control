@@ -2,7 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,9 +24,9 @@ public class JellyfinSetupController {
     private static final String REDIRECT = "redirect:/setup";
 
     private final JellyfinSetupService setup;
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
 
-    public JellyfinSetupController(JellyfinSetupService setup, DeviceManager devices) {
+    public JellyfinSetupController(JellyfinSetupService setup, DeviceQueries devices) {
         this.devices = devices;
         this.setup = setup;
     }

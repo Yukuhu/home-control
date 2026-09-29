@@ -3,7 +3,7 @@ package dev.andre.homecontrol.sources.youtube;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
@@ -65,7 +65,7 @@ class YouTubeSetupServiceTest {
     private QuotaLedger ledger;
     private ObjectProvider<YouTubeContentSource> source;
     private ObjectProvider<YouTubePlaylists> playlists;
-    private ObjectProvider<DeviceManager> devices;
+    private ObjectProvider<DeviceQueries> devices;
 
     @BeforeEach
     void setUp() {
@@ -336,15 +336,15 @@ class YouTubeSetupServiceTest {
 
     @Test
     void loungeSwitchNeedsACastDevice() {
-        DeviceManager manager = mock(DeviceManager.class);
-        given(devices.getIfAvailable()).willReturn(manager);
-        given(manager.device("kitchen")).willReturn(Optional.of(new Device("kitchen", "Kitchen", DeviceKind.CAST,
+        DeviceQueries registered = mock(DeviceQueries.class);
+        given(devices.getIfAvailable()).willReturn(registered);
+        given(registered.device("kitchen")).willReturn(Optional.of(new Device("kitchen", "Kitchen", DeviceKind.CAST,
                 "10.0.0.9", Map.of("cast", Map.of()), Instant.now())));
-        given(manager.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
-        given(manager.device("living")).willReturn(Optional.of(new Device("living", "Living Room", DeviceKind.WEBOS,
+        given(registered.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
+        given(registered.device("living")).willReturn(Optional.of(new Device("living", "Living Room", DeviceKind.WEBOS,
                 "10.0.0.7", Map.of("webos", Map.of()), Instant.now())));
-        given(manager.capabilities("living")).willReturn(EnumSet.of(Capability.APP_LINK));
-        given(manager.device("gone")).willReturn(Optional.empty());
+        given(registered.capabilities("living")).willReturn(EnumSet.of(Capability.APP_LINK));
+        given(registered.device("gone")).willReturn(Optional.empty());
 
         assertThat(service.setLounge("kitchen", true)).isEqualTo("Kitchen");
         assertThat(service.settings().loungeDevices()).containsExactly("kitchen");

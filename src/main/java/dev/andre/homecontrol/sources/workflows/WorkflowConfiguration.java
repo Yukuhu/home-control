@@ -4,8 +4,9 @@ import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.RailPreferences;
+import dev.andre.homecontrol.core.DeviceCommands;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.content.ContentChangedEvent;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.beans.factory.ObjectProvider;
@@ -49,8 +50,9 @@ public class WorkflowConfiguration {
     }
 
     @Bean public WorkflowCastRouteExecutor workflowCastRouteExecutor(WorkflowStore store, WorkflowRunner runner,
-                                                                      DeviceManager devices, RailPreferences preferences) {
-        return new WorkflowCastRouteExecutor(store, runner, devices, preferences);
+                                                                      DeviceQueries devices, DeviceCommands commands,
+                                                                      RailPreferences preferences) {
+        return new WorkflowCastRouteExecutor(store, runner, devices, commands, preferences);
     }
 
     @Bean public ContentChanges workflowContentChanges(WorkflowCatalogs catalogs, ObjectProvider<RailCache> rails) {

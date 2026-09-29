@@ -4,14 +4,15 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.device.DeviceManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -43,8 +44,9 @@ class DeepLinkTestServiceTest {
     private static final DeviceState HOME = new DeviceState(DeviceStatus.CONNECTED, true, "com.webos.app.home",
             12, 100, false, Instant.now());
 
-    private final DeviceManager devices = mock(DeviceManager.class);
-    private DeepLinkTestService service = new DeepLinkTestService(devices,
+    private final DeviceQueries devices = mock(DeviceQueries.class);
+    private final DeviceCommands commands = mock(DeviceCommands.class);
+    private DeepLinkTestService service = new DeepLinkTestService(devices, commands,
             new DeepLinkTestProperties(VIDEO, Duration.ofMillis(300)));
 
     @BeforeEach
@@ -61,7 +63,7 @@ class DeepLinkTestServiceTest {
         doAnswer(call -> {
             Thread.ofVirtual().start(() -> service.onStateChanged(new DeviceStateChangedEvent(deviceId, state)));
             return null;
-        }).when(devices).execute(eq("lg"), any());
+        }).when(commands).execute(eq("lg"), any());
     }
 
     @Test
@@ -75,7 +77,7 @@ class DeepLinkTestServiceTest {
         assertThat(result.appAfter()).isEqualTo("youtube.leanback.v4");
         assertThat(result.message()).contains("switched from com.webos.app.home to youtube.leanback.v4")
                 .contains("check the screen");
-        verify(devices).execute("lg", new Action.OpenAppLink(VIDEO));
+        verify(commands).execute("lg", new Action.OpenAppLink(VIDEO));
     }
 
     @Test
@@ -144,18 +146,18 @@ class DeepLinkTestServiceTest {
         // Only the path that never waits for the app to change returns NOT_OBSERVABLE.
         assertThat(result.outcome()).isEqualTo(DeepLinkTestResult.Outcome.NOT_OBSERVABLE);
         assertThat(result.message()).contains("does not report which app is in front");
-        verify(devices).execute("lg", new Action.OpenAppLink(VIDEO));
+        verify(commands).execute("lg", new Action.OpenAppLink(VIDEO));
     }
 
     @Test
     void aFailedSendIsReportedWithTheReason() {
         doThrow(new ActionFailedException("LG TV could not open the link: 500 Application error"))
-                .when(devices).execute(eq("lg"), any());
+                .when(commands).execute(eq("lg"), any());
         DeepLinkTestResult refused = service.run("lg");
         assertThat(refused.outcome()).isEqualTo(DeepLinkTestResult.Outcome.FAILED);
         assertThat(refused.message()).contains("500 Application error");
 
-        doThrow(new DeviceOfflineException("LG TV is not connected")).when(devices).execute(eq("lg"), any());
+        doThrow(new DeviceOfflineException("LG TV is not connected")).when(commands).execute(eq("lg"), any());
         DeepLinkTestResult offline = service.run("lg");
         assertThat(offline.outcome()).isEqualTo(DeepLinkTestResult.Outcome.FAILED);
         assertThat(offline.message()).contains("LG TV is not connected");
@@ -164,7 +166,7 @@ class DeepLinkTestServiceTest {
     @Test
     void anUnexpectedFailureIsReportedWithoutItsInternals() {
         doThrow(new IllegalStateException("Cannot invoke \"Session.send()\" because \"this.session\" is null"))
-                .when(devices).execute(eq("lg"), any());
+                .when(commands).execute(eq("lg"), any());
 
         DeepLinkTestResult failed = service.run("lg");
 
@@ -181,7 +183,7 @@ class DeepLinkTestServiceTest {
         assertThatThrownBy(() -> service.run("lg"))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessageContaining("cannot open app links");
-        verify(devices, never()).execute(anyString(), any());
+        verify(commands, never()).execute(anyString(), any());
     }
 
     @Test
@@ -193,10 +195,10 @@ class DeepLinkTestServiceTest {
 
     @Test
     void aSecondTestOnTheSameDeviceWhileOneRunsIsRefused() throws Exception {
-        service = new DeepLinkTestService(devices, new DeepLinkTestProperties(VIDEO, Duration.ofSeconds(1)));
+        service = new DeepLinkTestService(devices, commands, new DeepLinkTestProperties(VIDEO, Duration.ofSeconds(1)));
         AtomicReference<DeepLinkTestResult> first = new AtomicReference<>();
         Thread running = Thread.ofVirtual().start(() -> first.set(service.run("lg")));
-        await().atMost(Duration.ofSeconds(5)).until(() -> mockingDetails(devices).getInvocations().stream()
+        await().atMost(Duration.ofSeconds(5)).until(() -> mockingDetails(commands).getInvocations().stream()
                 .anyMatch(invocation -> invocation.getMethod().getName().equals("execute")));
 
         DeepLinkTestResult second = service.run("lg");

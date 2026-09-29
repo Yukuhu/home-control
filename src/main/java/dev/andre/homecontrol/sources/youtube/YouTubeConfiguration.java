@@ -2,8 +2,9 @@ package dev.andre.homecontrol.sources.youtube;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.content.RailCache;
+import dev.andre.homecontrol.core.DeviceCommands;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
@@ -75,7 +76,7 @@ public class YouTubeConfiguration {
                                                    ObjectProvider<YouTubeAccount> account, QuotaLedger ledger,
                                                    ObjectProvider<YouTubeContentSource> source,
                                                    ObjectProvider<YouTubePlaylists> playlists,
-                                                   ObjectProvider<DeviceManager> devices) {
+                                                   ObjectProvider<DeviceQueries> devices) {
         return new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger, source,
                 playlists, devices);
     }
@@ -124,9 +125,9 @@ public class YouTubeConfiguration {
     }
 
     @Bean
-    public YouTubeLoungeRouteExecutor youTubeLoungeRouteExecutor(DeviceManager devices, LoungeClient lounge,
+    public YouTubeLoungeRouteExecutor youTubeLoungeRouteExecutor(DeviceCommands commands, LoungeClient lounge,
                                                                  YouTubeSetupService setup) {
-        return new YouTubeLoungeRouteExecutor(devices, lounge, setup);
+        return new YouTubeLoungeRouteExecutor(commands, lounge, setup);
     }
 
     /** After either grant, clear both cache layers and look up the newly authorized channel. */

@@ -3,13 +3,14 @@ package dev.andre.homecontrol.sources.jellyfin;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.LaunchedMedia;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
-import dev.andre.homecontrol.device.DeviceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
@@ -33,14 +34,17 @@ public class JellyfinVlcExecutor implements RouteExecutor {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final JellyfinSetupService setup;
     private final JellyfinClient client;
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
+    private final DeviceCommands commands;
     private final Duration timeout;
 
-    public JellyfinVlcExecutor(JellyfinSetupService setup, JellyfinClient client, DeviceManager devices, Duration timeout) {
+    public JellyfinVlcExecutor(JellyfinSetupService setup, JellyfinClient client, DeviceQueries devices,
+                               DeviceCommands commands, Duration timeout) {
         if (timeout.isNegative() || timeout.isZero()) throw new IllegalArgumentException("Startup timeout must be positive");
         this.setup = setup;
         this.client = client;
         this.devices = devices;
+        this.commands = commands;
         this.timeout = timeout;
     }
 
@@ -61,7 +65,7 @@ public class JellyfinVlcExecutor implements RouteExecutor {
             checkDeadline(deadline);
             log.info("Sending VLC playback link to {}", device.id());
             // The link also starts playback. Never retry it after a successful socket write.
-            devices.execute(device.id(), new Action.OpenAppLink(launch.link(), launch.media()));
+            commands.execute(device.id(), new Action.OpenAppLink(launch.link(), launch.media()));
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new ActionFailedException("VLC startup was interrupted");
@@ -144,7 +148,7 @@ public class JellyfinVlcExecutor implements RouteExecutor {
             if (state.connected() && state.powerOn()) return;
             if (state.connected() && System.nanoTime() >= nextWake) {
                 try {
-                    devices.execute(device.id(), new Action.PressKey(RemoteKey.WAKEUP));
+                    commands.execute(device.id(), new Action.PressKey(RemoteKey.WAKEUP));
                 } catch (DeviceOfflineException _) {
                     // Only the idempotent wake command can be retried after reconnecting.
                 }

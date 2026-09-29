@@ -3,9 +3,9 @@ package dev.andre.homecontrol.sources.youtube;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
-import dev.andre.homecontrol.device.DeviceManager;
 
 import java.util.Map;
 import java.util.UUID;
@@ -22,12 +22,12 @@ public class YouTubeLoungeRouteExecutor implements RouteExecutor {
     private static final CastAppQuery SESSION_STATUS = new CastAppQuery(RECEIVER_APP_ID, MDX_NAMESPACE,
             Map.of("type", "getMdxSessionStatus"), "mdxSessionStatus");
 
-    private final DeviceManager devices;
+    private final DeviceCommands commands;
     private final LoungeClient lounge;
     private final YouTubeSetupService setup;
 
-    public YouTubeLoungeRouteExecutor(DeviceManager devices, LoungeClient lounge, YouTubeSetupService setup) {
-        this.devices = devices;
+    public YouTubeLoungeRouteExecutor(DeviceCommands commands, LoungeClient lounge, YouTubeSetupService setup) {
+        this.commands = commands;
         this.lounge = lounge;
         this.setup = setup;
     }
@@ -42,7 +42,7 @@ public class YouTubeLoungeRouteExecutor implements RouteExecutor {
         Route.YouTubeLounge play = (Route.YouTubeLounge) route;
         Map<String, Object> reply;
         try {
-            reply = devices.query(device.id(), SESSION_STATUS);
+            reply = commands.query(device.id(), SESSION_STATUS);
         } catch (ActionFailedException e) {
             throw failed(device, "the YouTube receiver did not answer (" + e.getMessage() + ")");
         }
