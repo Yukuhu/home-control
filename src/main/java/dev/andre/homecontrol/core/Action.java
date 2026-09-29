@@ -7,19 +7,18 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-/** A command for one device. Each action names the capability an adapter must declare to accept it. */
+/** A command for one device. Each action names the capabilities that can carry it and what it asks of a device. */
 public sealed interface Action {
 
-    Capability requires();
+    /** The capabilities an adapter may declare to carry this action; it needs one of them. */
+    Set<Capability> requires();
+
+    /** What this action asks of a device, for "<device> cannot <purpose>", e.g. "switch inputs". */
+    String purpose();
 
     /** Whether an adapter declaring {@code capabilities} may be asked to perform this action. */
     default boolean acceptedBy(Set<Capability> capabilities) {
-        return capabilities.contains(requires());
-    }
-
-    /** Actions that drive a stream: renderers play it on the device, local sinks through the server. */
-    private static boolean playsStreams(Set<Capability> capabilities) {
-        return capabilities.contains(Capability.MEDIA_RENDERER) || capabilities.contains(Capability.LOCAL_AUDIO_SINK);
+        return !Collections.disjoint(requires(), capabilities);
     }
 
     record PressKey(RemoteKey key, KeyPress press) implements Action {
@@ -32,8 +31,13 @@ public sealed interface Action {
         }
 
         @Override
-        public Capability requires() {
-            return Capability.REMOTE_KEYS;
+        public Set<Capability> requires() {
+            return Set.of(Capability.REMOTE_KEYS);
+        }
+
+        @Override
+        public String purpose() {
+            return "take remote keys";
         }
     }
 
@@ -53,16 +57,26 @@ public sealed interface Action {
         }
 
         @Override
-        public Capability requires() {
-            return Capability.APP_LINK;
+        public Set<Capability> requires() {
+            return Set.of(Capability.APP_LINK);
+        }
+
+        @Override
+        public String purpose() {
+            return "open app links";
         }
     }
 
     /** Switch a TV to an input its handle listed through {@link InputListing}. */
     record SelectInput(String inputId) implements Action {
         @Override
-        public Capability requires() {
-            return Capability.REMOTE_KEYS;
+        public Set<Capability> requires() {
+            return Set.of(Capability.INPUTS);
+        }
+
+        @Override
+        public String purpose() {
+            return "switch inputs";
         }
     }
 
@@ -75,29 +89,38 @@ public sealed interface Action {
         }
 
         @Override
-        public Capability requires() {
-            return Capability.VOLUME;
+        public Set<Capability> requires() {
+            return Set.of(Capability.VOLUME);
+        }
+
+        @Override
+        public String purpose() {
+            return "change the volume";
         }
     }
 
     record Mute(boolean muted) implements Action {
         @Override
-        public Capability requires() {
-            return Capability.VOLUME;
+        public Set<Capability> requires() {
+            return Set.of(Capability.VOLUME);
+        }
+
+        @Override
+        public String purpose() {
+            return "mute";
         }
     }
 
     /** Stop whatever is being cast or played. */
     record Stop() implements Action {
         @Override
-        public Capability requires() {
-            return Capability.CAST_RECEIVER;
+        public Set<Capability> requires() {
+            return Set.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK);
         }
 
-        /** Cast receivers, media renderers and local audio sinks all stop playback (B kept requires() for its tests). */
         @Override
-        public boolean acceptedBy(Set<Capability> capabilities) {
-            return capabilities.contains(Capability.CAST_RECEIVER) || Action.playsStreams(capabilities);
+        public String purpose() {
+            return "stop playback";
         }
     }
 
@@ -111,13 +134,13 @@ public sealed interface Action {
         }
 
         @Override
-        public Capability requires() {
-            return Capability.MEDIA_RENDERER;
+        public Set<Capability> requires() {
+            return Set.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK);
         }
 
         @Override
-        public boolean acceptedBy(Set<Capability> capabilities) {
-            return Action.playsStreams(capabilities);
+        public String purpose() {
+            return "play a stream";
         }
 
         /** The query can hold a Jellyfin ApiKey; never print it. */
@@ -130,26 +153,26 @@ public sealed interface Action {
     /** Pause what a media renderer, or the server's own player on a local audio sink, plays. */
     record Pause() implements Action {
         @Override
-        public Capability requires() {
-            return Capability.MEDIA_RENDERER;
+        public Set<Capability> requires() {
+            return Set.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK);
         }
 
         @Override
-        public boolean acceptedBy(Set<Capability> capabilities) {
-            return Action.playsStreams(capabilities);
+        public String purpose() {
+            return "pause";
         }
     }
 
     /** Resume what a media renderer, or the server's own player on a local audio sink, paused. */
     record Resume() implements Action {
         @Override
-        public Capability requires() {
-            return Capability.MEDIA_RENDERER;
+        public Set<Capability> requires() {
+            return Set.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK);
         }
 
         @Override
-        public boolean acceptedBy(Set<Capability> capabilities) {
-            return Action.playsStreams(capabilities);
+        public String purpose() {
+            return "resume";
         }
     }
 
@@ -162,16 +185,26 @@ public sealed interface Action {
         }
 
         @Override
-        public Capability requires() {
-            return Capability.MEDIA_RENDERER;
+        public Set<Capability> requires() {
+            return Set.of(Capability.GROUPING);
+        }
+
+        @Override
+        public String purpose() {
+            return "be grouped";
         }
     }
 
     /** Leave the speaker group and play on its own. */
     record LeaveGroup() implements Action {
         @Override
-        public Capability requires() {
-            return Capability.MEDIA_RENDERER;
+        public Set<Capability> requires() {
+            return Set.of(Capability.GROUPING);
+        }
+
+        @Override
+        public String purpose() {
+            return "be grouped";
         }
     }
 
@@ -186,8 +219,13 @@ public sealed interface Action {
         }
 
         @Override
-        public Capability requires() {
-            return Capability.CAST_RECEIVER;
+        public Set<Capability> requires() {
+            return Set.of(Capability.CAST_RECEIVER);
+        }
+
+        @Override
+        public String purpose() {
+            return "receive Cast media";
         }
 
         /** The load map can carry a StreamUrl with an API key; never print it. */
@@ -211,8 +249,13 @@ public sealed interface Action {
         }
 
         @Override
-        public Capability requires() {
-            return Capability.CAST_RECEIVER;
+        public Set<Capability> requires() {
+            return Set.of(Capability.CAST_RECEIVER);
+        }
+
+        @Override
+        public String purpose() {
+            return "receive Cast media";
         }
 
         /** The body can carry credentials; never print it. */

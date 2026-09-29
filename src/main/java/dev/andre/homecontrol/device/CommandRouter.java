@@ -58,7 +58,7 @@ final class CommandRouter implements DeviceCommands {
                 return;
             }
         }
-        throw failures.reason(() -> new UnsupportedActionException(device.name() + " cannot perform " + action));
+        throw failures.reason(() -> new UnsupportedActionException(device.name() + " cannot " + action.purpose()));
     }
 
     /**
@@ -75,7 +75,7 @@ final class CommandRouter implements DeviceCommands {
             }
         }
         if (!stopped) {
-            throw failures.reason(() -> new UnsupportedActionException(device.name() + " cannot perform " + stop));
+            throw failures.reason(() -> new UnsupportedActionException(device.name() + " cannot " + stop.purpose()));
         }
     }
 
