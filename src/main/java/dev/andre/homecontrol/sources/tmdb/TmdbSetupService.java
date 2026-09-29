@@ -36,7 +36,7 @@ public class TmdbSetupService {
     }
 
     public Optional<TmdbSettings> settings() {
-        return TmdbSettings.from(sources.get(TmdbSettings.SOURCE_ID));
+        return sources.get(TmdbSettings.SOURCE_ID, TmdbSettings.class, TmdbSettings::fromVersionOne);
     }
 
     public Optional<TmdbCredential> credential() {
@@ -63,7 +63,7 @@ public class TmdbSetupService {
         login.storeSecrets(Map.of(TmdbSettings.CREDENTIAL_SECRET, credential.value()),
                 request.loginPassword(), request.loginPasswordConfirmation(), http);
         TmdbSettings settings = new TmdbSettings(credential.kind(), clock.instant());
-        sources.put(TmdbSettings.SOURCE_ID, settings.toMap());
+        sources.put(TmdbSettings.SOURCE_ID, settings);
         return settings;
     }
 

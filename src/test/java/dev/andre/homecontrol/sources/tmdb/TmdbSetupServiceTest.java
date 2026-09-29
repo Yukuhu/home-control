@@ -70,8 +70,8 @@ class TmdbSetupServiceTest {
         assertThat(result.credentialKind()).isEqualTo(TmdbCredential.Kind.BEARER);
         assertThat(result.connectedAt()).isEqualTo(NOW);
         assertThat(secretStore.secret(TmdbSettings.CREDENTIAL_SECRET)).contains(FakeTmdbServer.READ_TOKEN);
-        assertThat(sources.get(TmdbSettings.SOURCE_ID)).containsEntry("credentialKind", "BEARER")
-                .containsEntry("connectedAt", "2026-09-16T10:00:00Z");
+        assertThat(sources.get(TmdbSettings.SOURCE_ID, TmdbSettings.class, TmdbSettings::fromVersionOne))
+                .contains(new TmdbSettings(TmdbCredential.Kind.BEARER, Instant.parse("2026-09-16T10:00:00Z")));
         assertThat(loginService.loginRequired()).isTrue();
         assertThat(fake.count("GET", "/3/authentication")).isEqualTo(1);
         assertThat(fake.last("GET", "/3/authentication").header("authorization"))

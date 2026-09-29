@@ -38,7 +38,7 @@ public class JellyfinSetupService {
     }
 
     public Optional<JellyfinSettings> settings() {
-        return JellyfinSettings.from(sources.get(JellyfinSettings.SOURCE_ID));
+        return sources.get(JellyfinSettings.SOURCE_ID, JellyfinSettings.class, JellyfinSettings::fromVersionOne);
     }
 
     public Optional<JellyfinConnection> connection() {
@@ -83,7 +83,7 @@ public class JellyfinSetupService {
             }
             throw e;
         }
-        sources.put(JellyfinSettings.SOURCE_ID, next.toMap());
+        sources.put(JellyfinSettings.SOURCE_ID, next);
         previous.filter(old -> old.authMode() == JellyfinSettings.AuthMode.PASSWORD)
                 .ifPresent(old -> previousToken.filter(oldToken -> !oldToken.equals(token))
                         .ifPresent(oldToken -> revokeQuietly(new JellyfinConnection(old.serverUrl(), oldToken, old.deviceId(), old.userId()))));
@@ -127,7 +127,7 @@ public class JellyfinSetupService {
 
     /** Session links and other non-secret changes. */
     public void save(JellyfinSettings settings) {
-        sources.put(JellyfinSettings.SOURCE_ID, settings.toMap());
+        sources.put(JellyfinSettings.SOURCE_ID, settings);
     }
 
     /** Pins a Jellyfin app (by its DeviceId) to one device; a blank device id unlinks it. */

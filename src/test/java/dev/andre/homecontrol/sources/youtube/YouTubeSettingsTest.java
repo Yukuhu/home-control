@@ -1,7 +1,14 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,17 +18,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class YouTubeSettingsTest {
 
-    @Test
-    void roundTripsEveryKey() {
+    @TempDir
+    Path dir;
+
+    private YouTubeSettings everyField() {
         Map<String, String> playlists = new LinkedHashMap<>();
         playlists.put("PLa", "Music");
         playlists.put("PLb", "Watch later picks");
-        YouTubeSettings settings = new YouTubeSettings(Instant.parse("2026-09-16T10:00:00Z"), "chan-1", "Andre",
+        return new YouTubeSettings(Instant.parse("2026-09-16T10:00:00Z"), "chan-1", "Andre",
                 true, playlists, Set.of("b", "a"), "remote-1");
+    }
 
-        Map<String, String> map = settings.toMap();
+    @Test
+    void roundTripsEveryFieldThroughSourcesJson() {
+        Path file = dir.resolve("sources.json");
+        new JsonFileSourceSettings(file).put(YouTubeSettings.SOURCE_ID, everyField());
 
-        assertThat(map).containsExactlyInAnyOrderEntriesOf(Map.of(
+        assertThat(YouTubeSettings.read(new JsonFileSourceSettings(file))).isEqualTo(everyField());
+    }
+
+    @Test
+    void versionOneReadsEveryKey() {
+        Map<String, String> flat = Map.of(
                 "connectedAt", "2026-09-16T10:00:00Z",
                 "channelId", "chan-1",
                 "channelTitle", "Andre",
@@ -29,13 +47,36 @@ class YouTubeSettingsTest {
                 "playlist.PLa", "Music",
                 "playlist.PLb", "Watch later picks",
                 "lounge.devices", "a,b",
-                "lounge.remoteId", "remote-1"));
-        assertThat(YouTubeSettings.from(map)).isEqualTo(settings);
+                "lounge.remoteId", "remote-1");
+
+        assertThat(YouTubeSettings.fromVersionOne(flat)).isEqualTo(everyField());
     }
 
     @Test
-    void emptyMapIsNotConnected() {
-        YouTubeSettings settings = YouTubeSettings.from(Map.of());
+    void nothingStoredIsNotConnected() {
+        assertThat(YouTubeSettings.read(new JsonFileSourceSettings(dir.resolve("sources.json"))))
+                .isEqualTo(YouTubeSettings.EMPTY);
+    }
+
+    @Test
+    void theVersionOneFixtureConvertsPlaylistsAndLoungeDevicesAndRoundTripsThroughTheStore() throws IOException {
+        Path file = dir.resolve("sources.json");
+        Files.copy(Path.of("src/test/resources/fixtures/sources/sources-v1.json"), file);
+
+        YouTubeSettings converted = YouTubeSettings.read(new JsonFileSourceSettings(file));
+
+        assertThat(converted.playlists()).containsExactly(Map.entry("PL1", "Cooking"), Map.entry("PL2", "Music"));
+        assertThat(converted.loungeDevices()).containsExactly("shield-1", "tv-2");
+        assertThat(converted.watchLater()).isTrue();
+        assertThat(YouTubeSettings.read(new JsonFileSourceSettings(file))).isEqualTo(converted);
+        JsonNode section = JsonMapper.builder().build().readTree(Files.readAllBytes(file)).path("sources").path("youtube");
+        assertThat(section.path("loungeDevices").isArray()).isTrue();
+        assertThat(section.path("playlists").path("PL2").asString()).isEqualTo("Music");
+    }
+
+    @Test
+    void anEmptyVersionOneSectionIsNotConnected() {
+        YouTubeSettings settings = YouTubeSettings.fromVersionOne(Map.of());
 
         assertThat(settings.connectedAt()).isNull();
         assertThat(settings.watchLater()).isFalse();
@@ -64,7 +105,7 @@ class YouTubeSettingsTest {
     void playlistsAreOrderedByTitle() {
         Map<String, String> map = Map.of("playlist.PLb", "Zebra", "playlist.PLa", "apple");
 
-        YouTubeSettings settings = YouTubeSettings.from(map);
+        YouTubeSettings settings = YouTubeSettings.fromVersionOne(map);
 
         assertThat(settings.playlists().keySet()).containsExactly("PLa", "PLb");
     }

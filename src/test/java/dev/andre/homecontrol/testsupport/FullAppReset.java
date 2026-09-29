@@ -18,6 +18,7 @@ import dev.andre.homecontrol.sources.youtube.QuotaLedger;
 import dev.andre.homecontrol.sources.youtube.YouTubeSearch;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupService;
 import dev.andre.homecontrol.storage.DataDirectory;
+import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -66,9 +67,10 @@ public final class FullAppReset implements AfterAllCallback {
         app.getBean(TheSportsDbSchedule.class).clear();
         app.getBean(PairingService.class).cancel();
         app.getBean(LoginRateLimiter.class).reset();
+        app.getBean(JsonFileSourceSettings.class).reset();
 
         Path dataDir = app.getBean(DataDirectory.class).path();
-        for (String file : new String[]{"secrets.json", "secret.key", "sources.json", "sports.json", "pinned.json"}) {
+        for (String file : new String[]{"secrets.json", "secret.key"}) {
             delete(dataDir.resolve(file));
         }
         RailCache rails = app.getBean(RailCache.class);
