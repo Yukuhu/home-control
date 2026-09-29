@@ -27,7 +27,7 @@
 <div>
 <p class="eyebrow">YOUR MEDIA, YOUR WAY</p>
 <h1 th:text="${workflowId == null} ? 'Create a workflow' : 'Edit workflow'">Workflow</h1>
-<p>Turn a JSON response into a playable media address.</p>
+<p>Turn JSON responses into a playable media address.</p>
 </div>
 <a class="button" th:href="@{/setup#workflows}">Back to Setup</a>
 </div>
@@ -35,9 +35,8 @@
 <nav class="setup-nav" aria-label="Workflow sections">
 <p class="eyebrow">WORKFLOW</p>
 <a href="#workflow-details">Details</a>
-<a href="#workflow-source">Source</a>
-<a href="#workflow-selection">Entries</a>
-<a href="#workflow-mappings">Fields</a>
+<a href="#workflow-calls">Calls</a>
+<a href="#workflow-selection">Tiles</a>
 <a href="#workflow-media">Media</a>
 <a href="#workflow-action">Action</a>
 <a href="#workflow-test" th:if="${workflowId != null}">Test</a>
@@ -81,59 +80,91 @@
 </select>
 </div>
 </fieldset>
-<fieldset id="workflow-source">
-<legend>2. Fetch JSON</legend>
-<p class="hint">Fetch one JSON response from this address. Request headers apply only to this fetch.</p>
+<fieldset id="workflow-calls">
+<legend>2. Calls</legend>
+<p class="hint">Each call fetches one JSON response with GET. A call can use values of the calls above it, such as <code>{token}</code>, in its URL and headers. Calls that do not depend on each other run at the same time. A call that runs once per entry is made for each tile.</p>
+<p class="hint">In a header value, write <code>{{</code> and <code>}}</code> for a literal brace.</p>
+<div data-rows="calls">
+<article class="workflow-call" data-row="calls" th:each="call, c : ${workflowForm.calls}">
+<div class="workflow-call-header">
+<h3 th:text="|Call ${c.index + 1}|">Call 1</h3>
+<button type="button" data-move-row="up" aria-label="Move call up">Up</button>
+<button type="button" data-move-row="down" aria-label="Move call down">Down</button>
+<button type="button" data-remove-row="calls" aria-label="Remove call">Remove</button>
+<p class="workflow-phase" th:text="${call.phase != null and call.phase != '' ? call.phase : 'Save to see when this call runs'}">Runs at Play</p>
+</div>
+<input type="hidden" data-field="savedName" th:id="|workflow-calls-${c.index}-savedName|" th:name="|calls[${c.index}].savedName|" th:value="${call.savedName}">
 <div class="workflow-field">
-<label for="workflow-urlMode">Source URL</label>
-<select id="workflow-urlMode" name="urlMode">
-<option value="KEEP" th:selected="${workflowForm.urlMode != null and workflowForm.urlMode.name() == 'KEEP'}">Keep saved URL</option>
-<option value="REPLACE" th:selected="${workflowForm.urlMode != null and workflowForm.urlMode.name() == 'REPLACE'}">Replace URL</option>
+<label th:for="|workflow-calls-${c.index}-name|">Call name</label>
+<input data-field="name" data-call-name type="text" maxlength="24" autocomplete="off" th:id="|workflow-calls-${c.index}-name|" th:name="|calls[${c.index}].name|" th:value="${call.name}">
+</div>
+<div class="workflow-field">
+<label th:for="|workflow-calls-${c.index}-scope|">Runs</label>
+<select data-field="scope" th:id="|workflow-calls-${c.index}-scope|" th:name="|calls[${c.index}].scope|">
+<option value="SHARED" th:selected="${call.scope != null and call.scope.name() == 'SHARED'}">Once</option>
+<option value="ENTRY" th:if="${workflowForm.mode != null and workflowForm.mode.name() == 'GENERATED'}" th:selected="${call.scope != null and call.scope.name() == 'ENTRY'}">Once per entry</option>
+</select>
+</div>
+<div class="workflow-field">
+<label th:for="|workflow-calls-${c.index}-urlMode|">Source URL</label>
+<select data-field="urlMode" th:id="|workflow-calls-${c.index}-urlMode|" th:name="|calls[${c.index}].urlMode|">
+<option value="KEEP" th:selected="${call.urlMode != null and call.urlMode.name() == 'KEEP'}">Keep saved URL</option>
+<option value="REPLACE" th:selected="${call.urlMode != null and call.urlMode.name() == 'REPLACE'}">Replace URL</option>
 </select>
 </div>
 <div data-replacement="urlMode">
 <div class="workflow-field">
-<label for="workflow-url">New source URL</label>
-<input id="workflow-url" name="url" type="url" maxlength="8192" autocomplete="off" th:value="${workflowForm.url}">
+<label th:for="|workflow-calls-${c.index}-url|">New source URL</label>
+<input data-field="url" type="text" maxlength="8192" autocomplete="off" th:id="|workflow-calls-${c.index}-url|" th:name="|calls[${c.index}].url|" th:value="${call.url}">
 </div>
 </div>
 <div class="workflow-field">
-<label for="workflow-headersMode">Request headers</label>
-<select id="workflow-headersMode" name="headersMode">
-<option value="KEEP" th:selected="${workflowForm.headersMode != null and workflowForm.headersMode.name() == 'KEEP'}">Keep saved headers</option>
-<option value="REPLACE" th:selected="${workflowForm.headersMode != null and workflowForm.headersMode.name() == 'REPLACE'}">Replace headers</option>
+<label th:for="|workflow-calls-${c.index}-headersMode|">Request headers</label>
+<select data-field="headersMode" th:id="|workflow-calls-${c.index}-headersMode|" th:name="|calls[${c.index}].headersMode|">
+<option value="KEEP" th:selected="${call.headersMode != null and call.headersMode.name() == 'KEEP'}">Keep saved headers</option>
+<option value="REPLACE" th:selected="${call.headersMode != null and call.headersMode.name() == 'REPLACE'}">Replace headers</option>
 </select>
 </div>
 <div data-replacement="headersMode">
-<p class="hint">Replacing with no rows clears all saved headers.</p>
+<p class="hint">Replacing with no rows clears all saved headers of this call.</p>
 <div data-rows="headers">
-<div class="workflow-row" data-row="headers" th:each="row, stat : ${workflowForm.headers}">
+<div class="workflow-row" data-row="headers" th:each="header, h : ${call.headers}">
 <div class="workflow-field">
-<label for="workflow-headers-0-name" th:for="'workflow-headers-' + ${stat.index} + '-name'">Header name</label>
-<input id="workflow-headers-0-name" name="headers[0].name" th:id="'workflow-headers-' + ${stat.index} + '-name'" th:name="'headers[' + ${stat.index} + '].name'" data-field="name" type="text" autocomplete="off" maxlength="120" th:value="${row.name}">
+<label th:for="|workflow-calls-${c.index}-headers-${h.index}-name|">Header name</label>
+<input data-field="name" type="text" autocomplete="off" maxlength="120" th:id="|workflow-calls-${c.index}-headers-${h.index}-name|" th:name="|calls[${c.index}].headers[${h.index}].name|" th:value="${header.name}">
 </div>
 <div class="workflow-field">
-<label for="workflow-headers-0-value" th:for="'workflow-headers-' + ${stat.index} + '-value'">New header value</label>
-<input id="workflow-headers-0-value" name="headers[0].value" th:id="'workflow-headers-' + ${stat.index} + '-value'" th:name="'headers[' + ${stat.index} + '].value'" data-field="value" type="password" autocomplete="off" maxlength="16384">
+<label th:for="|workflow-calls-${c.index}-headers-${h.index}-value|">New header value</label>
+<input data-field="value" type="password" autocomplete="off" maxlength="16384" th:id="|workflow-calls-${c.index}-headers-${h.index}-value|" th:name="|calls[${c.index}].headers[${h.index}].value|">
 </div>
 <button type="button" data-remove-row="headers" aria-label="Remove header">Remove</button>
 </div>
 </div>
 <button type="button" data-add-row="headers">Add header</button>
-<template id="workflow-headers-template">
-<div class="workflow-row" data-row="headers">
+</div>
+<p class="hint">Values read from this call's response. New values start sensitive to mask previews.</p>
+<div data-rows="variables">
+<div class="workflow-row" data-row="variables" th:each="row, v : ${call.variables}">
 <div class="workflow-field">
-<label for="workflow-headers-new-name">Header name</label>
-<input id="workflow-headers-new-name" name="headers[0].name" data-field="name" type="text" autocomplete="off" maxlength="120">
+<label th:for="|workflow-calls-${c.index}-variables-${v.index}-name|">Variable name</label>
+<input data-field="name" type="text" autocomplete="off" maxlength="32" th:id="|workflow-calls-${c.index}-variables-${v.index}-name|" th:name="|calls[${c.index}].variables[${v.index}].name|" th:value="${row.name}">
 </div>
 <div class="workflow-field">
-<label for="workflow-headers-new-value">New header value</label>
-<input id="workflow-headers-new-value" name="headers[0].value" data-field="value" type="password" autocomplete="off" maxlength="16384">
+<label th:for="|workflow-calls-${c.index}-variables-${v.index}-pointer|">JSON Pointer</label>
+<input data-field="pointer" type="text" autocomplete="off" maxlength="512" th:id="|workflow-calls-${c.index}-variables-${v.index}-pointer|" th:name="|calls[${c.index}].variables[${v.index}].pointer|" th:value="${row.pointer}">
 </div>
-<button type="button" data-remove-row="headers" aria-label="Remove header">Remove</button>
+<div class="workflow-field">
+<label th:for="|workflow-calls-${c.index}-variables-${v.index}-sensitive|">Sensitive value</label>
+<input data-field="sensitive" type="checkbox" value="true" th:id="|workflow-calls-${c.index}-variables-${v.index}-sensitive|" th:name="|calls[${c.index}].variables[${v.index}].sensitive|" th:checked="${row.sensitive}">
+<input type="hidden" data-marker="sensitive" value="on" th:name="|_calls[${c.index}].variables[${v.index}].sensitive|">
 </div>
-</template>
+<button type="button" data-remove-row="variables" aria-label="Remove value">Remove</button>
 </div>
+</div>
+<button type="button" data-add-row="variables">Add value</button>
+</article>
+</div>
+<button type="button" data-add-row="calls">Add call</button>
 </fieldset>
 <fieldset id="workflow-selection">
 <legend>3. Choose tiles</legend>
@@ -154,6 +185,12 @@
 </div>
 <div data-mode="GENERATED">
 <div class="workflow-field">
+<label for="workflow-entryCall">Entries come from</label>
+<select id="workflow-entryCall" name="entryCall">
+<option th:each="call : ${workflowForm.calls}" th:value="${call.name}" th:text="${call.name}" th:selected="${call.name == workflowForm.entryCall}">main</option>
+</select>
+</div>
+<div class="workflow-field">
 <label for="workflow-arrayPointer">Entry array pointer</label>
 <input id="workflow-arrayPointer" name="arrayPointer" type="text" maxlength="512" autocomplete="off" th:value="${workflowForm.arrayPointer}">
 </div>
@@ -166,89 +203,63 @@
 <input id="workflow-titlePointer" name="titlePointer" type="text" maxlength="512" autocomplete="off" th:value="${workflowForm.titlePointer}">
 </div>
 <div class="workflow-field">
-<input type="hidden" name="_includeSubtitlePointer" value="on">
-<label for="workflow-includeSubtitlePointer" class="workflow-checkbox">
-<input id="workflow-includeSubtitlePointer" name="includeSubtitlePointer" type="checkbox" value="true" th:checked="${workflowForm.includeSubtitlePointer}">Read an optional subtitle</label>
+<label for="workflow-subtitleFrom">Subtitle</label>
+<select id="workflow-subtitleFrom" name="subtitleFrom">
+<option value="NONE" th:selected="${workflowForm.subtitleFrom == null or workflowForm.subtitleFrom.name() == 'NONE'}">No subtitle</option>
+<option value="POINTER" th:selected="${workflowForm.subtitleFrom != null and workflowForm.subtitleFrom.name() == 'POINTER'}">A field of the entry</option>
+<option value="VARIABLE" th:selected="${workflowForm.subtitleFrom != null and workflowForm.subtitleFrom.name() == 'VARIABLE'}">A value from a call</option>
+</select>
 </div>
-<div data-optional="includeSubtitlePointer">
-<div class="workflow-field">
+<div data-choice="subtitleFrom:POINTER"><div class="workflow-field">
 <label for="workflow-subtitlePointer">Entry subtitle pointer</label>
 <input id="workflow-subtitlePointer" name="subtitlePointer" type="text" maxlength="512" autocomplete="off" th:value="${workflowForm.subtitlePointer}">
-</div>
-</div>
+</div></div>
+<div data-choice="subtitleFrom:VARIABLE"><div class="workflow-field">
+<label for="workflow-subtitleVariable">Subtitle value name</label>
+<input id="workflow-subtitleVariable" name="subtitleVariable" type="text" maxlength="32" autocomplete="off" th:value="${workflowForm.subtitleVariable}">
+</div></div>
 <div class="workflow-field">
-<input type="hidden" name="_includeArtworkPointer" value="on">
-<label for="workflow-includeArtworkPointer" class="workflow-checkbox">
-<input id="workflow-includeArtworkPointer" name="includeArtworkPointer" type="checkbox" value="true" th:checked="${workflowForm.includeArtworkPointer}">Read optional artwork</label>
+<label for="workflow-artworkFrom">Artwork</label>
+<select id="workflow-artworkFrom" name="artworkFrom">
+<option value="NONE" th:selected="${workflowForm.artworkFrom == null or workflowForm.artworkFrom.name() == 'NONE'}">No artwork</option>
+<option value="POINTER" th:selected="${workflowForm.artworkFrom != null and workflowForm.artworkFrom.name() == 'POINTER'}">A field of the entry</option>
+<option value="VARIABLE" th:selected="${workflowForm.artworkFrom != null and workflowForm.artworkFrom.name() == 'VARIABLE'}">A value from a call</option>
+</select>
 </div>
-<div data-optional="includeArtworkPointer">
-<div class="workflow-field">
+<div data-choice="artworkFrom:POINTER"><div class="workflow-field">
 <label for="workflow-artworkPointer">Entry artwork pointer</label>
 <input id="workflow-artworkPointer" name="artworkPointer" type="text" maxlength="512" autocomplete="off" th:value="${workflowForm.artworkPointer}">
-</div>
-</div>
-<p class="hint">The array pointer reads the whole response. ID, title, subtitle and artwork pointers read each entry. IDs must be unique strings or whole numbers. Up to 200 entries are supported.</p>
-</div>
-<p class="hint">JSON Pointer examples: <code>/items</code>, <code>/auth/token</code>. Leave a pointer blank to select its root. Escape a slash as <code>~1</code> and a tilde as <code>~0</code>. Optional selections apply only when their checkbox is selected.</p>
-</fieldset>
-<fieldset id="workflow-mappings">
-<legend>4. Map fields</legend>
-<p class="hint">Give each value a name, such as <code>A</code> or <code>Token</code>. One-tile workflows read the whole response. Generated tiles can also read the current entry. New mappings start sensitive to mask previews.</p>
-<p class="hint">Switching to one tile changes all mappings to Whole response. Review their pointers. If you switch back to generated tiles, choose Current entry again where needed.</p>
-<div data-rows="variables">
-<div class="workflow-row" data-row="variables" th:each="row, stat : ${workflowForm.variables}">
+</div></div>
+<div data-choice="artworkFrom:VARIABLE"><div class="workflow-field">
+<label for="workflow-artworkVariable">Artwork value name</label>
+<input id="workflow-artworkVariable" name="artworkVariable" type="text" maxlength="32" autocomplete="off" th:value="${workflowForm.artworkVariable}">
+</div></div>
+<p class="hint">Entry fields are values read from each entry. Per-entry calls and the media address can use them.</p>
+<div data-rows="entryVariables">
+<div class="workflow-row" data-row="entryVariables" th:each="row, e : ${workflowForm.entryVariables}">
 <div class="workflow-field">
-<label for="workflow-variables-0-name" th:for="'workflow-variables-' + ${stat.index} + '-name'">Variable name</label>
-<input id="workflow-variables-0-name" name="variables[0].name" th:id="'workflow-variables-' + ${stat.index} + '-name'" th:name="'variables[' + ${stat.index} + '].name'" data-field="name" type="text" autocomplete="off" maxlength="32" th:value="${row.name}">
+<label th:for="|workflow-entryVariables-${e.index}-name|">Variable name</label>
+<input data-field="name" type="text" autocomplete="off" maxlength="32" th:id="|workflow-entryVariables-${e.index}-name|" th:name="|entryVariables[${e.index}].name|" th:value="${row.name}">
 </div>
 <div class="workflow-field">
-<label for="workflow-variables-0-scope" th:for="'workflow-variables-' + ${stat.index} + '-scope'">Read from</label>
-<select id="workflow-variables-0-scope" name="variables[0].scope" th:id="'workflow-variables-' + ${stat.index} + '-scope'" th:name="'variables[' + ${stat.index} + '].scope'" data-field="scope">
-<option value="ROOT" th:selected="${row.scope != null and row.scope.name() == 'ROOT'}">Whole response</option>
-<option value="ENTRY" th:if="${workflowForm.mode != null and workflowForm.mode.name() == 'GENERATED'}" th:selected="${row.scope != null and row.scope.name() == 'ENTRY'}">Current entry</option>
-</select>
+<label th:for="|workflow-entryVariables-${e.index}-pointer|">JSON Pointer</label>
+<input data-field="pointer" type="text" autocomplete="off" maxlength="512" th:id="|workflow-entryVariables-${e.index}-pointer|" th:name="|entryVariables[${e.index}].pointer|" th:value="${row.pointer}">
 </div>
 <div class="workflow-field">
-<label for="workflow-variables-0-pointer" th:for="'workflow-variables-' + ${stat.index} + '-pointer'">JSON Pointer</label>
-<input id="workflow-variables-0-pointer" name="variables[0].pointer" th:id="'workflow-variables-' + ${stat.index} + '-pointer'" th:name="'variables[' + ${stat.index} + '].pointer'" data-field="pointer" type="text" autocomplete="off" maxlength="512" th:value="${row.pointer}">
+<label th:for="|workflow-entryVariables-${e.index}-sensitive|">Sensitive value</label>
+<input data-field="sensitive" type="checkbox" value="true" th:id="|workflow-entryVariables-${e.index}-sensitive|" th:name="|entryVariables[${e.index}].sensitive|" th:checked="${row.sensitive}">
+<input type="hidden" data-marker="sensitive" value="on" th:name="|_entryVariables[${e.index}].sensitive|">
 </div>
-<div class="workflow-field">
-<label for="workflow-variables-0-sensitive" th:for="'workflow-variables-' + ${stat.index} + '-sensitive'">Sensitive value</label>
-<input id="workflow-variables-0-sensitive" name="variables[0].sensitive" th:id="'workflow-variables-' + ${stat.index} + '-sensitive'" th:name="'variables[' + ${stat.index} + '].sensitive'" data-field="sensitive" type="checkbox" value="true" th:checked="${row.sensitive}">
-<input type="hidden" data-marker="sensitive" name="_variables[0].sensitive" value="on" th:name="'_variables[' + ${stat.index} + '].sensitive'">
-</div>
-<button type="button" data-remove-row="variables" aria-label="Remove mapping">Remove</button>
+<button type="button" data-remove-row="entryVariables" aria-label="Remove entry field">Remove</button>
 </div>
 </div>
-<button type="button" data-add-row="variables">Add mapping</button>
-<template id="workflow-variables-template">
-<div class="workflow-row" data-row="variables">
-<div class="workflow-field">
-<label for="workflow-variables-new-name">Variable name</label>
-<input id="workflow-variables-new-name" name="variables[0].name" data-field="name" type="text" autocomplete="off" maxlength="32">
+<button type="button" data-add-row="entryVariables">Add entry field</button>
+<p class="hint">IDs must be unique strings or whole numbers. Up to 200 entries are supported, or 50 when a per-entry call runs at refresh. A tile's subtitle and artwork cannot use a value marked sensitive.</p>
 </div>
-<div class="workflow-field">
-<label for="workflow-variables-new-scope">Read from</label>
-<select id="workflow-variables-new-scope" name="variables[0].scope" data-field="scope">
-<option value="ROOT">Whole response</option>
-<option value="ENTRY">Current entry</option>
-</select>
-</div>
-<div class="workflow-field">
-<label for="workflow-variables-new-pointer">JSON Pointer</label>
-<input id="workflow-variables-new-pointer" name="variables[0].pointer" data-field="pointer" type="text" autocomplete="off" maxlength="512">
-</div>
-<div class="workflow-field">
-<label for="workflow-variables-new-sensitive">Sensitive value</label>
-<input id="workflow-variables-new-sensitive" name="variables[0].sensitive" data-field="sensitive" type="checkbox" value="true" checked>
-<input type="hidden" data-marker="sensitive" name="_variables[0].sensitive" value="on">
-</div>
-<button type="button" data-remove-row="variables" aria-label="Remove mapping">Remove</button>
-</div>
-</template>
+<p class="hint">JSON Pointer examples: <code>/items</code>, <code>/auth/token</code>. Leave a pointer blank to select its root. Escape a slash as <code>~1</code> and a tilde as <code>~0</code>. The array pointer reads the response of the call the entries come from; the other entry pointers read each entry.</p>
 </fieldset>
 <fieldset id="workflow-media">
-<legend>5. Build the media address</legend>
+<legend>4. Build the media address</legend>
 <div class="workflow-field">
 <label for="workflow-templateMode">Media URL template</label>
 <select id="workflow-templateMode" name="templateMode">
@@ -262,7 +273,7 @@
 <input id="workflow-template" name="template" type="text" maxlength="8192" autocomplete="off" th:value="${workflowForm.template}">
 </div>
 </div>
-<p class="hint">Insert mapped fields as <code>{A}</code> in a path or query value, for example <code>https://media.example/play?id={A}</code>. Values are URL encoded for you.</p>
+<p class="hint">Insert values as <code>{A}</code> in a path or query value, for example <code>https://media.example/play?id={A}</code>. Values are URL encoded for you.</p>
 <div class="workflow-field">
 <label for="workflow-mimeType">Direct media MIME type</label>
 <input id="workflow-mimeType" name="mimeType" type="text" list="workflow-mime-presets" maxlength="100" autocomplete="off" th:value="${workflowForm.mimeType}">
@@ -276,7 +287,7 @@
 <p class="hint">Use a direct media address and matching type, such as <code>video/mp4</code>, <code>audio/mpeg</code>, or <code>application/vnd.apple.mpegurl</code>. Your receiver must reach it directly. Custom media-download headers are not supported.</p>
 </fieldset>
 <fieldset id="workflow-action">
-<legend>6. Action</legend>
+<legend>5. Action</legend>
 <p>Play sends a Cast LOAD to the Chromecast or Cast-enabled device selected on the Dashboard. The receiver fetches the direct media address itself.</p>
 </fieldset>
 <fieldset th:if="${needsLoginPassword}">
@@ -293,6 +304,106 @@
 </fieldset>
 <p class="hint">Saving never starts playback. A generated workflow may fetch JSON when its Dashboard row refreshes after Save; a single tile waits until Play. Saved credentials stay hidden; choose Keep to retain them.</p>
 <button type="submit" class="primary">Save workflow</button>
+<template id="workflow-calls-template">
+<article class="workflow-call" data-row="calls">
+<div class="workflow-call-header">
+<h3>Call</h3>
+<button type="button" data-move-row="up" aria-label="Move call up">Up</button>
+<button type="button" data-move-row="down" aria-label="Move call down">Down</button>
+<button type="button" data-remove-row="calls" aria-label="Remove call">Remove</button>
+<p class="workflow-phase">Save to see when this call runs</p>
+</div>
+<input type="hidden" data-field="savedName" value="">
+<div class="workflow-field">
+<label>Call name</label>
+<input data-field="name" data-call-name type="text" maxlength="24" autocomplete="off">
+</div>
+<div class="workflow-field">
+<label>Runs</label>
+<select data-field="scope">
+<option value="SHARED">Once</option>
+<option value="ENTRY">Once per entry</option>
+</select>
+</div>
+<div class="workflow-field">
+<label>Source URL</label>
+<select data-field="urlMode">
+<option value="KEEP">Keep saved URL</option>
+<option value="REPLACE" selected>Replace URL</option>
+</select>
+</div>
+<div data-replacement="urlMode">
+<div class="workflow-field">
+<label>New source URL</label>
+<input data-field="url" type="text" maxlength="8192" autocomplete="off">
+</div>
+</div>
+<div class="workflow-field">
+<label>Request headers</label>
+<select data-field="headersMode">
+<option value="KEEP">Keep saved headers</option>
+<option value="REPLACE" selected>Replace headers</option>
+</select>
+</div>
+<div data-replacement="headersMode">
+<p class="hint">Replacing with no rows clears all saved headers of this call.</p>
+<div data-rows="headers"></div>
+<button type="button" data-add-row="headers">Add header</button>
+</div>
+<p class="hint">Values read from this call's response. New values start sensitive to mask previews.</p>
+<div data-rows="variables"></div>
+<button type="button" data-add-row="variables">Add value</button>
+</article>
+</template>
+<template id="workflow-headers-template">
+<div class="workflow-row" data-row="headers">
+<div class="workflow-field">
+<label>Header name</label>
+<input data-field="name" type="text" autocomplete="off" maxlength="120">
+</div>
+<div class="workflow-field">
+<label>New header value</label>
+<input data-field="value" type="password" autocomplete="off" maxlength="16384">
+</div>
+<button type="button" data-remove-row="headers" aria-label="Remove header">Remove</button>
+</div>
+</template>
+<template id="workflow-variables-template">
+<div class="workflow-row" data-row="variables">
+<div class="workflow-field">
+<label>Variable name</label>
+<input data-field="name" type="text" autocomplete="off" maxlength="32">
+</div>
+<div class="workflow-field">
+<label>JSON Pointer</label>
+<input data-field="pointer" type="text" autocomplete="off" maxlength="512">
+</div>
+<div class="workflow-field">
+<label>Sensitive value</label>
+<input data-field="sensitive" type="checkbox" value="true" checked>
+<input type="hidden" data-marker="sensitive" value="on">
+</div>
+<button type="button" data-remove-row="variables" aria-label="Remove value">Remove</button>
+</div>
+</template>
+<template id="workflow-entryVariables-template">
+<div class="workflow-row" data-row="entryVariables">
+<div class="workflow-field">
+<label>Variable name</label>
+<input data-field="name" type="text" autocomplete="off" maxlength="32">
+</div>
+<div class="workflow-field">
+<label>JSON Pointer</label>
+<input data-field="pointer" type="text" autocomplete="off" maxlength="512">
+</div>
+<div class="workflow-field">
+<label>Sensitive value</label>
+<input data-field="sensitive" type="checkbox" value="true" checked>
+<input type="hidden" data-marker="sensitive" value="on">
+</div>
+<button type="button" data-remove-row="entryVariables" aria-label="Remove entry field">Remove</button>
+</div>
+</template>
 </form>
 </section>
 <section id="workflow-test" th:if="${workflowId != null}">

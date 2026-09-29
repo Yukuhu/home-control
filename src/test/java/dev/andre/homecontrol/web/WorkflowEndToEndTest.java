@@ -133,18 +133,19 @@ class WorkflowEndToEndTest {
                 .header("Sec-CH-UA-Platform", "Linux")
                 .param("name", mode.equals("SINGLE") ? "Single News" : "Generated News")
                 .param("enabled", "true").param("mode", mode).param("kind", "VIDEO")
-                .param("urlMode", "REPLACE").param("url", upstream.url("/feed?key=" + URL_SECRET).toString())
+                .param("calls[0].name", "main").param("calls[0].scope", "SHARED")
+                .param("calls[0].urlMode", "REPLACE").param("calls[0].url", upstream.url("/feed?key=" + URL_SECRET).toString())
                 .param("templateMode", "REPLACE")
                 .param("template", upstream.url("/media/" + TEMPLATE_SECRET).toString() + "?id={A}&token={C}")
-                .param("headersMode", "REPLACE").param("headers[0].name", "Authorization")
-                .param("headers[0].value", HEADER).param("mimeType", "video/mp4")
-                .param("variables[0].name", "A").param("variables[0].scope", mode.equals("SINGLE") ? "ROOT" : "ENTRY")
-                .param("variables[0].pointer", "/id")
-                .param("variables[1].name", "C").param("variables[1].scope", "ROOT")
-                .param("variables[1].pointer", "/auth/token").param("variables[1].sensitive", "true")
+                .param("calls[0].headersMode", "REPLACE").param("calls[0].headers[0].name", "Authorization")
+                .param("calls[0].headers[0].value", HEADER).param("mimeType", "video/mp4")
+                .param("calls[0].variables[0].name", "C").param("calls[0].variables[0].pointer", "/auth/token")
+                .param("calls[0].variables[0].sensitive", "true")
+                .param(mode.equals("SINGLE") ? "calls[0].variables[1].name" : "entryVariables[0].name", "A")
+                .param(mode.equals("SINGLE") ? "calls[0].variables[1].pointer" : "entryVariables[0].pointer", "/id")
                 .param("loginPassword", PASSWORD).param("loginPasswordConfirmation", PASSWORD);
         if (mode.equals("SINGLE")) builder.param("title", "News");
-        else builder.param("arrayPointer", "/channels").param("idPointer", "/id").param("titlePointer", "/title");
+        else builder.param("entryCall", "main").param("arrayPointer", "/channels").param("idPointer", "/id").param("titlePointer", "/title");
         return builder;
     }
 
@@ -197,7 +198,7 @@ class WorkflowEndToEndTest {
                         .param("expectedRevision", "1").session(session))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         noSecrets(tested);
-        assertThat(tested).contains("Fetch JSON", "News", "Masked media address");
+        assertThat(tested).contains("<strong>Play</strong>", "News", "Masked media address");
         assertThat(upstream.count("/feed")).isEqualTo(1);
         assertThat(fakeDevices.recorded(deviceId)).isEmpty();
 
