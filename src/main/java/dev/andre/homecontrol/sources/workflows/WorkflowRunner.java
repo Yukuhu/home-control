@@ -78,6 +78,9 @@ public final class WorkflowRunner {
             values = calls.run(entryCalls, plan, known, run, entry.title()).values();
         } catch (WorkflowException failure) {
             problem = failure.call() != null ? failure.getMessage() : "Entry \"" + entry.title() + "\": " + failure.detail();
+        } catch (RuntimeException _) {
+            // Never expose the message of an exception this code did not author.
+            problem = "Entry \"" + entry.title() + "\": could not be read";
         }
         String subtitle = subtitle(listing.subtitle(), entry.subtitle(), values);
         URI artwork = artwork(listing.artwork(), entry.artwork(), values);
