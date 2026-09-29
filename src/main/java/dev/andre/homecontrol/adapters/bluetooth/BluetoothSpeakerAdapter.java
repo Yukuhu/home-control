@@ -5,6 +5,7 @@ import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezException;
 import dev.andre.homecontrol.adapters.bluetooth.player.AudioDeviceResolver;
 import dev.andre.homecontrol.adapters.bluetooth.player.MpvLauncher;
 import dev.andre.homecontrol.adapters.bluetooth.player.MpvPlayer;
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
@@ -22,7 +23,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /** Bluetooth speakers (spec epic J): server-side playback through the host's BlueZ and mpv. */
-public class BluetoothSpeakerAdapter implements DeviceAdapter {
+public class BluetoothSpeakerAdapter implements DeviceAdapter, AdapterDiscovery {
 
     private static final Logger log = LoggerFactory.getLogger(BluetoothSpeakerAdapter.class);
 

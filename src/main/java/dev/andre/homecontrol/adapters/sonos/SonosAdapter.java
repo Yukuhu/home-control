@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.sonos;
 
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
@@ -21,7 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /** Sonos rooms (spec §4.1): media renderers with grouping. Pairing-free. */
-public class SonosAdapter implements DeviceAdapter {
+public class SonosAdapter implements DeviceAdapter, AdapterDiscovery {
 
     public static final String ADAPTER_ID = SonosSettings.ADAPTER_ID;
 

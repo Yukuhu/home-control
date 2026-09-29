@@ -64,7 +64,7 @@ class WorkflowEndToEndTest {
         @Bean RecordingAdapter workflowRecordingAdapter() { return new RecordingAdapter(); }
     }
 
-    static final class RecordingAdapter implements DeviceAdapter {
+    static final class RecordingAdapter implements DeviceAdapter, AdapterDiscovery {
         record Recorded(String deviceId, Action action) {}
         final List<Recorded> actions = new CopyOnWriteArrayList<>();
         @Override public String id() { return "workflow-test"; }

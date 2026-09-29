@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
@@ -20,7 +21,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /** Android TV Remote v2: the Shield and every other Android TV / Google TV box. */
-public class AndroidTvAdapter implements DeviceAdapter {
+public class AndroidTvAdapter implements DeviceAdapter, AdapterDiscovery {
 
     public static final String ADAPTER_ID = AndroidTvSettings.ADAPTER_ID;
 

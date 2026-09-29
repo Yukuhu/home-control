@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.tizen;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.adapters.support.PairingKeys;
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Device;
@@ -30,7 +31,7 @@ import java.util.function.Consumer;
  * Samsung Tizen TVs: remote-control WebSocket, REST API and DIAL (spec §4.1). The registry is only
  * read here; what a session learns (token, MAC) is stored through the device manager.
  */
-public class TizenAdapter implements WakeOnLanAdapter {
+public class TizenAdapter implements WakeOnLanAdapter, AdapterDiscovery {
 
     public static final String ADAPTER_ID = TizenSettings.ADAPTER_ID;
     public static final String SEARCH_TARGET = "urn:samsung.com:device:RemoteControlReceiver:1";

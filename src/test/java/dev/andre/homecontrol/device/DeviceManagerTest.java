@@ -10,6 +10,7 @@ import dev.andre.homecontrol.adapters.androidtv.MdnsDiscovery;
 import dev.andre.homecontrol.adapters.androidtv.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
@@ -689,7 +690,7 @@ class DeviceManagerTest {
     }
 
     /** A minimal {@link DeviceAdapter} test double: fixed id/capabilities, a pluggable connect. */
-    private static final class FakeAdapter implements DeviceAdapter {
+    private static final class FakeAdapter implements DeviceAdapter, AdapterDiscovery {
 
         private final String id;
         private final Set<Capability> capabilities;

@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.device;
 
+import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Capability;
@@ -22,7 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /** A scriptable adapter for DeviceManager tests: no network, records what it was asked to do. */
-class StubAdapter implements DeviceAdapter {
+class StubAdapter implements DeviceAdapter, AdapterDiscovery {
 
     private final String id;
     private final DeviceKind kind;
