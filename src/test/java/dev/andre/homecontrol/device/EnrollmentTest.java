@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DiscoveredDevice;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -104,6 +105,23 @@ class EnrollmentTest {
 
         assertThat(attaching.get(5, TimeUnit.SECONDS).id()).isEqualTo("shield");
         assertThat(wiring.registry().findAll()).hasSize(1);
+    }
+
+    @Test
+    void addingAReceiverWhoseNameBelongsToTwoDevicesRegistersANewOne() {
+        StubAdapter androidtv = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, false);
+        StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false);
+        Wiring wiring = wire(HostAddresses::lookup, androidtv, cast);
+        wiring.registry().save(new Device("a", "Living Room", DeviceKind.ANDROID_TV, "10.0.0.6",
+                Map.of("androidtv", Map.of()), Instant.EPOCH));
+        wiring.registry().save(new Device("b", "Living Room", DeviceKind.CAST, "10.0.0.7",
+                Map.of("cast", Map.of("host", "10.0.0.7", "port", "8009")), Instant.EPOCH));
+        cast.visible.add(new DiscoveredDevice("cast", "Living Room", "10.0.0.9", 8009, Map.of()));
+
+        Device added = wiring.enrollment().addDiscovered("cast", "10.0.0.9", 8009);
+
+        assertThat(added.id()).isNotIn("a", "b");
+        assertThat(wiring.registry().findById("a").orElseThrow().hasAdapter("cast")).isFalse();
     }
 
     @Test

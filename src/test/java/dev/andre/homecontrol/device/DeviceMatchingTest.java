@@ -28,13 +28,13 @@ class DeviceMatchingTest {
         Device byHost = device("a", "Kitchen", "10.0.0.5");
         Device byName = device("b", "Living Room", "10.0.0.6");
 
-        assertThat(DeviceMatching.bestMatch(List.of(byName, byHost), receiver("Living Room", "10.0.0.5")))
+        assertThat(DeviceMatching.owner(List.of(byName, byHost), receiver("Living Room", "10.0.0.5")))
                 .contains(byHost);
     }
 
     @Test
     void anAmbiguousNameMatchesNothing() {
-        assertThat(DeviceMatching.bestMatch(List.of(device("a", "TV", "10.0.0.5"), device("b", "TV", "10.0.0.6")),
+        assertThat(DeviceMatching.owner(List.of(device("a", "TV", "10.0.0.5"), device("b", "TV", "10.0.0.6")),
                 receiver("TV", "10.0.0.9"))).isEmpty();
     }
 
@@ -42,7 +42,23 @@ class DeviceMatchingTest {
     void aDeviceThatAlreadyHasTheAdapterIsNeverTheMatch() {
         Device withCast = device("a", "TV", "10.0.0.5").withAdapter("cast", Map.of());
 
-        assertThat(DeviceMatching.bestMatch(List.of(withCast), receiver("TV", "10.0.0.5"))).isEmpty();
+        assertThat(DeviceMatching.owner(List.of(withCast), receiver("TV", "10.0.0.5"))).isEmpty();
+    }
+
+    @Test
+    void aNameMatchIsVetoedWhenAnotherDeviceSitsAtTheReceiversAddress() {
+        Device named = device("a", "Living Room", "10.0.0.6");
+        Device atTheAddress = device("b", "Kitchen", "10.0.0.9").withAdapter("cast", Map.of());
+
+        assertThat(DeviceMatching.owner(List.of(named, atTheAddress), receiver("Living Room", "10.0.0.9"))).isEmpty();
+    }
+
+    @Test
+    void aNameMatchIsVetoedWhenAnotherDeviceHasThatName() {
+        Device named = device("a", "Living Room", "10.0.0.6");
+        Device sameNameWithCast = device("b", "Living Room", "10.0.0.7").withAdapter("cast", Map.of());
+
+        assertThat(DeviceMatching.owner(List.of(named, sameNameWithCast), receiver("Living Room", "10.0.0.9"))).isEmpty();
     }
 
     @Test

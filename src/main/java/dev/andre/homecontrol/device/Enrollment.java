@@ -236,7 +236,7 @@ final class Enrollment {
             if (isRegistered(registered, found)) {
                 throw new IllegalArgumentException(found.name() + " is already added");
             }
-            device = DeviceMatching.bestMatch(registered, found)
+            device = DeviceMatching.owner(registered, found)
                     .map(target -> target.withAdapter(adapterId, settings))
                     .orElseGet(() -> new Device(DeviceMatching.uniqueId(registered, adapterId, found.host()), found.name(),
                             adapter.kind(), found.host(), Map.of(adapterId, settings), Instant.now()));
@@ -271,7 +271,7 @@ final class Enrollment {
             if (carrier.isPresent()) {
                 reconnectIfMoved(carrier.get(), found.adapterId(), settings.get(), after);
             } else {
-                DeviceMatching.bestMatch(registered, found).ifPresent(target -> {
+                DeviceMatching.owner(registered, found).ifPresent(target -> {
                     Device merged = target.withAdapter(found.adapterId(), settings.get());
                     registry.save(merged);
                     after.connect(merged);
