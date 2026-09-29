@@ -11,6 +11,8 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
+import dev.andre.homecontrol.core.ReceiverApps;
+import dev.andre.homecontrol.core.UnsupportedActionException;
 
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -120,7 +122,7 @@ class StubAdapter implements DeviceAdapter, AdapterDiscovery {
         return boundCredentials;
     }
 
-    static final class StubHandle implements DeviceHandle {
+    static final class StubHandle implements DeviceHandle, ReceiverApps {
 
         private final Consumer<DeviceState> onChange;
         final List<Action> executed = new CopyOnWriteArrayList<>();
@@ -164,7 +166,7 @@ class StubAdapter implements DeviceAdapter, AdapterDiscovery {
             }
             queried.add(query);
             if (answer == null) {
-                return DeviceHandle.super.query(query);
+                throw new UnsupportedActionException("This connection cannot ask receiver apps");
             }
             return answer;
         }

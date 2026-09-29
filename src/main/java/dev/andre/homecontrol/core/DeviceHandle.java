@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.core;
 
-import java.util.Map;
+import java.util.Optional;
 
 /** One live connection to one device through one adapter. Reconnects on its own until closed. */
 public interface DeviceHandle extends AutoCloseable {
@@ -15,11 +15,11 @@ public interface DeviceHandle extends AutoCloseable {
     void execute(Action action);
 
     /**
-     * Asks a receiver app and returns its reply, now or never (same exceptions as {@link #execute}).
-     * Only Cast connections can; every other connection is unsupported.
+     * What this connection offers beyond commands, such as its inputs ({@link InputListing}), its speaker grouping
+     * ({@link GroupListing}) or its receiver apps ({@link ReceiverApps}); empty when it offers none of that kind.
      */
-    default Map<String, Object> query(CastAppQuery query) {
-        throw new UnsupportedActionException("This connection cannot ask receiver apps");
+    default <T> Optional<T> feature(Class<T> type) {
+        return type.isInstance(this) ? Optional.of(type.cast(this)) : Optional.empty();
     }
 
     @Override

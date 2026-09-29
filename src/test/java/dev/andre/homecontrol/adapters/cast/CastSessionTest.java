@@ -12,6 +12,7 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
+import dev.andre.homecontrol.core.ReceiverApps;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.CastLoads;
@@ -95,6 +96,7 @@ class CastSessionTest {
         assertThat(state.volumeMax()).isEqualTo(100);
         assertThat(state.muted()).isTrue();
         assertThat(seen.all()).extracting(DeviceState::status).startsWith(DeviceStatus.CONNECTING);
+        assertThat(session.feature(ReceiverApps.class)).containsSame(session);
     }
 
     @Test

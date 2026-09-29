@@ -12,6 +12,7 @@ import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.InputListing;
 import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.testsupport.InMemoryDeviceSecrets;
 import dev.andre.homecontrol.core.RemoteKey;
@@ -351,6 +352,7 @@ class WebOsSessionTest {
 
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertThat(session.inputs())
                 .containsExactly(new TvInput("HDMI_1", "HDMI 1"), new TvInput("HDMI_2", "PlayStation")));
+        assertThat(session.feature(InputListing.class)).containsSame(session);
         session.execute(new Action.SelectInput("HDMI_2"));
         assertThat(tv.nextRequest("ssap://tv/switchInput").path("payload").path("inputId").asString())
                 .isEqualTo("HDMI_2");

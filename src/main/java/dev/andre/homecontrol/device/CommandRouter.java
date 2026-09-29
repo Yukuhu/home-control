@@ -11,9 +11,11 @@ import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.ReceiverApps;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -94,8 +96,13 @@ final class CommandRouter implements DeviceCommands {
             DeviceHandle handle = deviceHandles.get(adapterId);
             if (accepts(device, adapterId, capabilities -> capabilities.contains(Capability.CAST_RECEIVER))
                     && failures.reachable(handle)) {
+                Optional<ReceiverApps> receiver = handle.feature(ReceiverApps.class);
+                if (receiver.isEmpty()) {
+                    failures.unsupported(new UnsupportedActionException(device.name() + " cannot ask receiver apps"));
+                    continue;
+                }
                 try {
-                    return handle.query(query);
+                    return receiver.get().query(query);
                 } catch (DeviceOfflineException e) {
                     failures.offline(e);
                 } catch (UnsupportedActionException e) {
