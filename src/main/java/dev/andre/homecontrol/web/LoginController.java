@@ -24,6 +24,8 @@ public class LoginController {
     private static final String LOGIN = "login";
     private static final String ERROR = "error";
     private static final String LOGIN_ERROR = "loginError";
+    private static final String LOGIN_MESSAGE = "loginMessage";
+    private static final String SETUP_REDIRECT = "redirect:/setup";
 
     private final LoginService loginService;
     private final LoginRateLimiter limiter;
@@ -91,16 +93,46 @@ public class LoginController {
     public String changePassword(@RequestParam(required = false) String current, @RequestParam(required = false) String password,
                                  @RequestParam(required = false) String confirmation, HttpServletRequest request,
                                  RedirectAttributes redirect) {
+        return guessing(request, redirect, () -> loginService.changePassword(current, password, confirmation, request),
+                "Password changed. Other browsers need to log in again.");
+    }
+
+    /** No guess is involved, so it is not rate-limited. Only possible while no login exists. */
+    @PostMapping("/setup/password/set")
+    public String setPassword(@RequestParam(required = false) String password,
+                              @RequestParam(required = false) String confirmation, HttpServletRequest request,
+                              RedirectAttributes redirect) {
+        try {
+            loginService.setPassword(password, confirmation, request);
+            redirect.addFlashAttribute(LOGIN_MESSAGE, "Password set. Every browser now needs it to open Home Control.");
+        } catch (PasswordRejectedException e) {
+            redirect.addFlashAttribute(LOGIN_ERROR, e.getMessage());
+        }
+        return SETUP_REDIRECT;
+    }
+
+    @PostMapping("/setup/password/remove")
+    public String removePassword(@RequestParam(required = false) String current, HttpServletRequest request,
+                                 RedirectAttributes redirect) {
+        return guessing(request, redirect, () -> loginService.removePassword(current),
+                "Password removed. Anyone on your network can open Home Control.");
+    }
+
+    /**
+     * Runs an action that checks the current password. Every checked guess counts against the address. A rejected
+     * request, a busy verifier or an unexpected failure gives the reservation back.
+     */
+    private String guessing(HttpServletRequest request, RedirectAttributes redirect, Runnable attempt, String success) {
         String address = request.getRemoteAddr();
         Optional<Duration> blocked = limiter.reserve(address);
         if (blocked.isPresent()) {
             redirect.addFlashAttribute(LOGIN_ERROR, tooManyAttempts(blocked.get()));
-            return "redirect:/setup";
+            return SETUP_REDIRECT;
         }
         try {
-            loginService.changePassword(current, password, confirmation, request);
+            attempt.run();
             limiter.succeeded(address);
-            redirect.addFlashAttribute("loginMessage", "Password changed. Other browsers need to log in again.");
+            redirect.addFlashAttribute(LOGIN_MESSAGE, success);
         } catch (WrongPasswordException e) {
             redirect.addFlashAttribute(LOGIN_ERROR, e.getMessage()); // a wrong guess keeps counting
         } catch (PasswordRejectedException | LoginBusyException e) {
@@ -110,7 +142,7 @@ public class LoginController {
             limiter.release(address);
             throw e;
         }
-        return "redirect:/setup";
+        return SETUP_REDIRECT;
     }
 
     private static String tooManyAttempts(Duration wait) {
