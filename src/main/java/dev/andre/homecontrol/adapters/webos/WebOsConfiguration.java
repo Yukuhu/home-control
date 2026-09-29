@@ -4,6 +4,7 @@ import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -18,12 +19,13 @@ public class WebOsConfiguration {
 
     @Bean
     public WebOsAdapter webOsAdapter(WebOsProperties properties, SsdpDiscovery ssdp, DeviceRegistry registry,
-                                     WakeOnLan wakeOnLan) {
-        return new WebOsAdapter(properties, ssdp, registry, wakeOnLan);
+                                     WakeOnLan wakeOnLan, DeviceSecrets secrets) {
+        return new WebOsAdapter(properties, ssdp, registry, wakeOnLan, secrets);
     }
 
     @Bean
-    public WebOsPairing webOsPairing(WebOsProperties properties, SsdpDiscovery ssdp, DeviceManager devices) {
-        return new WebOsPairing(properties, ssdp, devices);
+    public WebOsPairing webOsPairing(WebOsProperties properties, SsdpDiscovery ssdp, DeviceManager devices,
+                                     DeviceSecrets secrets) {
+        return new WebOsPairing(properties, ssdp, devices, secrets);
     }
 }

@@ -9,6 +9,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.testsupport.InMemoryDeviceSecrets;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.WakeOnLanAdapter;
@@ -45,6 +46,7 @@ class TizenAdapterTest {
     private FakeTizenServer tv;
     private FakeWakeOnLanReceiver receiver;
     private DeviceRegistry registry;
+    private final InMemoryDeviceSecrets secrets = new InMemoryDeviceSecrets();
     private SsdpDiscovery ssdp;
 
     @BeforeEach
@@ -70,7 +72,7 @@ class TizenAdapterTest {
     }
 
     private TizenAdapter adapter(SsdpDiscovery discovery, TizenProperties properties) {
-        return new TizenAdapter(properties, discovery, registry, new WakeOnLan(receiver.address()));
+        return new TizenAdapter(properties, discovery, registry, new WakeOnLan(receiver.address()), secrets);
     }
 
     private static SsdpDiscovery notStarted() {
@@ -79,7 +81,8 @@ class TizenAdapterTest {
 
     private Device device() {
         Device device = new Device("samsung", "Samsung TV", DeviceKind.TIZEN, "127.0.0.1",
-                Map.of("tizen", Map.of("paired", "true", "token", FakeTizenServer.TOKEN)), Instant.now());
+                Map.of("tizen", Map.of("paired", "true", "keyRef", "0123456789abcdef")), Instant.now());
+        secrets.putDeviceSecret(TizenSettings.secretName("0123456789abcdef"), FakeTizenServer.TOKEN);
         registry.save(device);
         return device;
     }

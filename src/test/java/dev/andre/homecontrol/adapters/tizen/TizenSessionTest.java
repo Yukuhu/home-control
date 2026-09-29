@@ -12,6 +12,7 @@ import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.LearnedSettings;
+import dev.andre.homecontrol.testsupport.InMemoryDeviceSecrets;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
@@ -35,6 +36,8 @@ import static org.awaitility.Awaitility.await;
 
 class TizenSessionTest {
 
+    private static final String KEY_REF = "0123456789abcdef";
+
     private static final Map<String, String> PAIRED = Map.of("paired", "true", "token", FakeTizenServer.TOKEN);
 
     /** Poll 200 ms (so the first handshake backoff is 400 ms), no wake grace, Allow/Deny within 500 ms. */
@@ -49,6 +52,7 @@ class TizenSessionTest {
     private DeviceRegistry registry;
     private TizenSession session;
     private final RecordingStateListener states = new RecordingStateListener();
+    private final InMemoryDeviceSecrets secrets = new InMemoryDeviceSecrets();
 
     @BeforeEach
     void setUp() throws IOException {
@@ -81,10 +85,10 @@ class TizenSessionTest {
 
     private TizenSession start(Map<String, String> settings, TizenTimings timings) {
         Device device = new Device("samsung", "Samsung TV", DeviceKind.TIZEN, "127.0.0.1",
-                Map.of("tizen", settings), Instant.now());
+                Map.of("tizen", stored(settings)), Instant.now());
         registry.save(device);
         session = new TizenSession(device, TizenRestTest.properties(tv), timings, InsecureTls.httpClient(Duration.ofSeconds(2)),
-                registry, learned(), new WakeOnLan(receiver.address()), states, () -> { });
+                registry, learned(), secrets, new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         return session;
     }
@@ -110,8 +114,25 @@ class TizenSessionTest {
         await().atMost(Duration.ofSeconds(5)).until(() -> session.state().currentApp() == null);
     }
 
+    /** Settings as the device manager keeps them since 2B: the token as a device secret, named by keyRef. */
+    private Map<String, String> stored(Map<String, String> settings) {
+        Map<String, String> stored = new LinkedHashMap<>(settings);
+        String token = stored.remove("token");
+        if (token != null) {
+            secrets.putDeviceSecret(TizenSettings.secretName(KEY_REF), token);
+            stored.put("keyRef", KEY_REF);
+        }
+        return stored;
+    }
+
+    /** A stored setting; {@code token} is looked up as the device secret the entry's keyRef names. */
     private String stored(String key) {
-        return registry.findById("samsung").orElseThrow().adapterSettings(TizenAdapter.ADAPTER_ID).get(key);
+        Map<String, String> settings = registry.findById("samsung").orElseThrow().adapterSettings(TizenAdapter.ADAPTER_ID);
+        if (!"token".equals(key)) {
+            return settings.get(key);
+        }
+        String keyRef = settings.get("keyRef");
+        return keyRef == null ? null : secrets.deviceSecret(TizenSettings.secretName(keyRef)).orElse(null);
     }
 
     @Test

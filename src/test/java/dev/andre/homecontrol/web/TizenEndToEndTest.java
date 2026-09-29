@@ -5,6 +5,7 @@ import dev.andre.homecontrol.adapters.net.FakeWakeOnLanReceiver;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.adapters.tizen.FakeTizenServer;
 import dev.andre.homecontrol.adapters.tizen.TizenAdapter;
+import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.device.DeviceManager;
@@ -109,6 +110,9 @@ class TizenEndToEndTest {
     @Autowired
     DeviceRegistry registry;
 
+    @Autowired
+    DeviceSecrets deviceSecrets;
+
     private final HttpClient http = HttpClient.newHttpClient();
 
     private HttpResponse<String> get(String path) throws Exception {
@@ -148,7 +152,9 @@ class TizenEndToEndTest {
         assertThat(paired.statusCode()).isBetween(300, 399);
         assertThat(paired.headers().firstValue("Location")).hasValueSatisfying(location ->
                 assertThat(location).endsWith("/?device=" + ID));
-        assertThat(settings()).containsEntry("paired", "true").containsEntry("token", FakeTizenServer.TOKEN);
+        assertThat(settings()).containsEntry("paired", "true").doesNotContainKey("token").containsKey("keyRef");
+        assertThat(deviceSecrets.deviceSecret("device.tizen." + settings().get("keyRef") + ".token"))
+                .contains(FakeTizenServer.TOKEN);
         assertThat(TV.queries().getFirst()).doesNotContain("token=");
 
         // 3. Connected with the token; MAC learned from REST.

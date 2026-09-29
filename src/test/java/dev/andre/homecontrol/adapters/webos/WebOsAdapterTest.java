@@ -9,6 +9,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.testsupport.InMemoryDeviceSecrets;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.WakeOnLanAdapter;
@@ -48,6 +49,7 @@ class WebOsAdapterTest {
     private FakeSsapServer tv;
     private FakeWakeOnLanReceiver receiver;
     private DeviceRegistry registry;
+    private final InMemoryDeviceSecrets secrets = new InMemoryDeviceSecrets();
     private SsdpDiscovery ssdp;
 
     @BeforeEach
@@ -73,7 +75,7 @@ class WebOsAdapterTest {
     }
 
     private WebOsAdapter adapter(SsdpDiscovery discovery, WebOsProperties properties) {
-        return new WebOsAdapter(properties, discovery, registry, new WakeOnLan(receiver.address()));
+        return new WebOsAdapter(properties, discovery, registry, new WakeOnLan(receiver.address()), secrets);
     }
 
     private static SsdpDiscovery notStarted() {
@@ -82,7 +84,8 @@ class WebOsAdapterTest {
 
     private Device device() {
         Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1",
-                Map.of("webos", Map.of("clientKey", FakeSsapServer.CLIENT_KEY)), Instant.now());
+                Map.of("webos", Map.of("keyRef", "0123456789abcdef")), Instant.now());
+        secrets.putDeviceSecret(WebOsSettings.secretName("0123456789abcdef"), FakeSsapServer.CLIENT_KEY);
         registry.save(device);
         return device;
     }

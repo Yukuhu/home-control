@@ -13,6 +13,7 @@ import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.LearnedSettings;
+import dev.andre.homecontrol.testsupport.InMemoryDeviceSecrets;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.UnsupportedActionException;
@@ -40,6 +41,8 @@ import static org.awaitility.Awaitility.await;
 
 class WebOsSessionTest {
 
+    private static final String KEY_REF = "0123456789abcdef";
+
     /**
      * Backoff 50–100 ms, no wake grace, liveness every 30 s (off for most tests), a 2 s pairing-prompt wait that
      * connect() never actually uses (it only ever registers with a stored key).
@@ -58,6 +61,7 @@ class WebOsSessionTest {
     private DeviceRegistry registry;
     private WebOsSession session;
     private final RecordingStateListener states = new RecordingStateListener();
+    private final InMemoryDeviceSecrets secrets = new InMemoryDeviceSecrets();
 
     @BeforeEach
     void startTv() throws IOException {
@@ -94,13 +98,14 @@ class WebOsSessionTest {
 
     private WebOsSession session(Map<String, String> settings, Consumer<DeviceState> listener, WebOsTimings timings)
             throws IOException {
-        Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1", Map.of("webos", settings), Instant.now());
+        Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1", Map.of("webos", stored(settings)),
+                Instant.now());
         registry.save(device);
         WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(),
                 Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(1),
                 Duration.ofSeconds(2), Duration.ofSeconds(0));
         session = new WebOsSession(device, properties, timings, InsecureTls.httpClient(Duration.ofSeconds(2)), registry,
-                learned(), new WakeOnLan(receiver.address()), listener, () -> { });
+                learned(), secrets, new WakeOnLan(receiver.address()), listener, () -> { });
         return session;
     }
 
@@ -127,6 +132,17 @@ class WebOsSessionTest {
 
     private void awaitStatus(DeviceStatus status) {
         await().atMost(Duration.ofSeconds(5)).until(() -> session.state().status() == status);
+    }
+
+    /** Settings as the device manager keeps them since 2B: the client key as a device secret, named by keyRef. */
+    private Map<String, String> stored(Map<String, String> settings) {
+        Map<String, String> stored = new LinkedHashMap<>(settings);
+        String key = stored.remove("clientKey");
+        if (key != null) {
+            secrets.putDeviceSecret(WebOsSettings.secretName(KEY_REF), key);
+            stored.put("keyRef", KEY_REF);
+        }
+        return stored;
     }
 
     private String storedSetting(String key) {
@@ -412,14 +428,14 @@ class WebOsSessionTest {
     @Test
     void aConnectionThatAnswersNothingIsDetectedByTheLivenessCheckAndReopened() throws Exception {
         Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1",
-                Map.of("webos", Map.of("clientKey", FakeSsapServer.CLIENT_KEY)), Instant.now());
+                Map.of("webos", stored(Map.of("clientKey", FakeSsapServer.CLIENT_KEY))), Instant.now());
         registry.save(device);
         WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(),
                 Duration.ofSeconds(2), Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(1),
                 Duration.ofSeconds(2), Duration.ofSeconds(0), Duration.ofSeconds(1));
         session = new WebOsSession(device, properties, LIVENESS, InsecureTls.httpClient(Duration.ofSeconds(2)),
                 registry,
-                learned(), new WakeOnLan(receiver.address()), states, () -> { });
+                learned(), secrets, new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         connected();
         int connections = tv.connections();
@@ -435,14 +451,14 @@ class WebOsSessionTest {
     @Test
     void aLivenessCheckTheTvAnswersKeepsTheConnection() throws Exception {
         Device device = new Device("lg", "LG TV", DeviceKind.WEBOS, "127.0.0.1",
-                Map.of("webos", Map.of("clientKey", FakeSsapServer.CLIENT_KEY)), Instant.now());
+                Map.of("webos", stored(Map.of("clientKey", FakeSsapServer.CLIENT_KEY))), Instant.now());
         registry.save(device);
         WebOsProperties properties = new WebOsProperties(true, tv.port(), FakeWebSocketServer.closedPort(),
                 Duration.ofSeconds(2), Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(1),
                 Duration.ofSeconds(2), Duration.ofSeconds(0), Duration.ofSeconds(1));
         session = new WebOsSession(device, properties, LIVENESS, InsecureTls.httpClient(Duration.ofSeconds(2)),
                 registry,
-                learned(), new WakeOnLan(receiver.address()), states, () -> { });
+                learned(), secrets, new WakeOnLan(receiver.address()), states, () -> { });
         session.start();
         connected();
         int connections = tv.connections();

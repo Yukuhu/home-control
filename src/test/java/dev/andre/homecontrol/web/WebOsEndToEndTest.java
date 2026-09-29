@@ -6,6 +6,7 @@ import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.adapters.webos.FakeSsapServer;
 import dev.andre.homecontrol.adapters.webos.WebOsAdapter;
+import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
@@ -122,6 +123,9 @@ class WebOsEndToEndTest {
     @Autowired
     DeviceRegistry registry;
 
+    @Autowired
+    DeviceSecrets deviceSecrets;
+
     private final HttpClient http = HttpClient.newHttpClient();
 
     private HttpResponse<String> get(String path) throws Exception {
@@ -160,7 +164,9 @@ class WebOsEndToEndTest {
         Device device = registry.findById(ID).orElseThrow();
         assertThat(device.kind()).isEqualTo(DeviceKind.WEBOS);
         assertThat(device.name()).isEqualTo("[LG] webOS TV OLED55C9PLA");
-        assertThat(device.adapterSettings("webos")).containsEntry("clientKey", FakeSsapServer.CLIENT_KEY);
+        assertThat(device.adapterSettings("webos")).doesNotContainKey("clientKey").containsKey("keyRef");
+        assertThat(deviceSecrets.deviceSecret("device.webos." + device.adapterSettings("webos").get("keyRef") + ".client-key"))
+                .contains(FakeSsapServer.CLIENT_KEY);
 
         // 3. Connected, MAC learned, inputs on the dashboard.
         awaitStatus(DeviceStatus.CONNECTED);

@@ -1,7 +1,9 @@
 package dev.andre.homecontrol.adapters.tizen;
 
 import dev.andre.homecontrol.adapters.net.InsecureTls;
+import dev.andre.homecontrol.adapters.support.PairingKeys;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.PromptPairing;
 import dev.andre.homecontrol.core.PromptPairingResult;
 import dev.andre.homecontrol.device.DeviceManager;
@@ -17,12 +19,14 @@ public class TizenPairing implements PromptPairing {
 
     private final TizenProperties properties;
     private final DeviceManager devices;
+    private final PairingKeys keys;
     private final HttpClient http;
     private final TizenRest rest;
 
-    public TizenPairing(TizenProperties properties, DeviceManager devices) {
+    public TizenPairing(TizenProperties properties, DeviceManager devices, DeviceSecrets secrets) {
         this.properties = properties;
         this.devices = devices;
+        this.keys = TizenSettings.keys(secrets);
         this.http = InsecureTls.httpClient(properties.connectTimeout());
         this.rest = new TizenRest(http, properties);
     }
@@ -50,7 +54,8 @@ public class TizenPairing implements PromptPairing {
                 case CONNECTED -> {
                     Map<String, String> settings = new LinkedHashMap<>();
                     settings.put(TizenSettings.PAIRED_KEY, "true");
-                    connection.token().ifPresent(token -> settings.put(TizenSettings.TOKEN_KEY, token));
+                    connection.token().ifPresent(token ->
+                            settings.put(TizenSettings.KEY_REF, keys.storePaired(devices.devices(), host, token)));
                     String deviceName = name != null && !name.isBlank() ? name.trim()
                             : rest.deviceInfo(host).map(TizenDeviceInfo::name).filter(n -> !n.isBlank()).orElse("Samsung TV");
                     yield new PromptPairingResult.Paired(
