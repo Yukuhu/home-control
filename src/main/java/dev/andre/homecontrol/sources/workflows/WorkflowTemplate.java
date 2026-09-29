@@ -13,6 +13,8 @@ import java.util.regex.Pattern;
 /** One validated media URL template, tokenized once for expansion and safe preview. */
 public final class WorkflowTemplate {
     private static final Pattern VARIABLE = Pattern.compile("\\{([A-Za-z]\\w{0,31})\\}");
+    private static final String INVALID = "invalid ";
+    private static final String PLACEHOLDER = " placeholder";
     private static final int MAX_URL = 8_192;
     private final String template;
     private final List<Token> tokens;
@@ -30,7 +32,7 @@ public final class WorkflowTemplate {
     public WorkflowTemplate(String template, Set<String> variableNames, String label, WorkflowException.Stage stage) {
         this.label = label;
         this.stage = stage;
-        if (template == null || template.isBlank() || template.length() > MAX_URL) fail("invalid " + label + " template length");
+        if (template == null || template.isBlank() || template.length() > MAX_URL) fail(INVALID + label + " template length");
         this.template = template;
         this.tokens = tokenize(template, variableNames);
         int authority = template.indexOf("://");
@@ -55,14 +57,14 @@ public final class WorkflowTemplate {
         int previous = 0;
         while (matcher.find()) {
             String literal = template.substring(previous, matcher.start());
-            if (literal.indexOf('{') >= 0 || literal.indexOf('}') >= 0) fail("invalid " + label + " placeholder");
+            if (literal.indexOf('{') >= 0 || literal.indexOf('}') >= 0) fail(INVALID + label + PLACEHOLDER);
             parts.add(new Token(literal, false, previous));
-            if (!variableNames.contains(matcher.group(1))) fail("unknown " + label + " placeholder: " + matcher.group(1));
+            if (!variableNames.contains(matcher.group(1))) fail("unknown " + label + PLACEHOLDER + ": " + matcher.group(1));
             parts.add(new Token(matcher.group(1), true, matcher.start()));
             previous = matcher.end();
         }
         String tail = template.substring(previous);
-        if (tail.indexOf('{') >= 0 || tail.indexOf('}') >= 0) fail("invalid " + label + " placeholder");
+        if (tail.indexOf('{') >= 0 || tail.indexOf('}') >= 0) fail(INVALID + label + PLACEHOLDER);
         parts.add(new Token(tail, false, previous));
         return List.copyOf(parts);
     }
@@ -72,11 +74,11 @@ public final class WorkflowTemplate {
             if (!token.variable()) continue;
             int start = token.start();
             if (queryStart < 0 || start < queryStart) {
-                if (pathStart < 0 || start < pathStart) fail(label + " placeholder must be in a path or query value");
+                if (pathStart < 0 || start < pathStart) fail(label + PLACEHOLDER + " must be in a path or query value");
             } else {
                 int fieldStart = Math.max(template.lastIndexOf('&', start), queryStart);
                 int equals = template.indexOf('=', fieldStart + 1);
-                if (equals < 0 || equals >= start) fail(label + " placeholder must be in a query value");
+                if (equals < 0 || equals >= start) fail(label + PLACEHOLDER + " must be in a query value");
             }
         }
     }
@@ -86,7 +88,7 @@ public final class WorkflowTemplate {
         for (Token token : tokens) {
             if (token.variable()) {
                 WorkflowJson.Value value = values.get(token.text());
-                if (value == null || value.text() == null) fail("unresolved " + label + " placeholder");
+                if (value == null || value.text() == null) fail("unresolved " + label + PLACEHOLDER);
                 built.append(encodeComponent(value.text()));
             } else built.append(token.text());
             if (built.length() > MAX_URL) fail("expanded " + label + " exceeds limit");
@@ -100,7 +102,7 @@ public final class WorkflowTemplate {
         for (Token token : tokens) {
             if (token.variable()) {
                 WorkflowJson.Value value = values.get(token.text());
-                if (value == null || value.text() == null) fail("unresolved " + label + " placeholder");
+                if (value == null || value.text() == null) fail("unresolved " + label + PLACEHOLDER);
                 display.append(value.sensitive() ? "•••" : encodeComponent(value.text()));
             } else {
                 previewLiteral(display, token);
@@ -152,13 +154,13 @@ public final class WorkflowTemplate {
             URI uri = new URI(raw);
             if (uri.getScheme() == null || !(uri.getScheme().equalsIgnoreCase("http") || uri.getScheme().equalsIgnoreCase("https"))
                     || uri.getHost() == null || uri.getHost().isBlank() || uri.getRawUserInfo() != null
-                    || uri.getRawFragment() != null) fail("invalid " + label + " template");
+                    || uri.getRawFragment() != null) fail(INVALID + label + " template");
             for (String segment : uri.getPath().split("/", -1)) {
                 if (segment.equals(".") || segment.equals("..")) fail("dot path segment in " + label);
             }
             return uri;
         } catch (URISyntaxException _) {
-            throw new WorkflowException(stage, "invalid " + label + " template");
+            throw new WorkflowException(stage, INVALID + label + " template");
         }
     }
 

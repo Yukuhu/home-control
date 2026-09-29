@@ -37,22 +37,29 @@ public final class WorkflowHeaderTemplate {
             } else if (c == '{') {
                 int end = template.indexOf('}', i);
                 String name = end < 0 ? "" : template.substring(i + 1, end);
-                if (!NAME.matcher(name).matches()) throw new WorkflowException(Stage.WORKFLOW, "invalid header placeholder");
-                if (!literal.isEmpty()) {
-                    parts.add(new Token(literal.toString(), false));
-                    literal.setLength(0);
-                }
+                if (!NAME.matcher(name).matches()) throw invalidPlaceholder();
+                flush(parts, literal);
                 parts.add(new Token(name, true));
                 i = end + 1;
             } else if (c == '}') {
-                throw new WorkflowException(Stage.WORKFLOW, "invalid header placeholder");
+                throw invalidPlaceholder();
             } else {
                 literal.append(c);
                 i++;
             }
         }
-        if (!literal.isEmpty()) parts.add(new Token(literal.toString(), false));
+        flush(parts, literal);
         return List.copyOf(parts);
+    }
+
+    private static void flush(List<Token> parts, StringBuilder literal) {
+        if (literal.isEmpty()) return;
+        parts.add(new Token(literal.toString(), false));
+        literal.setLength(0);
+    }
+
+    private static WorkflowException invalidPlaceholder() {
+        return new WorkflowException(Stage.WORKFLOW, "invalid header placeholder");
     }
 
     public Set<String> references() {

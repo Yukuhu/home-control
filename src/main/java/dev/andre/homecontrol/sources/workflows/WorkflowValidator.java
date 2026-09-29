@@ -16,6 +16,7 @@ public final class WorkflowValidator {
     static final int MAX_HEADERS = 16;
     static final int MAX_VARIABLES = 64;
     private static final String INVALID_PREFIX = "invalid ";
+    private static final String INVALID_HEADER_VALUE = "invalid header value: ";
     private static final Pattern CALL_NAME = Pattern.compile("[a-z][a-z0-9_]{0,23}");
     private static final Pattern NAME = Pattern.compile("[A-Za-z]\\w{0,31}");
     /** In a JSON pointer, {@code ~} only ever starts {@code ~0} or {@code ~1}. */
@@ -56,14 +57,18 @@ public final class WorkflowValidator {
         Set<String> names = new HashSet<>();
         for (Call call : draft.calls()) {
             if (call == null || call.variables() == null) fail("mappings are required");
-            for (Variable variable : call.variables()) variable(variable, names);
+            addVariables(call.variables(), names);
         }
         if (draft.listing() != null) {
             if (draft.listing().variables() == null) fail("mappings are required");
-            for (Variable variable : draft.listing().variables()) variable(variable, names);
+            addVariables(draft.listing().variables(), names);
         }
         if (names.size() > MAX_VARIABLES) fail("too many mappings");
         return names;
+    }
+
+    private static void addVariables(List<Variable> variables, Set<String> names) {
+        for (Variable variable : variables) variable(variable, names);
     }
 
     private static void variable(Variable variable, Set<String> names) {
@@ -101,16 +106,17 @@ public final class WorkflowValidator {
             String lower = header.name().toLowerCase(Locale.ROOT);
             if (DENIED_HEADERS.contains(lower) || lower.startsWith("proxy-")) fail(context + "header is not allowed: " + header.name());
             if (!names.add(lower)) fail(context + "duplicate header: " + header.name());
-            if (header.value() == null || header.value().chars().anyMatch(c -> c == '\r' || c == '\n' || c == 0)) {
-                fail(context + "invalid header value: " + header.name());
-            }
-            try {
-                if (!variables.containsAll(new WorkflowHeaderTemplate(header.value()).references())) {
-                    fail(context + "invalid header value: " + header.name());
-                }
-            } catch (WorkflowException _) {
-                fail(context + "invalid header value: " + header.name());
-            }
+            headerValue(header, context, variables);
+        }
+    }
+
+    private static void headerValue(Header header, String context, Set<String> variables) {
+        String invalid = context + INVALID_HEADER_VALUE + header.name();
+        if (header.value() == null || header.value().chars().anyMatch(c -> c == '\r' || c == '\n' || c == 0)) fail(invalid);
+        try {
+            if (!variables.containsAll(new WorkflowHeaderTemplate(header.value()).references())) fail(invalid);
+        } catch (WorkflowException _) {
+            fail(invalid);
         }
     }
 

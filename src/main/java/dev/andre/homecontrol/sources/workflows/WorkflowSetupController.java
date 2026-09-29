@@ -46,6 +46,7 @@ public final class WorkflowSetupController {
     private static final Pattern HEADER = Pattern.compile("(calls\\[[0-7]\\]\\.headers)\\[(0|[1-9]\\d?)\\]\\.(name|value)");
     private static final Pattern VARIABLE = Pattern.compile(
             "(calls\\[[0-7]\\]\\.variables|entryVariables)\\[(0|[1-9]\\d?)\\]\\.(name|pointer|sensitive)");
+    private static final String CALLS_PREFIX = "calls[";
     private static final Pattern CALL_NAME = Pattern.compile("[a-z][a-z0-9_]{0,23}");
     private static final Pattern VARIABLE_NAME = Pattern.compile("[A-Za-z]\\w{0,31}");
     public record ErrorView(String target, String message) {}
@@ -91,7 +92,7 @@ public final class WorkflowSetupController {
         for (var family : rows.entrySet()) {
             String prefix = family.getKey() + "[";
             // A call's rows without the call itself, or rows with gaps, are not bound at all.
-            boolean orphan = family.getKey().startsWith("calls[") && !calls.contains(family.getKey().charAt(6) - '0');
+            boolean orphan = family.getKey().startsWith(CALLS_PREFIX) && !calls.contains(family.getKey().charAt(6) - '0');
             if (orphan || !contiguous(family.getValue())) {
                 allowed.removeIf(field -> field.startsWith(orphan ? family.getKey() : prefix));
                 invalid = true;
@@ -339,30 +340,35 @@ public final class WorkflowSetupController {
 
     private static String callField(String detail, WorkflowForm form) {
         for (int i = 0; i < form.calls.size(); i++) {
-            String name = form.calls.get(i).name;
-            String prefix = "calls[" + i + "].";
-            if (name == null || !CALL_NAME.matcher(name).matches()) {
-                if (detail.equals("invalid call name")) return prefix + "name";
-                continue;
-            }
-            if (detail.equals("duplicate call name: " + name)) return prefix + "name";
-            if (!detail.startsWith("call " + name + ": ")) continue;
-            if (detail.contains("fetch URL")) return prefix + "urlMode";
-            String rest = detail.substring(("call " + name + ": ").length());
-            if (rest.startsWith("invalid header") || rest.startsWith("header is") || rest.startsWith("duplicate header")
-                    || rest.startsWith("too many headers") || rest.startsWith("headers are required")) {
-                return prefix + "headersMode";
-            }
-            if (rest.endsWith("make it a per-entry call")) return prefix + "scope";
-            if (detail.endsWith("invalid scope")) return prefix + "scope";
-            return prefix + "name";
+            String found = callFieldOf(detail, form.calls.get(i).name, CALLS_PREFIX + i + "].");
+            if (found != null) return found;
         }
         return null;
     }
 
+    /** The field of one call the diagnostic is about, or null when it is about another call. */
+    private static String callFieldOf(String detail, String name, String prefix) {
+        if (name == null || !CALL_NAME.matcher(name).matches()) {
+            return detail.equals("invalid call name") ? prefix + "name" : null;
+        }
+        if (detail.equals("duplicate call name: " + name)) return prefix + "name";
+        String context = "call " + name + ": ";
+        if (!detail.startsWith(context)) return null;
+        if (detail.contains("fetch URL")) return prefix + "urlMode";
+        String rest = detail.substring(context.length());
+        if (isHeaderDiagnostic(rest)) return prefix + "headersMode";
+        if (rest.endsWith("make it a per-entry call") || detail.endsWith("invalid scope")) return prefix + "scope";
+        return prefix + "name";
+    }
+
+    private static boolean isHeaderDiagnostic(String rest) {
+        return rest.startsWith("invalid header") || rest.startsWith("header is") || rest.startsWith("duplicate header")
+                || rest.startsWith("too many headers") || rest.startsWith("headers are required");
+    }
+
     private static String variableField(String detail, WorkflowForm form) {
         for (int i = 0; i < form.calls.size(); i++) {
-            String found = variableRows(detail, form.calls.get(i).variables, "calls[" + i + "].variables[");
+            String found = variableRows(detail, form.calls.get(i).variables, CALLS_PREFIX + i + "].variables[");
             if (found != null) return found;
         }
         return form.mode == WorkflowDraft.Mode.GENERATED
