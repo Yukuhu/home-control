@@ -4,7 +4,6 @@ import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
-import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
@@ -74,7 +73,6 @@ final class Enrollment {
     private final class AfterLock {
 
         private final List<DeviceConnections.Connecting> connects = new ArrayList<>();
-        private final List<DeviceHandle> toClose = new ArrayList<>();
         private final List<String> removed = new ArrayList<>();
 
         void connect(Device device) {
@@ -82,12 +80,12 @@ final class Enrollment {
         }
 
         void remove(String id) {
-            toClose.addAll(connections.end(id));
+            connections.end(id);
             removed.add(id);
         }
 
         void run() {
-            toClose.forEach(DeviceConnections::closeQuietly);
+            removed.forEach(connections::closeRetired);
             connects.forEach(connections::complete);
             removed.forEach(id -> events.publishEvent(new DeviceStateChangedEvent(id, DeviceState.initial())));
         }

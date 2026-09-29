@@ -7,6 +7,7 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.LearnedSettings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,16 +16,49 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 class DeviceConnectionsTest {
+
+    /** Like a TV that takes one connection at a time: counts its open connections, and holds its second connect. */
+    private static final class OneConnectionTv extends StubAdapter {
+
+        final List<StubHandle> created = new CopyOnWriteArrayList<>();
+        final AtomicLong mostOpen = new AtomicLong();
+        final AtomicInteger calls = new AtomicInteger();
+        final CountDownLatch secondEntered = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+
+        OneConnectionTv() {
+            super("tv", DeviceKind.ANDROID_TV, false, false);
+        }
+
+        @Override
+        public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
+            if (calls.incrementAndGet() == 2) {
+                secondEntered.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException _) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            StubHandle handle = (StubHandle) super.connect(device, onChange);
+            created.add(handle);
+            mostOpen.accumulateAndGet(created.stream().filter(open -> !open.closed).count(), Math::max);
+            return handle;
+        }
+    }
 
     private final List<Object> published = new CopyOnWriteArrayList<>();
     private final ExecutorService background = Executors.newVirtualThreadPerTaskExecutor();
@@ -101,6 +135,87 @@ class DeviceConnectionsTest {
         assertThat(oldClosedWhenConnecting).containsExactly(true, true);
         assertThat(adapter.handles.get("a")).isNotSameAs(old);
         assertThat(connections.handles("a")).containsValue(adapter.handles.get("a"));
+    }
+
+    @Test
+    void aReconnectBegunDuringAnotherWaitsUntilItsConnectionIsClosed() throws Exception {
+        OneConnectionTv tv = new OneConnectionTv();
+        DeviceConnections connections = connections(tv);
+        connections.complete(connections.begin(device("a", "tv")));
+        DeviceConnections.Connecting first = connections.begin(device("a", "tv"));
+        Future<?> firstDone = background.submit(() -> connections.complete(first));
+        assertThat(tv.secondEntered.await(5, TimeUnit.SECONDS)).isTrue();
+
+        DeviceConnections.Connecting second = connections.begin(device("a", "tv"));
+        Thread secondDone = Thread.ofPlatform().start(() -> connections.complete(second));
+        await().until(() -> tv.calls.get() == 3 || secondDone.getState() == Thread.State.WAITING
+                || secondDone.getState() == Thread.State.BLOCKED);
+        tv.release.countDown();
+        firstDone.get(5, TimeUnit.SECONDS);
+        secondDone.join(5_000);
+
+        assertThat(tv.mostOpen.get()).isEqualTo(1);
+        assertThat(tv.created).filteredOn(handle -> !handle.closed).singleElement()
+                .satisfies(open -> assertThat(connections.handles("a")).containsValue(open));
+    }
+
+    @Test
+    void aDeviceAddedAgainConnectsOnlyOnceItsRemovedHandlesAreClosed() throws Exception {
+        List<Boolean> oldClosedWhenConnecting = new CopyOnWriteArrayList<>();
+        StubAdapter adapter = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false) {
+            @Override
+            public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
+                StubAdapter.StubHandle old = handles.get(device.id());
+                oldClosedWhenConnecting.add(old == null || old.closed);
+                return super.connect(device, onChange);
+            }
+        };
+        DeviceConnections connections = connections(adapter);
+        connections.complete(connections.begin(device("a", "stub")));
+        CountDownLatch closing = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        adapter.handles.get("a").beforeClose = () -> {
+            closing.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+        };
+        connections.end("a");
+        Future<?> removing = background.submit(() -> connections.closeRetired("a"));
+        assertThat(closing.await(5, TimeUnit.SECONDS)).isTrue();
+
+        DeviceConnections.Connecting again = connections.begin(device("a", "stub"));
+        Thread adding = Thread.ofPlatform().start(() -> connections.complete(again));
+        await().until(() -> oldClosedWhenConnecting.size() == 2 || adding.getState() == Thread.State.WAITING);
+        release.countDown();
+        removing.get(5, TimeUnit.SECONDS);
+        adding.join(5_000);
+
+        assertThat(oldClosedWhenConnecting).containsExactly(true, true);
+    }
+
+    @Test
+    void onlyTheCurrentConnectionStoresWhatItLearns() {
+        List<Map<String, String>> stored = new CopyOnWriteArrayList<>();
+        List<LearnedSettings> sinks = new CopyOnWriteArrayList<>();
+        StubAdapter adapter = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false) {
+            @Override
+            public DeviceHandle connect(Device device, Consumer<DeviceState> onChange, LearnedSettings learned) {
+                sinks.add(learned);
+                return connect(device, onChange);
+            }
+        };
+        DeviceConnections connections = new DeviceConnections(Map.of("stub", adapter), published::add,
+                (deviceId, adapterId, updates) -> stored.add(updates));
+        connections.complete(connections.begin(device("a", "stub")));
+        connections.complete(connections.begin(device("a", "stub")));
+
+        sinks.get(0).store(Map.of("mac", "AA:BB:CC:DD:EE:01"));
+        sinks.get(1).store(Map.of("mac", "AA:BB:CC:DD:EE:02"));
+
+        assertThat(stored).containsExactly(Map.of("mac", "AA:BB:CC:DD:EE:02"));
     }
 
     @Test

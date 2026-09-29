@@ -12,24 +12,28 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * The live handles of every device and their composed state. A connect runs in two steps.
  * <ul>
- *   <li>{@link #begin} installs a new {@link Generation} and takes the old handles out, under this class's lock.
+ *   <li>{@link #begin} installs a new {@link Generation} and retires the old handles, under this class's lock.
  *       Callers begin while holding the registry lock, so connects and removals follow the order of the registry
  *       changes.</li>
- *   <li>{@link #complete} closes the old handles and calls {@code adapter.connect} outside every lock. It installs
+ *   <li>{@link #complete} closes the retired handles and calls {@code adapter.connect} outside every lock. It installs
  *       the new handles only if their generation is still current, and closes them otherwise. A ticket superseded
  *       before it reaches an adapter connects nothing more: its successor does.</li>
  * </ul>
- * The lock guards only these maps: it never covers {@code connect}, {@code close} or publishing an event. Two connects
- * of one device overlap only when the second begins while the first is inside {@code adapter.connect}; the first then
- * closes what it opened. A handle that fails to close is logged and dropped, so it stops no other close or connect.
+ * One device's completions take turns, and retired handles wait here until a turn closes them, so a device's old
+ * connections are always closed before a new one opens: a TV that takes one connection never sees two. A turn holds up
+ * no other device and is never taken while holding the registry lock or this class's lock, which guards only the maps
+ * and never covers {@code connect}, {@code close} or publishing an event. Only the current generation stores what its
+ * handles learn. A handle that fails to close is logged and dropped, so it stops no other close or connect.
  */
 final class DeviceConnections {
 
@@ -40,7 +44,7 @@ final class DeviceConnections {
     }
 
     /** A connect begun under the registry lock and completed after it is released. */
-    record Connecting(Device device, Generation generation, List<DeviceHandle> previous) {
+    record Connecting(Device device, Generation generation) {
     }
 
     private static final Logger log = LoggerFactory.getLogger(DeviceConnections.class);
@@ -50,9 +54,13 @@ final class DeviceConnections {
     private final LearnedSink learned;
     /** device id → (adapter id → handle), in the device's adapter order. */
     private final Map<String, Map<String, DeviceHandle>> handles = new ConcurrentHashMap<>();
+    /** device id → handles that {@link #begin} or {@link #end} took out and no turn has closed yet; under the lock. */
+    private final Map<String, List<DeviceHandle>> retired = new HashMap<>();
     /** device id → its current generation; a report from any other generation is ignored. */
     private final Map<String, Generation> reported = new ConcurrentHashMap<>();
     private final Object lock = new Object();
+    /** device id → the turn its completions and closes take, one at a time. */
+    private final Map<String, ReentrantLock> turns = new ConcurrentHashMap<>();
 
     DeviceConnections(Map<String, DeviceAdapter> adapters, ApplicationEventPublisher events, LearnedSink learned) {
         this.adapters = adapters;
@@ -65,9 +73,9 @@ final class DeviceConnections {
         Generation generation = new Generation(device.id(), adapterIds);
         synchronized (lock) {
             reported.put(device.id(), generation);
-            Map<String, DeviceHandle> previous = handles.remove(device.id());
-            return new Connecting(device, generation, previous == null ? List.of() : List.copyOf(previous.values()));
+            retire(device.id());
         }
+        return new Connecting(device, generation);
     }
 
     /**
@@ -76,9 +84,13 @@ final class DeviceConnections {
      * handle last published would otherwise stay on every screen.
      */
     void complete(Connecting connecting) {
-        connecting.previous().forEach(DeviceConnections::closeQuietly);
+        inTurn(connecting.device().id(), () -> completeInTurn(connecting));
+    }
+
+    private void completeInTurn(Connecting connecting) {
         Device device = connecting.device();
         Generation generation = connecting.generation();
+        takeRetired(device.id()).forEach(DeviceConnections::closeQuietly);
         Map<String, DeviceHandle> opened = new LinkedHashMap<>();
         for (String adapterId : generation.adapterIds) {
             if (!generation.current()) {
@@ -88,7 +100,11 @@ final class DeviceConnections {
             try {
                 opened.put(adapterId, adapters.get(adapterId).connect(device,
                         state -> generation.report(adapterId, state),
-                        updates -> learned.store(device.id(), adapterId, updates)));
+                        updates -> {
+                            if (generation.current()) {
+                                learned.store(device.id(), adapterId, updates);
+                            }
+                        }));
             } catch (RuntimeException e) {
                 log.warn("Could not connect {} via the {} adapter; leaving it disconnected", device.id(), adapterId, e);
                 opened.values().forEach(DeviceConnections::closeQuietly);
@@ -123,12 +139,25 @@ final class DeviceConnections {
         }
     }
 
-    /** Removes the device's generation and handles; the caller closes the handles returned, outside its locks. */
-    List<DeviceHandle> end(String id) {
+    /** Removes the device's generation and retires its handles; {@link #closeRetired} closes them. */
+    void end(String id) {
         synchronized (lock) {
             reported.remove(id);
-            Map<String, DeviceHandle> previous = handles.remove(id);
-            return previous == null ? List.of() : List.copyOf(previous.values());
+            retire(id);
+        }
+    }
+
+    /**
+     * Closes the device's retired handles in its turn, so a device added again under the same id connects only once
+     * they are closed. With nothing retired it takes no turn, so it never waits on a connect it has no part in.
+     */
+    void closeRetired(String id) {
+        boolean waiting;
+        synchronized (lock) {
+            waiting = retired.containsKey(id);
+        }
+        if (waiting) {
+            inTurn(id, () -> takeRetired(id).forEach(DeviceConnections::closeQuietly));
         }
     }
 
@@ -138,6 +167,8 @@ final class DeviceConnections {
             reported.clear();
             handles.values().forEach(deviceHandles -> open.addAll(deviceHandles.values()));
             handles.clear();
+            retired.values().forEach(open::addAll);
+            retired.clear();
         }
         open.forEach(DeviceConnections::closeQuietly);
     }
@@ -150,6 +181,31 @@ final class DeviceConnections {
     DeviceState state(String id) {
         Generation generation = reported.get(id);
         return generation == null ? DeviceState.initial() : generation.composed();
+    }
+
+    private void inTurn(String id, Runnable work) {
+        ReentrantLock turn = turns.computeIfAbsent(id, key -> new ReentrantLock());
+        turn.lock();
+        try {
+            work.run();
+        } finally {
+            turn.unlock();
+        }
+    }
+
+    /** Under the lock: the device's installed handles join those waiting to be closed. */
+    private void retire(String id) {
+        Map<String, DeviceHandle> installed = handles.remove(id);
+        if (installed != null) {
+            retired.computeIfAbsent(id, key -> new ArrayList<>()).addAll(installed.values());
+        }
+    }
+
+    private List<DeviceHandle> takeRetired(String id) {
+        synchronized (lock) {
+            List<DeviceHandle> taken = retired.remove(id);
+            return taken == null ? List.of() : taken;
+        }
     }
 
     /**

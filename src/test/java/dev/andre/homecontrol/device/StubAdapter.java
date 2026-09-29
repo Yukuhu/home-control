@@ -131,6 +131,8 @@ class StubAdapter implements DeviceAdapter, AdapterDiscovery {
         volatile RuntimeException failure;
         /** What {@link #close} throws once it has marked the handle closed; null closes cleanly. */
         volatile RuntimeException closeFailure;
+        /** Runs when {@link #close} starts, before the handle counts as closed: a slow close. */
+        volatile Runnable beforeClose = () -> { };
         volatile boolean closed;
 
         StubHandle(Consumer<DeviceState> onChange) {
@@ -169,6 +171,7 @@ class StubAdapter implements DeviceAdapter, AdapterDiscovery {
 
         @Override
         public void close() {
+            beforeClose.run();
             closed = true;
             if (closeFailure != null) {
                 throw closeFailure;
