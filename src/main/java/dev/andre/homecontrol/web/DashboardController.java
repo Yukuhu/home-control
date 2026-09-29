@@ -3,9 +3,9 @@ package dev.andre.homecontrol.web;
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.content.ContentSources;
-import dev.andre.homecontrol.device.DeviceManager;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,11 +23,11 @@ import java.util.Set;
 @Controller
 public class DashboardController {
 
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
     private final RailCache rails;
     private final ContentSources contentSources;
 
-    public DashboardController(DeviceManager devices, RailCache rails, ContentSources contentSources) {
+    public DashboardController(DeviceQueries devices, RailCache rails, ContentSources contentSources) {
         this.devices = devices;
         this.rails = rails;
         this.contentSources = contentSources;

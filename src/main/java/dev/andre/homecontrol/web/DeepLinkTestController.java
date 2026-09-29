@@ -1,8 +1,8 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.DeepLinkTestResult;
 import dev.andre.homecontrol.playback.DeepLinkTestService;
 import org.springframework.http.HttpStatus;
@@ -19,10 +19,10 @@ import java.util.Locale;
 @RestController
 public class DeepLinkTestController {
 
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
     private final DeepLinkTestService tests;
 
-    public DeepLinkTestController(DeviceManager devices, DeepLinkTestService tests) {
+    public DeepLinkTestController(DeviceQueries devices, DeepLinkTestService tests) {
         this.devices = devices;
         this.tests = tests;
     }

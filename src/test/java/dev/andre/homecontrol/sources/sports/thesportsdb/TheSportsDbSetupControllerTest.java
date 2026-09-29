@@ -36,8 +36,8 @@ class TheSportsDbSetupControllerTest extends WebSliceTest {
     @BeforeEach
     void defaults() {
         given(devices.devices()).willReturn(List.of());
-        given(devices.pairable()).willReturn(List.of());
-        given(devices.addable()).willReturn(List.of());
+        given(enrollment.pairable()).willReturn(List.of());
+        given(enrollment.addable()).willReturn(List.of());
         given(login.loginRequired()).willReturn(false);
         given(sportsSettings.current()).willReturn(SportsSettings.empty());
         given(sportsZones.effective()).willReturn(ZoneId.of("Europe/Berlin"));

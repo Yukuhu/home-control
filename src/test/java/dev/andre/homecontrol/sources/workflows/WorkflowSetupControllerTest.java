@@ -35,8 +35,8 @@ class WorkflowSetupControllerTest extends WebSliceTest {
         when(login.loginRequired()).thenReturn(true);
         when(login.isAuthenticated(any(jakarta.servlet.http.HttpServletRequest.class))).thenReturn(true);
         when(devices.devices()).thenReturn(List.of());
-        when(devices.pairable()).thenReturn(List.of());
-        when(devices.addable()).thenReturn(List.of());
+        when(enrollment.pairable()).thenReturn(List.of());
+        when(enrollment.addable()).thenReturn(List.of());
     }
 
     @Test void newMappingDefaultsSensitiveAndSavedFalseSurvives() {

@@ -39,14 +39,14 @@ class DeviceControllerTest extends WebSliceTest {
     void sendsAKeyToTheAddressedDevice() throws Exception {
         mockMvc.perform(post("/devices/shield/key/DPAD_UP")).andExpect(status().isNoContent());
 
-        verify(devices).execute("shield", new Action.PressKey(RemoteKey.DPAD_UP));
+        verify(commands).execute("shield", new Action.PressKey(RemoteKey.DPAD_UP));
     }
 
     @Test
     void rejectsAnUnknownKey() throws Exception {
         mockMvc.perform(post("/devices/shield/key/EJECT_TAPE")).andExpect(status().isBadRequest());
 
-        verifyNoInteractions(devices);
+        verifyNoInteractions(devices, commands, enrollment, deviceSettings);
     }
 
     @Test
@@ -54,7 +54,7 @@ class DeviceControllerTest extends WebSliceTest {
         mockMvc.perform(post("/devices/shield/key/DPAD_RIGHT").param("repeat", "3"))
                 .andExpect(status().isNoContent());
 
-        verify(devices, times(3))
+        verify(commands, times(3))
                 .execute("shield", new Action.PressKey(RemoteKey.DPAD_RIGHT, KeyPress.SHORT));
     }
 
@@ -65,8 +65,8 @@ class DeviceControllerTest extends WebSliceTest {
         mockMvc.perform(post("/devices/shield/key/DPAD_CENTER").param("press", "end_long"))
                 .andExpect(status().isNoContent());
 
-        verify(devices).execute("shield", new Action.PressKey(RemoteKey.DPAD_CENTER, KeyPress.START_LONG));
-        verify(devices).execute("shield", new Action.PressKey(RemoteKey.DPAD_CENTER, KeyPress.END_LONG));
+        verify(commands).execute("shield", new Action.PressKey(RemoteKey.DPAD_CENTER, KeyPress.START_LONG));
+        verify(commands).execute("shield", new Action.PressKey(RemoteKey.DPAD_CENTER, KeyPress.END_LONG));
     }
 
     @Test
@@ -87,28 +87,28 @@ class DeviceControllerTest extends WebSliceTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("VOLUME_UP has no long press"));
 
-        verifyNoInteractions(devices);
+        verifyNoInteractions(devices, commands, enrollment, deviceSettings);
     }
 
     @Test
     void stopsAtTheFirstFailure() throws Exception {
-        willThrow(new DeviceOfflineException("offline")).given(devices).execute(eq("shield"), any());
+        willThrow(new DeviceOfflineException("offline")).given(commands).execute(eq("shield"), any());
 
         mockMvc.perform(post("/devices/shield/key/DPAD_RIGHT").param("repeat", "3"))
                 .andExpect(status().isConflict());
 
-        verify(devices, times(1)).execute(eq("shield"), any());
+        verify(commands, times(1)).execute(eq("shield"), any());
     }
 
     @Test
     void pausesAndResumes() throws Exception {
         mockMvc.perform(post("/devices/shield/pause")).andExpect(status().isNoContent());
-        verify(devices).execute("shield", new Action.Pause());
+        verify(commands).execute("shield", new Action.Pause());
 
         mockMvc.perform(post("/devices/shield/resume")).andExpect(status().isNoContent());
-        verify(devices).execute("shield", new Action.Resume());
+        verify(commands).execute("shield", new Action.Resume());
 
-        willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
+        willThrow(new DeviceNotFoundException("No device with id ghost")).given(commands).execute(eq("ghost"), any());
         mockMvc.perform(post("/devices/ghost/pause")).andExpect(status().isNotFound());
     }
 
@@ -117,17 +117,17 @@ class DeviceControllerTest extends WebSliceTest {
         mockMvc.perform(post("/devices/kitchen/group/join/RINCON_000E58A0B1C201400"))
                 .andExpect(status().isNoContent())
                 .andExpect(header().string("HX-Refresh", "true"));
-        verify(devices).execute("kitchen", new Action.JoinGroup("RINCON_000E58A0B1C201400"));
+        verify(commands).execute("kitchen", new Action.JoinGroup("RINCON_000E58A0B1C201400"));
 
         mockMvc.perform(post("/devices/kitchen/group/leave"))
                 .andExpect(status().isNoContent())
                 .andExpect(header().string("HX-Refresh", "true"));
-        verify(devices).execute("kitchen", new Action.LeaveGroup());
+        verify(commands).execute("kitchen", new Action.LeaveGroup());
 
-        willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
+        willThrow(new DeviceNotFoundException("No device with id ghost")).given(commands).execute(eq("ghost"), any());
         mockMvc.perform(post("/devices/ghost/group/leave")).andExpect(status().isNotFound());
 
-        willThrow(new ActionFailedException("Kitchen refused to leave the group")).given(devices).execute(eq("kitchen"), any());
+        willThrow(new ActionFailedException("Kitchen refused to leave the group")).given(commands).execute(eq("kitchen"), any());
         mockMvc.perform(post("/devices/kitchen/group/leave"))
                 .andExpect(status().isBadGateway())
                 .andExpect(content().string("Kitchen refused to leave the group"));
@@ -135,7 +135,7 @@ class DeviceControllerTest extends WebSliceTest {
 
     @Test
     void reportsAnUnknownDeviceAsNotFound() throws Exception {
-        willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
+        willThrow(new DeviceNotFoundException("No device with id ghost")).given(commands).execute(eq("ghost"), any());
 
         mockMvc.perform(post("/devices/ghost/key/HOME"))
                 .andExpect(status().isNotFound())
@@ -144,7 +144,7 @@ class DeviceControllerTest extends WebSliceTest {
 
     @Test
     void reportsConflictWhenTheDeviceIsOffline() throws Exception {
-        willThrow(new DeviceOfflineException("offline")).given(devices).execute(eq("shield"), any());
+        willThrow(new DeviceOfflineException("offline")).given(commands).execute(eq("shield"), any());
 
         mockMvc.perform(post("/devices/shield/key/HOME"))
                 .andExpect(status().isConflict())
@@ -153,7 +153,7 @@ class DeviceControllerTest extends WebSliceTest {
 
     @Test
     void reportsUnprocessableWhenTheDeviceCannotDoThat() throws Exception {
-        willThrow(new UnsupportedActionException("Shield cannot perform that")).given(devices).execute(eq("shield"), any());
+        willThrow(new UnsupportedActionException("Shield cannot perform that")).given(commands).execute(eq("shield"), any());
 
         mockMvc.perform(post("/devices/shield/key/HOME")).andExpect(status().isUnprocessableContent());
     }
@@ -252,7 +252,7 @@ class DeviceControllerTest extends WebSliceTest {
     void setsTheVolume() throws Exception {
         mockMvc.perform(post("/devices/shield/volume").param("level", "40")).andExpect(status().isNoContent());
 
-        verify(devices).execute("shield", new Action.SetVolume(40));
+        verify(commands).execute("shield", new Action.SetVolume(40));
     }
 
     @Test
@@ -261,7 +261,7 @@ class DeviceControllerTest extends WebSliceTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Volume must be between 0 and 100"));
 
-        verifyNoInteractions(devices);
+        verifyNoInteractions(devices, commands, enrollment, deviceSettings);
     }
 
     @Test
@@ -269,13 +269,13 @@ class DeviceControllerTest extends WebSliceTest {
         mockMvc.perform(post("/devices/shield/mute").param("muted", "true")).andExpect(status().isNoContent());
         mockMvc.perform(post("/devices/shield/stop")).andExpect(status().isNoContent());
 
-        verify(devices).execute("shield", new Action.Mute(true));
-        verify(devices).execute("shield", new Action.Stop());
+        verify(commands).execute("shield", new Action.Mute(true));
+        verify(commands).execute("shield", new Action.Stop());
     }
 
     @Test
     void volumeForAnUnknownDeviceIsNotFound() throws Exception {
-        willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
+        willThrow(new DeviceNotFoundException("No device with id ghost")).given(commands).execute(eq("ghost"), any());
 
         mockMvc.perform(post("/devices/ghost/volume").param("level", "10"))
                 .andExpect(status().isNotFound())
@@ -284,14 +284,14 @@ class DeviceControllerTest extends WebSliceTest {
 
     @Test
     void stoppingAnOfflineDeviceIsAConflict() throws Exception {
-        willThrow(new DeviceOfflineException("Kitchen is not connected")).given(devices).execute(eq("kitchen"), any());
+        willThrow(new DeviceOfflineException("Kitchen is not connected")).given(commands).execute(eq("kitchen"), any());
 
         mockMvc.perform(post("/devices/kitchen/stop")).andExpect(status().isConflict());
     }
 
     @Test
     void mutingADeviceWithoutVolumeControlIsUnprocessable() throws Exception {
-        willThrow(new UnsupportedActionException("Bedroom cannot perform Mute")).given(devices).execute(eq("bedroom"), any());
+        willThrow(new UnsupportedActionException("Bedroom cannot perform Mute")).given(commands).execute(eq("bedroom"), any());
 
         mockMvc.perform(post("/devices/bedroom/mute").param("muted", "false")).andExpect(status().isUnprocessableContent());
     }
@@ -299,7 +299,7 @@ class DeviceControllerTest extends WebSliceTest {
     @Test
     void reportsBadGatewayWhenTheDeviceRefusesOrDoesNotAnswer() throws Exception {
         willThrow(new ActionFailedException("Kitchen did not answer in time when asked to set the volume"))
-                .given(devices).execute(eq("shield"), any());
+                .given(commands).execute(eq("shield"), any());
 
         mockMvc.perform(post("/devices/shield/volume").param("level", "10"))
                 .andExpect(status().isBadGateway())
@@ -310,20 +310,20 @@ class DeviceControllerTest extends WebSliceTest {
     void switchesTheInputOfTheAddressedDevice() throws Exception {
         mockMvc.perform(post("/devices/shield/input/HDMI_2")).andExpect(status().isNoContent());
 
-        verify(devices).execute("shield", new Action.SelectInput("HDMI_2"));
+        verify(commands).execute("shield", new Action.SelectInput("HDMI_2"));
     }
 
     @Test
     void anInputOfAnUnknownDeviceIsNotFound() throws Exception {
-        willThrow(new DeviceNotFoundException("No device with id ghost")).given(devices).execute(eq("ghost"), any());
+        willThrow(new DeviceNotFoundException("No device with id ghost")).given(commands).execute(eq("ghost"), any());
 
         mockMvc.perform(post("/devices/ghost/input/HDMI_1")).andExpect(status().isNotFound());
     }
 
     @Test
     void anInputOfAnOfflineTvIsAConflictAndOfADeviceWithoutInputsUnprocessable() throws Exception {
-        willThrow(new DeviceOfflineException("LG TV is not connected")).given(devices).execute(eq("lg"), any());
-        willThrow(new UnsupportedActionException("Android TV does not list its inputs")).given(devices).execute(eq("shield"), any());
+        willThrow(new DeviceOfflineException("LG TV is not connected")).given(commands).execute(eq("lg"), any());
+        willThrow(new UnsupportedActionException("Android TV does not list its inputs")).given(commands).execute(eq("shield"), any());
 
         mockMvc.perform(post("/devices/lg/input/HDMI_1")).andExpect(status().isConflict());
         mockMvc.perform(post("/devices/shield/input/HDMI_1")).andExpect(status().isUnprocessableContent());
@@ -331,7 +331,7 @@ class DeviceControllerTest extends WebSliceTest {
 
     @Test
     void anIllegalArgumentFromTheDeviceIsNotReportedAsABadVolume() {
-        willThrow(new IllegalArgumentException("programming error")).given(devices).execute(eq("shield"), any());
+        willThrow(new IllegalArgumentException("programming error")).given(commands).execute(eq("shield"), any());
 
         assertThatThrownBy(() -> mockMvc.perform(post("/devices/shield/volume").param("level", "10")))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class);

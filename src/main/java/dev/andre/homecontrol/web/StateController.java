@@ -2,9 +2,9 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.RailSnapshot;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -22,14 +22,14 @@ import java.util.function.BooleanSupplier;
 public class StateController {
 
     private final DeviceStateBroadcaster broadcaster;
-    private final DeviceManager sessions;
+    private final DeviceQueries devices;
     private final RailCache rails;
     private final LoginService login;
 
-    public StateController(DeviceStateBroadcaster broadcaster, DeviceManager sessions, RailCache rails,
+    public StateController(DeviceStateBroadcaster broadcaster, DeviceQueries devices, RailCache rails,
                            ObjectProvider<LoginService> login) {
         this.broadcaster = broadcaster;
-        this.sessions = sessions;
+        this.devices = devices;
         this.rails = rails;
         this.login = login.getIfAvailable();
         if (this.login != null) {
@@ -43,7 +43,7 @@ public class StateController {
         SseEmitter emitter = broadcaster.subscribe(stillAllowed(request));
         try {
             // One snapshot per device so a new tab paints every chip before anything changes.
-            for (Map.Entry<String, DeviceState> entry : sessions.states().entrySet()) {
+            for (Map.Entry<String, DeviceState> entry : devices.states().entrySet()) {
                 emitter.send(SseEmitter.event().name("state")
                         .data(new DeviceStateChangedEvent(entry.getKey(), entry.getValue())));
             }

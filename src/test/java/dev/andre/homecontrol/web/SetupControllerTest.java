@@ -45,8 +45,8 @@ class SetupControllerTest extends WebSliceTest {
     @BeforeEach
     void noDevicesUnlessATestSaysOtherwise() {
         given(devices.devices()).willReturn(List.of());
-        given(devices.pairable()).willReturn(List.of());
-        given(devices.addable()).willReturn(List.of());
+        given(enrollment.pairable()).willReturn(List.of());
+        given(enrollment.addable()).willReturn(List.of());
     }
 
     @Test
@@ -155,7 +155,7 @@ class SetupControllerTest extends WebSliceTest {
 
     @Test
     void rendersTheSetupPageWithEveryPairedDeviceDiscoveredDevicesAndManualEntry() throws Exception {
-        given(devices.pairable()).willReturn(List.of(
+        given(enrollment.pairable()).willReturn(List.of(
                 new DiscoveredDevice("androidtv", "Living Room Shield", "192.168.1.50", 6466)));
         given(devices.devices()).willReturn(List.of(
                 AndroidTvSettings.device("bedroom", "Bedroom Shield", "192.168.1.51", 6466, null, Instant.now()),
@@ -178,7 +178,7 @@ class SetupControllerTest extends WebSliceTest {
 
     @Test
     void offersDiscoveredCastReceiversWithAnAddButton() throws Exception {
-        given(devices.addable()).willReturn(List.of(
+        given(enrollment.addable()).willReturn(List.of(
                 new DiscoveredDevice("cast", "Kitchen speaker", "10.0.0.9", 8009, Map.of())));
 
         mockMvc.perform(get("/setup"))
@@ -213,7 +213,7 @@ class SetupControllerTest extends WebSliceTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/setup"));
 
-        verify(devices).addDiscovered("cast", "10.0.0.9", 8009);
+        verify(enrollment).addDiscovered("cast", "10.0.0.9", 8009);
     }
 
     @Test
@@ -223,13 +223,13 @@ class SetupControllerTest extends WebSliceTest {
         mockMvc.perform(post("/setup/split").param("id", "10-0-0-5").param("adapter", "cast"))
                 .andExpect(redirectedUrl("/setup"));
 
-        verify(devices).merge("10-0-0-5", "cast-10-0-0-5");
-        verify(devices).split("10-0-0-5", "cast");
+        verify(enrollment).merge("10-0-0-5", "cast-10-0-0-5");
+        verify(enrollment).split("10-0-0-5", "cast");
     }
 
     @Test
     void showsWhyAMergeWasRefused() throws Exception {
-        given(devices.merge("a", "b")).willThrow(new IllegalArgumentException("Merge the other way round: nope"));
+        given(enrollment.merge("a", "b")).willThrow(new IllegalArgumentException("Merge the other way round: nope"));
 
         mockMvc.perform(post("/setup/merge").param("target", "a").param("source", "b"))
                 .andExpect(status().isOk())

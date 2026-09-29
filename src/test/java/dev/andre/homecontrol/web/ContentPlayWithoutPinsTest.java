@@ -2,6 +2,7 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.PinnedLinks;
@@ -10,7 +11,6 @@ import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.ServiceLinks;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.playback.PlaybackPreview;
 import dev.andre.homecontrol.playback.PlaybackService;
 import org.junit.jupiter.api.Test;
@@ -38,7 +38,7 @@ class ContentPlayWithoutPinsTest {
 
     private static final String ITEM_ID = "3f2a9c1e7b6d4e5f8a9b0c1d2e3f4a5b";
 
-    private final DeviceManager devices = mock(DeviceManager.class);
+    private final DeviceQueries devices = mock(DeviceQueries.class);
     private final ContentSources sources = mock(ContentSources.class);
     private final PlaybackService playback = mock(PlaybackService.class);
     private final ContentSource tmdb = mock(ContentSource.class);
