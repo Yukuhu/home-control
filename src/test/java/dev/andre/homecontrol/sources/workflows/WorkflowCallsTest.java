@@ -130,6 +130,26 @@ class WorkflowCallsTest {
         } finally { release.countDown(); }
     }
 
+    @Test void twoIndependentCallsFailingTogetherEndTheRunPromptlyWithOneMessage() throws Exception {
+        var release = new CountDownLatch(1);
+        try (var server = new FakeWorkflowServer(); var http = client()) {
+            server.respond("/broken1", 404, "{}");
+            server.respond("/broken2", 404, "{}");
+            server.route("/slow", exchange -> {
+                try { release.await(); } catch (InterruptedException _) { Thread.currentThread().interrupt(); }
+                reply(exchange, "{}");
+            });
+            var draft = WorkflowFixtures.singleWith(List.of(call("slow", server.url("/slow").toString()),
+                    call("broken1", server.url("/broken1").toString()), call("broken2", server.url("/broken2").toString())));
+            long started = System.nanoTime();
+            assertThatThrownBy(() -> new WorkflowCalls(http).run(draft.calls(), WorkflowPlan.of(draft), Map.of(),
+                    new WorkflowCalls.Run(Duration.ofSeconds(10), 4), null))
+                    .isInstanceOf(WorkflowException.class)
+                    .hasMessageMatching("Call broken[12]: server returned HTTP 404");
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(3));
+        } finally { release.countDown(); }
+    }
+
     @Test void aRunNeverHasMoreFetchesAtOnceThanItsShare() throws Exception {
         var active = new AtomicInteger();
         var most = new AtomicInteger();
