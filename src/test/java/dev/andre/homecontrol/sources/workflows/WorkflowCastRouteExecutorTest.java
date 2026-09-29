@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class WorkflowCastRouteExecutorTest {
+    private static final WorkflowProperties PROPS =
+            new WorkflowProperties(true, true, java.time.Duration.ofSeconds(5), java.time.Duration.ofSeconds(10), 8, 2097152, 3);
     private final WorkflowIntegrationFixture fixture = new WorkflowIntegrationFixture(false);
     private final WorkflowRunner runner = mock(WorkflowRunner.class);
     private final DeviceQueries devices = mock(DeviceQueries.class);
@@ -69,7 +71,7 @@ class WorkflowCastRouteExecutorTest {
             var properties = new WorkflowProperties(true, true, java.time.Duration.ofSeconds(5),
                     java.time.Duration.ofSeconds(15), 4, 2097152, 3);
             try (var http = new WorkflowHttpClient(properties, new WorkflowUrlPolicy(true, java.net.InetAddress::getAllByName))) {
-                var realRunner = new WorkflowRunner(http);
+                var realRunner = new WorkflowRunner(http, properties);
                 var source = new WorkflowContentSource(generated.store, realRunner,
                         new WorkflowCatalogs(generated.store), preferences);
                 var item = source.rail(ID).items().getFirst();
@@ -102,10 +104,10 @@ class WorkflowCastRouteExecutorTest {
     @Test void disappearedPreciseNumericIdCannotCastItsRoundedNeighbor() {
         var generated = new WorkflowIntegrationFixture(true);
         var client = mock(WorkflowHttpClient.class);
-        when(client.fetch(any())).thenReturn(
+        when(client.fetch(any(), anyLong())).thenReturn(
                 "{\"token\":\"old\",\"items\":[{\"id\":9007199254740992.0,\"title\":\"Selected\"}]}".getBytes(java.nio.charset.StandardCharsets.UTF_8),
                 "{\"token\":\"fresh\",\"items\":[{\"id\":9007199254740993.0,\"title\":\"Other\"}]}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        var realRunner = new WorkflowRunner(client);
+        var realRunner = new WorkflowRunner(client, PROPS);
         var source = new WorkflowContentSource(generated.store, realRunner, new WorkflowCatalogs(generated.store), preferences);
         var item = source.rail(ID).items().getFirst();
         var cast = new WorkflowCastRouteExecutor(generated.store, realRunner, devices, commands, preferences);
@@ -113,7 +115,7 @@ class WorkflowCastRouteExecutorTest {
         var playback = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowCastStrategy())), List.of(), List.of(cast));
         assertThat(playback.attempt(item, "tv", Set.of())).isInstanceOf(PlayAttempt.Failed.class);
         verify(commands, never()).execute(any(), any());
-        verify(client, never()).checkMedia(any());
+        verify(client, never()).checkMedia(any(), anyLong());
     }
 
     @Test void wrongDeviceAndDisabledSourceNeverFetchOrSend() {

@@ -41,7 +41,9 @@ public class WorkflowConfiguration {
         return new WorkflowHttpClient(properties, policy);
     }
 
-    @Bean public WorkflowRunner workflowRunner(WorkflowHttpClient http) { return new WorkflowRunner(http); }
+    @Bean public WorkflowRunner workflowRunner(WorkflowHttpClient http, WorkflowProperties properties) {
+        return new WorkflowRunner(http, properties);
+    }
     @Bean public WorkflowCatalogs workflowCatalogs(WorkflowStore store) { return new WorkflowCatalogs(store); }
 
     @Bean public WorkflowContentSource workflowContentSource(WorkflowStore store, WorkflowRunner runner,
