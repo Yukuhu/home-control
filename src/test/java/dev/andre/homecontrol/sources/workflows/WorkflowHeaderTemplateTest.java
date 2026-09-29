@@ -34,7 +34,8 @@ class WorkflowHeaderTemplateTest {
     @Test void rejectsSubstitutedLineBreaksControlCharactersAndLongValues() {
         var template = new WorkflowHeaderTemplate("Bearer {token}");
         for (String value : List.of("a\r\nX-Injected: 1", "a\u0000b", "a\u007fb", "x".repeat(1025))) {
-            assertThatThrownBy(() -> template.expand(token(value)))
+            var values = token(value);
+            assertThatThrownBy(() -> template.expand(values))
                     .isInstanceOf(WorkflowException.class)
                     .hasMessage("Fetch JSON: header value from token is not allowed");
         }

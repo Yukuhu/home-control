@@ -61,7 +61,8 @@ class WorkflowJsonTest {
         var draft = channels();
         var duplicateIds = parse(
                 "{\"channels\":[{\"id\":1,\"title\":\"A\"},{\"id\":1.0,\"title\":\"B\"}]}");
-        assertThatThrownBy(() -> WorkflowJson.entries(draft.listing(), duplicateIds, 200))
+        var listing = draft.listing();
+        assertThatThrownBy(() -> WorkflowJson.entries(listing, duplicateIds, 200))
                 .isInstanceOf(WorkflowException.class).hasMessageContaining("ID");
         var items = new StringBuilder("{\"channels\":[");
         for (int i = 0; i < 201; i++) {
@@ -70,7 +71,7 @@ class WorkflowJsonTest {
         }
         items.append("]}");
         var oversizedCatalog = parse(items.toString());
-        assertThatThrownBy(() -> WorkflowJson.entries(draft.listing(), oversizedCatalog, 200))
+        assertThatThrownBy(() -> WorkflowJson.entries(listing, oversizedCatalog, 200))
                 .isInstanceOf(WorkflowException.class);
     }
 
@@ -78,7 +79,8 @@ class WorkflowJsonTest {
         var draft = channels();
         var blankTitle = parse(
                 "{\"channels\":[{\"id\":\"a\",\"title\":\" \"}]}");
-        assertThatThrownBy(() -> WorkflowJson.entries(draft.listing(), blankTitle, 200))
+        var listing = draft.listing();
+        assertThatThrownBy(() -> WorkflowJson.entries(listing, blankTitle, 200))
                 .isInstanceOf(WorkflowException.class).hasMessageContaining("title");
         var withArt = new Listing("main", "/channels", "/id", "/title", null, new Field("/art", null), java.util.List.of());
         assertThat(WorkflowJson.entries(withArt, parse(
@@ -183,7 +185,8 @@ class WorkflowJsonTest {
 
     private static void assertSelectFails(WorkflowDraft draft, String json, String detail) {
         var root = parse(json);
-        assertThatThrownBy(() -> WorkflowJson.entries(draft.listing(), root, 200)).as(json)
+        var listing = draft.listing();
+        assertThatThrownBy(() -> WorkflowJson.entries(listing, root, 200)).as(json)
                 .isInstanceOf(WorkflowException.class)
                 .hasMessage("Choose entries: " + detail);
     }

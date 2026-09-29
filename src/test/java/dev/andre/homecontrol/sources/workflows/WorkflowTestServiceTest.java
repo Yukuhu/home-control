@@ -49,8 +49,8 @@ class WorkflowTestServiceTest {
             server.respond("/images/music", 404, "{}");
             server.respond("/stream/news", 200, "{\"path\":\"secret-path-news\"}");
             server.respond("/stream/music", 200, "{\"path\":\"secret-path-music\"}");
-            var saved = save(WorkflowFixtures.chain(server.url("/")));
-            var result = service(http).test(saved.id(), saved.revision(), request);
+            var stored = save(WorkflowFixtures.chain(server.url("/")));
+            var result = service(http).test(stored.id(), stored.revision(), request);
             assertThat(result.stages()).extracting(WorkflowTestService.StageView::name).containsExactly("Refresh", "Play");
             assertThat(result.stages()).allMatch(WorkflowTestService.StageView::success);
             assertThat(result.totalEntries()).isEqualTo(2);
@@ -64,8 +64,8 @@ class WorkflowTestServiceTest {
     @Test void aFailingSharedCallIsNamedAndLeavesNoSamples() throws Exception {
         try (var server = new FakeWorkflowServer(); var http = client()) {
             server.respond("/list", 500, "{}");
-            var saved = save(WorkflowFixtures.chain(server.url("/")));
-            var result = service(http).test(saved.id(), saved.revision(), request);
+            var stored = save(WorkflowFixtures.chain(server.url("/")));
+            var result = service(http).test(stored.id(), stored.revision(), request);
             assertThat(result.stages()).last().satisfies(stage -> {
                 assertThat(stage.name()).isEqualTo("Call list");
                 assertThat(stage.success()).isFalse();
@@ -83,8 +83,8 @@ class WorkflowTestServiceTest {
                 server.respond("/images/e" + i, 200, "{\"url\":\"https://images.example/a.png\"}");
                 server.respond("/stream/e" + i, 200, "{\"path\":\"p" + i + "\"}");
             }
-            var saved = save(WorkflowFixtures.chain(server.url("/")));
-            var result = service(http).test(saved.id(), saved.revision(), request);
+            var stored = save(WorkflowFixtures.chain(server.url("/")));
+            var result = service(http).test(stored.id(), stored.revision(), request);
             assertThat(result.totalEntries()).isEqualTo(8);
             assertThat(result.samples()).hasSize(5);
             assertThat(server.count("/stream/e5")).isZero();
@@ -95,9 +95,9 @@ class WorkflowTestServiceTest {
         try (var server = new FakeWorkflowServer(); var http = client()) {
             server.respond("/one", 200, "{\"id\":\"item1\",\"token\":\"secret-token\"}");
             var single = WorkflowFixtures.single(server.url("/one"));
-            var saved = save(new WorkflowDraft(single.name(), single.enabled(), single.mode(), single.kind(),
+            var stored = save(new WorkflowDraft(single.name(), single.enabled(), single.mode(), single.kind(),
                     single.calls(), null, new WorkflowDraft.Tile("Radio", "Live", null), single.cast()));
-            var result = service(http).test(saved.id(), saved.revision(), request);
+            var result = service(http).test(stored.id(), stored.revision(), request);
             assertThat(result.stages()).extracting(WorkflowTestService.StageView::name).containsExactly("Play");
             assertThat(result.totalEntries()).isEqualTo(1);
             var sample = result.samples().getFirst();
@@ -139,9 +139,9 @@ class WorkflowTestServiceTest {
             when(http.fetch(any(WorkflowHttpClient.Request.class), anyLong())).thenAnswer(call ->
                     real.fetch(call.getArgument(0), call.getArgument(1)));
             doThrow(new RuntimeException("private-marker")).when(http).checkMedia(any(), anyLong());
-            var saved = save(WorkflowFixtures.chain(server.url("/")));
+            var stored = save(WorkflowFixtures.chain(server.url("/")));
             var result = new WorkflowTestService(store, login, new WorkflowRunner(http, PROPERTIES), http)
-                    .test(saved.id(), saved.revision(), request);
+                    .test(stored.id(), stored.revision(), request);
             assertThat(result.samples()).isEmpty();
             assertThat(result.stages()).last().satisfies(stage -> {
                 assertThat(stage.name()).isEqualTo("Play");

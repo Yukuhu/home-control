@@ -47,7 +47,8 @@ class WorkflowPlanTest {
         var chain = WorkflowFixtures.chain(BASE);
         var reordered = new ArrayList<>(chain.calls());
         reordered.add(0, reordered.remove(2)); // stream before list
-        assertThatThrownBy(() -> WorkflowPlan.of(with(chain, reordered)))
+        var draft = with(chain, reordered);
+        assertThatThrownBy(() -> WorkflowPlan.of(draft))
                 .isInstanceOf(WorkflowException.class)
                 .hasMessage("Workflow: call stream: uses {id}, which is defined by a call further down");
     }

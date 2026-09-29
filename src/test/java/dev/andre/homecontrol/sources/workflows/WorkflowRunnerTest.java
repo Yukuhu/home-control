@@ -182,7 +182,7 @@ class WorkflowRunnerTest {
             list(server, "t-2");
             server.respond("/stream/news", 200, "{\"path\":\"news-hd.m3u8\"}");
             var media = runner.resolve(definition, key);
-            assertThat(media.url().toString()).isEqualTo("https://media.example/play/news-hd.m3u8?t=t-2");
+            assertThat(media.url()).hasToString("https://media.example/play/news-hd.m3u8?t=t-2");
             assertThat(media.title()).isEqualTo("News");
             assertThat(server.requests("/stream/news").getFirst().header("Authorization")).isEqualTo("Bearer t-2");
             assertThat(server.count("/stream/music")).isZero();
