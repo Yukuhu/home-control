@@ -30,7 +30,7 @@ class BlockingAdapter extends StubAdapter {
             entered.countDown();
             try {
                 released.await();
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
             }
         }
