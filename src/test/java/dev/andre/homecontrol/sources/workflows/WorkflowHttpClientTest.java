@@ -10,6 +10,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -25,13 +26,67 @@ class WorkflowHttpClientTest {
         return client(timeout, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")});
     }
 
+    private static WorkflowHttpClient client(Duration timeout, int permits) {
+        return new WorkflowHttpClient(new WorkflowProperties(true, true, Duration.ofSeconds(1), timeout, permits, 2_097_152, 3),
+                new WorkflowUrlPolicy(true, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}));
+    }
+
+    private static long in(Duration wait) { return System.nanoTime() + wait.toNanos(); }
+
+    @Test void aFetchWithADeadlineWaitsForAFreeSlot() throws Exception {
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(5), 1)) {
+            server.block("/slow", false, entered, release);
+            server.respond("/next", 200, "{}");
+            var first = CompletableFuture.supplyAsync(() -> client.fetch(request(server.url("/slow"))),
+                    Executors.newVirtualThreadPerTaskExecutor());
+            assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
+            var second = CompletableFuture.supplyAsync(() -> client.fetch(request(server.url("/next")), in(Duration.ofSeconds(3))),
+                    Executors.newVirtualThreadPerTaskExecutor());
+            release.countDown();
+            assertThat(second.get(3, TimeUnit.SECONDS)).asString().isEqualTo("{}");
+            assertThat(first.get(3, TimeUnit.SECONDS)).isNotNull();
+        } finally { release.countDown(); }
+    }
+
+    @Test void aFetchWithADeadlineReportsBusyWhenNoSlotFreesInTime() throws Exception {
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(5), 1)) {
+            server.block("/slow", false, entered, release);
+            server.respond("/next", 200, "{}");
+            CompletableFuture.runAsync(() -> client.fetch(request(server.url("/slow"))), Executors.newVirtualThreadPerTaskExecutor());
+            assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
+            long started = System.nanoTime();
+            var next = request(server.url("/next"));
+            assertThatThrownBy(() -> client.fetch(next, in(Duration.ofMillis(200))))
+                    .isInstanceOf(WorkflowException.class).hasMessageContaining("busy");
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isGreaterThanOrEqualTo(Duration.ofMillis(150));
+            assertThat(server.count("/next")).isZero();
+        } finally { release.countDown(); }
+    }
+
+    @Test void aRunDeadlineEarlierThanTheCallTimeoutEndsTheFetch() throws Exception {
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(5), 2)) {
+            server.block("/slow", true, entered, release);
+            long started = System.nanoTime();
+            var slow = request(server.url("/slow"));
+            assertThatThrownBy(() -> client.fetch(slow, in(Duration.ofMillis(300))))
+                    .isInstanceOf(WorkflowException.class).hasMessageContaining("timed out");
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(2));
+        } finally { release.countDown(); }
+    }
+
     private static WorkflowHttpClient client(Duration timeout, WorkflowUrlPolicy.HostResolver resolver) {
         return new WorkflowHttpClient(new WorkflowProperties(true, true, Duration.ofSeconds(1), timeout, 4, 2_097_152, 3),
                 new WorkflowUrlPolicy(true, resolver));
     }
 
-    private static WorkflowDraft.Fetch request(URI uri) {
-        return new WorkflowDraft.Fetch(uri.toString(), List.of(new WorkflowDraft.Header("Authorization", "Bearer secret-marker")));
+    private static WorkflowHttpClient.Request request(URI uri) {
+        return new WorkflowHttpClient.Request(uri.toString(), List.of(new WorkflowDraft.Header("Authorization", "Bearer secret-marker")));
     }
 
     private static URI named(URI uri) { return URI.create(uri.toString().replace("127.0.0.1", "fixture.invalid")); }
@@ -336,7 +391,7 @@ class WorkflowHttpClientTest {
     @ParameterizedTest @ValueSource(strings = {"Host", "Cookie", "Connection", "Proxy-Authorization", "Accept-Encoding", "Content-Length", "Transfer-Encoding"})
     void neverSendsTransportOrCookieHeaderOverrides(String header) throws Exception {
         try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(3))) {
-            var request = new WorkflowDraft.Fetch(server.url("/feed").toString(), List.of(new WorkflowDraft.Header(header, "secret-marker")));
+            var request = new WorkflowHttpClient.Request(server.url("/feed").toString(), List.of(new WorkflowDraft.Header(header, "secret-marker")));
             assertThatThrownBy(() -> client.fetch(request)).isInstanceOf(WorkflowException.class).hasMessageNotContaining("secret-marker");
             assertThat(server.count("/feed")).isZero();
         }

@@ -77,7 +77,9 @@ class WorkflowUrlPolicyTest {
                 java.util.Map.of("home-control.workflows.enabled", "true"));
         var binder = new org.springframework.boot.context.properties.bind.Binder(source);
         var defaults = binder.bind("home-control.workflows", WorkflowProperties.class).get();
-        assertThat(defaults).isEqualTo(new WorkflowProperties(true, false, Duration.ofSeconds(5), Duration.ofSeconds(15), 4, 2_097_152, 3));
+        assertThat(defaults).isEqualTo(new WorkflowProperties(true, false, Duration.ofSeconds(5), Duration.ofSeconds(10), 8, 2_097_152, 3));
+        assertThat(defaults.playTimeout()).isEqualTo(Duration.ofSeconds(20));
+        assertThat(defaults.refreshTimeout()).isEqualTo(Duration.ofSeconds(60));
         source.put("home-control.workflows.allow-loopback", "true");
         source.put("home-control.workflows.request-timeout", "250ms");
         var configured = binder.bind("home-control.workflows", WorkflowProperties.class).get();

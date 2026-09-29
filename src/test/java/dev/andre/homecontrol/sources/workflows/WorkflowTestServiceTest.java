@@ -47,7 +47,7 @@ class WorkflowTestServiceTest {
         assertThat(result.samples().getFirst().variables()).containsExactly("A = item0", "C = •••");
         assertThat(result.samples().getFirst().maskedUrl()).contains("id=item0", "token=•••").doesNotContain("/play");
         assertThat(result.toString()).doesNotContain("secret-token", "saved-secret", "api.example", "JsonNode");
-        verify(http).fetch(saved.draft().fetch());
+        verify(http).fetch(any(WorkflowHttpClient.Request.class));
         verify(http, times(5)).checkMedia(any(URI.class));
         verifyNoMoreInteractions(http);
     }

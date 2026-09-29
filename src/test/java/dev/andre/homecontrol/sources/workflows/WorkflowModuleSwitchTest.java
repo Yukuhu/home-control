@@ -59,7 +59,7 @@ class WorkflowModuleSwitchTest {
             client.set(app.getBean(WorkflowHttpClient.class));
         });
         var closedClient = client.get();
-        var fetch = new WorkflowDraft.Fetch("https://never.example", List.of());
+        var fetch = new WorkflowHttpClient.Request("https://never.example", List.of());
         assertThatThrownBy(() -> closedClient.fetch(fetch))
                 .isInstanceOf(WorkflowException.class).hasMessageContaining("closed");
     }

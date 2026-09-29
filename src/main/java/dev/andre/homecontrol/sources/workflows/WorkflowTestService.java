@@ -39,7 +39,7 @@ public final class WorkflowTestService {
         int total = 0;
         Stage active = Stage.FETCH;
         try {
-            byte[] body = http.fetch(saved.draft().fetch());
+            byte[] body = http.fetch(new WorkflowHttpClient.Request(saved.draft().fetch().url(), saved.draft().fetch().headers()));
             stages.add(ok(Stage.FETCH)); active = Stage.PARSE;
             var root = WorkflowJson.parse(body);
             stages.add(ok(Stage.PARSE)); active = Stage.SELECT;
