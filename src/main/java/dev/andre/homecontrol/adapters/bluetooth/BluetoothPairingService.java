@@ -7,10 +7,11 @@ import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezException;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailures;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.MacAddress;
-import dev.andre.homecontrol.device.DeviceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,8 @@ public class BluetoothPairingService {
                     .thenComparing(BluetoothDeviceInfo::displayName, String.CASE_INSENSITIVE_ORDER);
 
     private final BluezClient bluez;
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
+    private final DeviceEnrollment enrollment;
     private final BluetoothProperties properties;
     private final Clock clock;
 
@@ -44,13 +46,16 @@ public class BluetoothPairingService {
     @SuppressWarnings("java:S3077")
     private volatile BluetoothScan lastScan = BluetoothScan.NONE;
 
-    public BluetoothPairingService(BluezClient bluez, DeviceManager devices, BluetoothProperties properties) {
-        this(bluez, devices, properties, Clock.systemUTC());
+    public BluetoothPairingService(BluezClient bluez, DeviceQueries devices, DeviceEnrollment enrollment,
+                                   BluetoothProperties properties) {
+        this(bluez, devices, enrollment, properties, Clock.systemUTC());
     }
 
-    public BluetoothPairingService(BluezClient bluez, DeviceManager devices, BluetoothProperties properties, Clock clock) {
+    public BluetoothPairingService(BluezClient bluez, DeviceQueries devices, DeviceEnrollment enrollment,
+                                   BluetoothProperties properties, Clock clock) {
         this.bluez = bluez;
         this.devices = devices;
+        this.enrollment = enrollment;
         this.properties = properties;
         this.clock = clock;
     }
@@ -100,7 +105,7 @@ public class BluetoothPairingService {
             Device device = new Device(id, name, DeviceKind.BLUETOOTH, address,
                     Map.of(BluetoothSettings.ADAPTER_ID, new BluetoothSettings(address, adapter.address(), audioDevice).toMap()),
                     clock.instant());
-            devices.adopt(device);
+            enrollment.adopt(device);
             return new BluetoothPairing(device, warning);
         } catch (BluezException e) {
             throw new BluetoothSetupException(e.getMessage());
@@ -162,7 +167,7 @@ public class BluetoothPairingService {
             throw new BluetoothSetupException(e.getMessage());
         }
         Device updated = device.withAdapter(BluetoothSettings.ADAPTER_ID, settings.toMap());
-        devices.adopt(updated);
+        enrollment.adopt(updated);
         return updated;
     }
 

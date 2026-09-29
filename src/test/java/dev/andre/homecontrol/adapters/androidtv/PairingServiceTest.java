@@ -1,11 +1,11 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.CodePairingOutcome;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakePairingServer;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RefusingPairingServer;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.StorageException;
 import java.time.Duration;
@@ -38,16 +38,16 @@ class PairingServiceTest {
 
     private FakePairingServer fakeDevice;
     private PairingService service;
-    private DeviceManager sessions;
+    private DeviceEnrollment enrollment;
     private CertificateStore certificates;
 
     @BeforeEach
     void setUp() throws Exception {
         fakeDevice = new FakePairingServer();
         AndroidTvProperties properties = new AndroidTvProperties(true, "shield", Duration.ofSeconds(10), Duration.ofSeconds(1), Duration.ofSeconds(4));
-        sessions = mock(DeviceManager.class);
+        enrollment = mock(DeviceEnrollment.class);
         certificates = new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray());
-        service = new PairingService(certificates, sessions, new DataDirectory(dir));
+        service = new PairingService(certificates, enrollment, new DataDirectory(dir));
     }
 
     @AfterEach
@@ -63,7 +63,7 @@ class PairingServiceTest {
         CodePairingOutcome result = service.submit(fakeDevice.awaitDisplayedCode());
 
         assertThat(result).isInstanceOf(CodePairingOutcome.Paired.class);
-        verify(sessions).adopt(org.mockito.ArgumentMatchers.argThat(device ->
+        verify(enrollment).adopt(org.mockito.ArgumentMatchers.argThat(device ->
                 device.name().equals("Living Room Shield")
                         && device.host().equals("127.0.0.1")
                         && AndroidTvSettings.of(device).port() == 6466
@@ -102,7 +102,7 @@ class PairingServiceTest {
         }
 
         org.mockito.ArgumentCaptor<Device> captor = org.mockito.ArgumentCaptor.forClass(Device.class);
-        verify(sessions, times(2)).adopt(captor.capture());
+        verify(enrollment, times(2)).adopt(captor.capture());
         List<Device> adopted = captor.getAllValues();
 
         assertThat(adopted.get(1).id())
@@ -126,7 +126,7 @@ class PairingServiceTest {
 
     @Test
     void endsTheAttemptEvenWhenAdoptingTheDeviceFails() throws Exception {
-        doThrow(new IllegalStateException("the registry is unwritable")).when(sessions).adopt(any());
+        doThrow(new IllegalStateException("the registry is unwritable")).when(enrollment).adopt(any());
         service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
         String code = fakeDevice.awaitDisplayedCode();
 
@@ -145,7 +145,7 @@ class PairingServiceTest {
             adopting.countDown();
             assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
             return null;
-        }).when(sessions).adopt(any());
+        }).when(enrollment).adopt(any());
         service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
         String code = fakeDevice.awaitDisplayedCode();
         CompletableFuture<CodePairingOutcome> first = CompletableFuture.supplyAsync(() -> service.submit(code));
@@ -182,7 +182,7 @@ class PairingServiceTest {
         Path keystore = blocked.resolve("keystore.p12");
         PairingService blockedService = new PairingService(
                 new CertificateStore(keystore, "shield".toCharArray()),
-                sessions,
+                enrollment,
                 new DataDirectory(blocked));
 
         int port = fakeDevice.port();

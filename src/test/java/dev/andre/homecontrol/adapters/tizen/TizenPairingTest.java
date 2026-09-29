@@ -1,10 +1,11 @@
 package dev.andre.homecontrol.adapters.tizen;
 
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.PromptPairingResult;
-import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.testsupport.InMemoryDeviceSecrets;
 import java.time.Duration;
 import org.mockito.ArgumentCaptor;
@@ -29,7 +30,8 @@ import static org.mockito.Mockito.when;
 
 class TizenPairingTest {
 
-    private final DeviceManager devices = mock(DeviceManager.class);
+    private final DeviceQueries devices = mock(DeviceQueries.class);
+    private final DeviceEnrollment enrollment = mock(DeviceEnrollment.class);
     private final InMemoryDeviceSecrets secrets = new InMemoryDeviceSecrets();
     private FakeTizenServer tv;
 
@@ -37,7 +39,7 @@ class TizenPairingTest {
     @SuppressWarnings("unchecked")
     void setUp() throws IOException {
         tv = new FakeTizenServer();
-        when(devices.attach(any(), any(), any(), any(), any())).thenAnswer(call -> new Device("tizen-127-0-0-1",
+        when(enrollment.attach(any(), any(), any(), any(), any())).thenAnswer(call -> new Device("tizen-127-0-0-1",
                 call.getArgument(1), call.getArgument(2), call.getArgument(0),
                 Map.of(call.getArgument(3), (Map<String, String>) call.getArgument(4)), Instant.now()));
     }
@@ -50,13 +52,13 @@ class TizenPairingTest {
     private TizenPairing pairing(int port, int pairingTimeoutSeconds) {
         return new TizenPairing(new TizenProperties(true, port, tv.httpPort(), tv.httpPort(), "Home Control",
                 Duration.ofSeconds(2), Duration.ofSeconds(2),
-                Duration.ofSeconds(pairingTimeoutSeconds), Duration.ofSeconds(1), Duration.ofSeconds(0)), devices, secrets);
+                Duration.ofSeconds(pairingTimeoutSeconds), Duration.ofSeconds(1), Duration.ofSeconds(0)), devices, enrollment, secrets);
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, String> attachedSettings() {
         ArgumentCaptor<Map<String, String>> settings = ArgumentCaptor.forClass(Map.class);
-        verify(devices).attach(eq("127.0.0.1"), any(), eq(DeviceKind.TIZEN), eq("tizen"), settings.capture());
+        verify(enrollment).attach(eq("127.0.0.1"), any(), eq(DeviceKind.TIZEN), eq("tizen"), settings.capture());
         return settings.getValue();
     }
 
@@ -67,7 +69,7 @@ class TizenPairingTest {
         PromptPairingResult result = pairing(tv.port(), 2).pair("127.0.0.1", null);
 
         assertThat(result).isInstanceOf(PromptPairingResult.Paired.class);
-        verify(devices).attach(eq("127.0.0.1"), eq("[TV] Samsung 8 Series (55)"), eq(DeviceKind.TIZEN), eq("tizen"), any());
+        verify(enrollment).attach(eq("127.0.0.1"), eq("[TV] Samsung 8 Series (55)"), eq(DeviceKind.TIZEN), eq("tizen"), any());
         Map<String, String> settings = attachedSettings();
         assertThat(settings).containsOnlyKeys("paired", "keyRef").containsEntry("paired", "true");
         assertThat(secrets.deviceSecret(TizenSettings.secretName(settings.get("keyRef")))).contains("73184052");
@@ -90,7 +92,7 @@ class TizenPairingTest {
     void theUsersNameWins() {
         pairing(tv.port(), 2).pair("127.0.0.1", "Bedroom TV");
 
-        verify(devices).attach(eq("127.0.0.1"), eq("Bedroom TV"), eq(DeviceKind.TIZEN), eq("tizen"), anyMap());
+        verify(enrollment).attach(eq("127.0.0.1"), eq("Bedroom TV"), eq(DeviceKind.TIZEN), eq("tizen"), anyMap());
     }
 
     @Test
@@ -99,7 +101,7 @@ class TizenPairingTest {
 
         pairing(tv.port(), 2).pair("127.0.0.1", "TV");
 
-        verify(devices).attach("127.0.0.1", "TV", DeviceKind.TIZEN, "tizen", Map.of("paired", "true"));
+        verify(enrollment).attach("127.0.0.1", "TV", DeviceKind.TIZEN, "tizen", Map.of("paired", "true"));
     }
 
     @Test
@@ -108,7 +110,7 @@ class TizenPairingTest {
 
         assertThat(pairing(tv.port(), 2).pair("127.0.0.1", "TV")).isInstanceOfSatisfying(PromptPairingResult.Declined.class,
                 declined -> assertThat(declined.reason()).contains("declined"));
-        verify(devices, never()).attach(anyString(), anyString(), any(), anyString(), anyMap());
+        verify(enrollment, never()).attach(anyString(), anyString(), any(), anyString(), anyMap());
     }
 
     @Test
@@ -117,7 +119,7 @@ class TizenPairingTest {
 
         assertThat(pairing(tv.port(), 1).pair("127.0.0.1", "TV")).isInstanceOfSatisfying(PromptPairingResult.Failed.class,
                 failed -> assertThat(failed.reason()).contains("within 1 seconds"));
-        verify(devices, never()).attach(anyString(), anyString(), any(), anyString(), anyMap());
+        verify(enrollment, never()).attach(anyString(), anyString(), any(), anyString(), anyMap());
     }
 
     @Test
@@ -131,8 +133,7 @@ class TizenPairingTest {
     void describesItselfForTheSetupPage() {
         TizenPairing pairing = new TizenPairing(new TizenProperties(true, 8002, 8001, 8080, "Home Control",
                 Duration.ofSeconds(3), Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofSeconds(5),
-                Duration.ofSeconds(3)),
-                devices, secrets);
+                Duration.ofSeconds(3)), devices, enrollment, secrets);
 
         assertThat(pairing.adapterId()).isEqualTo("tizen");
         assertThat(pairing.displayName()).isEqualTo("Samsung TV");

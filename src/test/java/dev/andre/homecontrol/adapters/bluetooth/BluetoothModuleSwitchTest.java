@@ -1,11 +1,12 @@
 package dev.andre.homecontrol.adapters.bluetooth;
 
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezClient;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezException;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure;
 import dev.andre.homecontrol.adapters.bluetooth.player.MpvLauncher;
 import dev.andre.homecontrol.adapters.bluetooth.player.ProcessMpvLauncher;
-import dev.andre.homecontrol.device.DeviceManager;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -25,7 +26,8 @@ import static org.mockito.Mockito.mock;
 class BluetoothModuleSwitchTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withBean(DeviceManager.class, () -> mock(DeviceManager.class))
+            .withBean(DeviceQueries.class, () -> mock(DeviceQueries.class))
+            .withBean(DeviceEnrollment.class, () -> mock(DeviceEnrollment.class))
             .withUserConfiguration(BluetoothConfiguration.class);
 
     @Test

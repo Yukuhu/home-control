@@ -5,7 +5,7 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.PairingResult;
 import dev.andre.homecontrol.adapters.androidtv.protocol.PairingSession;
 import dev.andre.homecontrol.core.CodePairing;
 import dev.andre.homecontrol.core.CodePairingOutcome;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.storage.DataDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +29,7 @@ public class PairingService implements CodePairing {
     private static final Logger log = LoggerFactory.getLogger(PairingService.class);
 
     private final CertificateStore certificates;
-    private final DeviceManager sessions;
+    private final DeviceEnrollment enrollment;
     private final DataDirectory dataDirectory;
 
     /**
@@ -42,10 +42,10 @@ public class PairingService implements CodePairing {
      */
     private final AtomicReference<Attempt> attempt = new AtomicReference<>();
 
-    public PairingService(CertificateStore certificates, DeviceManager sessions,
+    public PairingService(CertificateStore certificates, DeviceEnrollment enrollment,
                           DataDirectory dataDirectory) {
         this.certificates = certificates;
-        this.sessions = sessions;
+        this.enrollment = enrollment;
         this.dataDirectory = dataDirectory;
     }
 
@@ -97,7 +97,7 @@ public class PairingService implements CodePairing {
             return switch (result) {
                 case PairingResult.Paired(var serverCertificate) -> {
                     certificates.save(current.deviceId(), current.credential());
-                    sessions.adopt(AndroidTvSettings.device(
+                    enrollment.adopt(AndroidTvSettings.device(
                             current.deviceId(),
                             current.name(),
                             current.host(),

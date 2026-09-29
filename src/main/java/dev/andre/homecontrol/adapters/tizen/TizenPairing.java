@@ -2,11 +2,12 @@ package dev.andre.homecontrol.adapters.tizen;
 
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.support.PairingKeys;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.PromptPairing;
 import dev.andre.homecontrol.core.PromptPairingResult;
-import dev.andre.homecontrol.device.DeviceManager;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
@@ -18,14 +19,17 @@ import java.util.Map;
 public class TizenPairing implements PromptPairing {
 
     private final TizenProperties properties;
-    private final DeviceManager devices;
+    private final DeviceQueries devices;
+    private final DeviceEnrollment enrollment;
     private final PairingKeys keys;
     private final HttpClient http;
     private final TizenRest rest;
 
-    public TizenPairing(TizenProperties properties, DeviceManager devices, DeviceSecrets secrets) {
+    public TizenPairing(TizenProperties properties, DeviceQueries devices, DeviceEnrollment enrollment,
+                        DeviceSecrets secrets) {
         this.properties = properties;
         this.devices = devices;
+        this.enrollment = enrollment;
         this.keys = TizenSettings.keys(secrets);
         this.http = InsecureTls.httpClient(properties.connectTimeout());
         this.rest = new TizenRest(http, properties);
@@ -59,7 +63,7 @@ public class TizenPairing implements PromptPairing {
                     String deviceName = name != null && !name.isBlank() ? name.trim()
                             : rest.deviceInfo(host).map(TizenDeviceInfo::name).filter(n -> !n.isBlank()).orElse("Samsung TV");
                     yield new PromptPairingResult.Paired(
-                            devices.attach(host, deviceName, DeviceKind.TIZEN, TizenAdapter.ADAPTER_ID, settings));
+                            enrollment.attach(host, deviceName, DeviceKind.TIZEN, TizenAdapter.ADAPTER_ID, settings));
                 }
                 case UNAUTHORIZED -> new PromptPairingResult.Declined("The TV declined the connection request");
                 case NO_ANSWER -> new PromptPairingResult.Failed("Nobody allowed the connection on the TV within "

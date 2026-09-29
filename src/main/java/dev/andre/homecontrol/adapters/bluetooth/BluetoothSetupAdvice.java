@@ -2,7 +2,7 @@ package dev.andre.homecontrol.adapters.bluetooth;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
-import dev.andre.homecontrol.device.DeviceManager;
+import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -26,11 +26,11 @@ public class BluetoothSetupAdvice {
 
     private final ObjectProvider<BluetoothHostChecks> checks;
     private final ObjectProvider<BluetoothPairingService> pairing;
-    private final ObjectProvider<DeviceManager> devices;
+    private final ObjectProvider<DeviceQueries> devices;
     private final ObjectProvider<BluetoothProperties> properties;
 
     public BluetoothSetupAdvice(ObjectProvider<BluetoothHostChecks> checks, ObjectProvider<BluetoothPairingService> pairing,
-                                ObjectProvider<DeviceManager> devices, ObjectProvider<BluetoothProperties> properties) {
+                                ObjectProvider<DeviceQueries> devices, ObjectProvider<BluetoothProperties> properties) {
         this.checks = checks;
         this.pairing = pairing;
         this.devices = devices;
@@ -41,18 +41,18 @@ public class BluetoothSetupAdvice {
     public View bluetooth() {
         BluetoothHostChecks hostChecks = checks.getIfAvailable();
         BluetoothPairingService service = pairing.getIfAvailable();
-        DeviceManager manager = devices.getIfAvailable();
+        DeviceQueries registered = devices.getIfAvailable();
         BluetoothProperties props = properties.getIfAvailable();
-        if (hostChecks == null || service == null || manager == null || props == null) {
+        if (hostChecks == null || service == null || registered == null || props == null) {
             return null;
         }
         List<HostCheck> results = hostChecks.results();
-        List<SpeakerRow> speakers = manager.devices().stream()
+        List<SpeakerRow> speakers = registered.devices().stream()
                 .filter(device -> device.hasAdapter(BluetoothSettings.ADAPTER_ID))
                 .map(device -> {
                     BluetoothSettings settings = BluetoothSettings.of(device);
                     return new SpeakerRow(device.id(), device.name(), settings.address(),
-                            manager.state(device.id()).status().name(), settings.audioDevice());
+                            registered.state(device.id()).status().name(), settings.audioDevice());
                 })
                 .toList();
         return new View(results, results.stream().allMatch(HostCheck::ok), service.lastScan(),
