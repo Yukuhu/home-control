@@ -7,11 +7,9 @@ import dev.andre.homecontrol.security.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import static dev.andre.homecontrol.sources.workflows.WorkflowException.Stage;
 
 /** Explicit, authenticated preview. Only the returned display strings may leave this service. */
@@ -25,73 +23,64 @@ public final class WorkflowTestService {
     public record Result(List<StageView> stages, int totalEntries, List<SampleView> samples, List<String> warnings) {
         public Result { stages = List.copyOf(stages); samples = List.copyOf(samples); warnings = List.copyOf(warnings); }
     }
+    private static final String RECEIVER = "Your receiver must reach the media address directly. Custom media-download headers are not supported.";
+    private static final String ARTWORK = "Some artwork was omitted because it is not a public HTTPS image address without credentials.";
+    private static final int SAMPLES = 5;
     private final WorkflowStore store;
     private final LoginService login;
+    private final WorkflowRunner runner;
     private final WorkflowHttpClient http;
 
-    public WorkflowTestService(WorkflowStore store, LoginService login, WorkflowHttpClient http) {
-        this.store = store; this.login = login; this.http = http;
+    public WorkflowTestService(WorkflowStore store, LoginService login, WorkflowRunner runner, WorkflowHttpClient http) {
+        this.store = store; this.login = login; this.runner = runner; this.http = http;
     }
 
     public Result test(String id, long revision, HttpServletRequest request) {
         authenticate(request);
         WorkflowDefinition saved = current(id, revision);
+        var draft = saved.draft();
         List<StageView> stages = new ArrayList<>();
         List<SampleView> samples = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         int total = 0;
-        Stage active = Stage.FETCH;
+        String active = "Refresh";
         try {
-            byte[] body = http.fetch(WorkflowRunner.request(saved.draft().calls().getFirst(), Set.of(), Map.of()));
-            stages.add(ok(Stage.FETCH)); active = Stage.PARSE;
-            var root = WorkflowJson.parse(body);
-            stages.add(ok(Stage.PARSE)); active = Stage.SELECT;
-            var draft = saved.draft();
-            var first = draft.calls().getFirst();
-            var entries = draft.mode() == WorkflowDraft.Mode.SINGLE
-                    ? List.of(new WorkflowJson.Entry("single", draft.tile().title(), draft.tile().subtitle(),
-                            WorkflowJson.artwork(draft.tile().artwork()), root))
-                    : WorkflowJson.entries(draft.listing(), root, WorkflowRunner.ENTRY_LIMIT);
-            total = entries.size(); stages.add(ok(Stage.SELECT));
-            if (draft.mode() == WorkflowDraft.Mode.GENERATED && draft.listing().artwork() != null
-                    && draft.listing().artwork().pointer() != null) {
-                boolean omitted = entries.stream().anyMatch(entry -> {
-                    var selected = entry.node().at(draft.listing().artwork().pointer());
-                    return entry.artwork() == null && !selected.isMissingNode() && !selected.isNull();
-                });
-                if (omitted) warnings.add("Some artwork was omitted because it is not a public HTTPS image address without credentials.");
+            if (draft.mode() == WorkflowDraft.Mode.GENERATED) {
+                var refresh = runner.refresh(saved, runner.refreshRun());
+                total = refresh.entries().size();
+                stages.add(new StageView("Refresh", true, total + " entries"));
+                warnings.addAll(refresh.problems());
+                if (refresh.artworkOmitted()) warnings.add(ARTWORK);
             }
-            active = Stage.BUILD;
-            var allVariables = new ArrayList<>(first.variables());
-            if (draft.mode() == WorkflowDraft.Mode.GENERATED) allVariables.addAll(draft.listing().variables());
-            var template = new WorkflowTemplate(draft.cast().template(), allVariables.stream()
-                    .map(WorkflowDraft.Variable::name).collect(Collectors.toSet()));
-            for (var entry : entries.stream().limit(5).toList()) {
-                active = Stage.MAP;
-                var values = new HashMap<>(WorkflowJson.values(first.variables(), root));
-                if (draft.mode() == WorkflowDraft.Mode.GENERATED) {
-                    values.putAll(WorkflowJson.values(draft.listing().variables(), entry.node()));
-                }
-                var masked = allVariables.stream().map(variable -> variable.name() + " = "
-                        + (variable.sensitive() ? "•••" : values.get(variable.name()).text())).toList();
-                active = Stage.BUILD;
-                http.checkMedia(template.expand(values));
-                samples.add(new SampleView(entry.title(), entry.subtitle(), masked, template.preview(values)));
+            active = "Play";
+            var run = runner.playRun();
+            var context = runner.play(saved, run);
+            if (draft.mode() == WorkflowDraft.Mode.SINGLE) total = 1;
+            var template = new WorkflowTemplate(draft.cast().template(), Set.copyOf(context.plan().variables()));
+            for (var entry : context.entries().stream().limit(SAMPLES).toList()) {
+                var values = runner.entryValues(saved, context, entry, run);
+                http.checkMedia(runner.media(saved, context.plan(), values), run.deadline());
+                samples.add(new SampleView(entry.title(), entry.subtitle(), masked(context.plan(), values), template.preview(values)));
             }
-            stages.add(ok(Stage.MAP)); stages.add(ok(Stage.BUILD));
-            warnings.add("Your receiver must reach the media address directly. Custom media-download headers are not supported.");
+            stages.add(new StageView("Play", true, "Complete"));
+            warnings.add(RECEIVER);
         } catch (RuntimeException failure) {
-            Stage failed = failure instanceof WorkflowException e ? e.stage() : active;
             // WorkflowException's contract allows only locally authored safe context.
             // Never expose messages or causes from parser, network or other exceptions.
-            String message = failure instanceof WorkflowException ? failure.getMessage()
-                    : "Could not complete this step. Check the saved settings and response format.";
-            stages.add(new StageView(label(failed), false, message));
+            boolean safe = failure instanceof WorkflowException;
+            String name = failure instanceof WorkflowException known && known.call() != null ? "Call " + known.call() : active;
+            String message = safe ? failure.getMessage() : "Could not complete this step. Check the saved settings and response format.";
+            stages.add(new StageView(name, false, message));
             samples.clear();
         }
         authenticate(request);
         current(id, revision); // An explicit Test may run while disabled, but never return an obsolete revision.
         return new Result(stages, total, samples, warnings);
+    }
+
+    private static List<String> masked(WorkflowPlan plan, Map<String, WorkflowJson.Value> values) {
+        return plan.variables().stream().filter(values::containsKey)
+                .map(name -> name + " = " + (plan.sensitive(name) ? "\u2022\u2022\u2022" : values.get(name).text())).toList();
     }
 
     private void authenticate(HttpServletRequest request) {
@@ -103,11 +92,4 @@ public final class WorkflowTestService {
         return saved;
     }
     private static WorkflowException changed() { return new WorkflowException(Stage.WORKFLOW, "Workflow changed; reopen this item"); }
-    private static StageView ok(Stage stage) { return new StageView(label(stage), true, "Complete"); }
-    private static String label(Stage stage) {
-        return switch (stage) {
-            case FETCH -> "Fetch JSON"; case PARSE -> "Parse JSON"; case SELECT -> "Choose entries";
-            case MAP -> "Map fields"; case BUILD -> "Build media URL"; case WORKFLOW -> "Workflow";
-        };
-    }
 }
