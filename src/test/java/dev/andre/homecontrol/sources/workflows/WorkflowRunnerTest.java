@@ -13,19 +13,19 @@ class WorkflowRunnerTest {
     @Test void catalogFetchesOnceAndDoesNotEvaluateMissingMediaMappings() {
         var client = mock(WorkflowHttpClient.class);
         var definition = new WorkflowDefinition(1, WorkflowIntegrationFixture.ID, 1, WorkflowFixtures.generated());
-        when(client.fetch(definition.draft().fetch())).thenReturn(bytes("{\"items\":[{\"id\":\"news\",\"title\":\"News\"}]}"));
+        when(client.fetch(any(WorkflowHttpClient.Request.class))).thenReturn(bytes("{\"items\":[{\"id\":\"news\",\"title\":\"News\"}]}"));
         var entries = new WorkflowRunner(client).catalog(definition);
         assertThat(entries).hasSize(1);
         assertThat(entries.getFirst().key()).matches("[a-f0-9]{64}");
         assertThat(entries.getFirst().title()).isEqualTo("News");
-        verify(client).fetch(definition.draft().fetch());
+        verify(client).fetch(any(WorkflowHttpClient.Request.class));
         verify(client, never()).checkMedia(any());
     }
 
     @Test void resolveUsesFreshTokenAndStableEntryAfterReorderingAndChecksMediaOnce() {
         var client = mock(WorkflowHttpClient.class);
         var definition = new WorkflowDefinition(1, WorkflowIntegrationFixture.ID, 1, WorkflowFixtures.generated());
-        when(client.fetch(definition.draft().fetch())).thenReturn(
+        when(client.fetch(any(WorkflowHttpClient.Request.class))).thenReturn(
                 bytes("{\"token\":\"old-secret\",\"items\":[{\"id\":\"news\",\"title\":\"News\"}]}"),
                 bytes("{\"token\":\"fresh-secret\",\"items\":[{\"id\":\"other\",\"title\":\"Other\"},{\"id\":\"news\",\"title\":\"New News\"}]}"));
         var runner = new WorkflowRunner(client);
@@ -35,7 +35,7 @@ class WorkflowRunnerTest {
         assertThat(media.title()).isEqualTo("New News");
         assertThat(media.mimeType()).isEqualTo("video/mp4");
         assertThat(media.toString()).doesNotContain("media.example", "fresh-secret", "New News", "video/mp4");
-        verify(client, times(2)).fetch(definition.draft().fetch());
+        verify(client, times(2)).fetch(any(WorkflowHttpClient.Request.class));
         verify(client, times(1)).checkMedia(media.url());
     }
 

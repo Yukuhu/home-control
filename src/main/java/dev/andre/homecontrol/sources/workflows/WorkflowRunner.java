@@ -18,14 +18,14 @@ public final class WorkflowRunner {
 
     public List<CatalogEntry> catalog(WorkflowDefinition definition) {
         var draft = definition.draft();
-        var root = WorkflowJson.parse(http.fetch(draft.fetch()));
+        var root = WorkflowJson.parse(http.fetch(new WorkflowHttpClient.Request(draft.fetch().url(), draft.fetch().headers())));
         return WorkflowJson.entries(draft, root).stream()
                 .map(entry -> new CatalogEntry(entry.key(), entry.title(), entry.subtitle(), entry.artwork())).toList();
     }
 
     public ResolvedMedia resolve(WorkflowDefinition definition, String entryKey) {
         var draft = definition.draft();
-        var root = WorkflowJson.parse(http.fetch(draft.fetch()));
+        var root = WorkflowJson.parse(http.fetch(new WorkflowHttpClient.Request(draft.fetch().url(), draft.fetch().headers())));
         var selected = WorkflowJson.entries(draft, root).stream().filter(entry -> entry.key().equals(entryKey))
                 .findFirst().orElseThrow(() -> new WorkflowException(WorkflowException.Stage.SELECT,
                         "entry disappeared; refresh this workflow"));

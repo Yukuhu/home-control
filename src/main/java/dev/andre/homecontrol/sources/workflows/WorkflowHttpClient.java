@@ -60,12 +60,36 @@ public final class WorkflowHttpClient implements AutoCloseable {
         }, properties.maxConcurrentFetches(), properties.connectTimeout());
     }
 
-    public byte[] fetch(WorkflowDraft.Fetch fetch) {
-        return bounded(Stage.FETCH, () -> fetchBody(fetch));
+    /** One GET with its URL and header values already expanded. Printing it shows neither. */
+    public record Request(String url, List<WorkflowDraft.Header> headers) {
+        public Request {
+            headers = headers == null ? null : java.util.Collections.unmodifiableList(new java.util.ArrayList<>(headers));
+        }
+
+        @Override public String toString() { return "Request"; }
+    }
+
+    /** Fails at once with "busy" when every fetch slot is taken. */
+    public byte[] fetch(Request request) {
+        return bounded(Stage.FETCH, System.nanoTime() + properties.requestTimeout().toNanos(), false,
+                () -> fetchBody(request));
+    }
+
+    /** Waits for a fetch slot until {@code deadline}; the fetch ends at the deadline or the request timeout. */
+    public byte[] fetch(Request request, long deadline) {
+        return bounded(Stage.FETCH, deadline, true, () -> fetchBody(request));
     }
 
     public void checkMedia(URI uri) {
-        bounded(Stage.BUILD, () -> {
+        checkMedia(uri, System.nanoTime() + properties.requestTimeout().toNanos(), false);
+    }
+
+    public void checkMedia(URI uri, long deadline) {
+        checkMedia(uri, deadline, true);
+    }
+
+    private void checkMedia(URI uri, long deadline, boolean wait) {
+        bounded(Stage.BUILD, deadline, wait, () -> {
             URI checked = policy.parse(uri == null ? null : uri.toString());
             current.get().check();
             policy.addresses(checked.getHost());
@@ -74,7 +98,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
         });
     }
 
-    private byte[] fetchBody(WorkflowDraft.Fetch fetch) throws IOException {
+    private byte[] fetchBody(Request fetch) throws IOException {
         if (fetch == null || fetch.headers() == null || fetch.headers().size() > 16) {
             throw failure(Stage.FETCH, "invalid request settings");
         }
@@ -188,10 +212,11 @@ public final class WorkflowHttpClient implements AutoCloseable {
         }
     }
 
-    private <T> T bounded(Stage stage, Callable<T> work) {
+    private <T> T bounded(Stage stage, long deadline, boolean wait, Callable<T> work) {
         if (closed.get()) throw failure(stage, CLIENT_CLOSED);
-        if (!permits.tryAcquire()) throw failure(stage, "busy; try again later");
-        var operation = new Operation<T>(stage);
+        acquire(stage, deadline, wait);
+        long callDeadline = System.nanoTime() + properties.requestTimeout().toNanos();
+        var operation = new Operation<T>(stage, deadline - callDeadline < 0 ? deadline : callDeadline);
         operations.add(operation);
         try {
             executor.execute(() -> runOperation(operation, work));
@@ -212,6 +237,18 @@ public final class WorkflowHttpClient implements AutoCloseable {
         } catch (ExecutionException e) {
             if (e.getCause() instanceof WorkflowException safe && safe.stage() == stage) throw safe;
             throw failure(stage, "request failed");
+        }
+    }
+
+    private void acquire(Stage stage, long deadline, boolean wait) {
+        try {
+            long remaining = deadline - System.nanoTime();
+            boolean admitted = wait ? remaining > 0 && permits.tryAcquire(remaining, TimeUnit.NANOSECONDS)
+                    : permits.tryAcquire();
+            if (!admitted) throw failure(stage, "busy; try again later");
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            throw failure(stage, "request interrupted");
         }
     }
 
@@ -245,7 +282,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
 
     private final class Operation<T> {
         private final Stage stage;
-        private final long deadline = System.nanoTime() + properties.requestTimeout().toNanos();
+        private final long deadline;
         private final AtomicBoolean cancelled = new AtomicBoolean();
         private final AtomicReference<HttpGet> active = new AtomicReference<>();
         private final CompletableFuture<T> result = new CompletableFuture<>();
@@ -253,7 +290,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
         @SuppressWarnings("java:S3077")
         private volatile Thread worker;
 
-        Operation(Stage stage) { this.stage = stage; }
+        Operation(Stage stage, long deadline) { this.stage = stage; this.deadline = deadline; }
         long remaining() { return Math.max(0, deadline - System.nanoTime()); }
         void check() {
             if (closed.get() || cancelled.get() || Thread.currentThread().isInterrupted() || remaining() == 0) {
