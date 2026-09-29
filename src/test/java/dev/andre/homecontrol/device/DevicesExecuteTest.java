@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -87,7 +88,8 @@ class DevicesExecuteTest {
         cast.handles.get("shield").failure = new UnsupportedActionException("not this one");
 
         var setVolume = new Action.SetVolume(5);
-        assertThatThrownBy(() -> devices.commands().execute("shield", setVolume))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.execute("shield", setVolume))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessageContaining("paired again");
     }
@@ -98,7 +100,8 @@ class DevicesExecuteTest {
         cast.handles.get("shield").failure = new UnsupportedActionException("last reason");
 
         var setVolume = new Action.SetVolume(5);
-        assertThatThrownBy(() -> devices.commands().execute("shield", setVolume))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.execute("shield", setVolume))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("last reason");
     }
@@ -108,7 +111,8 @@ class DevicesExecuteTest {
         androidtv.handles.get("shield").failure = new ActionFailedException("Shield refused");
 
         var setVolume = new Action.SetVolume(5);
-        assertThatThrownBy(() -> devices.commands().execute("shield", setVolume))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.execute("shield", setVolume))
                 .isInstanceOf(ActionFailedException.class);
         assertThat(cast.handles.get("shield").executed).isEmpty();
     }
@@ -136,11 +140,12 @@ class DevicesExecuteTest {
         devices.start();
 
         var setVolume = new Action.SetVolume(5);
-        assertThatThrownBy(() -> devices.commands().execute("shield", setVolume))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.execute("shield", setVolume))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("Shield is not connected");
         var openLink = new Action.OpenAppLink(URI.create("https://a.example"));
-        assertThatThrownBy(() -> devices.commands().execute("shield", openLink))
+        assertThatThrownBy(() -> commands.execute("shield", openLink))
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
@@ -165,7 +170,8 @@ class DevicesExecuteTest {
             // Only when nobody could stop is the failure reported.
             upnp.handles.get("tv").failure = new DeviceOfflineException("gone");
             var stop = new Action.Stop();
-            assertThatThrownBy(() -> both.commands().execute("tv", stop)).isInstanceOf(ActionFailedException.class);
+            DeviceCommands commands = both.commands();
+            assertThatThrownBy(() -> commands.execute("tv", stop)).isInstanceOf(ActionFailedException.class);
         } finally {
             both.close();
         }
@@ -201,7 +207,8 @@ class DevicesExecuteTest {
                     new Action.SetVolume(20), new Action.Mute(true));
 
             var pressHome = new Action.PressKey(RemoteKey.HOME);
-            assertThatThrownBy(() -> speakers.commands().execute("bluetooth-aa-bb-cc-dd-ee-ff", pressHome))
+            DeviceCommands commands = speakers.commands();
+            assertThatThrownBy(() -> commands.execute("bluetooth-aa-bb-cc-dd-ee-ff", pressHome))
                     .isInstanceOf(UnsupportedActionException.class);
         } finally {
             speakers.close();
@@ -221,7 +228,8 @@ class DevicesExecuteTest {
 
             assertThat(upnp.handles.get("speaker").executed).containsExactly(new Action.Stop());
             var pressHome = new Action.PressKey(RemoteKey.HOME);
-            assertThatThrownBy(() -> speakers.commands().execute("speaker", pressHome))
+            DeviceCommands commands = speakers.commands();
+            assertThatThrownBy(() -> commands.execute("speaker", pressHome))
                     .isInstanceOf(UnsupportedActionException.class);
         } finally {
             speakers.close();

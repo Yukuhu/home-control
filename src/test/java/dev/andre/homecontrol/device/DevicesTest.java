@@ -55,7 +55,10 @@ import java.util.function.Function;
 import dev.andre.homecontrol.adapters.upnp.UpnpAdapter;
 import dev.andre.homecontrol.adapters.upnp.UpnpDiscovery;
 import dev.andre.homecontrol.adapters.upnp.UpnpProperties;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
+import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceSettings;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
 
@@ -246,9 +249,10 @@ class DevicesTest {
         try (Devices devices = Devices.assemble(registry, List.of(), publisher)) {
             devices.start();
 
-            assertThatThrownBy(() -> devices.enrollment().merge("cast-10-0-0-6", "shield-10-0-0-5"))
+            DeviceEnrollment enrollment = devices.enrollment();
+            assertThatThrownBy(() -> enrollment.merge("cast-10-0-0-6", "shield-10-0-0-5"))
                     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("androidtv module is switched off");
-            assertThatThrownBy(() -> devices.enrollment().split("tv-10-0-0-7", "androidtv"))
+            assertThatThrownBy(() -> enrollment.split("tv-10-0-0-7", "androidtv"))
                     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("androidtv module is switched off");
             assertThat(registry.findById("shield-10-0-0-5")).isPresent();
             assertThat(registry.findById("cast-10-0-0-6").orElseThrow().hasAdapter("androidtv")).isFalse();
@@ -266,9 +270,10 @@ class DevicesTest {
             devices.start();
 
             var pressHome = new Action.PressKey(RemoteKey.HOME);
-            assertThatThrownBy(() -> devices.commands().execute("nope", pressHome))
+            DeviceCommands commands = devices.commands();
+            assertThatThrownBy(() -> commands.execute("nope", pressHome))
                     .isInstanceOf(DeviceNotFoundException.class);
-            assertThatThrownBy(() -> devices.commands().execute("speaker", pressHome))
+            assertThatThrownBy(() -> commands.execute("speaker", pressHome))
                     .isInstanceOf(UnsupportedActionException.class);
             assertThat(devices.queries().capabilities("speaker")).isEmpty();
             assertThat(devices.queries().state("speaker").status()).isEqualTo(DeviceStatus.DISCONNECTED);
@@ -329,7 +334,8 @@ class DevicesTest {
             // Nothing was started, so "shield" has no handle even though its
             // adapter declares REMOTE_KEYS — that is offline, not unsupported.
             var pressHome = new Action.PressKey(RemoteKey.HOME);
-            assertThatThrownBy(() -> devices.commands().execute("shield", pressHome))
+            DeviceCommands commands = devices.commands();
+            assertThatThrownBy(() -> commands.execute("shield", pressHome))
                     .isInstanceOf(DeviceOfflineException.class);
         }
     }
@@ -373,7 +379,8 @@ class DevicesTest {
 
             assertThat(devices.queries().state("bad").status()).isEqualTo(DeviceStatus.DISCONNECTED);
             var pressHome = new Action.PressKey(RemoteKey.HOME);
-            assertThatThrownBy(() -> devices.commands().execute("bad", pressHome))
+            DeviceCommands commands = devices.commands();
+            assertThatThrownBy(() -> commands.execute("bad", pressHome))
                     .isInstanceOf(DeviceOfflineException.class);
             assertThatCode(() -> devices.commands().execute("good", new Action.PressKey(RemoteKey.HOME)))
                     .as("the failing device's adapter must not stop the other device from getting a handle")
@@ -495,7 +502,8 @@ class DevicesTest {
         try (Devices devices = wakingDevices(registry)) {
             String before = Files.readString(dir.resolve("devices.json"));
 
-            assertThatThrownBy(() -> devices.settings().setWakeOnLanMac("tv", "nope")).isInstanceOf(IllegalArgumentException.class);
+            DeviceSettings deviceSettings = devices.settings();
+            assertThatThrownBy(() -> deviceSettings.setWakeOnLanMac("tv", "nope")).isInstanceOf(IllegalArgumentException.class);
 
             assertThat(Files.readString(dir.resolve("devices.json"))).isEqualTo(before);
         }
@@ -756,11 +764,10 @@ class DevicesTest {
     @Test
     void assembleWiresOneConnectionMapForQueriesCommandsAndEnrollment() {
         StubAdapter stub = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false, Capability.REMOTE_KEYS);
-        List<Object> published = new CopyOnWriteArrayList<>();
         Action pressHome = new Action.PressKey(RemoteKey.HOME);
 
         try (Devices devices = Devices.assemble(new JsonFileDeviceRegistry(dir.resolve("devices.json")),
-                List.of(stub), published::add)) {
+                List.of(stub), publisher)) {
             devices.start();
             devices.enrollment().adopt(new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.5",
                     Map.of("stub", Map.of()), Instant.EPOCH));

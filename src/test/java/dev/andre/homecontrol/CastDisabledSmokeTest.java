@@ -1,7 +1,6 @@
 package dev.andre.homecontrol;
 
 import dev.andre.homecontrol.adapters.cast.CastAdapter;
-import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
@@ -52,7 +51,7 @@ class CastDisabledSmokeTest extends ModulesOffTest {
                 Map.of("androidtv", Map.of(), "cast", Map.of("port", "8009")), Instant.now());
         enrollment.adopt(shield);
 
-        assertThat(devices.capabilities("shield-c")).doesNotContain(Capability.CAST_RECEIVER);
+        assertThat(devices.capabilities("shield-c")).isEmpty();
 
         mockMvc.perform(get("/").param("device", "shield-c"))
                 .andExpect(status().isOk())

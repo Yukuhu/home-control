@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
@@ -72,7 +73,8 @@ class DevicesFallThroughTest {
         upnp.handles.get("tv").failure = new UnsupportedActionException("upnp cannot");
 
         var stop = new Action.Stop();
-        assertThatThrownBy(() -> devices.commands().execute("tv", stop))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.execute("tv", stop))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("cast is gone");
     }
@@ -85,7 +87,8 @@ class DevicesFallThroughTest {
         upnp.handles.get("tv").failure = new UnsupportedActionException("last reason");
 
         var stop = new Action.Stop();
-        assertThatThrownBy(() -> devices.commands().execute("tv", stop))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.execute("tv", stop))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("last reason");
     }
@@ -96,7 +99,8 @@ class DevicesFallThroughTest {
         // not started: no handles
 
         var stop = new Action.Stop();
-        assertThatThrownBy(() -> devices.commands().execute("tv", stop))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.execute("tv", stop))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("TV is not connected");
     }
@@ -107,7 +111,8 @@ class DevicesFallThroughTest {
         devices.start();
 
         var stop = new Action.Stop();
-        assertThatThrownBy(() -> devices.commands().execute("tv", stop))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.execute("tv", stop))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("TV cannot perform " + stop);
         assertThat(remote.handles.get("tv").executed).isEmpty();
@@ -128,12 +133,13 @@ class DevicesFallThroughTest {
         assertThat(devices.commands().query("tv", MDX)).isEqualTo(Map.of("type", "mdxSessionStatus"));
 
         third.handles.get("tv").failure = new UnsupportedActionException("cast3 cannot");
-        assertThatThrownBy(() -> devices.commands().query("tv", MDX))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.query("tv", MDX))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("cast is gone");
 
         cast.handles.get("tv").failure = new UnsupportedActionException("cast cannot");
-        assertThatThrownBy(() -> devices.commands().query("tv", MDX))
+        assertThatThrownBy(() -> commands.query("tv", MDX))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("cast3 cannot");
     }
