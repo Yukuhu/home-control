@@ -228,10 +228,10 @@ class JellyfinEndToEndTest extends FullAppTest {
                 assertThat(Files.readString(dataDir().resolve("sources.json"))).doesNotContain(ACCESS_TOKEN);
                 assertThat(Files.readString(dataDir().resolve("secrets.json"))).doesNotContain(ACCESS_TOKEN);
 
-                // Disconnecting removes the last secret: the deployment is device-only again.
+                // Disconnecting removes the last credential but keeps the login, until it is removed on purpose.
                 assertThat(send(browser, post("/setup/sources/jellyfin/disconnect", Map.of())).statusCode()).isEqualTo(302);
                 assertThat(jellyfin.requests("POST", "/Sessions/Logout")).isNotEmpty();
-                assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(200);
+                assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(302);
             } finally {
                 devices.forget("shield-e2e");
                 devices.forget("kitchen-e2e");

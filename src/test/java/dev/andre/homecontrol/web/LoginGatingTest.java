@@ -71,8 +71,7 @@ class LoginGatingTest extends FullAppTest {
                 .andExpect(status().isNotFound());
         mockMvc.perform(post("/devices/nope/key/HOME")).andExpect(status().isNotFound());
         mockMvc.perform(get("/login")).andExpect(redirectedUrl("/"));
-        assertThat(dataDir().resolve("secrets.json")).doesNotExist();
-        assertThat(dataDir().resolve("secret.key")).doesNotExist();
+        assertThat(login.loginRequired()).isFalse();
     }
 
     @Test

@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.testsupport;
 
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceSecrets;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.device.DeviceManager;
 import dev.andre.homecontrol.security.LoginRateLimiter;
@@ -86,14 +87,14 @@ class FullAppResetTest extends FullAppTest {
 
         assertThat(devices.devices()).isEmpty();
         assertThat(login.loginRequired()).isFalse();
-        assertThat(secrets.names()).isEmpty();
+        assertThat(secrets.names()).allMatch(name -> name.startsWith(DeviceSecrets.PREFIX));
         assertThat(limiter.blockedFor("127.0.0.1")).isEmpty();
         assertThat(pins.all()).isEmpty();
         assertThat(sports.current()).isEqualTo(SportsSettings.empty());
         assertThat(quota.usage().units()).isZero();
         assertThat(knownVideos.find("Kz1aT5nM3pQ")).isEmpty();
         assertThat(context.getBean(JsonFileSourceSettings.class).preferences()).isEmpty();
-        for (String file : new String[]{"secrets.json", "secret.key", "sources.json", "youtube-quota.json"}) {
+        for (String file : new String[]{"sources.json", "youtube-quota.json"}) {
             assertThat(dataDir().resolve(file)).doesNotExist();
         }
         assertThat(SharedFakes.tmdb().requests()).isEmpty();

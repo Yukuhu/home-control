@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.storage;
 
+import dev.andre.homecontrol.core.DeviceSecrets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
@@ -20,21 +21,24 @@ import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /**
- * API keys, tokens and the login hash, encrypted with AES-256-GCM in {@code secrets.json} (spec §8, §9).
- * Invariant: secrets exist if and only if a login exists — secrets are never stored unprotected, and
- * removing the last one returns the deployment to device-only. No message or log line carries a
- * secret, the hash or the key.
+ * API keys, tokens, device credentials and the login hash, encrypted with AES-256-GCM in {@code secrets.json}
+ * (spec §8, §9). Two kinds of secrets: names starting with {@code device.} are device secrets, which never need the
+ * login; every other name is an account credential. Invariant: account credentials exist only while a login exists.
+ * The login is set and removed on purpose; it never disappears with the last secret. No message or log line carries
+ * a secret, the hash or the key.
  */
-public class SecretStore {
+public class SecretStore implements DeviceSecrets {
 
     private static final String LOGIN = "login";
     private static final String VERSION_KEY = "version";
@@ -86,37 +90,96 @@ public class SecretStore {
         return Optional.ofNullable(credential);
     }
 
-    /** Adds or replaces secrets. A login must already exist. */
+    /** Adds or replaces secrets. An account credential needs a login. */
     public synchronized void putSecrets(Map<String, String> values) {
         validate(values);
-        if (credential == null) {
-            throw new IllegalStateException("Set a login password before storing secrets");
+        if (credential == null && values.keySet().stream().anyMatch(SecretStore::isAccountCredential)) {
+            throw new IllegalStateException("Set a login password before storing account credentials");
         }
         Map<String, String> next = new HashMap<>(secrets);
         next.putAll(values);
         write(credential, next);
     }
 
-    /** Stores the first secrets and the login that protects them in one atomic write. */
+    /** Stores the first account credentials and the login that protects them in one atomic write. */
     public synchronized void putFirstSecrets(Map<String, String> values, LoginCredential newLogin) {
         validate(values);
         if (newLogin == null) {
             throw new IllegalArgumentException("A login is required");
         }
-        if (!secrets.isEmpty() || credential != null) {
-            throw new IllegalStateException("Secrets already exist; log in to add more");
+        if (credential != null) {
+            throw new IllegalStateException("A login already exists; log in to add more");
         }
-        write(newLogin, values);
+        Map<String, String> next = new HashMap<>(secrets);
+        next.putAll(values);
+        write(newLogin, next);
     }
 
-    /** Removing the last secret also removes the login. */
+    /** Never removes the login: that is {@link #removeLogin}'s job alone. */
     public synchronized void removeSecrets(Collection<String> names) {
         Map<String, String> next = new HashMap<>(secrets);
         names.forEach(next::remove);
         if (next.size() == secrets.size()) {
             return;
         }
-        write(next.isEmpty() ? null : credential, next);
+        write(credential, next);
+    }
+
+    public synchronized void setLogin(LoginCredential newLogin) {
+        if (newLogin == null) {
+            throw new IllegalArgumentException("A login is required");
+        }
+        if (credential != null) {
+            throw new IllegalStateException("A login already exists");
+        }
+        write(newLogin, secrets);
+    }
+
+    /** Refused while account credentials exist: nothing may be stored unprotected. */
+    public synchronized void removeLogin() {
+        if (hasAccountCredentials()) {
+            throw new IllegalStateException("Account credentials need the login");
+        }
+        if (credential != null) {
+            write(null, secrets);
+        }
+    }
+
+    public synchronized boolean hasAccountCredentials() {
+        return secrets.keySet().stream().anyMatch(SecretStore::isAccountCredential);
+    }
+
+    /** The names of the stored account credentials, sorted. */
+    public synchronized Set<String> accountCredentialNames() {
+        return Collections.unmodifiableSortedSet(secrets.keySet().stream().filter(SecretStore::isAccountCredential)
+                .collect(TreeSet::new, TreeSet::add, TreeSet::addAll));
+    }
+
+    @Override
+    public synchronized Optional<String> deviceSecret(String name) {
+        return secret(requireDeviceName(name));
+    }
+
+    @Override
+    public synchronized void putDeviceSecret(String name, String value) {
+        putSecrets(Map.of(requireDeviceName(name), value));
+    }
+
+    @Override
+    public synchronized void removeDeviceSecrets(Collection<String> names) {
+        names.forEach(SecretStore::requireDeviceName);
+        removeSecrets(names);
+    }
+
+    private static boolean isAccountCredential(String name) {
+        return !name.startsWith(DeviceSecrets.PREFIX);
+    }
+
+    private static String requireDeviceName(String name) {
+        if (name == null || !name.startsWith(DeviceSecrets.PREFIX)) {
+            throw new IllegalArgumentException("Not a device secret name");
+        }
+        return name;
     }
 
     public synchronized void replaceLogin(LoginCredential newLogin) {

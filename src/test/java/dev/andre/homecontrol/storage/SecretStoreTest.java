@@ -93,7 +93,7 @@ class SecretStoreTest {
     }
 
     @Test
-    void secretsAreNeverStoredWithoutALogin() {
+    void accountCredentialsAreNeverStoredWithoutALogin() {
         SecretStore store = store(null);
 
         var secrets = Map.of("jellyfin.token", "x");
@@ -115,15 +115,65 @@ class SecretStoreTest {
     }
 
     @Test
-    void removingTheLastSecretRemovesTheLogin() {
+    void theLoginSurvivesTheLastSecret() {
         SecretStore store = store(null);
         store.putFirstSecrets(Map.of("a", "1", "b", "2"), new LoginCredential("h", "v1"));
 
         store.removeSecrets(List.of("a"));
-        assertThat(store.login()).isPresent();
         store.removeSecrets(List.of("b"));
 
         assertThat(store.hasSecrets()).isFalse();
+        assertThat(store(null).login()).contains(new LoginCredential("h", "v1"));
+    }
+
+    @Test
+    void aDeviceSecretNeedsNoLogin() {
+        SecretStore store = store(null);
+
+        store.putDeviceSecret("device.webos.0123456789abcdef.client-key", "k");
+
+        assertThat(store(null).deviceSecret("device.webos.0123456789abcdef.client-key")).contains("k");
+        assertThat(store(null).login()).isEmpty();
+        assertThat(store(null).hasAccountCredentials()).isFalse();
+    }
+
+    @Test
+    void anAccountCredentialStillNeedsALoginBesideDeviceSecrets() {
+        SecretStore store = store(null);
+        store.putDeviceSecret("device.androidtv.keystore-password", "p");
+        var credential = Map.of("jellyfin.token", "t");
+
+        assertThatThrownBy(() -> store.putSecrets(credential)).isInstanceOf(IllegalStateException.class);
+        store.putFirstSecrets(credential, new LoginCredential("h", "v1"));
+
+        assertThat(store(null).accountCredentialNames()).containsExactly("jellyfin.token");
+        assertThat(store(null).deviceSecret("device.androidtv.keystore-password")).contains("p");
+    }
+
+    @Test
+    void deviceSecretMethodsRefuseOtherNames() {
+        SecretStore store = store(null);
+        List<String> names = List.of("jellyfin.token");
+
+        assertThatThrownBy(() -> store.putDeviceSecret("jellyfin.token", "t")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.deviceSecret("jellyfin.token")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.removeDeviceSecrets(names)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aLoginIsSetAndRemovedOnPurpose() {
+        SecretStore store = store(null);
+        var second = new LoginCredential("h2", "v2");
+
+        store.setLogin(new LoginCredential("h", "v1"));
+        assertThat(store(null).login()).isPresent();
+        assertThatThrownBy(() -> store.setLogin(second)).isInstanceOf(IllegalStateException.class);
+
+        store.putSecrets(Map.of("tmdb.credential", "c"));
+        assertThatThrownBy(store::removeLogin).isInstanceOf(IllegalStateException.class);
+
+        store.removeSecrets(List.of("tmdb.credential"));
+        store.removeLogin();
         assertThat(store(null).login()).isEmpty();
     }
 

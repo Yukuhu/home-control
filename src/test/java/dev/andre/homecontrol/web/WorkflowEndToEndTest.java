@@ -111,6 +111,9 @@ class WorkflowEndToEndTest {
                 assertThat(login.authenticate(PASSWORD, request)).isTrue();
                 for (var definition : workflows.all()) workflows.remove(definition.id(), definition.revision(), request);
             }
+            if (login.loginRequired()) {
+                login.removePassword(PASSWORD); // the login outlives the last workflow; the next test starts without one
+            }
         } finally {
             devices.forget(deviceId);
             devices.forget("workflow-no-cast");
