@@ -12,7 +12,6 @@ import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.testsupport.InMemoryDeviceSecrets;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
-import dev.andre.homecontrol.core.WakeOnLanAdapter;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
@@ -96,7 +95,6 @@ class TizenAdapterTest {
                         Capability.WAKE_ON_LAN);
         assertThat(adapter.id()).isEqualTo("tizen");
         assertThat(adapter.kind()).isEqualTo(DeviceKind.TIZEN);
-        assertThat(adapter).isInstanceOf(WakeOnLanAdapter.class);
         assertThat(adapter.settingsFor(new DiscoveredDevice("tizen", "Samsung", "127.0.0.1", 8002))).isEmpty();
     }
 

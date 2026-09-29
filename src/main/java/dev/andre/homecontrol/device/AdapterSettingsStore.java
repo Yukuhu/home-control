@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.device;
 
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
@@ -7,7 +8,7 @@ import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceSettings;
 import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.core.MacAddress;
-import dev.andre.homecontrol.core.WakeOnLanAdapter;
+import dev.andre.homecontrol.core.WakeOnLanSettings;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -59,9 +60,9 @@ final class AdapterSettingsStore implements DeviceSettings {
             Device device = registered.get();
             Map<String, String> settings = new LinkedHashMap<>(device.adapterSettings(adapterId));
             Map<String, String> accepted = new LinkedHashMap<>(updates);
-            if ("true".equals(settings.get(WakeOnLanAdapter.MAC_ADDRESS_MANUAL))) {
-                accepted.remove(WakeOnLanAdapter.MAC_ADDRESS);
-                accepted.remove(WakeOnLanAdapter.MAC_ADDRESS_MANUAL);
+            if ("true".equals(settings.get(WakeOnLanSettings.MAC_ADDRESS_MANUAL))) {
+                accepted.remove(WakeOnLanSettings.MAC_ADDRESS);
+                accepted.remove(WakeOnLanSettings.MAC_ADDRESS_MANUAL);
             }
             settings.putAll(accepted);
             if (!settings.equals(device.adapterSettings(adapterId))) {
@@ -75,15 +76,15 @@ final class AdapterSettingsStore implements DeviceSettings {
     public boolean wakesOnLan(String id) {
         return registry.findById(id)
                 .map(device -> device.adapters().keySet().stream()
-                        .anyMatch(adapterId -> adapters.get(adapterId) instanceof WakeOnLanAdapter))
+                        .anyMatch(adapterId -> wakes(device, adapterId)))
                 .orElse(false);
     }
 
     @Override
     public Optional<String> wakeOnLanMac(String id) {
         return registry.findById(id).flatMap(device -> device.adapters().keySet().stream()
-                .filter(adapterId -> adapters.get(adapterId) instanceof WakeOnLanAdapter)
-                .map(adapterId -> device.adapterSettings(adapterId).get(WakeOnLanAdapter.MAC_ADDRESS))
+                .filter(adapterId -> wakes(device, adapterId))
+                .map(adapterId -> device.adapterSettings(adapterId).get(WakeOnLanSettings.MAC_ADDRESS))
                 .filter(mac -> mac != null && !mac.isBlank())
                 .findFirst());
     }
@@ -103,19 +104,25 @@ final class AdapterSettingsStore implements DeviceSettings {
                     .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
             Device updated = device;
             for (String adapterId : device.adapters().keySet()) {
-                if (adapters.get(adapterId) instanceof WakeOnLanAdapter) {
+                if (wakes(device, adapterId)) {
                     Map<String, String> settings = new LinkedHashMap<>(updated.adapterSettings(adapterId));
                     if (clear) {
-                        settings.remove(WakeOnLanAdapter.MAC_ADDRESS);
-                        settings.remove(WakeOnLanAdapter.MAC_ADDRESS_MANUAL);
+                        settings.remove(WakeOnLanSettings.MAC_ADDRESS);
+                        settings.remove(WakeOnLanSettings.MAC_ADDRESS_MANUAL);
                     } else {
-                        settings.put(WakeOnLanAdapter.MAC_ADDRESS, normalized);
-                        settings.put(WakeOnLanAdapter.MAC_ADDRESS_MANUAL, "true");
+                        settings.put(WakeOnLanSettings.MAC_ADDRESS, normalized);
+                        settings.put(WakeOnLanSettings.MAC_ADDRESS_MANUAL, "true");
                     }
                     updated = updated.withAdapter(adapterId, settings);
                 }
             }
             registry.save(updated);
         }
+    }
+
+    /** True when the device's adapter {@code adapterId} is switched on and wakes it with Wake-on-LAN. */
+    private boolean wakes(Device device, String adapterId) {
+        DeviceAdapter adapter = adapters.get(adapterId);
+        return adapter != null && adapter.capabilities(device).contains(Capability.WAKE_ON_LAN);
     }
 }

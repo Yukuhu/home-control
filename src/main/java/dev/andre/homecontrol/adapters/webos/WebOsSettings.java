@@ -3,7 +3,7 @@ package dev.andre.homecontrol.adapters.webos;
 import dev.andre.homecontrol.adapters.support.PairingKeys;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceSecrets;
-import dev.andre.homecontrol.core.WakeOnLanAdapter;
+import dev.andre.homecontrol.core.WakeOnLanSettings;
 
 import java.util.Map;
 
@@ -23,8 +23,8 @@ public record WebOsSettings(String keyRef, String clientKey, String macAddress, 
         Map<String, String> settings = device.adapterSettings(ADAPTER_ID);
         PairingKeys keys = keys(secrets);
         return new WebOsSettings(keys.referenceOf(device), keys.keyOf(device),
-                blankToNull(settings.get(WakeOnLanAdapter.MAC_ADDRESS)),
-                "true".equals(settings.get(WakeOnLanAdapter.MAC_ADDRESS_MANUAL)));
+                blankToNull(settings.get(WakeOnLanSettings.MAC_ADDRESS)),
+                "true".equals(settings.get(WakeOnLanSettings.MAC_ADDRESS_MANUAL)));
     }
 
     static PairingKeys keys(DeviceSecrets secrets) {
