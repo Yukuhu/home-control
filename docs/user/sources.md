@@ -4,12 +4,14 @@ Connecting the services Home Control plays from, and the login that protects the
 
 ## Content sources and login
 
-Device-only deployments (no content source connected) are unchanged: `/`, `/setup` and the
-remote work with no login, exactly as before this feature.
+Without a login password, `/`, `/setup` and the remote work with no login. You can set one at
+any time in **Setup → Account**.
 
-Connecting a content source such as Jellyfin, YouTube, or a workflow stores a secret, so from that point on a
-login password guards every page, the live-update stream and artwork, for every client. Set
-the login password on the setup page at the same time you connect the source.
+A content source such as Jellyfin, YouTube, or a workflow stores a credential, and a credential
+needs the login password: if none is set yet, set it on the setup page at the same time you
+connect the source. From then on it guards every page, the live-update stream and artwork, for
+every client. Disconnecting the last source keeps the password; remove it in **Setup →
+Account** once no connected source needs it.
 
 ### Dynamic workflows
 
@@ -88,8 +90,8 @@ when Jellyfin cannot be matched to it automatically (see
 [Docker-networked Jellyfin](#docker-networked-jellyfin)).
 
 Jellyfin 10.9 or newer is required. Turn the whole module off with
-`HOME_CONTROL_JELLYFIN_ENABLED=false` — this does not remove a stored token, so the login
-requirement stays; disconnect Jellyfin first, or delete `secrets.json`, to drop it.
+`HOME_CONTROL_JELLYFIN_ENABLED=false` — this does not remove a stored token; disconnect Jellyfin
+first to drop it.
 
 ### Play routes
 

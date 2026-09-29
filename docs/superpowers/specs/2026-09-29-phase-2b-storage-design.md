@@ -169,6 +169,9 @@ This serves the roadmap's goals of fewer bugs and races, and code that is easy t
     connected sources. Otherwise it removes the login and notifies listeners. Sessions need no ending: without a
     login every browser is let in, and a session's version no longer matches any later password.
   - `removeSecrets` never removes the login.
+- **A forgotten password** (added during implementation). Deleting `secrets.json`, the old way back, would now unpair
+  every TV. `HOME_CONTROL_RESET_LOGIN=true` (`home-control.security.reset-login`) instead removes the login and the
+  account credentials at startup, in one write, and keeps the device secrets.
 - **Web.**
   - `POST /setup/password/set` and `POST /setup/password/remove` sit next to the existing `/setup/password`. The
     remove route is guarded by the same rate limiter and cross-origin rules.

@@ -12,15 +12,15 @@ root.
 | --- | --- |
 | `config` | The configuration root (`HomeControlProperties`), the list of modules that can be switched off (`Module`, `@ConditionalOnModule`), and `LegacyPropertyNames`, which keeps renamed configuration keys working. |
 | `core` | The domain model every other package builds on: devices, capabilities, actions and device states, and the adapter contract (`DeviceAdapter`, `DeviceHandle`). `core.content` holds content sources, items and rails; `core.playback` playable references, routes and the playback planner. It depends only on the JDK. |
-| `device` | `DeviceManager`: the known devices, their connections and state, merging what discovery finds, and sending commands to a device's adapters. `JsonFileDeviceRegistry` stores the paired devices in `devices.json`. |
-| `adapters` | One package per device protocol: `androidtv`, `cast`, `webos`, `tizen`, `upnp`, `sonos`, `bluetooth`. Each is a module that can be switched off, with its wire protocol in a `protocol` subpackage where it has one. `adapters.net` (TLS, WebSockets, Wake-on-LAN) and `adapters.links` (content ids in service links) are shared. |
+| `device` | `DeviceManager`: the known devices, their connections and state, merging what discovery finds, and sending commands to a device's adapters. At startup it lets each adapter check and bring up to date its own settings (`DeviceAdapter.validate`, `migrate`). `JsonFileDeviceRegistry` stores the paired devices in `devices.json`. |
+| `adapters` | One package per device protocol: `androidtv`, `cast`, `webos`, `tizen`, `upnp`, `sonos`, `bluetooth`. Each is a module that can be switched off, with its wire protocol in a `protocol` subpackage where it has one. `adapters.net` (TLS, WebSockets, Wake-on-LAN), `adapters.links` (content ids in service links) and `adapters.support` (TV pairing keys kept as device secrets) are shared. |
 | `discovery` | mDNS and SSDP discovery. |
 | `sources` | One package per content source: `jellyfin`, `youtube`, `tmdb`, `sports`, `pinned`, `workflows`. Each is a module that can be switched off. `sources.http` is shared: HTTP clients that connect only to vetted addresses and bound response bodies in size and time. |
 | `content` | The rail cache, search across sources, and source preferences. |
 | `playback` | `PlaybackService`, which plans a route for an item on a device, carries it out and reports the outcome, and the deep-link test. |
 | `web` | Controllers, view models and the server-sent event stream behind the dashboard and setup pages. |
 | `security` | Login, the host allowlist, cross-origin protection and the security headers. |
-| `storage` | The data directory, the encrypted secret store and its key, and source settings. |
+| `storage` | The data directory, the one writer for its files (`AtomicFiles`), the versioned JSON files the stores hold (`VersionedJsonFile`), the encrypted secret store and its key, and source settings. See [ADR 0002](../adr/0002-versioned-data-files-and-device-secrets.md). |
 | `crypto` | Argon2id hashing for the login password and the secret key. |
 
 ## Dependencies
@@ -44,6 +44,7 @@ flowchart TD
     playback --> device
     content --> storage
     device --> storage
+    adapters --> device
     adapters --> discovery
     adapters --> storage
     security --> storage
@@ -61,8 +62,8 @@ flowchart TD
 | Content sources are independent of each other, apart from the shared `sources.http` | strict |
 | Device adapters are independent of each other, apart from the shared `adapters.net`, `adapters.links` and `adapters.support`, and Sonos using `adapters.upnp.protocol` | strict |
 | `java.net.http`, Apache HttpClient 5, jmDNS and D-Bus are used only in `adapters`, `sources` and `discovery` | strict |
-| `..protocol..` packages depend on neither Spring nor any application package other than `adapters.net` and other protocol packages | frozen: 46 |
-| No cycles between the top-level packages | frozen: 4 |
+| `..protocol..` packages depend on neither Spring nor any application package other than `adapters.net` and other protocol packages | frozen: 42 |
+| No cycles between the top-level packages | frozen: 1 |
 | `sources` does not depend on `adapters` | frozen: 0 |
 | `adapters` depends on neither `sources` nor `web` | frozen: 1 |
 | `web` does not depend on `adapters` | frozen: 0 |

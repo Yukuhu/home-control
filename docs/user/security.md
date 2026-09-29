@@ -2,16 +2,18 @@
 
 What Home Control protects, and how.
 
-Device-only deployments have no authentication: anyone who can reach the port can control the
-TV. This is deliberate for a LAN-only tool. Connecting a content source (see
-[Content sources and login](sources.md#content-sources-and-login)) adds a login password that
-then guards every page. Either way, do not expose this app to the internet without putting an
-authenticating reverse proxy in front of it.
+Without a login password, anyone who can reach the port can control the TV. This is deliberate
+for a LAN-only tool. Set a password in **Setup → Account**, or when you connect a content source
+(see [Content sources and login](sources.md#content-sources-and-login)); from then on it guards
+every page. It stays until you remove it there, which is possible once no connected source needs
+it. Either way, do not expose this app to the internet without putting an authenticating reverse
+proxy in front of it.
 
 ## Secrets
 
-Secrets (session tokens, the login password hash) live in `/data/secrets.json`, encrypted at
-rest. The key is either:
+Secrets live in `/data/secrets.json`, encrypted at rest: the login password hash, the content
+sources' tokens and keys, and the devices' own credentials (the pairing keys of LG and Samsung
+TVs, and the Android TV keystore's password). The key is either:
 
 - a random `/data/secret.key` created next to it the first time a secret is stored (the
   default), or
@@ -24,9 +26,11 @@ useless without it. Once you start the app with `HOME_CONTROL_SECRET` set, chang
 that value stops the app from starting until the original value is restored — there is no
 partial recovery.
 
-**Forgotten login password:** stop the container, delete `/data/secrets.json`, and reconnect
-your content sources. This clears every stored secret and login password; there is no other
-way to reset just the password.
+**Forgotten login password:** start the app once with `HOME_CONTROL_RESET_LOGIN=true`. It
+removes the login password and the content sources' credentials, and logs that it did; the TV
+pairings stay. Remove the setting again, set a new password in **Setup → Account**, and
+reconnect your content sources. Do not delete `secrets.json` for this: it also holds the TV
+pairings.
 
 Behind an HTTPS reverse proxy, set `HOME_CONTROL_SECURE_COOKIE=true` so the login cookie is
 marked `Secure`. If the proxy rewrites the `Host` header, also set

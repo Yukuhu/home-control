@@ -24,6 +24,7 @@ Every setting, as a Spring property or an environment variable.
 | `home-control.deep-link-test.youtube-url` | Big Buck Bunny on YouTube | Video the test button opens |
 | `home-control.deep-link-test.timeout` | `10s` | How long the test button watches for the app to change (the setup page says so) |
 | `HOME_CONTROL_SECRET` | unset | Passphrase that encrypts `secrets.json`; without it a random `secret.key` is created next to it on first use |
+| `HOME_CONTROL_RESET_LOGIN` | `false` | `true` removes a forgotten login password, and the content sources' credentials, at startup; the TV pairings stay. Unset it again afterwards |
 | `HOME_CONTROL_TRUSTED_ORIGINS` | empty | Comma-separated origins allowed to send changes, e.g. `https://home.example.org` behind a reverse proxy; their host names are also allowed |
 | `HOME_CONTROL_ALLOWED_HOSTS` | empty | Comma-separated extra host names the app answers to: exact names, or `*.example.org` for its subdomains |
 | `HOME_CONTROL_SECURE_COOKIE` | `false` | Mark the login cookie `Secure` when the app is only reached over HTTPS |
@@ -71,11 +72,19 @@ Durations take a unit (`10s`, `2m`, `6h`); a bare number of a key that was once 
 [Security](security.md#allowed-hosts-and-origins) explains which host names the app answers to, and when
 `HOME_CONTROL_ALLOWED_HOSTS` and `HOME_CONTROL_TRUSTED_ORIGINS` are needed.
 
-An older `devices.json` (from before multi-device support) is upgraded in place on
-first start; the upgrade keeps existing pairings, so no re-pairing is needed after
-updating. The upgrade is one-way: an older image cannot read the new file. The original
-is kept once as `devices.v1.json` in the same directory — to roll back, stop the app,
-restore that file as `devices.json`, and start the older image.
+Files under `/data` from an older version are upgraded in place on first start, keeping every
+pairing and setting:
+
+- `devices.json` gains a format version, and LG and Samsung TVs' pairing keys move from it into
+  the encrypted `secrets.json`;
+- `sources.json` keeps each source's settings in its own shape;
+- a keystore protected by the old default password `shield`, or by `change-me` from an older
+  `compose.yaml`, is re-protected under a generated one.
+
+The upgrade is one-way: an older image cannot read the new files. Each original is kept once
+beside it as `<name>.v<n>.json`, for example `devices.v2.json`. To roll back, stop the app,
+restore those files and a copy of `secrets.json` from before the upgrade, and start the older
+image.
 
 ## Renamed settings
 
