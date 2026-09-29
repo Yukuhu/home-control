@@ -143,7 +143,7 @@ class YouTubeAuthorizationServiceTest {
         assertThat(status.state()).isEqualTo(YouTubeAuthorizationService.State.CONNECTED);
         assertThat(status.message()).isEqualTo("YouTube connected");
 
-        YouTubeSettings settings = YouTubeSettings.from(sourceSettings.get(YouTubeSettings.SOURCE_ID));
+        YouTubeSettings settings = YouTubeSettings.read(sourceSettings);
         assertThat(settings.connectedAt()).isEqualTo(clock.instant());
         assertThat(connectedCount.get()).isEqualTo(1);
         assertThat(authorization.pollOnce()).isFalse();

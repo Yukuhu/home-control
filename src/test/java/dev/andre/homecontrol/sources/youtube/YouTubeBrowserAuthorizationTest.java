@@ -176,9 +176,9 @@ class YouTubeBrowserAuthorizationTest {
     @Test
     void aDifferentAccountClearsTheOldLibraryButPreservesDeviceSettings() {
         settings.put(YouTubeSettings.SOURCE_ID, new YouTubeSettings(clock.instant(), "old-channel", "Old account", true,
-                Map.of("PLold", "Old playlist"), Set.of("tv"), "remote").toMap());
+                Map.of("PLold", "Old playlist"), Set.of("tv"), "remote"));
         authorization.completeBrowser("browser-session", start(), "code", null);
-        var connected = YouTubeSettings.from(settings.get(YouTubeSettings.SOURCE_ID));
+        var connected = YouTubeSettings.read(settings);
         assertThat(connected.channelId()).isNull();
         assertThat(connected.playlists()).isEmpty();
         assertThat(connected.watchLater()).isFalse();

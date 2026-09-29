@@ -11,6 +11,8 @@ import dev.andre.homecontrol.sources.sports.SportsSettingsService;
 import dev.andre.homecontrol.sources.youtube.KnownVideos;
 import dev.andre.homecontrol.sources.youtube.QuotaLedger;
 import dev.andre.homecontrol.sources.youtube.YouTubeVideo;
+import dev.andre.homecontrol.core.content.SourcePreferences;
+import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,6 +70,7 @@ class FullAppResetTest extends FullAppTest {
         }
         pins.add("https://www.netflix.com/title/1", "Stranger Things");
         sports.update(current -> current.withTimeZone("Europe/Berlin"));
+        context.getBean(JsonFileSourceSettings.class).putPreferences(SourcePreferences.defaults("de-DE", "DE"));
         quota.charge(QuotaLedger.Call.VIDEOS_LIST);
         knownVideos.remember(List.of(new YouTubeVideo("Kz1aT5nM3pQ", "A", "Chan", Instant.now())));
         try (HttpClient http = HttpClient.newHttpClient()) {
@@ -89,8 +92,8 @@ class FullAppResetTest extends FullAppTest {
         assertThat(sports.current()).isEqualTo(SportsSettings.empty());
         assertThat(quota.usage().units()).isZero();
         assertThat(knownVideos.find("Kz1aT5nM3pQ")).isEmpty();
-        for (String file : new String[]{"secrets.json", "secret.key", "sources.json", "sports.json", "pinned.json",
-                "youtube-quota.json"}) {
+        assertThat(context.getBean(JsonFileSourceSettings.class).preferences()).isEmpty();
+        for (String file : new String[]{"secrets.json", "secret.key", "sources.json", "youtube-quota.json"}) {
             assertThat(dataDir().resolve(file)).doesNotExist();
         }
         assertThat(SharedFakes.tmdb().requests()).isEmpty();

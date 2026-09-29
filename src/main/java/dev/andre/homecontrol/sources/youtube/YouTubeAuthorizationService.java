@@ -225,17 +225,17 @@ public class YouTubeAuthorizationService implements AutoCloseable {
         secrets.putSecrets(Map.of(YouTubeSettings.REFRESH_TOKEN, refreshToken));
         tokens.reset();
         tokens.prime(accessToken);
-        YouTubeSettings current = YouTubeSettings.from(settings.get(YouTubeSettings.SOURCE_ID));
+        YouTubeSettings current = YouTubeSettings.read(settings);
         settings.put(YouTubeSettings.SOURCE_ID,
-                current.withoutAccount().withConnection(clock.instant(), null, null).toMap());
+                current.withoutAccount().withConnection(clock.instant(), null, null));
         finish(State.CONNECTED, "YouTube connected");
         notifyConnected();
         // Restore rail choices only after Google confirms this is still the same channel.
         // Failed channel lookups leave an empty library instead of showing another account's data.
-        YouTubeSettings resolved = YouTubeSettings.from(settings.get(YouTubeSettings.SOURCE_ID));
+        YouTubeSettings resolved = YouTubeSettings.read(settings);
         if (current.channelId() != null && current.channelId().equals(resolved.channelId())) {
             settings.put(YouTubeSettings.SOURCE_ID,
-                    resolved.withPlaylists(current.playlists()).withWatchLater(current.watchLater()).toMap());
+                    resolved.withPlaylists(current.playlists()).withWatchLater(current.watchLater()));
         }
     }
 

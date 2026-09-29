@@ -70,11 +70,11 @@ public class YouTubeSetupService {
     }
 
     public YouTubeSettings settings() {
-        return YouTubeSettings.from(sourceSettings.get(YouTubeSettings.SOURCE_ID));
+        return YouTubeSettings.read(sourceSettings);
     }
 
     public void save(YouTubeSettings settings) {
-        sourceSettings.put(YouTubeSettings.SOURCE_ID, settings.toMap());
+        sourceSettings.put(YouTubeSettings.SOURCE_ID, settings);
     }
 
     public boolean hasClient() {

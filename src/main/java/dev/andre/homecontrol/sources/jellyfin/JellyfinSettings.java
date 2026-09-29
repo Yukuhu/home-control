@@ -3,13 +3,11 @@ package dev.andre.homecontrol.sources.jellyfin;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.TreeMap;
 import java.util.regex.Pattern;
 
-/** Non-secret Jellyfin settings kept in sources.json. The token lives in the secret store. */
+/** Non-secret Jellyfin settings kept in sources.json, as this record's JSON. The token lives in the secret store. */
 public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String serverId, String serverName,
                                String serverVersion, String userId, String userName, AuthMode authMode,
                                String deviceId, String castReceiverId, Map<String, String> sessionLinks, Map<String, Player> players) {
@@ -50,24 +48,11 @@ public record JellyfinSettings(URI serverUrl, URI deviceServerUrl, String server
         sessionLinks = sessionLinks == null ? Map.of() : Map.copyOf(sessionLinks);
     }
 
-    public Map<String, String> toMap() {
-        Map<String, String> map = new LinkedHashMap<>();
-        map.put(SERVER_URL_KEY, serverUrl.toString());
-        map.put("deviceServerUrl", deviceServerUrl.toString());
-        map.put("serverId", serverId);
-        map.put("serverName", serverName);
-        map.put("serverVersion", serverVersion);
-        map.put(USER_ID_KEY, userId);
-        map.put("userName", userName);
-        map.put("authMode", authMode.name());
-        map.put("deviceId", deviceId);
-        map.put("castReceiverId", castReceiverId);
-        new TreeMap<>(sessionLinks).forEach((device, jellyfinDevice) -> map.put(LINK_PREFIX + device, jellyfinDevice));
-        new TreeMap<>(players).forEach((device, player) -> map.put("player." + device, player.name().toLowerCase(Locale.ROOT)));
-        return map;
-    }
-
-    public static Optional<JellyfinSettings> from(Map<String, String> map) {
+    /**
+     * sources.json version 1's flat section, with {@code link.<device>} and {@code player.<device>} keys. Empty when
+     * it lacks the server address or the user.
+     */
+    public static Optional<JellyfinSettings> fromVersionOne(Map<String, String> map) {
         if (map == null || map.get(SERVER_URL_KEY) == null || map.get(USER_ID_KEY) == null) {
             return Optional.empty();
         }

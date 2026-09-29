@@ -1,17 +1,22 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
-/** Non-secret YouTube settings kept in sources.json. The OAuth client and tokens live in the secret store. */
+/**
+ * Non-secret YouTube settings kept in sources.json, as this record's JSON. The OAuth client and tokens live in the
+ * secret store.
+ */
 public record YouTubeSettings(Instant connectedAt, String channelId, String channelTitle, boolean watchLater,
                               Map<String, String> playlists, Set<String> loungeDevices, String loungeRemoteId) {
 
@@ -25,7 +30,7 @@ public record YouTubeSettings(Instant connectedAt, String channelId, String chan
     private static final String LOUNGE_DEVICES_KEY = "lounge.devices";
     private static final String LOUNGE_REMOTE_ID_KEY = "lounge.remoteId";
 
-    public static final YouTubeSettings EMPTY = from(Map.of());
+    public static final YouTubeSettings EMPTY = new YouTubeSettings(null, null, null, false, Map.of(), Set.of(), null);
 
     public YouTubeSettings {
         Map<String, String> source = playlists == null ? Map.of() : playlists;
@@ -39,7 +44,15 @@ public record YouTubeSettings(Instant connectedAt, String channelId, String chan
         loungeDevices = Collections.unmodifiableSortedSet(new TreeSet<>(loungeDevices == null ? Set.of() : loungeDevices));
     }
 
-    public static YouTubeSettings from(Map<String, String> map) {
+    /** The stored settings, or {@link #EMPTY} before anything was saved. */
+    public static YouTubeSettings read(JsonFileSourceSettings sources) {
+        return sources.get(SOURCE_ID, YouTubeSettings.class, flat -> Optional.of(fromVersionOne(flat))).orElse(EMPTY);
+    }
+
+    /**
+     * sources.json version 1's flat section: {@code playlist.<id>} keys and comma-separated {@code lounge.devices}.
+     */
+    public static YouTubeSettings fromVersionOne(Map<String, String> map) {
         if (map == null) {
             map = Map.of();
         }
@@ -65,22 +78,6 @@ public record YouTubeSettings(Instant connectedAt, String channelId, String chan
         }
         return new YouTubeSettings(connectedAt, map.get("channelId"), map.get("channelTitle"), watchLater,
                 playlists, loungeDevices, map.get(LOUNGE_REMOTE_ID_KEY));
-    }
-
-    public Map<String, String> toMap() {
-        Map<String, String> map = new LinkedHashMap<>();
-        putIfPresent(map, "connectedAt", connectedAt == null ? null : connectedAt.toString());
-        putIfPresent(map, "channelId", channelId);
-        putIfPresent(map, "channelTitle", channelTitle);
-        if (watchLater) {
-            map.put("watchLater", "true");
-        }
-        playlists.forEach((id, title) -> putIfPresent(map, PLAYLIST_PREFIX + id, title));
-        if (!loungeDevices.isEmpty()) {
-            map.put(LOUNGE_DEVICES_KEY, String.join(",", new TreeSet<>(loungeDevices)));
-        }
-        putIfPresent(map, LOUNGE_REMOTE_ID_KEY, loungeRemoteId);
-        return map;
     }
 
     public YouTubeSettings withConnection(Instant connectedAt, String channelId, String channelTitle) {
@@ -122,12 +119,6 @@ public record YouTubeSettings(Instant connectedAt, String channelId, String chan
             return Instant.parse(value);
         } catch (DateTimeParseException _) {
             return null;
-        }
-    }
-
-    private static void putIfPresent(Map<String, String> map, String key, String value) {
-        if (value != null && !value.isBlank()) {
-            map.put(key, value);
         }
     }
 }

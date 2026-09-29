@@ -6,66 +6,116 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.Function;
 
 /**
- * Non-secret per-source settings (e.g. a Jellyfin server address and user) plus the household's
- * rail/source preferences (D4), in one small JSON file written atomically via a temp file and
- * rename, the same pattern as the device registry. The whole document is read and rewritten as a
- * tree so that top-level keys neither {@code get}/{@code put}/{@code remove} nor
- * {@link #putPreferences} know about are preserved. Secrets never live here — they go in
- * {@link SecretStore}.
+ * sources.json, version 2. It holds non-secret per-source settings, each source's section being its own settings
+ * record as JSON, plus the household's rail and source preferences (D4). Version 1 flattened every section into
+ * strings. Its sections wait under {@code unmigrated} until their source reads them and converts them with its own
+ * {@code fromVersionOne}, so this store needs no source's types, and a switched-off source's section survives
+ * untouched. Secrets never live here; they go in {@link SecretStore}.
  */
 public class JsonFileSourceSettings {
 
+    private static final int VERSION = 2;
     private static final String SOURCES = "sources";
+    private static final String UNMIGRATED = "unmigrated";
     private static final String PREFERENCES = "preferences";
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
-    private static final int VERSION = 1;
+    /** The whole file. {@code preferences} is null until they are first saved. */
+    record Document(Map<String, JsonNode> sources, Map<String, Map<String, String>> unmigrated, JsonNode preferences) {
 
-    private final JsonMapper mapper = JsonMapper.builder().build();
-    private final Path file;
+        static final Document EMPTY = new Document(Map.of(), Map.of(), null);
 
-    public JsonFileSourceSettings(Path file) {
-        this.file = file;
+        Document {
+            sources = Collections.unmodifiableMap(new TreeMap<>(sources));
+            unmigrated = Collections.unmodifiableMap(new TreeMap<>(unmigrated));
+        }
+
+        Document withSource(String id, JsonNode section) {
+            Map<String, JsonNode> next = new TreeMap<>(sources);
+            next.put(id, section);
+            Map<String, Map<String, String>> rest = new TreeMap<>(unmigrated);
+            rest.remove(id);
+            return new Document(next, rest, preferences);
+        }
+
+        Document without(String id) {
+            Map<String, JsonNode> next = new TreeMap<>(sources);
+            next.remove(id);
+            Map<String, Map<String, String>> rest = new TreeMap<>(unmigrated);
+            rest.remove(id);
+            return new Document(next, rest, preferences);
+        }
+
+        Document withPreferences(JsonNode node) {
+            return new Document(sources, unmigrated, node);
+        }
     }
 
-    /** {@code Map.of()} when the file, or that source within it, does not exist. Never creates the file. */
-    public synchronized Map<String, String> get(String sourceId) {
-        Map<String, String> values = new LinkedHashMap<>();
-        read().path(SOURCES).path(sourceId).properties()
-                .forEach(field -> values.put(field.getKey(), field.getValue().asString("")));
-        return values;
+    private final Path path;
+    private final VersionedJsonFile<Document> file;
+
+    public JsonFileSourceSettings(Path path) {
+        this.path = path;
+        this.file = new VersionedJsonFile<>(path, "source settings", VERSION, () -> Document.EMPTY,
+                JsonFileSourceSettings::readDocument, JsonFileSourceSettings::writeDocument)
+                .migrate(1, JsonFileSourceSettings::versionOneToTwo);
     }
 
-    public synchronized void put(String sourceId, Map<String, String> settings) {
-        ObjectNode root = read();
-        ObjectNode sourceNode = objectChild(root, SOURCES).putObject(sourceId);
-        new TreeMap<>(settings).forEach(sourceNode::put);
-        write(root);
+    /**
+     * The source's settings, or empty when it has none. A section still in version 1's flat form is converted by
+     * {@code fromVersionOne} and stored typed in the same step. A flat section it cannot use is dropped, reading as
+     * "not connected".
+     */
+    public synchronized <T> Optional<T> get(String sourceId, Class<T> type,
+                                            Function<Map<String, String>, Optional<T>> fromVersionOne) {
+        Document document = file.read();
+        JsonNode section = document.sources().get(sourceId);
+        if (section != null) {
+            return Optional.of(bind(sourceId, section, type));
+        }
+        Map<String, String> flat = document.unmigrated().get(sourceId);
+        if (flat == null) {
+            return Optional.empty();
+        }
+        Optional<T> converted = fromVersionOne.apply(flat);
+        file.update(current -> converted
+                .map(value -> current.withSource(sourceId, MAPPER.valueToTree(value)))
+                .orElseGet(() -> current.without(sourceId)));
+        return converted;
+    }
+
+    public synchronized void put(String sourceId, Object settings) {
+        file.update(document -> document.withSource(sourceId, MAPPER.valueToTree(settings)));
     }
 
     public synchronized void remove(String sourceId) {
-        ObjectNode root = read();
-        if (objectChild(root, SOURCES).remove(sourceId) != null) {
-            write(root);
+        Document document = file.read();
+        if (document.sources().containsKey(sourceId) || document.unmigrated().containsKey(sourceId)) {
+            file.update(current -> current.without(sourceId));
         }
+    }
+
+    /** Deletes the file. Exists for the shared test context. */
+    public synchronized void reset() {
+        file.delete();
     }
 
     /** Empty when nothing was ever saved. A malformed {@code preferences} object is a named {@link StorageException}. */
     public synchronized Optional<SourcePreferences> preferences() {
-        JsonNode node = read().path(PREFERENCES);
-        if (node.isMissingNode() || node.isNull()) {
+        JsonNode node = file.read().preferences();
+        if (node == null || node.isNull()) {
             return Optional.empty();
         }
         try {
@@ -78,15 +128,13 @@ public class JsonFileSourceSettings {
                     node.path("region").asString(null),
                     strings(node.path("providers"))));
         } catch (RuntimeException e) {
-            throw new StorageException("Could not read source preferences in " + file
+            throw new StorageException("Could not read source preferences in " + path
                     + "; fix or delete the \"preferences\" object", e);
         }
     }
 
     public synchronized void putPreferences(SourcePreferences preferences) {
-        ObjectNode root = read();
-        root.remove(PREFERENCES);
-        ObjectNode node = root.putObject(PREFERENCES);
+        ObjectNode node = MAPPER.createObjectNode();
         preferences.railOrder().forEach(node.putArray("railOrder")::add);
         preferences.hiddenRails().forEach(node.putArray("hiddenRails")::add);
         preferences.disabledSources().forEach(node.putArray("disabledSources")::add);
@@ -95,12 +143,16 @@ public class JsonFileSourceSettings {
         node.put("locale", preferences.locale());
         node.put("region", preferences.region());
         preferences.providers().forEach(node.putArray("providers")::add);
-        write(root);
+        file.update(document -> document.withPreferences(node));
     }
 
-    private static ObjectNode objectChild(ObjectNode root, String field) {
-        JsonNode existing = root.get(field);
-        return existing instanceof ObjectNode object ? object : root.putObject(field);
+    private <T> T bind(String sourceId, JsonNode section, Class<T> type) {
+        try {
+            return MAPPER.treeToValue(section, type);
+        } catch (JacksonException | IllegalArgumentException e) {
+            throw new StorageException("Could not read the " + sourceId + " settings in " + path
+                    + "; fix or delete that section", e);
+        }
     }
 
     private static List<String> strings(JsonNode node) {
@@ -138,44 +190,55 @@ public class JsonFileSourceSettings {
         return values;
     }
 
-    /** Reads the whole document, defaulting to an empty one; never creates the file. */
-    private ObjectNode read() {
-        if (!Files.exists(file)) {
-            ObjectNode root = mapper.createObjectNode();
-            root.put("version", VERSION);
-            root.putObject(SOURCES);
-            return root;
+    private static Document readDocument(JsonNode root) {
+        if (!root.isObject()) {
+            throw new IllegalArgumentException("document must be a JSON object");
         }
-        try {
-            JsonNode root = mapper.readTree(Files.readAllBytes(file));
-            if (!(root instanceof ObjectNode object)) {
-                throw new IllegalArgumentException("document must be a JSON object");
-            }
-            return object;
-        } catch (IOException | JacksonException | IllegalArgumentException e) {
-            throw new StorageException(
-                    "Could not read source settings " + file + "; check file permissions and JSON integrity", e);
-        }
+        Map<String, JsonNode> sources = new TreeMap<>();
+        root.path(SOURCES).properties().forEach(field -> sources.put(field.getKey(), field.getValue()));
+        Map<String, Map<String, String>> unmigrated = new TreeMap<>();
+        root.path(UNMIGRATED).properties().forEach(field -> unmigrated.put(field.getKey(), flat(field.getValue())));
+        return new Document(sources, unmigrated, root.get(PREFERENCES));
     }
 
-    private void write(ObjectNode root) {
-        root.put("version", VERSION);
-        Path parent = file.toAbsolutePath().getParent();
-        Path temp = null;
-        try {
-            Files.createDirectories(parent);
-            temp = Files.createTempFile(parent, SOURCES, ".json");
-            Files.write(temp, mapper.writeValueAsBytes(root));
-            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException | JacksonException e) {
-            if (temp != null) {
-                try {
-                    Files.deleteIfExists(temp);
-                } catch (IOException _) {
-                    // Cleanup error; let the original exception propagate
-                }
-            }
-            throw new StorageException("Could not write source settings " + file + "; check file permissions", e);
+    private static Map<String, String> flat(JsonNode section) {
+        Map<String, String> values = new TreeMap<>();
+        section.properties().forEach(field -> values.put(field.getKey(), field.getValue().asString("")));
+        return Collections.unmodifiableMap(values);
+    }
+
+    private static ObjectNode writeDocument(Document document) {
+        ObjectNode root = MAPPER.createObjectNode();
+        ObjectNode sources = root.putObject(SOURCES);
+        document.sources().forEach(sources::set);
+        if (!document.unmigrated().isEmpty()) {
+            ObjectNode unmigrated = root.putObject(UNMIGRATED);
+            document.unmigrated().forEach((id, values) -> {
+                ObjectNode section = unmigrated.putObject(id);
+                values.forEach(section::put);
+            });
         }
+        if (document.preferences() != null) {
+            root.set(PREFERENCES, document.preferences());
+        }
+        return root;
+    }
+
+    /** Every flat section waits under "unmigrated" for its source; the preferences keep their shape. */
+    private static JsonNode versionOneToTwo(JsonNode v1) {
+        if (!v1.isObject()) {
+            throw new IllegalArgumentException("document must be a JSON object");
+        }
+        ObjectNode v2 = MAPPER.createObjectNode();
+        v2.putObject(SOURCES);
+        JsonNode sections = v1.path(SOURCES);
+        if (sections.isObject()) {
+            v2.set(UNMIGRATED, sections);
+        }
+        JsonNode preferences = v1.get(PREFERENCES);
+        if (preferences != null) {
+            v2.set(PREFERENCES, preferences);
+        }
+        return v2;
     }
 }
