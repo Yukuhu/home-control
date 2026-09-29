@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.GroupListing;
 import dev.andre.homecontrol.core.GroupMember;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.SpeakerGroup;
@@ -139,6 +140,7 @@ class SonosSessionTest {
     @Test
     void joinsAndLeavesGroups() {
         SonosSession session = connected(kitchen);
+        assertThat(session.feature(GroupListing.class)).containsSame(session);
 
         session.execute(new Action.JoinGroup(LIVING));
         assertThat(kitchen.calls("SetAVTransportURI").getLast().argument("CurrentURI")).isEqualTo("x-rincon:RINCON_000E58A0B1C201400");

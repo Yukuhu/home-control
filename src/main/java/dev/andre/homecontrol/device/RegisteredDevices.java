@@ -99,8 +99,9 @@ final class RegisteredDevices implements DeviceQueries {
     @Override
     public Optional<SpeakerTopology> speakerTopology(String id) {
         return connections.handles(id).values().stream()
-                .filter(GroupListing.class::isInstance)
-                .map(handle -> ((GroupListing) handle).speakerTopology())
+                .map(handle -> handle.feature(GroupListing.class))
+                .flatMap(Optional::stream)
+                .map(GroupListing::speakerTopology)
                 .flatMap(Optional::stream)
                 .findFirst();
     }
@@ -109,8 +110,9 @@ final class RegisteredDevices implements DeviceQueries {
     @Override
     public List<TvInput> inputs(String id) {
         return connections.handles(id).values().stream()
-                .filter(InputListing.class::isInstance)
-                .map(handle -> ((InputListing) handle).inputs())
+                .map(handle -> handle.feature(InputListing.class))
+                .flatMap(Optional::stream)
+                .map(InputListing::inputs)
                 .filter(list -> !list.isEmpty())
                 .findFirst()
                 .orElse(List.of());

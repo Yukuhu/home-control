@@ -18,6 +18,7 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
+import dev.andre.homecontrol.core.ReceiverApps;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +50,7 @@ import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.RECEIV
  * queued). The session follows the media channel of whichever app is in front, so casts started
  * from a phone show up as now playing too. Cast has no pairing, so there is no UNPAIRED state.
  */
-public class CastSession implements DeviceHandle {
+public class CastSession implements DeviceHandle, ReceiverApps {
 
     private static final String RECEIVER_STATUS_TYPE = "RECEIVER_STATUS";
     private static final String REACH_PREFIX = "reach ";
