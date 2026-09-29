@@ -29,7 +29,7 @@ import java.util.function.Consumer;
 
 /**
  * Samsung Tizen TVs: remote-control WebSocket, REST API and DIAL (spec §4.1). The registry is only
- * read here; what a session learns (token, MAC) is stored through the device manager.
+ * read here; what a session learns (token, MAC) is stored through the device package.
  */
 public class TizenAdapter implements WakeOnLanAdapter, AdapterDiscovery {
 
@@ -82,7 +82,7 @@ public class TizenAdapter implements WakeOnLanAdapter, AdapterDiscovery {
         return EnumSet.of(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME, Capability.APP_LINK);
     }
 
-    /** Outside the device manager: the session works, but a learned MAC address or token is not stored. */
+    /** Outside the device package: the session works, but a learned MAC address or token is not stored. */
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
         return connect(device, onChange, LearnedSettings.DISCARD);

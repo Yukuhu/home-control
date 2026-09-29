@@ -43,7 +43,7 @@ import java.util.function.UnaryOperator;
  * screen every few seconds.
  *
  * <p>Settings are read from the registry (the MAC may be typed in meanwhile) but written only
- * through {@link LearnedSettings}, i.e. by the device manager under its lock.
+ * through {@link LearnedSettings}, i.e. by the device package under its registry lock.
  *
  * <p>Tizen never publishes CONNECTING: a poll every few seconds against a switched-off TV would
  * otherwise emit two SSE events per interval.

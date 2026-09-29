@@ -28,7 +28,7 @@ final class DeviceMatching {
      * adapter order (the first adapter stays primary); the adapter's settings are overlaid so values
      * the pairing does not send (a hand-entered MAC) survive a re-pair.
      */
-    // DeviceManager.attach's five inputs plus the three it is made pure over (registry, clock, host match).
+    // Enrollment.attach's five inputs plus the three it is made pure over (registry, clock, host match).
     @SuppressWarnings("java:S107")
     static Device attach(List<Device> registered, String host, String name, DeviceKind kind, String adapterId,
                          Map<String, String> settings, Instant now, BiPredicate<String, String> sameHost) {

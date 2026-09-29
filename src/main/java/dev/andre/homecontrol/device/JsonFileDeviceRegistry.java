@@ -17,7 +17,7 @@ import java.util.Optional;
 /**
  * Registry backed by devices.json, version 3: {@code {"version": 3, "devices": [...]}}. It is read once, then served
  * from memory and written through. Versions 1 (v0.3's single Android TV) and 2 were bare arrays. Each adapter checks
- * its own settings when the device manager starts.
+ * its own settings when Devices starts.
  */
 public class JsonFileDeviceRegistry implements DeviceRegistry {
 
