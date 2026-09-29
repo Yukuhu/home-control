@@ -137,7 +137,7 @@ class LiveEventRoutingTest {
         PlayableRef primeVideo = new PlayableRef.AppLink(URI.create("https://app.primevideo.com/"), "primevideo");
         PlayableRef netflix = new PlayableRef.AppLink(URI.create("https://www.netflix.com/browse"), "netflix");
         Set<Capability> appLink = Set.of(Capability.APP_LINK);
-        Set<Capability> shield = Set.of(Capability.REMOTE_KEYS, Capability.POWER, Capability.VOLUME, Capability.APP_LINK);
+        Set<Capability> shield = Set.of(Capability.REMOTE_KEYS, Capability.VOLUME, Capability.APP_LINK);
         Set<Capability> castOnly = Set.of(Capability.CAST_RECEIVER, Capability.VOLUME);
         Set<Capability> none = Set.of();
 
