@@ -56,4 +56,11 @@ class ApplicationYamlTest {
             assertThat(environment.getProperty("home-control.security.secret")).isEmpty();
         });
     }
+
+    @Test
+    void theOldKeystorePasswordNameStillReachesTheKeystoreFromAnySource() {
+        runner.withSystemProperties("SHIELD_KEYSTORE_PASSWORD=from-a-system-property")
+                .run(context -> assertThat(context.getEnvironment()
+                        .getProperty("home-control.androidtv.keystore-password")).isEqualTo("from-a-system-property"));
+    }
 }

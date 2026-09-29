@@ -120,4 +120,34 @@ class LegacyPropertyNamesTest {
                         "shield.stale-timeout-seconds", "shield.reconnect-initial-delay-seconds",
                         "shield.reconnect-max-delay-seconds");
     }
+
+    @Test
+    void anOldKeyInAnotherSpellingSpringAcceptsIsFound() {
+        sources.addLast(new MapPropertySource("mounted", Map.of("shield.keystorePassword", "camel")));
+        sources.addLast(new MapPropertySource("jar", Map.of("home-control.androidtv.keystore-password", "shield")));
+
+        apply();
+
+        assertThat(environment.getProperty("home-control.androidtv.keystore-password")).isEqualTo("camel");
+    }
+
+    @Test
+    void anOldEnvironmentVariableInSpringsCanonicalFormIsFound() {
+        sources.addLast(new SystemEnvironmentPropertySource("systemEnvironment",
+                Map.of("SHIELD_KEYSTOREPASSWORD", "canonical")));
+        sources.addLast(new MapPropertySource("jar", Map.of("home-control.androidtv.keystore-password", "shield")));
+
+        apply();
+
+        assertThat(environment.getProperty("home-control.androidtv.keystore-password")).isEqualTo("canonical");
+    }
+
+    @Test
+    void spacesAroundAnOldSecondsValueDoNotCount() {
+        sources.addLast(new MapPropertySource("mounted", Map.of("home-control.webos.connect-timeout-seconds", " 20 ")));
+
+        apply();
+
+        assertThat(environment.getProperty("home-control.webos.connect-timeout")).isEqualTo("20s");
+    }
 }

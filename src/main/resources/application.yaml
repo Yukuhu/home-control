@@ -25,8 +25,8 @@ home-control:
     enabled: true
   androidtv:
     enabled: true
-    # SHIELD_KEYSTORE_PASSWORD, the old name, still sets it.
-    keystore-password: shield
+    # SHIELD_KEYSTORE_PASSWORD, the old name, still sets it, from any source.
+    keystore-password: ${SHIELD_KEYSTORE_PASSWORD:shield}
     # The device pings when idle; commands postpone pings. Count traffic in both directions.
     stale-timeout: 10s
     reconnect-initial-delay: 1s

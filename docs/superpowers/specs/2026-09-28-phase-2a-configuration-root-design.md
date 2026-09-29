@@ -77,16 +77,19 @@ That serves the roadmap's goals of cheap new devices and sources and code that i
   registered in `META-INF/spring.factories` and ordered just after `ConfigDataEnvironmentPostProcessor`, so
   `application.yaml` and mounted configuration files are loaded before it runs. It holds one explicit table of all 58
   renames (below). For each old name:
-  - It finds the first property source that contains the old name. `SystemEnvironmentPropertySource` matches relaxed
-    names, so `SHIELD_DATA_DIR` counts for `shield.data-dir`.
+  - It finds the first property source that sets the old name in any spelling the binder accepts: `shield.data-dir`,
+    `shield.dataDir` or `shield.data_dir` in a file, `SHIELD_DATA_DIR` or `SHIELD_DATADIR` in the environment. It
+    looks the names up the way the binder does (`ConfigurationPropertySource`), not by exact key.
+  - `application.yaml` keeps `keystore-password: ${SHIELD_KEYSTORE_PASSWORD:shield}`, so the old name still works
+    from sources relaxed binding never mapped, such as a system property with that literal name.
   - If the new name is set in the same source or a higher-ranked one, the new name wins. The old value is ignored,
     with a warning.
   - Otherwise it copies the value to the new name, into a `MapPropertySource` named
     `legacyPropertyNames:<source>` and placed directly below the old key's source. A copied value therefore keeps the
     old key's rank: `SHIELD_KEYSTORE_PASSWORD` in the environment beats the new key's default shipped in
     `application.yaml`.
-  - A seconds key's value `v` is copied as `v + "s"`: `10` becomes `10s`, and a placeholder `${X:10}` becomes
-    `${X:10}s`, which resolves to `10s`.
+  - A seconds key's value `v` is copied as `v.strip() + "s"`: `10` and ` 10 ` become `10s`, and a placeholder
+    `${X:10}` becomes `${X:10}s`, which resolves to `10s`.
   - It logs through `DeferredLogFactory`, once per old key in use:
     `Configuration key shield.data-dir is deprecated; use home-control.data-dir`. If the new key wins, it adds
     `(ignored: home-control.data-dir is also set)`.
@@ -146,8 +149,12 @@ That serves the roadmap's goals of cheap new devices and sources and code that i
     This removes the six frozen violations of "web does not depend on adapters" in store
     `ba1e77bf-4f55-4da3-9db0-7f64cf972c19` and their lines in `34477544-f6df-4e51-a96d-cc0f65ebc691`.
   - `JsonFileDeviceRegistry` keeps migrating old `devices.json` files: it only uses the adapter id constant.
-    Jellyfin's `hasAdapter("androidtv")` simply finds no adapter when the module is off. A device that still carries
-    an Android TV entry shows no Android TV controls, as with Cast today.
+    A device that still carries an Android TV entry shows no Android TV controls, as with Cast today.
+  - Code that checked for an `androidtv` entry in `devices.json` must check what the device can do now. Jellyfin's
+    route executor wakes and launches the app only when the device has the `APP_LINK` and `REMOTE_KEYS`
+    capabilities; otherwise it plays the open Jellyfin session directly.
+  - `DeviceManager` refuses to merge or split an entry whose module is switched off: its pairing may be bound to the
+    device id, as Android TV's is.
 - **`@Value` reads move into the records:**
   - `SetupController` takes `DeepLinkTestProperties.timeout()`;
   - both Jellyfin beans take `JellyfinProperties.startupTimeout()`.

@@ -5,7 +5,10 @@ import org.springframework.boot.EnvironmentPostProcessor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.context.config.ConfigDataEnvironmentPostProcessor;
 import org.springframework.boot.logging.DeferredLogFactory;
-import org.springframework.boot.origin.OriginTrackedValue;
+import org.springframework.boot.context.properties.source.ConfigurationProperty;
+import org.springframework.boot.context.properties.source.ConfigurationPropertyName;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySource;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
 import org.springframework.core.Ordered;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
@@ -133,33 +136,42 @@ public final class LegacyPropertyNames implements EnvironmentPostProcessor, Orde
         MutablePropertySources sources = environment.getPropertySources();
         Map<String, Map<String, Object>> copies = new LinkedHashMap<>();
         for (Rename rename : renames) {
-            PropertySource<?> oldSource = firstContaining(sources, rename.oldName());
-            if (oldSource == null) {
+            Found old = firstContaining(sources, rename.oldName());
+            if (old == null) {
                 continue;
             }
             String warning = "Configuration key " + rename.oldName() + " is deprecated; use " + rename.newName();
-            PropertySource<?> newSource = firstContaining(sources, rename.newName());
-            if (newSource != null && sources.precedenceOf(newSource) <= sources.precedenceOf(oldSource)) {
+            Found found = firstContaining(sources, rename.newName());
+            if (found != null && sources.precedenceOf(found.source()) <= sources.precedenceOf(old.source())) {
                 log.warn(warning + " (ignored: " + rename.newName() + " is also set)");
                 continue;
             }
-            Object value = oldSource.getProperty(rename.oldName());
-            if (value instanceof OriginTrackedValue tracked) {
-                value = tracked.getValue();
-            }
-            copies.computeIfAbsent(oldSource.getName(), name -> new LinkedHashMap<>())
-                    .put(rename.newName(), rename.seconds() ? value + "s" : value);
+            Object value = old.value();
+            copies.computeIfAbsent(old.source().getName(), name -> new LinkedHashMap<>())
+                    .put(rename.newName(), rename.seconds() ? String.valueOf(value).strip() + "s" : value);
             log.warn(warning);
         }
         copies.forEach((sourceName, values) ->
                 sources.addAfter(sourceName, new MapPropertySource(SOURCE_PREFIX + sourceName, values)));
     }
 
-    /** Skips Spring Boot's attached source, which wraps all the others and so contains every key. */
-    private static PropertySource<?> firstContaining(MutablePropertySources sources, String name) {
+    private record Found(PropertySource<?> source, Object value) {
+    }
+
+    /**
+     * The first source that sets {@code name} in any spelling the binder accepts ({@code keystorePassword},
+     * {@code SHIELD_KEYSTOREPASSWORD}, …). Skips Spring Boot's attached source, which wraps all the others.
+     */
+    private static Found firstContaining(MutablePropertySources sources, String name) {
+        ConfigurationPropertyName key = ConfigurationPropertyName.of(name);
         for (PropertySource<?> source : sources) {
-            if (!"configurationProperties".equals(source.getName()) && source.containsProperty(name)) {
-                return source;
+            if (ConfigurationPropertySources.isAttachedConfigurationPropertySource(source)) {
+                continue;
+            }
+            ConfigurationPropertySource adapted = ConfigurationPropertySource.from(source);
+            ConfigurationProperty property = adapted == null ? null : adapted.getConfigurationProperty(key);
+            if (property != null) {
+                return new Found(source, property.getValue());
             }
         }
         return null;
