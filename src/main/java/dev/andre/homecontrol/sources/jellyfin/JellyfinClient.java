@@ -19,7 +19,6 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Locale;

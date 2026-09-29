@@ -13,7 +13,6 @@ import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.Map;
 
 /**

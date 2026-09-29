@@ -12,7 +12,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Optional;
 
 /** The TV's REST API on 8001. Every failure is "no answer": the TV may be off or the model may lack the endpoint. */

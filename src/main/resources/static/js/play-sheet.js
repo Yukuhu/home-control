@@ -54,7 +54,7 @@ async function submitPin(event) {
         }
         input.value = "";
         toast(data.message, { ok: true });
-        preview();
+        preview().catch(previewFailed);
     } catch {
         errorEl.textContent = "Cannot reach the server";
         errorEl.hidden = false;
@@ -82,7 +82,14 @@ function selectDevice(deviceId) {
         button.setAttribute("aria-checked", String(button.dataset.sheetDevice === deviceId));
         button.tabIndex = button.dataset.sheetDevice === deviceId ? 0 : -1;
     }
-    preview();
+    preview().catch(previewFailed);
+}
+
+function previewFailed() {
+    const routeEl = document.getElementById("sheet-route");
+    routeEl.textContent = "Cannot plan this right now";
+    routeEl.classList.add("unroutable");
+    document.getElementById("sheet-play").disabled = true;
 }
 
 async function preview() {
@@ -180,11 +187,17 @@ async function attempt(deviceId, skip) {
         current = request;
         toast(`${failed}. Next: ${data.next.description}`, {
             action: `Try ${data.next.description}`,
-            onAction: () => { current = request; attempt(deviceId, [...skip, data.route.key]); },
+            onAction: () => { current = request; attempt(deviceId, [...skip, data.route.key]).catch(playbackFailed); },
         });
     } else {
         toast(`${failed}. There is no other way to play this on ${data.deviceName}.`);
     }
+}
+
+function playbackFailed() {
+    sheet().close();
+    document.getElementById("sheet-play").disabled = false;
+    toast("Cannot play this");
 }
 
 export function openPlaySheet(tile) {
@@ -211,7 +224,7 @@ export function initPlaySheet() {
         const device = event.target.closest("[data-sheet-device]");
         if (device) selectDevice(device.dataset.sheetDevice);
     });
-    document.getElementById("sheet-play").addEventListener("click", () => attempt(target, []));
+    document.getElementById("sheet-play").addEventListener("click", () => attempt(target, []).catch(playbackFailed));
     document.getElementById("sheet-pin")?.addEventListener("submit", submitPin);
     sheet().addEventListener("close", () => { previewSeq++; });
 }

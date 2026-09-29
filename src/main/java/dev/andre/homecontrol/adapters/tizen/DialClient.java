@@ -6,7 +6,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 
 /** DIAL application launch (DIAL 2.x §6.1): {@code POST http://host:8080/ws/apps/<app>} with the app's arguments. */
 final class DialClient {

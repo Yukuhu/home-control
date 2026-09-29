@@ -21,7 +21,6 @@ import dev.andre.homecontrol.discovery.ssdp.SsdpService;
 import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;

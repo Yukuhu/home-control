@@ -18,7 +18,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
-import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
