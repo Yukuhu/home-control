@@ -7,6 +7,8 @@ import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceStateChangedEvent;
+import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +32,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EnrollmentTest {
 
@@ -48,7 +51,11 @@ class EnrollmentTest {
     }
 
     private Wiring wire(Function<String, Optional<InetAddress>> resolver, DeviceAdapter... adapters) {
-        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        return wire(new JsonFileDeviceRegistry(dir.resolve("devices.json")), resolver, adapters);
+    }
+
+    private Wiring wire(DeviceRegistry registry, Function<String, Optional<InetAddress>> resolver,
+                        DeviceAdapter... adapters) {
         Map<String, DeviceAdapter> byId = new LinkedHashMap<>();
         for (DeviceAdapter adapter : adapters) {
             byId.put(adapter.id(), adapter);
@@ -57,6 +64,50 @@ class EnrollmentTest {
         AdapterSettingsStore settings = new AdapterSettingsStore(registry, byId, lock);
         DeviceConnections connections = new DeviceConnections(byId, published::add, settings::updateAdapterSettings);
         return new Wiring(registry, connections, new Enrollment(registry, byId, connections, lock, published::add, resolver));
+    }
+
+    /** A registry on a disk that is full once {@code full} is set: every write fails, reads still work. */
+    private static final class FullDisk implements DeviceRegistry {
+
+        private final DeviceRegistry files;
+        volatile boolean full;
+
+        FullDisk(DeviceRegistry files) {
+            this.files = files;
+        }
+
+        @Override
+        public List<Device> findAll() {
+            return files.findAll();
+        }
+
+        @Override
+        public Optional<Device> findById(String id) {
+            return files.findById(id);
+        }
+
+        @Override
+        public Optional<Device> first() {
+            return files.first();
+        }
+
+        @Override
+        public void save(Device device) {
+            write();
+            files.save(device);
+        }
+
+        @Override
+        public void delete(String id) {
+            write();
+            files.delete(id);
+        }
+
+        private void write() {
+            if (full) {
+                throw new IllegalStateException("No space left on device");
+            }
+        }
     }
 
     private static Device device(String id, String adapterId, String host) {
@@ -175,5 +226,59 @@ class EnrollmentTest {
         assertThat(wiring.registry().findById("a")).isEmpty();
         assertThat(wiring.connections().handles("a")).isEmpty();
         assertThat(slow.handles.get("a").closed).isTrue();
+    }
+
+    @Test
+    void aForgetThatFailsLeavesTheDeviceConnected() {
+        StubAdapter stub = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false) {
+            @Override
+            public void forget(Device device) {
+                throw new IllegalStateException("secrets.json is read-only");
+            }
+        };
+        Wiring wiring = wire(HostAddresses::lookup, stub);
+        wiring.enrollment().adopt(device("tv", "stub", "10.0.0.5"));
+
+        assertThatThrownBy(() -> wiring.enrollment().forget("tv")).hasMessageContaining("read-only");
+
+        assertThat(wiring.registry().findById("tv")).isPresent();
+        assertThat(wiring.connections().handles("tv")).containsValue(stub.handles.get("tv"));
+        assertThat(stub.handles.get("tv").closed).isFalse();
+    }
+
+    @Test
+    void aMergeThatCannotBeSavedLeavesTheSourceConnected() {
+        StubAdapter one = new StubAdapter("one", DeviceKind.ANDROID_TV, false, false);
+        StubAdapter two = new StubAdapter("two", DeviceKind.CAST, false, false);
+        FullDisk disk = new FullDisk(new JsonFileDeviceRegistry(dir.resolve("devices.json")));
+        Wiring wiring = wire(disk, HostAddresses::lookup, one, two);
+        wiring.enrollment().adopt(device("a", "one", "10.0.0.5"));
+        wiring.enrollment().adopt(device("b", "two", "10.0.0.6"));
+        disk.full = true;
+
+        assertThatThrownBy(() -> wiring.enrollment().merge("a", "b")).hasMessageContaining("No space");
+
+        assertThat(wiring.connections().handles("b")).containsValue(two.handles.get("b"));
+        assertThat(two.handles.get("b").closed).isFalse();
+    }
+
+    @Test
+    void aHandleThatFailsToCloseStopsNoOtherStepOfAMerge() {
+        StubAdapter one = new StubAdapter("one", DeviceKind.ANDROID_TV, false, false);
+        StubAdapter two = new StubAdapter("two", DeviceKind.CAST, false, false);
+        Wiring wiring = wire(HostAddresses::lookup, one, two);
+        wiring.enrollment().adopt(device("a", "one", "10.0.0.5"));
+        wiring.enrollment().adopt(device("b", "two", "10.0.0.6"));
+        two.handles.get("b").closeFailure = new IllegalStateException("socket already gone");
+
+        wiring.enrollment().merge("a", "b");
+
+        assertThat(wiring.connections().handles("a")).containsOnlyKeys("one", "two");
+        assertThat(wiring.connections().state("a").status()).isEqualTo(DeviceStatus.CONNECTED);
+        assertThat(published).anySatisfy(event -> assertThat(event).isInstanceOfSatisfying(
+                DeviceStateChangedEvent.class, e -> {
+                    assertThat(e.deviceId()).isEqualTo("b");
+                    assertThat(e.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
+                }));
     }
 }

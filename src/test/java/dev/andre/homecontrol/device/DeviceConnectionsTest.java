@@ -81,7 +81,15 @@ class DeviceConnectionsTest {
 
     @Test
     void theOldHandlesCloseBeforeTheNewOnesConnect() {
-        StubAdapter adapter = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false);
+        List<Boolean> oldClosedWhenConnecting = new CopyOnWriteArrayList<>();
+        StubAdapter adapter = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false) {
+            @Override
+            public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
+                StubAdapter.StubHandle old = handles.get(device.id());
+                oldClosedWhenConnecting.add(old == null || old.closed);
+                return super.connect(device, onChange);
+            }
+        };
         DeviceConnections connections = connections(adapter);
         connections.complete(connections.begin(device("a", "stub")));
         StubAdapter.StubHandle old = adapter.handles.get("a");
@@ -90,9 +98,52 @@ class DeviceConnectionsTest {
         assertThat(old.closed).isFalse();
         connections.complete(again);
 
-        assertThat(old.closed).isTrue();
+        assertThat(oldClosedWhenConnecting).containsExactly(true, true);
         assertThat(adapter.handles.get("a")).isNotSameAs(old);
         assertThat(connections.handles("a")).containsValue(adapter.handles.get("a"));
+    }
+
+    @Test
+    void aTicketSupersededBeforeItCompletesConnectsNothing() {
+        StubAdapter adapter = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false);
+        DeviceConnections connections = connections(adapter);
+        connections.complete(connections.begin(device("a", "stub")));
+        StubAdapter.StubHandle old = adapter.handles.get("a");
+        DeviceConnections.Connecting first = connections.begin(device("a", "stub"));
+        DeviceConnections.Connecting second = connections.begin(device("a", "stub"));
+
+        connections.complete(first);
+
+        assertThat(old.closed).isTrue();
+        assertThat(adapter.handles.get("a")).isSameAs(old);
+        connections.complete(second);
+        assertThat(connections.handles("a")).containsValue(adapter.handles.get("a")).doesNotContainValue(old);
+    }
+
+    @Test
+    void aPreviousHandleThatFailsToCloseStillLetsTheNewOnesConnect() {
+        StubAdapter adapter = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false);
+        DeviceConnections connections = connections(adapter);
+        connections.complete(connections.begin(device("a", "stub")));
+        adapter.handles.get("a").closeFailure = new IllegalStateException("socket already gone");
+
+        connections.complete(connections.begin(device("a", "stub")));
+
+        assertThat(connections.state("a").status()).isEqualTo(DeviceStatus.CONNECTED);
+        assertThat(connections.handles("a")).containsValue(adapter.handles.get("a"));
+    }
+
+    @Test
+    void closeAllClosesTheOtherHandlesWhenOneFailsToClose() {
+        StubAdapter adapter = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false);
+        DeviceConnections connections = connections(adapter);
+        connections.complete(connections.begin(device("a", "stub")));
+        connections.complete(connections.begin(device("b", "stub")));
+        adapter.handles.get("a").closeFailure = new IllegalStateException("socket already gone");
+
+        connections.closeAll();
+
+        assertThat(adapter.handles.get("b").closed).isTrue();
     }
 
     @Test

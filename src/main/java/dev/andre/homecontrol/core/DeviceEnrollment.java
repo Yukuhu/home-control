@@ -26,7 +26,10 @@ public interface DeviceEnrollment {
     /** The setup page's "Add": merge into the matching device, or register a new one. */
     Device addDiscovered(String adapterId, String host, int port);
 
-    /** Disconnects the device, lets each of its adapters forget its pairing, and removes it; an unknown id is a no-op. */
+    /**
+     * Lets each of the device's adapters forget its pairing, removes the device, and then disconnects it. If any of that
+     * fails, the device stays registered and connected. An unknown id is a no-op.
+     */
     void forget(String id);
 
     /** Moves every adapter of {@code source} into {@code target} and removes {@code source}. */
