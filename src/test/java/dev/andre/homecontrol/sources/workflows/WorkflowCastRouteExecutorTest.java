@@ -31,7 +31,7 @@ class WorkflowCastRouteExecutorTest {
     private final DeviceCommands commands = mock(DeviceCommands.class);
     private final RailPreferences preferences = mock(RailPreferences.class);
     private final Device tv = new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.1", Map.of(), Instant.now());
-    private final Route.WorkflowCast route = new Route.WorkflowCast(ID, 1, "single");
+    private final WorkflowCastRoute route = new WorkflowCastRoute(ID, 1, "single");
     private final WorkflowRunner.ResolvedMedia media = new WorkflowRunner.ResolvedMedia(
             URI.create("https://media.example/play?token=fresh-secret"), "audio/aac", "News");
     private WorkflowCastRouteExecutor executor;
@@ -77,10 +77,10 @@ class WorkflowCastRouteExecutorTest {
                 var item = source.rail(ID).items().getFirst();
                 var cast = new WorkflowCastRouteExecutor(generated.store, realRunner, devices, commands, preferences);
                 when(devices.device("tv")).thenReturn(Optional.of(tv));
-                var playback = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowCastStrategy())),
+                var playback = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowConfiguration().workflowCastStrategy())),
                         List.of(), List.of(cast));
                 assertThat(source.item(item.id())).contains(item);
-                assertThat(playback.plan(item, "tv")).isInstanceOf(Route.WorkflowCast.class);
+                assertThat(playback.plan(item, "tv")).isInstanceOf(WorkflowCastRoute.class);
                 assertThat(playback.preview(item, "tv").routes()).hasSize(1);
                 assertThat(server.count("/catalog")).isEqualTo(1);
                 server.respond("/catalog", 200, "{\"token\":\"fresh-secret\",\"items\":[{\"id\":\"other\",\"title\":\"Other\"},{\"id\":\"news\",\"title\":\"Fresh News\"}]}");
@@ -112,7 +112,7 @@ class WorkflowCastRouteExecutorTest {
         var item = source.rail(ID).items().getFirst();
         var cast = new WorkflowCastRouteExecutor(generated.store, realRunner, devices, commands, preferences);
         when(devices.device("tv")).thenReturn(Optional.of(tv));
-        var playback = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowCastStrategy())), List.of(), List.of(cast));
+        var playback = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowConfiguration().workflowCastStrategy())), List.of(), List.of(cast));
         assertThat(playback.attempt(item, "tv", Set.of())).isInstanceOf(PlayAttempt.Failed.class);
         verify(commands, never()).execute(any(), any());
         verify(client, never()).checkMedia(any(), anyLong());
@@ -132,7 +132,7 @@ class WorkflowCastRouteExecutorTest {
         fixture.store.update(ID, 1, fixture.definition.draft(), fixture.request);
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(ActionFailedException.class);
         fixture.store.setEnabled(ID, 2, false, fixture.request);
-        var disabledRoute = new Route.WorkflowCast(ID, 3, "single");
+        var disabledRoute = new WorkflowCastRoute(ID, 3, "single");
         assertThatThrownBy(() -> executor.execute(disabledRoute, tv)).isInstanceOf(ActionFailedException.class);
         fixture.store.remove(ID, 3, fixture.request);
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(ActionFailedException.class);
@@ -143,9 +143,9 @@ class WorkflowCastRouteExecutorTest {
     @Test void fetchFailureBecomesFailedAttemptAndNeverSends() {
         when(runner.resolve(any(), any())).thenThrow(new WorkflowException(WorkflowException.Stage.FETCH, "request failed"));
         when(devices.device("tv")).thenReturn(Optional.of(tv));
-        var service = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowCastStrategy())), List.of(), List.of(executor));
+        var service = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowConfiguration().workflowCastStrategy())), List.of(), List.of(executor));
         var item = new ContentItem(ID, "workflows", ContentKind.VIDEO, "News", null, null,
-                List.of(new PlayableRef.WorkflowCast(ID, 1, "single")));
+                List.of(new WorkflowCastRef(ID, 1, "single")));
         assertThat(service.attempt(item, "tv", Set.of())).isInstanceOfSatisfying(PlayAttempt.Failed.class,
                 failed -> assertThat(failed.cause()).hasMessageContaining("Fetch JSON"));
         verify(commands, never()).execute(any(), any());

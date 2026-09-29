@@ -11,7 +11,6 @@ import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.playback.DelegatedRoute;
-import dev.andre.homecontrol.core.playback.Route;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -76,7 +75,7 @@ class JellyfinRouteExecutorTest {
 
     @Test
     void tellsTheSessionToPlay() {
-        executor.execute(new Route.JellyfinSession("s1", "item-1", 600L, "Web"), browser);
+        executor.execute(new JellyfinRoute.Session("s1", "item-1", 600L, "Web"), browser);
 
         verify(sessions).playNow("s1", "item-1", 600L);
         verifyNoInteractions(commands);
@@ -91,7 +90,7 @@ class JellyfinRouteExecutorTest {
     void aDeviceWhoseAndroidTvModuleIsOffPlaysTheOpenSessionDirectly() {
         given(devices.capabilities("shield")).willReturn(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS));
 
-        executor.execute(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV"), shield);
+        executor.execute(new JellyfinRoute.Session("s1", "item-1", 600L, "Android TV"), shield);
 
         verify(sessions).playNow("s1", "item-1", 600L);
         verify(commands, never()).execute(anyString(), any());
@@ -101,7 +100,7 @@ class JellyfinRouteExecutorTest {
     void aClosedSessionOrUnreachableServerIsAFailedAction() {
         willThrow(new JellyfinException(JellyfinException.Kind.NOT_FOUND, "The Jellyfin app on that device has closed its session"))
                 .given(sessions).playNow("s1", "item-1", 600L);
-        DelegatedRoute route = new Route.JellyfinSession("s1", "item-1", 600L, "Web");
+        DelegatedRoute route = new JellyfinRoute.Session("s1", "item-1", 600L, "Web");
 
         assertThatThrownBy(() -> executor.execute(route, browser))
                 .isInstanceOf(ActionFailedException.class)
@@ -118,7 +117,7 @@ class JellyfinRouteExecutorTest {
                 .when(commands).execute("shield", LAUNCH);
         given(sessions.sessionFor(shield)).willReturn(Optional.empty(), Optional.of(session("fresh")));
 
-        executor.execute(new Route.JellyfinSession("stale", "item-1", 600L, "Android TV"), shield);
+        executor.execute(new JellyfinRoute.Session("stale", "item-1", 600L, "Android TV"), shield);
 
         var order = inOrder(commands, sessions);
         order.verify(commands).execute(eq("shield"), argThat(action -> action instanceof Action.PressKey key && key.key().code() == 224));
@@ -134,7 +133,7 @@ class JellyfinRouteExecutorTest {
         doAnswer(_ -> { state.set(ready()); return null; }).when(commands).execute("shield", LAUNCH);
         given(sessions.sessionFor(shield)).willReturn(Optional.of(session("fresh")));
 
-        executor.execute(new Route.JellyfinApp("item-1", 0), shield);
+        executor.execute(new JellyfinRoute.App("item-1", 0), shield);
 
         verify(commands).execute("shield", LAUNCH);
         verify(commands, never()).execute(eq("shield"), isA(Action.PressKey.class));
@@ -146,7 +145,7 @@ class JellyfinRouteExecutorTest {
         given(devices.state("shield")).willReturn(ready());
         given(sessions.sessionFor(shield)).willReturn(Optional.of(session("fresh")));
 
-        executor.execute(new Route.JellyfinSession("old-preview", "item-1", 600L, "Android TV"), shield);
+        executor.execute(new JellyfinRoute.Session("old-preview", "item-1", 600L, "Android TV"), shield);
 
         verify(commands, never()).execute(anyString(), any());
         verify(sessions).playNow("fresh", "item-1", 600L);
@@ -160,7 +159,7 @@ class JellyfinRouteExecutorTest {
                 .when(commands).execute(eq("shield"), isA(Action.PressKey.class));
         given(sessions.sessionFor(shield)).willReturn(Optional.of(session("fresh")));
 
-        executor.execute(new Route.JellyfinApp("item-1", 600L), shield);
+        executor.execute(new JellyfinRoute.App("item-1", 600L), shield);
 
         verify(commands, never()).execute(eq("shield"), isA(Action.OpenAppLink.class));
         verify(sessions).playNow("fresh", "item-1", 600L);
@@ -171,7 +170,7 @@ class JellyfinRouteExecutorTest {
         given(devices.state("shield")).willReturn(DeviceState.initial(), ready());
         given(sessions.sessionFor(shield)).willReturn(Optional.of(session("fresh")));
 
-        executor.execute(new Route.JellyfinApp("item-1", 0), shield);
+        executor.execute(new JellyfinRoute.App("item-1", 0), shield);
 
         verify(sessions).playNow("fresh", "item-1", 0);
         verify(commands, never()).execute(anyString(), any());
@@ -193,7 +192,7 @@ class JellyfinRouteExecutorTest {
         }).doAnswer(_ -> { state.set(ready()); return null; }).when(commands).execute("shield", LAUNCH);
         given(sessions.sessionFor(shield)).willReturn(Optional.of(session("fresh")));
 
-        executor.execute(new Route.JellyfinApp("item-1", 600L), shield);
+        executor.execute(new JellyfinRoute.App("item-1", 600L), shield);
 
         verify(commands, times(2)).execute("shield", LAUNCH);
         verify(sessions).playNow("fresh", "item-1", 600L);
@@ -207,7 +206,7 @@ class JellyfinRouteExecutorTest {
                 .doAnswer(_ -> { state.set(ready()); return null; }).when(commands).execute("shield", LAUNCH);
         given(sessions.sessionFor(shield)).willReturn(Optional.of(session("fresh")));
 
-        executor.execute(new Route.JellyfinApp("item-1", 0), shield);
+        executor.execute(new JellyfinRoute.App("item-1", 0), shield);
 
         verify(sessions).playNow("fresh", "item-1", 0);
     }
@@ -221,7 +220,7 @@ class JellyfinRouteExecutorTest {
         var startup = new JellyfinRouteExecutor(sessions, devices, commands, Duration.ofSeconds(4),
                 Duration.ofMillis(100), Duration.ofMillis(10));
 
-        startup.execute(new Route.JellyfinApp("item-1", 0), shield);
+        startup.execute(new JellyfinRoute.App("item-1", 0), shield);
 
         verify(commands, times(2)).execute("shield", LAUNCH);
         verify(sessions).playNow("fresh", "item-1", 0);
@@ -230,7 +229,7 @@ class JellyfinRouteExecutorTest {
     @Test
     void aLaunchThatNeverReachesJellyfinCannotUseAnOldSession() {
         given(devices.state("shield")).willReturn(ready().withCurrentApp("launcher"));
-        DelegatedRoute route = new Route.JellyfinSession("stale", "item-1", 0, "Android TV");
+        DelegatedRoute route = new JellyfinRoute.Session("stale", "item-1", 0, "Android TV");
 
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("installed");
@@ -243,7 +242,7 @@ class JellyfinRouteExecutorTest {
     void aMissingSessionTimesOutWithoutSendingPlayback() {
         given(devices.state("shield")).willReturn(ready());
         given(sessions.sessionFor(shield)).willReturn(Optional.empty());
-        DelegatedRoute route = new Route.JellyfinApp("item-1", 0);
+        DelegatedRoute route = new JellyfinRoute.App("item-1", 0);
 
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("Jellyfin").hasMessageContaining("sign in");
@@ -254,7 +253,7 @@ class JellyfinRouteExecutorTest {
     @Test
     void aFailedWakeNeverLaunchesOrPlays() {
         given(devices.state("shield")).willReturn(ready().withPower(false));
-        DelegatedRoute route = new Route.JellyfinApp("item-1", 0);
+        DelegatedRoute route = new JellyfinRoute.App("item-1", 0);
 
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("wake");
@@ -266,7 +265,7 @@ class JellyfinRouteExecutorTest {
     @Test
     void anOfflineDeviceDoesNotReceiveCommands() {
         given(devices.state("shield")).willReturn(DeviceState.initial());
-        DelegatedRoute route = new Route.JellyfinApp("item-1", 0);
+        DelegatedRoute route = new JellyfinRoute.App("item-1", 0);
 
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(DeviceOfflineException.class).hasMessageContaining("connect");
@@ -291,7 +290,7 @@ class JellyfinRouteExecutorTest {
         });
         var bounded = new JellyfinRouteExecutor(sessions, devices, commands, Duration.ofMillis(100),
                 Duration.ofMillis(100), Duration.ofMillis(10));
-        DelegatedRoute route = new Route.JellyfinApp("item-1", 0);
+        DelegatedRoute route = new JellyfinRoute.App("item-1", 0);
 
         try {
             assertTimeout(Duration.ofSeconds(1), () ->
@@ -309,7 +308,7 @@ class JellyfinRouteExecutorTest {
     void interruptionStopsStartupWithoutPlayback() {
         given(devices.state("shield")).willReturn(ready());
         given(sessions.sessionFor(shield)).willReturn(Optional.empty());
-        DelegatedRoute route = new Route.JellyfinApp("item-1", 0);
+        DelegatedRoute route = new JellyfinRoute.App("item-1", 0);
         Thread.currentThread().interrupt();
         try {
             assertThatThrownBy(() -> executor.execute(route, shield))

@@ -64,21 +64,6 @@ public sealed interface Route permits DeviceRoute, DelegatedRoute, Route.Unrouta
         }
     }
 
-    /** Deferred workflow execution, available only to Cast receivers. */
-    record WorkflowCast(String workflowId, long revision, String entryKey) implements DelegatedRoute {
-        @Override
-        public String source() {
-            return "Workflows";
-        }
-
-        @Override
-        public String key() {
-            return "workflow-cast";
-        }
-
-        @Override public String describe() { return "Cast with the Default Media Receiver"; }
-    }
-
     /** Run a Cast receiver app and send it a LOAD (spec §5.3 rung 3). */
     record Cast(String receiverAppId, Map<String, Object> load) implements DeviceRoute {
         @Override
@@ -132,85 +117,6 @@ public sealed interface Route permits DeviceRoute, DelegatedRoute, Route.Unrouta
         @Override
         public String toString() {
             return message.toString();
-        }
-    }
-
-    /** Deferred VLC launch; credentials are resolved only when Play is pressed. */
-    record JellyfinVlc(String itemId) implements DelegatedRoute {
-        @Override
-        public String source() {
-            return "Jellyfin";
-        }
-
-        @Override
-        public String key() {
-            return "jellyfin-vlc";
-        }
-
-        @Override
-        public boolean optimistic() {
-            return true;
-        }
-
-        @Override public String describe() { return "Open in VLC (from beginning; no Jellyfin progress tracking)"; }
-    }
-
-    /** Wake an Android TV and open Jellyfin as needed, then play through its fresh session. */
-    record JellyfinApp(String itemId, long startPositionTicks) implements DelegatedRoute {
-        @Override
-        public String source() {
-            return "Jellyfin";
-        }
-
-        @Override
-        public String key() {
-            return "jellyfin-app";
-        }
-
-        @Override
-        public String describe() {
-            return "Play in Jellyfin (wake device and open app if needed)";
-        }
-    }
-
-    /** Tell a Jellyfin session to play. Android TV also checks power and foreground app at execution time. */
-    record JellyfinSession(String sessionId, String itemId, long startPositionTicks, String client) implements DelegatedRoute {
-        @Override
-        public String source() {
-            return "Jellyfin";
-        }
-
-        @Override
-        public String key() {
-            return "jellyfin-session";
-        }
-
-        @Override
-        public String describe() {
-            return client == null || client.isBlank()
-                    ? "Play in the open Jellyfin app"
-                    : "Play in the open Jellyfin app (" + client + ")";
-        }
-    }
-
-    /**
-     * Start the video on a Cast receiver through its best-effort remote-control pairing. Executed by a
-     * RouteExecutor, not an adapter; the device part goes through DeviceCommands.query.
-     */
-    record YouTubeLounge(String videoId) implements DelegatedRoute {
-        @Override
-        public String source() {
-            return "YouTube";
-        }
-
-        @Override
-        public String key() {
-            return "youtube-lounge";
-        }
-
-        @Override
-        public String describe() {
-            return "Cast with the YouTube receiver (best effort)";
         }
     }
 

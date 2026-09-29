@@ -9,10 +9,11 @@ import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.content.ContentSource;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
-import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.playback.PlayAttempt;
 import dev.andre.homecontrol.playback.PlaybackPreview;
+import dev.andre.homecontrol.sources.workflows.WorkflowCastRef;
+import dev.andre.homecontrol.sources.workflows.WorkflowCastRoute;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,12 +78,12 @@ class ContentPlayPreviewTest extends WebSliceTest {
     void workflowPreviewExposesOnlySafeRouteMetadata() throws Exception {
         var workflow = mock(ContentSource.class);
         var item = new ContentItem("w-0123456789ab", "workflows", ContentKind.VIDEO,
-                "News", null, null, List.of(new PlayableRef.WorkflowCast("w-0123456789ab", 1, "single")));
+                "News", null, null, List.of(new WorkflowCastRef("w-0123456789ab", 1, "single")));
         given(devices.device("living")).willReturn(Optional.of(living));
         given(sources.find("workflows")).willReturn(Optional.of(workflow));
         given(workflow.item(item.id())).willReturn(Optional.of(item));
         given(playback.preview(item, "living")).willReturn(new PlaybackPreview(living,
-                List.of(new Route.WorkflowCast("w-0123456789ab", 1, "single")), null));
+                List.of(new WorkflowCastRoute("w-0123456789ab", 1, "single")), null));
         mockMvc.perform(get("/devices/living/route-preview").param("source", "workflows").param("item", item.id()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.route.key").value("workflow-cast"))

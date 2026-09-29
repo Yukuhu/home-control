@@ -43,8 +43,8 @@ class WorkflowContentSourceTest {
         var device = new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.1", Map.of(), Instant.now());
         when(devices.device("tv")).thenReturn(Optional.of(device));
         when(devices.capabilities("tv")).thenReturn(Set.of(Capability.CAST_RECEIVER));
-        var service = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowCastStrategy())));
-        assertThat(service.plan(item, "tv")).isInstanceOf(Route.WorkflowCast.class);
+        var service = new PlaybackService(devices, commands, new PlaybackPlanner(List.of(new WorkflowConfiguration().workflowCastStrategy())));
+        assertThat(service.plan(item, "tv")).isInstanceOf(WorkflowCastRoute.class);
         assertThat(service.preview(item, "tv").routes()).hasSize(1);
         verifyNoInteractions(runner);
     }
@@ -56,7 +56,7 @@ class WorkflowContentSourceTest {
         when(runner.catalog(fixture.definition)).thenReturn(List.of(new WorkflowRunner.CatalogEntry(key, "News", null, null)));
         var item = source.rail(ID).items().getFirst();
         assertThat(item.id()).isEqualTo(ID + "." + key);
-        assertThat(item.playables()).containsExactly(new PlayableRef.WorkflowCast(ID, 1, key));
+        assertThat(item.playables()).containsExactly(new WorkflowCastRef(ID, 1, key));
         assertThat(source.item(item.id())).contains(item);
         verify(runner, times(1)).catalog(fixture.definition);
         verify(runner, never()).resolve(any(), any());

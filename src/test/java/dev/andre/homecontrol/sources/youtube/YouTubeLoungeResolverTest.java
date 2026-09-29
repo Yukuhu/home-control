@@ -54,7 +54,7 @@ class YouTubeLoungeResolverTest {
         PlayableResolver.Resolution resolution = resolver.resolve(LINK, ITEM, device("kitchen"),
                 EnumSet.of(Capability.CAST_RECEIVER));
 
-        assertThat(resolution.playables()).containsExactly(LINK, new PlayableRef.YouTubeLounge("aqz-KE-bpKQ"));
+        assertThat(resolution.playables()).containsExactly(LINK, new YouTubeLoungeRef("aqz-KE-bpKQ"));
         assertThat(resolution.liveCapabilities()).isEmpty();
         assertThat(resolution.notes()).isEmpty();
     }

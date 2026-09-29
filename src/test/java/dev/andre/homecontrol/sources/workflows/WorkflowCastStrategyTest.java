@@ -1,6 +1,11 @@
-package dev.andre.homecontrol.core.playback;
+package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.playback.ContentItem;
+import dev.andre.homecontrol.core.playback.ContentKind;
+import dev.andre.homecontrol.core.playback.PlaybackPlanner;
+import dev.andre.homecontrol.core.playback.Route;
+import dev.andre.homecontrol.core.playback.RouteStrategies;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
@@ -9,8 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WorkflowCastStrategyTest {
     @Test void workflowOnlyRoutesToCastEvenOnMergedDevices() {
         var item = new ContentItem("w-0123456789ab", "workflows", ContentKind.VIDEO,
-                "News", null, null, List.of(new PlayableRef.WorkflowCast("w-0123456789ab", 1, "single")));
-        var strategy = new WorkflowCastStrategy();
+                "News", null, null, List.of(new WorkflowCastRef("w-0123456789ab", 1, "single")));
+        var strategy = new WorkflowConfiguration().workflowCastStrategy();
         assertThat(strategy.route(item, Set.of(Capability.APP_LINK))).isEmpty();
         var route = strategy.route(item, Set.of(Capability.APP_LINK, Capability.CAST_RECEIVER)).orElseThrow();
         assertThat(route.key()).isEqualTo("workflow-cast");

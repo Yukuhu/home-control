@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Turns a source's abstract reference (e.g. {@link PlayableRef.JellyfinItem}) into concrete ones at
+ * Turns a source's abstract reference (e.g. a Jellyfin item) into concrete ones at
  * play time. Resolvers may do I/O and may build references that carry credentials; those never
  * leave the server. The planner itself stays pure.
  */

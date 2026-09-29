@@ -8,7 +8,7 @@ import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
-import dev.andre.homecontrol.core.playback.PlayableRef;
+import dev.andre.homecontrol.sources.jellyfin.JellyfinPlayable;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -94,7 +94,7 @@ class ContentControllerTest extends WebSliceTest {
         RailDescriptor descriptor = new RailDescriptor("jellyfin", "resume", "Continue watching");
         ContentItem item = new ContentItem("item-1", "jellyfin", ContentKind.EPISODE, "Title", "Sub",
                 URI.create("/sources/jellyfin/images/item-1/Primary?tag=t"),
-                List.of(new PlayableRef.JellyfinItem("srv", "item-1", 99)), 0.5);
+                List.of(new JellyfinPlayable.Item("srv", "item-1", 99)), 0.5);
         RailSnapshot snapshot = new RailSnapshot(descriptor, RailStatus.READY, List.of(item),
                 Instant.parse("2026-09-16T09:00:00Z"), null, false, 1);
         given(rails.snapshot("jellyfin", "resume")).willReturn(Optional.of(snapshot));

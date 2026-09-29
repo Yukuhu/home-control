@@ -1,6 +1,11 @@
-package dev.andre.homecontrol.core.playback;
+package dev.andre.homecontrol.sources.youtube;
 
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.playback.ContentItem;
+import dev.andre.homecontrol.core.playback.ContentKind;
+import dev.andre.homecontrol.core.playback.PlayableRef;
+import dev.andre.homecontrol.core.playback.PlaybackPlanner;
+import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.testsupport.Planners;
 import org.junit.jupiter.api.Test;
 
@@ -18,10 +23,10 @@ class YouTubeRoutesTest {
 
     private final PlaybackPlanner planner = Planners.production();
 
-    /** Written out like YouTubeVideo.toItem(): core tests do not import sources. */
+    /** Written out like YouTubeVideo.toItem(). */
     private final ContentItem item = new ContentItem("aqz-KE-bpKQ", "youtube", ContentKind.VIDEO, "Big Buck Bunny",
             "Blender", URI.create("/sources/youtube/thumbnails/aqz-KE-bpKQ"), List.of(LINK));
-    private final ContentItem lounge = item.withPlayables(List.of(LINK, new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")));
+    private final ContentItem lounge = item.withPlayables(List.of(LINK, new YouTubeLoungeRef("aqz-KE-bpKQ")));
 
     @Test
     void androidTvOpensTheYouTubeApp() {
@@ -49,7 +54,7 @@ class YouTubeRoutesTest {
     void aCastOnlyDeviceWithTheSwitchCastsThroughLounge() {
         Route route = planner.plan(lounge, EnumSet.of(Capability.CAST_RECEIVER, Capability.VOLUME)).first();
 
-        assertThat(route).isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ"));
+        assertThat(route).isEqualTo(new YouTubeLoungeRoute("aqz-KE-bpKQ"));
         assertThat(route.describe()).isEqualTo("Cast with the YouTube receiver (best effort)");
     }
 
@@ -60,7 +65,7 @@ class YouTubeRoutesTest {
 
         assertThat(planner.plan(lounge, shield).first()).isEqualTo(new Route.OpenAppLink(WATCH, "youtube"));
         assertThat(planner.plan(lounge, shield).routes())
-                .containsExactly(new Route.OpenAppLink(WATCH, "youtube"), new Route.YouTubeLounge("aqz-KE-bpKQ"));
+                .containsExactly(new Route.OpenAppLink(WATCH, "youtube"), new YouTubeLoungeRoute("aqz-KE-bpKQ"));
     }
 
     @Test

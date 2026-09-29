@@ -5,7 +5,6 @@ import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.playback.DelegatedRoute;
-import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
 
 import java.util.Map;
@@ -13,7 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Plays a {@link Route.YouTubeLounge}: asks the YouTube receiver on the Cast device for its screen id,
+ * Plays a {@link YouTubeLoungeRoute}: asks the YouTube receiver on the Cast device for its screen id,
  * then starts the video through the unofficial Lounge API. Best effort; every failure names the step.
  * Offline and unsupported devices pass through unchanged so the play sheet can say so.
  */
@@ -41,7 +40,7 @@ public class YouTubeLoungeRouteExecutor implements RouteExecutor {
 
     @Override
     public void execute(DelegatedRoute route, Device device) {
-        Route.YouTubeLounge play = (Route.YouTubeLounge) route;
+        YouTubeLoungeRoute play = (YouTubeLoungeRoute) route;
         Map<String, Object> reply;
         try {
             reply = commands.query(device.id(), SESSION_STATUS);

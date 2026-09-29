@@ -32,12 +32,12 @@ public class JellyfinPlayableResolver implements PlayableResolver {
 
     @Override
     public boolean resolves(PlayableRef ref) {
-        return ref instanceof PlayableRef.JellyfinItem;
+        return ref instanceof JellyfinPlayable.Item;
     }
 
     @Override
     public Resolution resolve(PlayableRef ref, ContentItem item, Device device, Set<Capability> capabilities) {
-        PlayableRef.JellyfinItem wanted = (PlayableRef.JellyfinItem) ref;
+        JellyfinPlayable.Item wanted = (JellyfinPlayable.Item) ref;
         Optional<JellyfinSettings> settings = setup.settings();
         Optional<JellyfinConnection> connection = setup.connection();
         if (settings.isEmpty() || connection.isEmpty()) {
@@ -65,21 +65,21 @@ public class JellyfinPlayableResolver implements PlayableResolver {
     }
 
     /** Preview remains read-only; native startup wins but Cast remains an explicit retry. */
-    private static PlayableRef nativeStart(PlayableRef.JellyfinItem wanted, JellyfinSettings settings, Device device) {
+    private static PlayableRef nativeStart(JellyfinPlayable.Item wanted, JellyfinSettings settings, Device device) {
         if (settings.player(device.id()) == JellyfinSettings.Player.VLC) {
-            return new PlayableRef.JellyfinVlc(wanted.itemId());
+            return new JellyfinPlayable.Vlc(wanted.itemId());
         }
-        return new PlayableRef.JellyfinApp(wanted.itemId(), wanted.resumeTicks());
+        return new JellyfinPlayable.App(wanted.itemId(), wanted.resumeTicks());
     }
 
     /** The whole resolution when a controllable Jellyfin app is open on the device; otherwise a note why not. */
-    private Optional<Resolution> openSession(PlayableRef.JellyfinItem wanted, Device device, List<String> notes) {
+    private Optional<Resolution> openSession(JellyfinPlayable.Item wanted, Device device, List<String> notes) {
         try {
             Optional<JellyfinSession> open = sessions.sessionFor(device);
             if (open.isEmpty()) {
                 notes.add("no Jellyfin app is open on " + device.name());
             }
-            return open.map(session -> new Resolution(List.of(new PlayableRef.JellyfinSession(session.id(),
+            return open.map(session -> new Resolution(List.of(new JellyfinPlayable.Session(session.id(),
                     wanted.itemId(), wanted.resumeTicks(), session.client())), Set.of(Capability.JELLYFIN_CLIENT), List.of()));
         } catch (JellyfinException e) {
             notes.add("could not ask Jellyfin which apps are open (" + e.getMessage() + ")");
@@ -88,7 +88,7 @@ public class JellyfinPlayableResolver implements PlayableResolver {
     }
 
     /** The receiver message on a Cast device, or else a direct stream on a media renderer or local audio sink. */
-    private void addReceiverPlayable(PlayableRef.JellyfinItem wanted, JellyfinSettings settings, JellyfinConnection connection,
+    private void addReceiverPlayable(JellyfinPlayable.Item wanted, JellyfinSettings settings, JellyfinConnection connection,
                                      Device device, Set<Capability> capabilities, List<PlayableRef> playables,
                                      List<String> notes) {
         boolean cast = capabilities.contains(Capability.CAST_RECEIVER);

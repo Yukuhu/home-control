@@ -1,7 +1,6 @@
 package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.core.playback.ContentItem;
-import dev.andre.homecontrol.core.playback.PlayableRef;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +51,7 @@ public final class WorkflowCatalogs {
             item = snapshots.getOrDefault(workflowId, Map.of()).get(itemId);
         }
         if (item == null) return Optional.empty();
-        var ref = (PlayableRef.WorkflowCast) item.playables().getFirst();
+        var ref = (WorkflowCastRef) item.playables().getFirst();
         return store.find(workflowId).filter(definition -> definition.draft().enabled()
                         && definition.revision() == ref.revision())
                 .map(ignored -> item);
@@ -68,6 +67,6 @@ public final class WorkflowCatalogs {
         return entries.stream().map(entry -> new ContentItem(
                 definition.draft().mode() == WorkflowDraft.Mode.SINGLE ? definition.id() : definition.id() + "." + entry.key(),
                 WorkflowContentSource.SOURCE_ID, definition.draft().kind(), entry.title(), entry.subtitle(), entry.artwork(),
-                List.of(new PlayableRef.WorkflowCast(definition.id(), definition.revision(), entry.key())))).toList();
+                List.of(new WorkflowCastRef(definition.id(), definition.revision(), entry.key())))).toList();
     }
 }

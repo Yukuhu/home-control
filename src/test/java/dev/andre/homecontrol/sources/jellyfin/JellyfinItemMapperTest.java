@@ -2,7 +2,6 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
-import dev.andre.homecontrol.core.playback.PlayableRef;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -32,7 +31,7 @@ class JellyfinItemMapperTest {
         assertThat(item.subtitle()).isEqualTo("S2:E5 · The Long Night");
         assertThat(item.artwork()).isEqualTo(URI.create("/sources/jellyfin/images/3f2a9c1e7b6d4e5f8a9b0c1d2e3f4a5b/Primary?tag=1a2b3c4d5e6f"));
         assertThat(item.progress()).isEqualTo(0.425);
-        assertThat(item.playables()).containsExactly(new PlayableRef.JellyfinItem(
+        assertThat(item.playables()).containsExactly(new JellyfinPlayable.Item(
                 "4e1a2b3c4d5e4f60718293a4b5c6d7e8", "3f2a9c1e7b6d4e5f8a9b0c1d2e3f4a5b", 6_120_000_000L));
     }
 
@@ -52,7 +51,7 @@ class JellyfinItemMapperTest {
 
         assertThat(item.artwork()).isEqualTo(URI.create("/sources/jellyfin/images/7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a29/Primary?tag=b8a7c6d5e4f3"));
         assertThat(item.progress()).isNull();
-        assertThat(item.playables()).singleElement().extracting(ref -> ((PlayableRef.JellyfinItem) ref).resumeTicks()).isEqualTo(0L);
+        assertThat(item.playables()).singleElement().extracting(ref -> ((JellyfinPlayable.Item) ref).resumeTicks()).isEqualTo(0L);
     }
 
     @Test

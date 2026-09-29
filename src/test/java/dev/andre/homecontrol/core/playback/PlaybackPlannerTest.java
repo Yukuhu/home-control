@@ -2,6 +2,12 @@ package dev.andre.homecontrol.core.playback;
 
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.sources.jellyfin.JellyfinPlayable;
+import dev.andre.homecontrol.sources.jellyfin.JellyfinRoute;
+import dev.andre.homecontrol.sources.jellyfin.JellyfinSessionStrategy;
+import dev.andre.homecontrol.sources.youtube.YouTubeConfiguration;
+import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRef;
+import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRoute;
 import dev.andre.homecontrol.testsupport.Planners;
 import org.junit.jupiter.api.Test;
 
@@ -21,8 +27,8 @@ class PlaybackPlannerTest {
                     RouteStrategies.castLoad(), RouteStrategies.castStream(), RouteStrategies.renderer(),
                     RouteStrategies.localSink()));
 
-    private static final PlayableRef.JellyfinSession OPEN_APP =
-            new PlayableRef.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV");
+    private static final JellyfinPlayable.Session OPEN_APP =
+            new JellyfinPlayable.Session("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV");
 
     private static final PlayableRef.CastLoad JELLYFIN_LOAD =
             new PlayableRef.CastLoad("F007D354", Map.of("media", Map.of("contentId", "item-1")));
@@ -65,7 +71,7 @@ class PlaybackPlannerTest {
 
     @Test
     void anUnresolvedJellyfinItemMeansTheSourceIsSwitchedOff() {
-        assertThat(planner.plan(item(new PlayableRef.JellyfinItem("srv", "item-1", 0)), EnumSet.allOf(Capability.class)).first())
+        assertThat(planner.plan(item(new JellyfinPlayable.Item("srv", "item-1", 0)), EnumSet.allOf(Capability.class)).first())
                 .isEqualTo(new Route.Unroutable("Jellyfin is switched off on this server"));
     }
 
@@ -74,9 +80,9 @@ class PlaybackPlannerTest {
         Route route = planner.plan(item(LINK, JELLYFIN_MESSAGE, STREAM, OPEN_APP),
                 EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK, Capability.CAST_RECEIVER)).first();
 
-        assertThat(route).isEqualTo(new Route.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV"));
+        assertThat(route).isEqualTo(new JellyfinRoute.Session("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV"));
         assertThat(route.describe()).isEqualTo("Play in the open Jellyfin app (Android TV)");
-        assertThat(new Route.JellyfinSession("s", "i", 0, " ").describe()).isEqualTo("Play in the open Jellyfin app");
+        assertThat(new JellyfinRoute.Session("s", "i", 0, " ").describe()).isEqualTo("Play in the open Jellyfin app");
     }
 
     @Test
@@ -118,12 +124,12 @@ class PlaybackPlannerTest {
 
     @Test
     void loungeNeedsACastReceiver() {
-        PlaybackPlanner withLounge = new PlaybackPlanner(List.of(RouteStrategies.appLink(), new YouTubeLoungeStrategy()));
+        PlaybackPlanner withLounge = new PlaybackPlanner(List.of(RouteStrategies.appLink(), new YouTubeConfiguration().youTubeLoungeStrategy()));
 
-        assertThat(withLounge.plan(item(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")), EnumSet.of(Capability.APP_LINK)).first())
+        assertThat(withLounge.plan(item(new YouTubeLoungeRef("aqz-KE-bpKQ")), EnumSet.of(Capability.APP_LINK)).first())
                 .isEqualTo(new Route.Unroutable("this device is not a Cast receiver"));
-        assertThat(withLounge.plan(item(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")), EnumSet.of(Capability.CAST_RECEIVER)).first())
-                .isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ"));
+        assertThat(withLounge.plan(item(new YouTubeLoungeRef("aqz-KE-bpKQ")), EnumSet.of(Capability.CAST_RECEIVER)).first())
+                .isEqualTo(new YouTubeLoungeRoute("aqz-KE-bpKQ"));
     }
 
     @Test
@@ -183,7 +189,7 @@ class PlaybackPlannerTest {
         assertThat(configured.plan(item(JELLYFIN_LOAD, JELLYFIN_MESSAGE), EnumSet.of(Capability.CAST_RECEIVER)).first())
                 .isInstanceOf(Route.CastMessage.class);
         assertThat(configured.plan(item(LINK, OPEN_APP), EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK)).first())
-                .isInstanceOf(Route.JellyfinSession.class);
+                .isInstanceOf(JellyfinRoute.Session.class);
     }
 
     @Test

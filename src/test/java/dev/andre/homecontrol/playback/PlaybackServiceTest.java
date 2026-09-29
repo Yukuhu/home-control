@@ -20,7 +20,14 @@ import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.core.playback.RouteExecutor;
 import dev.andre.homecontrol.core.playback.RouteStrategies;
 import dev.andre.homecontrol.core.playback.UnroutableException;
-import dev.andre.homecontrol.core.playback.YouTubeLoungeStrategy;
+import dev.andre.homecontrol.sources.jellyfin.JellyfinPlayable;
+import dev.andre.homecontrol.sources.jellyfin.JellyfinRoute;
+import dev.andre.homecontrol.sources.workflows.WorkflowCastRef;
+import dev.andre.homecontrol.sources.workflows.WorkflowCastRoute;
+import dev.andre.homecontrol.sources.workflows.WorkflowConfiguration;
+import dev.andre.homecontrol.sources.youtube.YouTubeConfiguration;
+import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRef;
+import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRoute;
 import dev.andre.homecontrol.testsupport.Planners;
 import org.junit.jupiter.api.Test;
 
@@ -52,7 +59,7 @@ class PlaybackServiceTest {
             Map.of("androidtv", Map.of()), Instant.now());
     private final RouteExecutor executor = mock(RouteExecutor.class);
 
-    private static final PlayableRef.JellyfinItem WANTED = new PlayableRef.JellyfinItem("srv", "item-1", 600L);
+    private static final JellyfinPlayable.Item WANTED = new JellyfinPlayable.Item("srv", "item-1", 600L);
     private static final ContentItem JELLYFIN_ITEM = new ContentItem("item-1", "jellyfin", ContentKind.EPISODE,
             "Northern Lights", null, null, List.of(WANTED));
 
@@ -60,7 +67,7 @@ class PlaybackServiceTest {
         return new PlayableResolver() {
             @Override
             public boolean resolves(PlayableRef ref) {
-                return ref instanceof PlayableRef.JellyfinItem;
+                return ref instanceof JellyfinPlayable.Item;
             }
 
             @Override
@@ -74,12 +81,12 @@ class PlaybackServiceTest {
     void workflowPlansWithoutExecutingAndPlayDelegatesExactlyOnce() {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(Set.of(Capability.CAST_RECEIVER));
-        var route = new Route.WorkflowCast("w-0123456789ab", 1, "single");
+        var route = new WorkflowCastRoute("w-0123456789ab", 1, "single");
         var item = new ContentItem("w-0123456789ab", "workflows", ContentKind.VIDEO, "News", null, null,
-                List.of(new PlayableRef.WorkflowCast("w-0123456789ab", 1, "single")));
+                List.of(new WorkflowCastRef("w-0123456789ab", 1, "single")));
         given(executor.keys()).willReturn(Set.of("workflow-cast"));
         var workflows = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new dev.andre.homecontrol.core.playback.WorkflowCastStrategy())),
+                new PlaybackPlanner(List.of(new WorkflowConfiguration().workflowCastStrategy())),
                 List.of(), List.of(executor));
         assertThat(workflows.plan(item, "shield")).isEqualTo(route);
         assertThat(workflows.preview(item, "shield").routes()).containsExactly(route);
@@ -128,13 +135,13 @@ class PlaybackServiceTest {
         given(executor.keys()).willReturn(Set.of("jellyfin-session"));
         PlaybackService service = new PlaybackService(devices, commands, Planners.production(),
                 List.of(resolverReturning(new PlayableResolver.Resolution(
-                        List.of(new PlayableRef.JellyfinSession("s1", "item-1", 600L, "Android TV")),
+                        List.of(new JellyfinPlayable.Session("s1", "item-1", 600L, "Android TV")),
                         Set.of(Capability.JELLYFIN_CLIENT), List.of()))),
                 List.of(executor));
 
         Route route = service.play(JELLYFIN_ITEM, "shield");
 
-        assertThat(route).isEqualTo(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV"));
+        assertThat(route).isEqualTo(new JellyfinRoute.Session("s1", "item-1", 600L, "Android TV"));
         verify(executor).execute((DelegatedRoute) route, shield);
         verify(commands, never()).execute(any(), any());
     }
@@ -350,15 +357,15 @@ class PlaybackServiceTest {
         given(executor.keys()).willReturn(Set.of("jellyfin-session"));
         PlaybackService service = new PlaybackService(devices, commands, Planners.production(),
                 List.of(resolverReturning(new PlayableResolver.Resolution(
-                        List.of(new PlayableRef.JellyfinSession("s1", "item-1", 600L, "Android TV")),
+                        List.of(new JellyfinPlayable.Session("s1", "item-1", 600L, "Android TV")),
                         Set.of(Capability.JELLYFIN_CLIENT), List.of()))),
                 List.of(executor));
 
         PlayAttempt attempt = service.attempt(JELLYFIN_ITEM, "shield", Set.of());
 
         assertThat(attempt).isInstanceOfSatisfying(PlayAttempt.Played.class,
-                played -> assertThat(played.route()).isEqualTo(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV")));
-        verify(executor).execute(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV"), shield);
+                played -> assertThat(played.route()).isEqualTo(new JellyfinRoute.Session("s1", "item-1", 600L, "Android TV")));
+        verify(executor).execute(new JellyfinRoute.Session("s1", "item-1", 600L, "Android TV"), shield);
 
         willThrow(new ActionFailedException("Jellyfin refused")).given(executor).execute(any(), any());
 
@@ -389,7 +396,7 @@ class PlaybackServiceTest {
             Map.of("cast", Map.of()), Instant.now());
     private static final URI WATCH = URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ");
     private static final ContentItem LOUNGE_ITEM = new ContentItem("aqz-KE-bpKQ", "youtube", ContentKind.VIDEO,
-            "Big Buck Bunny", null, null, List.of(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")));
+            "Big Buck Bunny", null, null, List.of(new YouTubeLoungeRef("aqz-KE-bpKQ")));
 
     @Test
     void aLoungeRouteRunsThroughItsExecutor() {
@@ -397,11 +404,11 @@ class PlaybackServiceTest {
         given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
         given(executor.keys()).willReturn(Set.of("youtube-lounge"));
         PlaybackService service = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new YouTubeLoungeStrategy())), List.of(), List.of(executor));
+                new PlaybackPlanner(List.of(new YouTubeConfiguration().youTubeLoungeStrategy())), List.of(), List.of(executor));
 
         Route route = service.play(LOUNGE_ITEM, "kitchen");
 
-        assertThat(route).isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ"));
+        assertThat(route).isEqualTo(new YouTubeLoungeRoute("aqz-KE-bpKQ"));
         verify(executor).execute((DelegatedRoute) route, kitchen);
         verify(commands, never()).execute(any(), any());
     }
@@ -411,7 +418,7 @@ class PlaybackServiceTest {
         given(devices.device("kitchen")).willReturn(Optional.of(kitchen));
         given(devices.capabilities("kitchen")).willReturn(EnumSet.of(Capability.CAST_RECEIVER));
         PlaybackService service = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new YouTubeLoungeStrategy())), List.of(), List.of());
+                new PlaybackPlanner(List.of(new YouTubeConfiguration().youTubeLoungeStrategy())), List.of(), List.of());
 
         assertThatThrownBy(() -> service.play(LOUNGE_ITEM, "kitchen"))
                 .isInstanceOf(UnroutableException.class)
@@ -426,21 +433,21 @@ class PlaybackServiceTest {
         PlaybackService service = new PlaybackService(devices, commands,
                 Planners.production(), List.of(), List.of(executor));
         ContentItem item = LOUNGE_ITEM.withPlayables(List.of(new PlayableRef.AppLink(WATCH, "youtube"),
-                new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")));
+                new YouTubeLoungeRef("aqz-KE-bpKQ")));
         willThrow(new ActionFailedException("Shield refused to open the link"))
                 .given(commands).execute(eq("shield"), any(Action.OpenAppLink.class));
 
         assertThat(service.attempt(item, "shield", Set.of()))
                 .isInstanceOfSatisfying(PlayAttempt.Failed.class, failed -> {
                     assertThat(failed.route().key()).isEqualTo("app-link");
-                    assertThat(failed.remaining()).containsExactly(new Route.YouTubeLounge("aqz-KE-bpKQ"));
+                    assertThat(failed.remaining()).containsExactly(new YouTubeLoungeRoute("aqz-KE-bpKQ"));
                 });
         verify(executor, never()).execute(any(), any());
 
         assertThat(service.attempt(item, "shield", Set.of("app-link")))
                 .isInstanceOfSatisfying(PlayAttempt.Played.class,
-                        played -> assertThat(played.route()).isEqualTo(new Route.YouTubeLounge("aqz-KE-bpKQ")));
-        verify(executor).execute(new Route.YouTubeLounge("aqz-KE-bpKQ"), shield);
+                        played -> assertThat(played.route()).isEqualTo(new YouTubeLoungeRoute("aqz-KE-bpKQ")));
+        verify(executor).execute(new YouTubeLoungeRoute("aqz-KE-bpKQ"), shield);
     }
 
     @Test
@@ -451,14 +458,14 @@ class PlaybackServiceTest {
         given(other.keys()).willReturn(Set.of("youtube-lounge"));
         given(executor.keys()).willReturn(Set.of("workflow-cast"));
         var item = new ContentItem("w-0123456789ab", "workflows", ContentKind.VIDEO, "News", null, null,
-                List.of(new PlayableRef.WorkflowCast("w-0123456789ab", 1, "single")));
+                List.of(new WorkflowCastRef("w-0123456789ab", 1, "single")));
         var service = new PlaybackService(devices, commands,
-                new PlaybackPlanner(List.of(new dev.andre.homecontrol.core.playback.WorkflowCastStrategy())),
+                new PlaybackPlanner(List.of(new WorkflowConfiguration().workflowCastStrategy())),
                 List.of(), List.of(other, executor));
 
         service.play(item, "shield");
 
-        verify(executor).execute(new Route.WorkflowCast("w-0123456789ab", 1, "single"), shield);
+        verify(executor).execute(new WorkflowCastRoute("w-0123456789ab", 1, "single"), shield);
         verify(other, never()).execute(any(), any());
     }
 
@@ -468,7 +475,7 @@ class PlaybackServiceTest {
         given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
         PlaybackService service = new PlaybackService(devices, commands, Planners.production(),
                 List.of(resolverReturning(new PlayableResolver.Resolution(
-                        List.of(new PlayableRef.JellyfinSession("s1", "item-1", 600L, "Android TV")),
+                        List.of(new JellyfinPlayable.Session("s1", "item-1", 600L, "Android TV")),
                         Set.of(Capability.JELLYFIN_CLIENT), List.of()))),
                 List.of());
 
