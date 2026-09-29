@@ -24,7 +24,7 @@ Every setting, as a Spring property or an environment variable.
 | `home-control.deep-link-test.youtube-url` | Big Buck Bunny on YouTube | Video the test button opens |
 | `home-control.deep-link-test.timeout` | `10s` | How long the test button watches for the app to change (the setup page says so) |
 | `HOME_CONTROL_SECRET` | unset | Passphrase that encrypts `secrets.json`; without it a random `secret.key` is created next to it on first use |
-| `HOME_CONTROL_RESET_LOGIN` | `false` | `true` removes a forgotten login password, and the content sources' credentials, at startup; the TV pairings stay. Unset it again afterwards |
+| `HOME_CONTROL_RESET_LOGIN` | `false` | `true` removes a forgotten login password, and the content sources' credentials, at the first start with it; the TV pairings stay. It runs once; unset it again so a later reset can run |
 | `HOME_CONTROL_TRUSTED_ORIGINS` | empty | Comma-separated origins allowed to send changes, e.g. `https://home.example.org` behind a reverse proxy; their host names are also allowed |
 | `HOME_CONTROL_ALLOWED_HOSTS` | empty | Comma-separated extra host names the app answers to: exact names, or `*.example.org` for its subdomains |
 | `HOME_CONTROL_SECURE_COOKIE` | `false` | Mark the login cookie `Secure` when the app is only reached over HTTPS |
@@ -81,10 +81,16 @@ pairing and setting:
 - a keystore protected by the old default password `shield`, or by `change-me` from an older
   `compose.yaml`, is re-protected under a generated one.
 
-The upgrade is one-way: an older image cannot read the new files. Each original is kept once
-beside it as `<name>.v<n>.json`, for example `devices.v2.json`. To roll back, stop the app,
-restore those files and a copy of `secrets.json` from before the upgrade, and start the older
-image.
+The upgrade is one-way: an older image cannot read the new files, and it cannot open the
+re-protected `keystore.p12`. **Copy the whole data directory before you upgrade.** To roll back,
+stop the app, put that copy back in place, and start the older image. Without a copy there is
+no way back that keeps the Android TV pairings: delete `keystore.p12` and `secrets.json`, pair
+the TVs again and reconnect the content sources. Each original is also kept once beside it as
+`<name>.v<n>.json`, for example `devices.v2.json`; that copy still holds the LG and Samsung
+pairing keys in plain text, so delete it once the upgraded install works.
+
+Edit the files under `/data` only while the app is stopped: it reads each one once and would
+overwrite a change made while it runs.
 
 ## Renamed settings
 
