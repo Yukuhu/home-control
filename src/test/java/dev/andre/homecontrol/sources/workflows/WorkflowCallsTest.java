@@ -142,8 +142,9 @@ class WorkflowCallsTest {
             var draft = WorkflowFixtures.singleWith(List.of(call("slow", server.url("/slow").toString()),
                     call("broken1", server.url("/broken1").toString()), call("broken2", server.url("/broken2").toString())));
             long started = System.nanoTime();
-            assertThatThrownBy(() -> new WorkflowCalls(http).run(draft.calls(), WorkflowPlan.of(draft), Map.of(),
-                    new WorkflowCalls.Run(Duration.ofSeconds(10), 4), null))
+            var plan = WorkflowPlan.of(draft);
+            var run = new WorkflowCalls.Run(Duration.ofSeconds(10), 4);
+            assertThatThrownBy(() -> new WorkflowCalls(http).run(draft.calls(), plan, Map.of(), run, null))
                     .isInstanceOf(WorkflowException.class)
                     .hasMessageMatching("Call broken[12]: server returned HTTP 404");
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(3));
@@ -153,11 +154,15 @@ class WorkflowCallsTest {
     @Test void aRunNeverHasMoreFetchesAtOnceThanItsShare() throws Exception {
         var active = new AtomicInteger();
         var most = new AtomicInteger();
+        var overlap = new CountDownLatch(1);
         try (var server = new FakeWorkflowServer(); var http = client()) {
             for (String path : List.of("/a", "/b", "/c")) {
                 server.route(path, exchange -> {
-                    most.accumulateAndGet(active.incrementAndGet(), Math::max);
-                    try { Thread.sleep(150); } catch (InterruptedException _) { Thread.currentThread().interrupt(); }
+                    int now = active.incrementAndGet();
+                    most.accumulateAndGet(now, Math::max);
+                    if (now > 1) overlap.countDown();
+                    // Stay active until a second fetch overlaps (the failure) or a generous window shows none did.
+                    try { overlap.await(300, TimeUnit.MILLISECONDS); } catch (InterruptedException _) { Thread.currentThread().interrupt(); }
                     active.decrementAndGet();
                     reply(exchange, "{}");
                 });
@@ -179,8 +184,9 @@ class WorkflowCallsTest {
             });
             var draft = WorkflowFixtures.singleWith(List.of(call("slow", server.url("/slow").toString())));
             long started = System.nanoTime();
-            assertThatThrownBy(() -> new WorkflowCalls(http).run(draft.calls(), WorkflowPlan.of(draft), Map.of(),
-                    new WorkflowCalls.Run(Duration.ofMillis(300), 4), null))
+            var plan = WorkflowPlan.of(draft);
+            var run = new WorkflowCalls.Run(Duration.ofMillis(300), 4);
+            assertThatThrownBy(() -> new WorkflowCalls(http).run(draft.calls(), plan, Map.of(), run, null))
                     .isInstanceOf(WorkflowException.class);
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(2));
         } finally { release.countDown(); }
@@ -192,8 +198,9 @@ class WorkflowCallsTest {
             var chain = WorkflowFixtures.chain(server.url("/"));
             var plan = WorkflowPlan.of(chain);
             var known = Map.of("id", new WorkflowJson.Value("news", false), "token", new WorkflowJson.Value("t", true));
-            assertThatThrownBy(() -> new WorkflowCalls(http).run(plan.refreshCalls(CallScope.ENTRY), plan, known,
-                    new WorkflowCalls.Run(Duration.ofSeconds(5), 3), "News"))
+            var entryCalls = plan.refreshCalls(CallScope.ENTRY);
+            var run = new WorkflowCalls.Run(Duration.ofSeconds(5), 3);
+            assertThatThrownBy(() -> new WorkflowCalls(http).run(entryCalls, plan, known, run, "News"))
                     .hasMessage("Call images · entry \"News\": server returned HTTP 404");
         }
     }

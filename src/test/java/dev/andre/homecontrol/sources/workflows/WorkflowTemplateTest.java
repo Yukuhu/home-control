@@ -83,7 +83,8 @@ class WorkflowTemplateTest {
                 .isInstanceOf(WorkflowException.class)
                 .hasMessage("Workflow: call URL placeholder must be in a path or query value");
         var template = new WorkflowTemplate("https://api.example/{id}", Set.of("id"), "call URL", WorkflowException.Stage.FETCH);
-        assertThatThrownBy(() -> template.expand(Map.of("id", new WorkflowJson.Value("..", false))))
+        var values = Map.of("id", new WorkflowJson.Value("..", false));
+        assertThatThrownBy(() -> template.expand(values))
                 .hasMessage("Fetch JSON: dot path segment in call URL");
     }
 

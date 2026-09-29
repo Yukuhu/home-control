@@ -56,11 +56,13 @@ class WorkflowHttpClientTest {
         try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(5), 1)) {
             server.block("/slow", false, entered, release);
             server.respond("/next", 200, "{}");
-            CompletableFuture.runAsync(() -> client.fetch(request(server.url("/slow"))), Executors.newVirtualThreadPerTaskExecutor());
+            var slowRequest = request(server.url("/slow"));
+            CompletableFuture.runAsync(() -> client.fetch(slowRequest), Executors.newVirtualThreadPerTaskExecutor());
             assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
             long started = System.nanoTime();
             var next = request(server.url("/next"));
-            assertThatThrownBy(() -> client.fetch(next, in(Duration.ofMillis(200))))
+            var deadline = in(Duration.ofMillis(200));
+            assertThatThrownBy(() -> client.fetch(next, deadline))
                     .isInstanceOf(WorkflowException.class).hasMessageContaining("busy");
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isGreaterThanOrEqualTo(Duration.ofMillis(150));
             assertThat(server.count("/next")).isZero();
@@ -74,7 +76,8 @@ class WorkflowHttpClientTest {
             server.block("/slow", true, entered, release);
             long started = System.nanoTime();
             var slow = request(server.url("/slow"));
-            assertThatThrownBy(() -> client.fetch(slow, in(Duration.ofMillis(300))))
+            var deadline = in(Duration.ofMillis(300));
+            assertThatThrownBy(() -> client.fetch(slow, deadline))
                     .isInstanceOf(WorkflowException.class).hasMessageContaining("timed out");
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(2));
         } finally { release.countDown(); }
