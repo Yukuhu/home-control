@@ -1,7 +1,7 @@
 package dev.andre.homecontrol.core.playback;
 
-import dev.andre.homecontrol.HomeControlConfiguration;
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.testsupport.Planners;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -16,7 +16,7 @@ class YouTubeRoutesTest {
     private static final URI WATCH = URI.create("https://www.youtube.com/watch?v=aqz-KE-bpKQ");
     private static final PlayableRef.AppLink LINK = new PlayableRef.AppLink(WATCH, "youtube");
 
-    private final PlaybackPlanner planner = new HomeControlConfiguration().playbackPlanner();
+    private final PlaybackPlanner planner = Planners.production();
 
     /** Written out like YouTubeVideo.toItem(): core tests do not import sources. */
     private final ContentItem item = new ContentItem("aqz-KE-bpKQ", "youtube", ContentKind.VIDEO, "Big Buck Bunny",

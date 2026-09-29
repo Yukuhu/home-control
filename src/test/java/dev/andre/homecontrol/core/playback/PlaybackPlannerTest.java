@@ -2,6 +2,7 @@ package dev.andre.homecontrol.core.playback;
 
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.testsupport.Planners;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -16,9 +17,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PlaybackPlannerTest {
 
     private final PlaybackPlanner planner = new PlaybackPlanner(
-            List.of(new JellyfinSessionStrategy(), new AppLinkStrategy(), new CastMessageStrategy(),
-                    new CastLoadStrategy(), new CastStreamStrategy(), new MediaRendererStrategy(),
-                    new LocalAudioSinkStrategy()));
+            List.of(new JellyfinSessionStrategy(), RouteStrategies.appLink(), RouteStrategies.castMessage(),
+                    RouteStrategies.castLoad(), RouteStrategies.castStream(), RouteStrategies.renderer(),
+                    RouteStrategies.localSink()));
 
     private static final PlayableRef.JellyfinSession OPEN_APP =
             new PlayableRef.JellyfinSession("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV");
@@ -117,7 +118,7 @@ class PlaybackPlannerTest {
 
     @Test
     void loungeNeedsACastReceiver() {
-        PlaybackPlanner withLounge = new PlaybackPlanner(List.of(new AppLinkStrategy(), new YouTubeLoungeStrategy()));
+        PlaybackPlanner withLounge = new PlaybackPlanner(List.of(RouteStrategies.appLink(), new YouTubeLoungeStrategy()));
 
         assertThat(withLounge.plan(item(new PlayableRef.YouTubeLounge("aqz-KE-bpKQ")), EnumSet.of(Capability.APP_LINK)).first())
                 .isEqualTo(new Route.Unroutable("this device is not a Cast receiver"));
@@ -172,7 +173,7 @@ class PlaybackPlannerTest {
 
     @Test
     void theApplicationsPlannerUsesTheSpecOrder() {
-        PlaybackPlanner configured = new dev.andre.homecontrol.HomeControlConfiguration().playbackPlanner();
+        PlaybackPlanner configured = Planners.production();
         ContentItem everything = item(STREAM, JELLYFIN_LOAD, LINK);
 
         assertThat(configured.plan(everything, EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)).first())
@@ -201,7 +202,7 @@ class PlaybackPlannerTest {
 
     @Test
     void explainsThatAStreamWasNotAcceptedByARenderer() {
-        PlaybackPlanner withoutRenderers = new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy()));
+        PlaybackPlanner withoutRenderers = new PlaybackPlanner(List.of(RouteStrategies.appLink(), RouteStrategies.castStream()));
 
         assertThat(withoutRenderers.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER)).first())
                 .isInstanceOfSatisfying(Route.Unroutable.class,
@@ -213,7 +214,7 @@ class PlaybackPlannerTest {
 
     @Test
     void theApplicationsPlannerEndsWithTheMediaRenderer() {
-        PlaybackPlanner configured = new dev.andre.homecontrol.HomeControlConfiguration().playbackPlanner();
+        PlaybackPlanner configured = Planners.production();
 
         assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER)).first()).isInstanceOf(Route.Render.class);
         assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)).first())
@@ -244,7 +245,7 @@ class PlaybackPlannerTest {
                 .isInstanceOfSatisfying(Route.Unroutable.class,
                         unroutable -> assertThat(unroutable.reason()).contains("a Bluetooth speaker plays audio streams only"));
 
-        PlaybackPlanner withoutLocalAudio = new PlaybackPlanner(List.of(new AppLinkStrategy(), new CastStreamStrategy()));
+        PlaybackPlanner withoutLocalAudio = new PlaybackPlanner(List.of(RouteStrategies.appLink(), RouteStrategies.castStream()));
         assertThat(withoutLocalAudio.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK)).first())
                 .isInstanceOfSatisfying(Route.Unroutable.class,
                         unroutable -> assertThat(unroutable.reason()).contains("the stream was not accepted"));
@@ -255,7 +256,7 @@ class PlaybackPlannerTest {
 
     @Test
     void theApplicationsPlannerEndsWithTheLocalAudioSink() {
-        PlaybackPlanner configured = new dev.andre.homecontrol.HomeControlConfiguration().playbackPlanner();
+        PlaybackPlanner configured = Planners.production();
 
         assertThat(configured.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK)).first()).isInstanceOf(Route.PlayLocally.class);
         assertThat(configured.plan(item(AUDIO), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)).first())
@@ -287,11 +288,13 @@ class PlaybackPlannerTest {
     }
 
     @Test
-    void theFirstStrategyThatRoutesWins() {
+    void withinARungTheFirstStrategyThatRoutesWins() {
         URI firstUri = URI.create("https://www.netflix.com/title/1");
         URI secondUri = URI.create("https://www.dazn.com/title/2");
-        RouteStrategy first = (i, caps) -> Optional.of(new Route.OpenAppLink(firstUri, "netflix"));
-        RouteStrategy second = (i, caps) -> Optional.of(new Route.OpenAppLink(secondUri, "dazn"));
+        RouteStrategy first = RefStrategy.of(Rung.APP_LINK, Capability.APP_LINK, PlayableRef.AppLink.class,
+                (link, item) -> new Route.OpenAppLink(firstUri, "netflix"));
+        RouteStrategy second = RefStrategy.of(Rung.APP_LINK, Capability.APP_LINK, PlayableRef.AppLink.class,
+                (link, item) -> new Route.OpenAppLink(secondUri, "dazn"));
         PlaybackPlanner ordered = new PlaybackPlanner(List.of(first, second));
 
         assertThat(ordered.plan(item(new PlayableRef.AppLink(firstUri, "netflix")), Set.of(Capability.APP_LINK)).first())

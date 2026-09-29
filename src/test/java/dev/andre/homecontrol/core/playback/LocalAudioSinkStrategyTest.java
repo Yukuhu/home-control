@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class LocalAudioSinkStrategyTest {
 
-    private final LocalAudioSinkStrategy strategy = new LocalAudioSinkStrategy();
+    private final RouteStrategy strategy = RouteStrategies.localSink();
 
     private static ContentItem song(PlayableRef... playables) {
         return new ContentItem("x", "test", ContentKind.TRACK, "Bunny Song", "The Rabbits", null, List.of(playables));
@@ -42,15 +42,15 @@ class LocalAudioSinkStrategyTest {
     void refusesVideoAndNonHttpStreams() {
         PlayableRef.StreamUrl video = new PlayableRef.StreamUrl(URI.create("http://nas/film.mp4"), "video/mp4");
         assertThat(strategy.route(song(video), EnumSet.of(Capability.LOCAL_AUDIO_SINK))).isEmpty();
-        assertThat(LocalAudioSinkStrategy.playable(video)).isFalse();
+        assertThat(RouteStrategies.playsLocally(video)).isFalse();
 
         PlayableRef.StreamUrl file = new PlayableRef.StreamUrl(URI.create("file:///music/a.flac"), "audio/flac");
         assertThat(strategy.route(song(file), EnumSet.of(Capability.LOCAL_AUDIO_SINK))).isEmpty();
-        assertThat(LocalAudioSinkStrategy.playable(file)).isFalse();
+        assertThat(RouteStrategies.playsLocally(file)).isFalse();
 
         PlayableRef.StreamUrl https = new PlayableRef.StreamUrl(URI.create("HTTPS://nas/a.ogg"), "Audio/Ogg");
         assertThat(strategy.route(song(https), EnumSet.of(Capability.LOCAL_AUDIO_SINK))).isPresent();
-        assertThat(LocalAudioSinkStrategy.playable(https)).isTrue();
+        assertThat(RouteStrategies.playsLocally(https)).isTrue();
     }
 
     @Test

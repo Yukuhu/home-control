@@ -3,6 +3,7 @@ package dev.andre.homecontrol.core.playback;
 import dev.andre.homecontrol.core.Capability;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,7 +21,7 @@ public class PlaybackPlanner {
     private final List<RouteStrategy> strategies;
 
     public PlaybackPlanner(List<RouteStrategy> strategies) {
-        this.strategies = List.copyOf(strategies);
+        this.strategies = strategies.stream().sorted(Comparator.comparing(RouteStrategy::rung)).toList();
     }
 
     /** Every route the strategies offer, in preference order (spec §5.3), or the reasons none does. Pure. */
@@ -44,11 +45,11 @@ public class PlaybackPlanner {
     /**
      * Reasons no strategy routed, one per distinct playable kind. An {@link PlayableRef.AppLink}
      * only ever fails here for lacking the capability: with {@link Capability#APP_LINK} present,
-     * {@link AppLinkStrategy} would already have routed it, so there is no "was not accepted" case.
+     * {@link RouteStrategies#appLink()} would already have routed it, so there is no "was not accepted" case.
      * The same holds for {@link PlayableRef.CastLoad}/{@link PlayableRef.CastMessage}/
      * {@link PlayableRef.YouTubeLounge}/{@link PlayableRef.StreamUrl} and {@link Capability#CAST_RECEIVER}:
-     * with it present, {@link YouTubeLoungeStrategy}/{@link CastMessageStrategy}/{@link CastLoadStrategy}/
-     * {@link CastStreamStrategy} would already have routed it, so reaching here always means the capability is missing —
+     * with it present, {@link YouTubeLoungeStrategy}/{@link RouteStrategies#castMessage()}/{@link RouteStrategies#castLoad()}/
+     * {@link RouteStrategies#castStream()} would already have routed it, so reaching here always means the capability is missing —
      * except a {@link PlayableRef.StreamUrl} on a Cast receiver or media renderer whose strategy is absent or declined
      * it, which reads "the stream was not accepted". Falls
      * back to a generic reason when none applies (e.g. a planner without that strategy).
@@ -85,7 +86,7 @@ public class PlaybackPlanner {
         boolean localSink = capabilities.contains(Capability.LOCAL_AUDIO_SINK);
         boolean castOrRenderer = capabilities.contains(Capability.CAST_RECEIVER)
                 || capabilities.contains(Capability.MEDIA_RENDERER);
-        if (localSink && !LocalAudioSinkStrategy.playable(stream) && !castOrRenderer) {
+        if (localSink && !RouteStrategies.playsLocally(stream) && !castOrRenderer) {
             return "a Bluetooth speaker plays audio streams only";
         }
         return castOrRenderer || localSink ? "the stream was not accepted" : "this device cannot play a direct stream";
