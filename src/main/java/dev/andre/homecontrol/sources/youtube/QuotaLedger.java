@@ -1,14 +1,14 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.storage.StorageException;
+import dev.andre.homecontrol.storage.VersionedJsonFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -25,7 +25,7 @@ import java.util.Map;
 public class QuotaLedger {
 
     private static final Logger log = LoggerFactory.getLogger(QuotaLedger.class);
-    private static final JsonMapper MAPPER = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
     public static final ZoneId PACIFIC = ZoneId.of("America/Los_Angeles");
 
     public enum Call {
@@ -64,7 +64,14 @@ public class QuotaLedger {
         }
     }
 
-    private final Path file;
+    /** What youtube-quota.json holds: one Pacific-time day's usage. {@code day} is null when nothing was stored. */
+    record Stored(LocalDate day, int units, int searches, Map<String, Integer> calls) {
+        Stored {
+            calls = Collections.unmodifiableMap(new LinkedHashMap<>(calls));
+        }
+    }
+
+    private final VersionedJsonFile<Stored> file;
     private final Clock clock;
     private final int dailyUnits;
     private final int searchesPerDay;
@@ -73,8 +80,9 @@ public class QuotaLedger {
     private int searches;
     private final Map<String, Integer> calls = new LinkedHashMap<>();
 
-    public QuotaLedger(Path file, Clock clock, int dailyUnits, int searchesPerDay) {
-        this.file = file;
+    public QuotaLedger(Path path, Clock clock, int dailyUnits, int searchesPerDay) {
+        this.file = new VersionedJsonFile<>(path, "the YouTube quota", 1, () -> new Stored(null, 0, 0, Map.of()),
+                QuotaLedger::readStored, QuotaLedger::writeStored);
         this.clock = clock;
         this.dailyUnits = dailyUnits;
         this.searchesPerDay = searchesPerDay;
@@ -120,11 +128,7 @@ public class QuotaLedger {
         units = 0;
         searches = 0;
         calls.clear();
-        try {
-            Files.deleteIfExists(file);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not delete " + file, e);
-        }
+        file.delete();
     }
 
     YouTubeException exhaustedException() {
@@ -155,28 +159,25 @@ public class QuotaLedger {
         }
     }
 
+    /** Today's stored usage, if any. An unreadable file is moved aside and the count starts from zero. */
     private void load() {
-        if (!Files.exists(file)) {
-            return;
-        }
         try {
-            JsonNode root = MAPPER.readTree(Files.readAllBytes(file));
-            if (root.path("version").asInt(0) != 1 || root.path("day").asString("").isBlank()) {
-                throw new IllegalStateException("unexpected shape");
-            }
-            if (!LocalDate.parse(root.path("day").asString("")).equals(day)) {
+            Stored stored = file.read();
+            if (stored.day() == null || !stored.day().equals(day)) {
                 return;
             }
-            units = root.path("units").asInt(0);
-            searches = root.path("searches").asInt(0);
-            root.path("calls").properties().forEach(entry -> calls.put(entry.getKey(), entry.getValue().asInt(0)));
-        } catch (IOException | RuntimeException e) {
-            Path aside = file.resolveSibling(file.getFileName() + ".corrupt-" + clock.instant().getEpochSecond());
-            log.warn("YouTube quota file {} is unreadable ({}); moved to {} and counting from zero", file, e.getMessage(), aside);
+            units = stored.units();
+            searches = stored.searches();
+            calls.putAll(stored.calls());
+        } catch (StorageException e) {
+            Path path = file.file();
+            Path aside = path.resolveSibling(path.getFileName() + ".corrupt-" + clock.instant().getEpochSecond());
+            log.warn("YouTube quota file {} is unreadable ({}); moved to {} and counting from zero", path,
+                    e.getCause() == null ? e.getMessage() : e.getCause().getMessage(), aside);
             try {
-                Files.move(file, aside, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(path, aside, StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException moveFailed) {
-                log.warn("Could not move {} aside: {}", file, moveFailed.getMessage());
+                log.warn("Could not move {} aside: {}", path, moveFailed.getMessage());
             }
             units = 0;
             searches = 0;
@@ -185,20 +186,27 @@ public class QuotaLedger {
     }
 
     private void write() {
-        ObjectNode root = MAPPER.createObjectNode();
-        root.put("version", 1);
-        root.put("day", day.toString());
-        root.put("units", units);
-        root.put("searches", searches);
-        ObjectNode callsNode = root.putObject("calls");
-        calls.forEach(callsNode::put);
-        try {
-            Files.createDirectories(file.getParent());
-            Path temp = Files.createTempFile(file.getParent(), ".youtube-quota-", ".tmp");
-            Files.write(temp, MAPPER.writeValueAsBytes(root));
-            Files.move(temp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not write " + file, e);
+        file.write(new Stored(day, units, searches, calls));
+    }
+
+    private static Stored readStored(JsonNode root) {
+        String storedDay = root.path("day").asString("");
+        if (storedDay.isBlank()) {
+            throw new IllegalArgumentException("day is required");
         }
+        Map<String, Integer> storedCalls = new LinkedHashMap<>();
+        root.path("calls").properties().forEach(entry -> storedCalls.put(entry.getKey(), entry.getValue().asInt(0)));
+        return new Stored(LocalDate.parse(storedDay), root.path("units").asInt(0), root.path("searches").asInt(0),
+                storedCalls);
+    }
+
+    private static ObjectNode writeStored(Stored stored) {
+        ObjectNode root = MAPPER.createObjectNode();
+        root.put("day", stored.day().toString());
+        root.put("units", stored.units());
+        root.put("searches", stored.searches());
+        ObjectNode callsNode = root.putObject("calls");
+        stored.calls().forEach(callsNode::put);
+        return root;
     }
 }

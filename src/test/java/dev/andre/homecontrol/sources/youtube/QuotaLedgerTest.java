@@ -35,6 +35,17 @@ class QuotaLedgerTest {
     }
 
     @Test
+    void theLedgerIsWrittenOwnerOnly() throws IOException {
+        org.assertj.core.api.Assumptions.assumeThat(file.getFileSystem().supportedFileAttributeViews()).contains("posix");
+        QuotaLedger ledger = new QuotaLedger(file, clock, 10000, 20);
+
+        ledger.charge(QuotaLedger.Call.VIDEOS_LIST);
+
+        assertThat(java.nio.file.attribute.PosixFilePermissions.toString(java.nio.file.Files.getPosixFilePermissions(file)))
+                .isEqualTo("rw-------");
+    }
+
+    @Test
     void chargesDocumentedUnits() {
         QuotaLedger ledger = new QuotaLedger(file, clock, 10000, 20);
 
