@@ -144,7 +144,9 @@ class WorkflowCallsTest {
             long started = System.nanoTime();
             var plan = WorkflowPlan.of(draft);
             var run = new WorkflowCalls.Run(Duration.ofSeconds(10), 4);
-            assertThatThrownBy(() -> new WorkflowCalls(http).run(draft.calls(), plan, Map.of(), run, null))
+            var engine = new WorkflowCalls(http);
+            var calls = draft.calls();
+            assertThatThrownBy(() -> engine.run(calls, plan, Map.of(), run, null))
                     .isInstanceOf(WorkflowException.class)
                     .hasMessageMatching("Call broken[12]: server returned HTTP 404");
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(3));
@@ -186,7 +188,9 @@ class WorkflowCallsTest {
             long started = System.nanoTime();
             var plan = WorkflowPlan.of(draft);
             var run = new WorkflowCalls.Run(Duration.ofMillis(300), 4);
-            assertThatThrownBy(() -> new WorkflowCalls(http).run(draft.calls(), plan, Map.of(), run, null))
+            var engine = new WorkflowCalls(http);
+            var calls = draft.calls();
+            assertThatThrownBy(() -> engine.run(calls, plan, Map.of(), run, null))
                     .isInstanceOf(WorkflowException.class);
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(2));
         } finally { release.countDown(); }

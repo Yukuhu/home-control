@@ -78,7 +78,8 @@ class WorkflowTemplateTest {
     }
 
     @Test void callUrlErrorsUseTheirLabelAndStage() {
-        assertThatThrownBy(() -> new WorkflowTemplate("https://{host}/x", Set.of("host"), "call URL",
+        var hostOnly = Set.of("host");
+        assertThatThrownBy(() -> new WorkflowTemplate("https://{host}/x", hostOnly, "call URL",
                 WorkflowException.Stage.WORKFLOW))
                 .isInstanceOf(WorkflowException.class)
                 .hasMessage("Workflow: call URL placeholder must be in a path or query value");
