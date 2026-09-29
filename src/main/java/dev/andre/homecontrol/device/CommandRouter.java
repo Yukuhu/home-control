@@ -2,10 +2,11 @@ package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
-import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -18,7 +19,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /** Sends commands and questions to a device through the first of its adapters that can take them. Lock-free. */
-final class CommandRouter {
+final class CommandRouter implements DeviceCommands {
 
     private static final String NO_DEVICE_PREFIX = "No device with id ";
     private static final String NOT_CONNECTED_SUFFIX = " is not connected";
@@ -42,7 +43,8 @@ final class CommandRouter {
      * capability none of the device's adapters declare is plainly unsupported. Nothing is
      * retried later (commands are ephemeral).
      */
-    void execute(String id, Action action) {
+    @Override
+    public void execute(String id, Action action) {
         Device device = registry.findById(id)
                 .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
         Map<String, DeviceHandle> deviceHandles = connections.handles(id);
@@ -82,7 +84,8 @@ final class CommandRouter {
      * {@link Capability#CAST_RECEIVER} are asked, with the same fall-through (offline or unsupported
      * hands over; a refusal or no answer, {@link ActionFailedException}, ends it).
      */
-    Map<String, Object> query(String id, CastAppQuery query) {
+    @Override
+    public Map<String, Object> query(String id, CastAppQuery query) {
         Device device = registry.findById(id)
                 .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
         Map<String, DeviceHandle> deviceHandles = connections.handles(id);

@@ -26,17 +26,18 @@ class DevicesTest {
     void assembleWiresOneConnectionMapForQueriesCommandsAndEnrollment() {
         StubAdapter stub = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false, Capability.REMOTE_KEYS);
         List<Object> published = new CopyOnWriteArrayList<>();
-        Devices devices = Devices.assemble(new JsonFileDeviceRegistry(dir.resolve("devices.json")), List.of(stub),
-                published::add);
         Action pressHome = new Action.PressKey(RemoteKey.HOME);
 
-        devices.enrollment().adopt(new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.5",
-                Map.of("stub", Map.of()), Instant.EPOCH));
-        devices.commands().execute("tv", pressHome);
+        try (Devices devices = Devices.assemble(new JsonFileDeviceRegistry(dir.resolve("devices.json")),
+                List.of(stub), published::add)) {
+            devices.start();
+            devices.enrollment().adopt(new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.5",
+                    Map.of("stub", Map.of()), Instant.EPOCH));
+            devices.commands().execute("tv", pressHome);
 
-        assertThat(devices.queries().state("tv").status()).isEqualTo(DeviceStatus.CONNECTED);
-        assertThat(stub.handles.get("tv").executed).containsExactly(pressHome);
-        devices.connections().closeAll();
+            assertThat(devices.queries().state("tv").status()).isEqualTo(DeviceStatus.CONNECTED);
+            assertThat(stub.handles.get("tv").executed).containsExactly(pressHome);
+        }
         assertThat(stub.handles.get("tv").closed).isTrue();
     }
 }

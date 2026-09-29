@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceSettings;
 import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.core.MacAddress;
 import dev.andre.homecontrol.core.WakeOnLanAdapter;
@@ -17,7 +18,7 @@ import java.util.function.BooleanSupplier;
  * The adapter settings a handle learns while connected and the Wake-on-LAN MAC the user types in. Every rewrite of a
  * device entry runs under the shared {@link RegistryLock}.
  */
-final class AdapterSettingsStore {
+final class AdapterSettingsStore implements DeviceSettings {
 
     private static final String NO_DEVICE_PREFIX = "No device with id ";
 
@@ -70,14 +71,16 @@ final class AdapterSettingsStore {
     }
 
     /** True when one of the device's adapters can switch it on with Wake-on-LAN. */
-    boolean wakesOnLan(String id) {
+    @Override
+    public boolean wakesOnLan(String id) {
         return registry.findById(id)
                 .map(device -> device.adapters().keySet().stream()
                         .anyMatch(adapterId -> adapters.get(adapterId) instanceof WakeOnLanAdapter))
                 .orElse(false);
     }
 
-    Optional<String> wakeOnLanMac(String id) {
+    @Override
+    public Optional<String> wakeOnLanMac(String id) {
         return registry.findById(id).flatMap(device -> device.adapters().keySet().stream()
                 .filter(adapterId -> adapters.get(adapterId) instanceof WakeOnLanAdapter)
                 .map(adapterId -> device.adapterSettings(adapterId).get(WakeOnLanAdapter.MAC_ADDRESS))
@@ -91,7 +94,8 @@ final class AdapterSettingsStore {
      * the registry when they wake the device. An invalid MAC throws {@link IllegalArgumentException}
      * before anything is written.
      */
-    void setWakeOnLanMac(String id, String mac) {
+    @Override
+    public void setWakeOnLanMac(String id, String mac) {
         boolean clear = mac == null || mac.isBlank();
         String normalized = clear ? null : MacAddress.normalize(mac);
         synchronized (lock) {
