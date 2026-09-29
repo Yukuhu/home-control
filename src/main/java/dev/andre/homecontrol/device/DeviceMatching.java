@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /** Which registered device a paired or discovered adapter belongs to: pure functions over a snapshot, no registry, adapters or DNS. */
@@ -43,40 +45,41 @@ final class DeviceMatching {
                 Map.of(adapterId, Map.copyOf(settings)), now);
     }
 
-    /** Same address first; otherwise the single device with the same name. Never one that already has the adapter. */
-    static Optional<Device> bestMatch(List<Device> registered, DiscoveredDevice found) {
+    /**
+     * The device a discovered receiver belongs to, for "Add" and the automatic merge. Among devices without the
+     * receiver's adapter: the one at the receiver's address; otherwise the single one with the receiver's name, unless
+     * that name or that address belongs to another registered device, where the receiver would belong instead.
+     */
+    static Optional<Device> owner(List<Device> registered, DiscoveredDevice found) {
         List<Device> candidates = registered.stream().filter(device -> !device.hasAdapter(found.adapterId())).toList();
-        Optional<Device> byHost = candidates.stream()
-                .filter(device -> device.host().equalsIgnoreCase(found.host()))
-                .findFirst();
-        if (byHost.isPresent()) {
-            return byHost;
-        }
-        List<Device> byName = candidates.stream().filter(device -> sameName(device.name(), found.name())).toList();
-        return byName.size() == 1 ? Optional.of(byName.getFirst()) : Optional.empty();
+        return pick(candidates, found.host(), found.name(), Device::host, Device::name,
+                chosen -> registered.stream().anyMatch(other -> !other.id().equals(chosen.id())
+                        && (sameName(other.name(), found.name()) || other.host().equalsIgnoreCase(found.host()))));
     }
 
     /**
-     * For a newly adopted device: the receiver at its address, or else the single receiver with its name — and only
-     * when no other registered device shares that name or that receiver's address, where it would belong instead.
+     * The receiver a newly adopted device absorbs: the same rule, seen from the device. The one at its address;
+     * otherwise the single one with its name, unless another registered device shares that name or sits at that
+     * receiver's address.
      */
     static Optional<DiscoveredDevice> absorbable(Device device, List<DiscoveredDevice> receivers, List<Device> others) {
-        Optional<DiscoveredDevice> byHost = receivers.stream()
-                .filter(found -> found.host().equalsIgnoreCase(device.host()))
-                .findFirst();
+        return pick(receivers, device.host(), device.name(), DiscoveredDevice::host, DiscoveredDevice::name,
+                chosen -> others.stream().anyMatch(other ->
+                        sameName(other.name(), device.name()) || other.host().equalsIgnoreCase(chosen.host())));
+    }
+
+    /** Same address first; otherwise the single same-named candidate, unless it belongs elsewhere. */
+    private static <T> Optional<T> pick(List<T> candidates, String host, String name, Function<T, String> hostOf,
+                                        Function<T, String> nameOf, Predicate<T> belongsElsewhere) {
+        Optional<T> byHost = candidates.stream().filter(c -> hostOf.apply(c).equalsIgnoreCase(host)).findFirst();
         if (byHost.isPresent()) {
             return byHost;
         }
-        List<DiscoveredDevice> byName = receivers.stream()
-                .filter(found -> sameName(found.name(), device.name()))
-                .toList();
-        if (byName.size() != 1) {
+        List<T> byName = candidates.stream().filter(c -> sameName(nameOf.apply(c), name)).toList();
+        if (byName.size() != 1 || belongsElsewhere.test(byName.getFirst())) {
             return Optional.empty();
         }
-        DiscoveredDevice only = byName.getFirst();
-        boolean belongsElsewhere = others.stream().anyMatch(other ->
-                sameName(other.name(), device.name()) || other.host().equalsIgnoreCase(only.host()));
-        return belongsElsewhere ? Optional.empty() : Optional.of(only);
+        return Optional.of(byName.getFirst());
     }
 
     static boolean sameName(String a, String b) {
