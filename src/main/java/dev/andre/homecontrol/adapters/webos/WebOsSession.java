@@ -17,7 +17,7 @@ import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.core.WakeOnLanAdapter;
+import dev.andre.homecontrol.core.WakeOnLanSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
@@ -246,7 +246,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
             update(s -> s.withPower(false));
             return;
         }
-        String mac = current().adapterSettings(WebOsSettings.ADAPTER_ID).get(WakeOnLanAdapter.MAC_ADDRESS);
+        String mac = current().adapterSettings(WebOsSettings.ADAPTER_ID).get(WakeOnLanSettings.MAC_ADDRESS);
         if (mac == null || mac.isBlank()) {
             throw new DeviceOfflineException(device.name() + " is off and no MAC address is known for Wake-on-LAN;"
                     + " switch it on once by hand or enter its MAC address on the setup page");
@@ -348,7 +348,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
                     .ifPresent(mac -> {
                         WebOsSettings settings = WebOsSettings.of(current(), secrets);
                         if (!settings.macAddressManual() && !mac.equals(settings.macAddress())) {
-                            learned.store(Map.of(WakeOnLanAdapter.MAC_ADDRESS, mac));
+                            learned.store(Map.of(WakeOnLanSettings.MAC_ADDRESS, mac));
                         }
                     });
         } catch (IOException e) {

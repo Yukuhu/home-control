@@ -33,7 +33,6 @@ import dev.andre.homecontrol.core.SpeakerGroup;
 import dev.andre.homecontrol.core.SpeakerTopology;
 import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.core.WakeOnLanAdapter;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -416,12 +415,12 @@ class DevicesTest {
     }
 
     /** A TV adapter that wakes its devices; remembers the {@link LearnedSettings} each connect got. */
-    static class WakingAdapter extends StubAdapter implements WakeOnLanAdapter {
+    static class WakingAdapter extends StubAdapter {
 
         final Map<String, LearnedSettings> learned = new ConcurrentHashMap<>();
 
         WakingAdapter() {
-            super("waking", DeviceKind.WEBOS, false, false, Capability.REMOTE_KEYS);
+            super("waking", DeviceKind.WEBOS, false, false, Capability.REMOTE_KEYS, Capability.WAKE_ON_LAN);
         }
 
         @Override
@@ -453,7 +452,7 @@ class DevicesTest {
     }
 
     @Test
-    void onlyDevicesWithAWakeOnLanAdapterWakeOnLan() {
+    void onlyDevicesWithAWakeOnLanCapabilityWakeOnLan() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
         try (Devices devices = wakingDevices(registry)) {
             assertThat(devices.settings().wakesOnLan("tv")).isTrue();
