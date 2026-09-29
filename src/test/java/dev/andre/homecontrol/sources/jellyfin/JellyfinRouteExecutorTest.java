@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -9,6 +10,7 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.device.DeviceManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -16,6 +18,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -50,6 +53,12 @@ class JellyfinRouteExecutorTest {
         return new JellyfinSession(id, "jf-shield", "Shield", "Android TV", "10.0.0.5", Instant.now(), true);
     }
 
+    /** The Shield's Android TV remote is up unless a test says otherwise. */
+    @BeforeEach
+    void theShieldCanBeWokenAndLaunched() {
+        given(devices.capabilities("shield")).willReturn(Set.of(Capability.APP_LINK, Capability.REMOTE_KEYS));
+    }
+
     @Test
     void productionWaitsAreTwoSecondsBetweenCommandsAndAQuarterSecondPerStep() {
         assertThat(JellyfinRouteExecutor.RETRY).isEqualTo(Duration.ofSeconds(2));
@@ -68,6 +77,17 @@ class JellyfinRouteExecutorTest {
 
         verify(sessions).playNow("s1", "item-1", 600L);
         verifyNoInteractions(devices);
+    }
+
+    /** Android TV switched off: the Shield has no remote to wake or launch with, so the open session plays as is. */
+    @Test
+    void aShieldWithoutItsAndroidTvRemotePlaysTheOpenSessionDirectly() {
+        given(devices.capabilities("shield")).willReturn(Set.of());
+
+        executor.execute(new Route.JellyfinSession("s1", "item-1", 600L, "Android TV"), shield);
+
+        verify(sessions).playNow("s1", "item-1", 600L);
+        verify(devices, never()).execute(anyString(), any());
     }
 
     @Test

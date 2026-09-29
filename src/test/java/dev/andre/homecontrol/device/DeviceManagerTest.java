@@ -173,6 +173,30 @@ class DeviceManagerTest {
         }
     }
 
+    /** With Android TV switched off, its pairing (bound to the device id) must not move to another id or device. */
+    @Test
+    void anEntryOfASwitchedOffModuleIsNeitherMergedNorSplit() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        registry.save(new Device("shield-10-0-0-5", "Shield", DeviceKind.ANDROID_TV, "10.0.0.5",
+                Map.of("androidtv", Map.of()), Instant.now()));
+        registry.save(new Device("cast-10-0-0-6", "Receiver", DeviceKind.CAST, "10.0.0.6",
+                Map.of("cast", Map.of("port", "8009")), Instant.now()));
+        registry.save(new Device("tv-10-0-0-7", "Living Room", DeviceKind.ANDROID_TV, "10.0.0.7",
+                Map.of("androidtv", Map.of(), "cast", Map.of("port", "8009")), Instant.now()));
+
+        try (DeviceManager manager = new DeviceManager(registry, List.of(), publisher)) {
+            manager.start();
+
+            assertThatThrownBy(() -> manager.merge("cast-10-0-0-6", "shield-10-0-0-5"))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("androidtv module is switched off");
+            assertThatThrownBy(() -> manager.split("tv-10-0-0-7", "androidtv"))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("androidtv module is switched off");
+            assertThat(registry.findById("shield-10-0-0-5")).isPresent();
+            assertThat(registry.findById("cast-10-0-0-6").orElseThrow().hasAdapter("androidtv")).isFalse();
+            assertThat(registry.findById("tv-10-0-0-7").orElseThrow().adapters()).containsOnlyKeys("androidtv", "cast");
+        }
+    }
+
     @Test
     void anUnknownDeviceIsNotFoundAndAnUnsupportedActionIsRejected() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));

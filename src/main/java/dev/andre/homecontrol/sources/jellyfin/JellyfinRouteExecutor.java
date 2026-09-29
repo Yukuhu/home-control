@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
@@ -15,6 +16,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -67,7 +69,7 @@ public class JellyfinRouteExecutor implements RouteExecutor {
                 case Route.JellyfinApp(var itemId, var startPositionTicks) ->
                         sessions.playNow(prepare(device), itemId, startPositionTicks);
                 case Route.JellyfinSession(var sessionId, var itemId, var startPositionTicks, _) -> {
-                    String id = device.hasAdapter("androidtv") ? prepare(device) : sessionId;
+                    String id = hasAndroidTvRemote(device) ? prepare(device) : sessionId;
                     sessions.playNow(id, itemId, startPositionTicks);
                 }
                 default -> throw new IllegalArgumentException("Not a Jellyfin route");
@@ -75,6 +77,18 @@ public class JellyfinRouteExecutor implements RouteExecutor {
         } catch (JellyfinException | IllegalArgumentException e) {
             throw new ActionFailedException("Jellyfin could not start playback on " + device.name() + " (" + e.getMessage() + ")");
         }
+    }
+
+    /**
+     * Whether the device can be woken and have Jellyfin launched now, as the resolver decides: an Android TV entry alone
+     * is not enough when the Android TV module is switched off.
+     */
+    private boolean hasAndroidTvRemote(Device device) {
+        if (!device.hasAdapter("androidtv")) {
+            return false;
+        }
+        Set<Capability> capabilities = devices.capabilities(device.id());
+        return capabilities.contains(Capability.APP_LINK) && capabilities.contains(Capability.REMOTE_KEYS);
     }
 
     private String prepare(Device device) {

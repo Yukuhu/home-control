@@ -572,7 +572,11 @@ public class DeviceManager implements AutoCloseable {
                     throw new IllegalArgumentException(target.name() + " already has a " + adapterId + " connection");
                 }
                 DeviceAdapter adapter = adapters.get(adapterId);
-                if (adapter != null && adapter.credentialsBoundToDeviceId()) {
+                if (adapter == null) {
+                    // Its pairing may be bound to the source's id (Android TV's is), so it stays where it is.
+                    throw new IllegalArgumentException("The " + adapterId + " module is switched off");
+                }
+                if (adapter.credentialsBoundToDeviceId()) {
                     throw new IllegalArgumentException("Merge the other way round: the " + adapterId
                             + " pairing of " + source.name() + " only works under its own id");
                 }
@@ -600,7 +604,10 @@ public class DeviceManager implements AutoCloseable {
                 throw new IllegalArgumentException(device.name() + " has only one connection; there is nothing to split");
             }
             DeviceAdapter adapter = adapters.get(adapterId);
-            if (adapter != null && adapter.credentialsBoundToDeviceId()) {
+            if (adapter == null) {
+                throw new IllegalArgumentException("The " + adapterId + " module is switched off");
+            }
+            if (adapter.credentialsBoundToDeviceId()) {
                 throw new IllegalArgumentException("The " + adapterId + " pairing belongs to " + device.name()
                         + " and cannot be split off; split the other connections instead");
             }
@@ -608,10 +615,10 @@ public class DeviceManager implements AutoCloseable {
             remaining.remove(adapterId);
             Device rest = new Device(device.id(), device.name(), device.kind(), device.host(), remaining, device.lastSeen());
             // A receiver merged in from another address takes that address with it.
-            String host = adapter != null ? adapter.hostOf(device) : device.host();
+            String host = adapter.hostOf(device);
             Device split = new Device(uniqueId(registry.findAll(), adapterId, host),
                     device.name() + " (" + adapterId + ")",
-                    adapter != null ? adapter.kind() : device.kind(), host,
+                    adapter.kind(), host,
                     Map.of(adapterId, device.adapterSettings(adapterId)), device.lastSeen());
             registry.save(rest);
             registry.save(split);
