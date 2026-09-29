@@ -41,7 +41,6 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -348,7 +347,7 @@ public class DeviceManager implements AutoCloseable {
     public void adopt(Device device) {
         synchronized (lock) {
             Device adopted = registry.findById(device.id())
-                    .map(existing -> keepOtherAdapters(existing, device))
+                    .map(existing -> DeviceMatching.keepOtherAdapters(existing, device))
                     .orElse(device);
             adopted = absorbAddable(adopted);
             registry.save(adopted);
@@ -383,7 +382,7 @@ public class DeviceManager implements AutoCloseable {
     public Device attach(String host, String name, DeviceKind kind, String adapterId, Map<String, String> settings) {
         Device merged;
         synchronized (lock) {
-            merged = DeviceMerge.attach(registry.findAll(), host, name, kind, adapterId, settings,
+            merged = DeviceMatching.attach(registry.findAll(), host, name, kind, adapterId, settings,
                     Instant.now(), Hosts::same);
             adopt(merged);
             merged = registry.findById(merged.id()).orElse(merged);
@@ -528,9 +527,9 @@ public class DeviceManager implements AutoCloseable {
             if (isRegistered(registered, found)) {
                 throw new IllegalArgumentException(found.name() + " is already added");
             }
-            Device device = bestMatch(registered, found)
+            Device device = DeviceMatching.bestMatch(registered, found)
                     .map(target -> target.withAdapter(adapterId, settings))
-                    .orElseGet(() -> new Device(uniqueId(registered, adapterId, found.host()), found.name(),
+                    .orElseGet(() -> new Device(DeviceMatching.uniqueId(registered, adapterId, found.host()), found.name(),
                             adapter.kind(), found.host(), Map.of(adapterId, settings), Instant.now()));
             registry.save(device);
             connect(device);
@@ -563,7 +562,7 @@ public class DeviceManager implements AutoCloseable {
                 reconnectIfMoved(carrier.get(), found.adapterId(), settings.get());
                 return;
             }
-            bestMatch(registered, found).ifPresent(target -> {
+            DeviceMatching.bestMatch(registered, found).ifPresent(target -> {
                 Device merged = target.withAdapter(found.adapterId(), settings.get());
                 registry.save(merged);
                 connect(merged);
@@ -661,7 +660,7 @@ public class DeviceManager implements AutoCloseable {
             Device rest = new Device(device.id(), device.name(), device.kind(), device.host(), remaining, device.lastSeen());
             // A receiver merged in from another address takes that address with it.
             String host = adapter.hostOf(device);
-            Device split = new Device(uniqueId(registry.findAll(), adapterId, host),
+            Device split = new Device(DeviceMatching.uniqueId(registry.findAll(), adapterId, host),
                     device.name() + " (" + adapterId + ")",
                     adapter.kind(), host,
                     Map.of(adapterId, device.adapterSettings(adapterId)), device.lastSeen());
@@ -689,29 +688,6 @@ public class DeviceManager implements AutoCloseable {
         return adapter != null && registered.stream().anyMatch(device -> adapter.carries(device, found));
     }
 
-    /** Same address first; otherwise the single device with the same name. Never one that already has the adapter. */
-    static Optional<Device> bestMatch(List<Device> registered, DiscoveredDevice found) {
-        List<Device> candidates = registered.stream().filter(device -> !device.hasAdapter(found.adapterId())).toList();
-        Optional<Device> byHost = candidates.stream()
-                .filter(device -> device.host().equalsIgnoreCase(found.host()))
-                .findFirst();
-        if (byHost.isPresent()) {
-            return byHost;
-        }
-        List<Device> byName = candidates.stream().filter(device -> sameName(device.name(), found.name())).toList();
-        return byName.size() == 1 ? Optional.of(byName.getFirst()) : Optional.empty();
-    }
-
-    static boolean sameName(String a, String b) {
-        return a != null && b != null && a.strip().equalsIgnoreCase(b.strip());
-    }
-
-    /** The re-paired adapters replace their old entries; every other adapter stays, in its place. */
-    static Device keepOtherAdapters(Device existing, Device adopted) {
-        Map<String, Map<String, String>> merged = new LinkedHashMap<>(existing.adapters());
-        merged.putAll(adopted.adapters());
-        return new Device(adopted.id(), adopted.name(), existing.kind(), adopted.host(), merged, adopted.lastSeen());
-    }
 
     /**
      * For each pairing-free adapter the adopted device lacks: the addable receiver at its
@@ -729,7 +705,7 @@ public class DeviceManager implements AutoCloseable {
             if (result.hasAdapter(entry.getKey())) {
                 continue;
             }
-            Optional<DiscoveredDevice> match = absorbable(result, entry.getValue(), others);
+            Optional<DiscoveredDevice> match = DeviceMatching.absorbable(result, entry.getValue(), others);
             if (match.isPresent()) {
                 result = result.withAdapter(entry.getKey(),
                         adapters.get(entry.getKey()).settingsFor(match.get()).orElseThrow());
@@ -738,35 +714,9 @@ public class DeviceManager implements AutoCloseable {
         return result;
     }
 
-    private static Optional<DiscoveredDevice> absorbable(Device device, List<DiscoveredDevice> receivers,
-                                                         List<Device> others) {
-        Optional<DiscoveredDevice> byHost = receivers.stream()
-                .filter(found -> found.host().equalsIgnoreCase(device.host()))
-                .findFirst();
-        if (byHost.isPresent()) {
-            return byHost;
-        }
-        List<DiscoveredDevice> byName = receivers.stream()
-                .filter(found -> sameName(found.name(), device.name()))
-                .toList();
-        if (byName.size() != 1) {
-            return Optional.empty();
-        }
-        DiscoveredDevice only = byName.getFirst();
-        boolean belongsElsewhere = others.stream().anyMatch(other ->
-                sameName(other.name(), device.name()) || other.host().equalsIgnoreCase(only.host()));
-        return belongsElsewhere ? Optional.empty() : Optional.of(only);
-    }
-
+    /** Kept for {@code DeviceManagerFallThroughTest}; see {@link DeviceMatching#uniqueId}. */
     static String uniqueId(List<Device> registered, String adapterId, String host) {
-        String base = adapterId + "-" + host.toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]+", "-").replaceFirst("^-", "").replaceFirst("-$", "");
-        Set<String> taken = registered.stream().map(Device::id).collect(Collectors.toSet());
-        String id = base;
-        for (int n = 2; taken.contains(id); n++) {
-            id = base + "-" + n;
-        }
-        return id;
+        return DeviceMatching.uniqueId(registered, adapterId, host);
     }
 
     /**
