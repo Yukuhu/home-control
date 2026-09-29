@@ -50,7 +50,7 @@ class ActionTest {
     }
 
     @Test
-    void volumeActionsRequireVolumeAndStopRequiresACastReceiver() {
+    void volumeActionsRequireVolumeAndStopAnyPlayer() {
         assertThat(new Action.SetVolume(40).requires()).containsExactly(Capability.VOLUME);
         assertThat(new Action.Mute(true).requires()).containsExactly(Capability.VOLUME);
         assertThat(new Action.Stop().requires()).containsExactlyInAnyOrder(CAST_RECEIVER, MEDIA_RENDERER, LOCAL_AUDIO_SINK);

@@ -343,7 +343,7 @@ class BluetoothSpeakerSessionTest {
     }
 
     @Test
-    void remoteKeysAreUnsupported() {
+    void everythingButPlaybackAndVolumeIsUnsupported() {
         bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
         start();
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));

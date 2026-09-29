@@ -5,6 +5,7 @@ import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceCommands;
+import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
@@ -23,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -172,5 +174,55 @@ class DevicesFallThroughTest {
     void generatedIdsNeverStartOrEndWithADash() {
         assertThat(DeviceMatching.uniqueId(List.of(), "upnp", "[FE80::1]")).isEqualTo("upnp-fe80-1");
         assertThat(DeviceMatching.uniqueId(List.of(), "upnp", "10.0.0.5")).isEqualTo("upnp-10-0-0-5");
+    }
+
+    /** A Cast adapter whose live connection answers no receiver-app questions: it offers no {@code ReceiverApps}. */
+    private static StubAdapter castWithoutReceiverApps() {
+        return new StubAdapter("cast0", DeviceKind.CAST, true, false, Capability.CAST_RECEIVER) {
+            @Override
+            public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
+                DeviceState connected = DeviceState.initial().withStatus(DeviceStatus.CONNECTED);
+                onChange.accept(connected);
+                return new DeviceHandle() {
+                    @Override
+                    public DeviceState state() {
+                        return connected;
+                    }
+
+                    @Override
+                    public void execute(Action action) {
+                        // Receiver-app questions are what these tests look at.
+                    }
+
+                    @Override
+                    public void close() {
+                        // Nothing to release.
+                    }
+                };
+            }
+        };
+    }
+
+    @Test
+    void aCastConnectionWithoutReceiverAppsHandsTheQuestionToTheNextOne() {
+        devices.close();
+        devices = Devices.assemble(registry, List.of(castWithoutReceiverApps(), cast), published::add);
+        register("cast0", "cast");
+        devices.start();
+        cast.handles.get("tv").answer = Map.of("type", "mdxSessionStatus");
+
+        assertThat(devices.commands().query("tv", MDX)).isEqualTo(Map.of("type", "mdxSessionStatus"));
+    }
+
+    @Test
+    void aCastConnectionWithoutReceiverAppsCannotBeAskedAlone() {
+        devices.close();
+        devices = Devices.assemble(registry, List.of(castWithoutReceiverApps()), published::add);
+        register("cast0");
+        devices.start();
+        DeviceCommands commands = devices.commands();
+
+        assertThatThrownBy(() -> commands.query("tv", MDX))
+                .isInstanceOf(UnsupportedActionException.class).hasMessage("TV cannot ask receiver apps");
     }
 }

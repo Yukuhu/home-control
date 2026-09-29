@@ -62,7 +62,7 @@ class AndroidTvAdapterTest {
     }
 
     @Test
-    void declaresRemoteKeysPowerVolumeAndAppLink() {
+    void declaresRemoteKeysAppLinksAndAndroidApps() {
         Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", 6466, null, Instant.now());
 
         assertThat(adapter(new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray()))
