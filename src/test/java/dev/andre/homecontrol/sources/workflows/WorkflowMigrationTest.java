@@ -62,6 +62,10 @@ class WorkflowMigrationTest {
         assertThat(draft.calls()).singleElement().extracting(Call::name).isEqualTo("main");
         assertThatThrownBy(() -> WorkflowValidator.validate(draft))
                 .hasMessage("Workflow: call main: nothing uses this call");
+        // The way out: remove the call. A single tile with a fixed media URL needs none.
+        var withoutCall = new WorkflowDraft(draft.name(), draft.enabled(), draft.mode(), draft.kind(), java.util.List.of(),
+                draft.listing(), draft.tile(), draft.cast());
+        WorkflowValidator.validate(withoutCall);
     }
 
     @Test void singleV1WithBothVariableScopesBecomesOneMainCallWithoutListing() {

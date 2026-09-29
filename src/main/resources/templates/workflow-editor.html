@@ -82,7 +82,7 @@
 </fieldset>
 <fieldset id="workflow-calls">
 <legend>2. Calls</legend>
-<p class="hint">Each call fetches one JSON response with GET. A call can use values of the calls above it, such as <code>{token}</code>, in its URL and headers. Calls that do not depend on each other run at the same time. A call that runs once per entry is made for each tile.</p>
+<p class="hint">Each call fetches one JSON response with GET. A call can use values of the calls above it, such as <code>{token}</code>, in its URL and headers. Calls that do not depend on each other run at the same time. A call that runs once per entry is made for each tile. A single tile that plays a fixed media address needs no call.</p>
 <p class="hint">In a header value, write <code>{{</code> and <code>}}</code> for a literal brace.</p>
 <div data-rows="calls">
 <article class="workflow-call" data-row="calls" th:each="call, c : ${workflowForm.calls}">
