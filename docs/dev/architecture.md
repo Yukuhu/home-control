@@ -48,8 +48,9 @@ flowchart TD
     storage --> crypto
 ```
 
-No package depends on `device`. The application's configuration in the root package assembles it and exposes the
-four `core` device interfaces as beans; every other package sees devices only through them.
+No top-level package depends on `device`. Only the application's configuration in the root package does: it
+assembles the device package and exposes the four `core` device interfaces as beans, through which every other
+package sees devices.
 
 ## Package rules
 
