@@ -1,7 +1,6 @@
 package dev.andre.homecontrol.device;
 
 import dev.andre.homecontrol.core.Action;
-import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
@@ -9,22 +8,14 @@ import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.core.DeviceNotFoundException;
-import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
 import dev.andre.homecontrol.core.Hosts;
-import dev.andre.homecontrol.core.GroupListing;
-import dev.andre.homecontrol.core.InputListing;
 import dev.andre.homecontrol.core.SpeakerTopology;
-import dev.andre.homecontrol.core.LearnedSettings;
-import dev.andre.homecontrol.core.MacAddress;
 import dev.andre.homecontrol.core.TvInput;
-import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.core.WakeOnLanAdapter;
 import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.StorageException;
 import jakarta.annotation.PostConstruct;
@@ -36,16 +27,12 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -59,23 +46,27 @@ import java.util.stream.Collectors;
 public class DeviceManager implements AutoCloseable {
 
     private static final String NO_DEVICE_PREFIX = "No device with id ";
-    private static final String NOT_CONNECTED_SUFFIX = " is not connected";
 
     private static final Logger log = LoggerFactory.getLogger(DeviceManager.class);
 
     private final DeviceRegistry registry;
     private final Map<String, DeviceAdapter> adapters = new LinkedHashMap<>();
     private final ApplicationEventPublisher events;
+    private final RegistryLock lock = new RegistryLock();
+    private final AdapterSettingsStore settings;
     private final DeviceConnections connections;
-    /** Guards the registry's read-modify-writes, so an adopt racing a forget or a discovery merge sees one registry. */
-    private final Object lock = new Object();
+    private final RegisteredDevices queries;
+    private final CommandRouter commands;
 
     public DeviceManager(DeviceRegistry registry, List<DeviceAdapter> adapters,
                          ApplicationEventPublisher events) {
         this.registry = registry;
         adapters.forEach(adapter -> this.adapters.put(adapter.id(), adapter));
         this.events = events;
-        this.connections = new DeviceConnections(this.adapters, events, this::updateAdapterSettings);
+        this.settings = new AdapterSettingsStore(registry, this.adapters, lock);
+        this.connections = new DeviceConnections(this.adapters, events, settings::updateAdapterSettings);
+        this.queries = new RegisteredDevices(registry, this.adapters, connections);
+        this.commands = new CommandRouter(registry, this.adapters, connections);
     }
 
     /**
@@ -122,199 +113,44 @@ public class DeviceManager implements AutoCloseable {
     }
 
     public List<Device> devices() {
-        return registry.findAll().stream()
-                .sorted(Comparator.comparing(Device::name, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+        return queries.devices();
     }
 
     public Optional<Device> device(String id) {
-        return registry.findById(id);
+        return queries.device(id);
     }
 
     /** The most recently paired device: what {@code /} shows when no device is selected. */
     public Optional<Device> defaultDevice() {
-        return registry.first();
+        return queries.defaultDevice();
     }
 
     /** The composed state of the device's adapters; an unknown or handle-less device reads as DISCONNECTED. */
     public DeviceState state(String id) {
-        return connections.state(id);
+        return queries.state(id);
     }
 
     public Map<String, DeviceState> states() {
-        Map<String, DeviceState> states = new LinkedHashMap<>();
-        devices().forEach(device -> states.put(device.id(), state(device.id())));
-        return states;
+        return queries.states();
     }
 
     public Set<Capability> capabilities(String id) {
-        Set<Capability> capabilities = EnumSet.noneOf(Capability.class);
-        registry.findById(id).ifPresent(device -> device.adapters().keySet().forEach(adapterId -> {
-            DeviceAdapter adapter = adapters.get(adapterId);
-            if (adapter != null) {
-                capabilities.addAll(adapter.capabilities(device));
-            }
-        }));
-        return capabilities;
+        return queries.capabilities(id);
     }
 
-    /**
-     * Tries the device's adapters that declare the needed capability, in order. An adapter that
-     * could not even send — unsupported, offline, or declaring the capability without a live
-     * handle (not yet connected, or a failed connect) — hands over to the next; an adapter whose
-     * device answered "no" ({@link dev.andre.homecontrol.core.ActionFailedException}) ends it.
-     * If nobody could send, the first offline reason wins over the last unsupported one; only a
-     * capability none of the device's adapters declare is plainly unsupported. Nothing is
-     * retried later (commands are ephemeral).
-     */
+    /** Sends through the first of the device's adapters that can; see {@link CommandRouter#execute}. */
     public void execute(String id, Action action) {
-        Device device = registry.findById(id)
-                .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
-        Map<String, DeviceHandle> deviceHandles = connections.handles(id);
-        if (action instanceof Action.Stop) {
-            stopEverywhere(device, deviceHandles, action);
-            return;
-        }
-        FallThrough failures = new FallThrough(device);
-        for (String adapterId : device.adapters().keySet()) {
-            if (accepts(device, adapterId, action::acceptedBy) && failures.sent(deviceHandles.get(adapterId), action)) {
-                return;
-            }
-        }
-        throw failures.reason(() -> new UnsupportedActionException(device.name() + " cannot perform " + action));
+        commands.execute(id, action);
     }
 
-    /**
-     * Stop is sent to every adapter that accepts it (a TV that is both a Cast receiver and a media
-     * renderer may be playing through either): done when any of them stopped. Otherwise the first
-     * refusal wins, then the first offline reason, then the last unsupported one.
-     */
-    private void stopEverywhere(Device device, Map<String, DeviceHandle> deviceHandles, Action stop) {
-        FallThrough failures = new FallThrough(device);
-        boolean stopped = false;
-        for (String adapterId : device.adapters().keySet()) {
-            if (accepts(device, adapterId, stop::acceptedBy) && failures.stopped(deviceHandles.get(adapterId), stop)) {
-                stopped = true;
-            }
-        }
-        if (!stopped) {
-            throw failures.reason(() -> new UnsupportedActionException(device.name() + " cannot perform " + stop));
-        }
-    }
-
-    /**
-     * Like {@link #execute}, for a question with an answer: only adapters declaring
-     * {@link Capability#CAST_RECEIVER} are asked, with the same fall-through (offline or unsupported
-     * hands over; a refusal or no answer, {@link dev.andre.homecontrol.core.ActionFailedException}, ends it).
-     */
+    /** Asks the first Cast receiver adapter that can answer; see {@link CommandRouter#query}. */
     public Map<String, Object> query(String id, CastAppQuery query) {
-        Device device = registry.findById(id)
-                .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
-        Map<String, DeviceHandle> deviceHandles = connections.handles(id);
-        FallThrough failures = new FallThrough(device);
-        for (String adapterId : device.adapters().keySet()) {
-            DeviceHandle handle = deviceHandles.get(adapterId);
-            if (accepts(device, adapterId, capabilities -> capabilities.contains(Capability.CAST_RECEIVER))
-                    && failures.reachable(handle)) {
-                try {
-                    return handle.query(query);
-                } catch (DeviceOfflineException e) {
-                    failures.offline(e);
-                } catch (UnsupportedActionException e) {
-                    failures.unsupported(e);
-                }
-            }
-        }
-        throw failures.reason(() -> new UnsupportedActionException(device.name() + " is not a Cast receiver"));
+        return commands.query(id, query);
     }
 
     /** Whether the adapter's module is switched on: a device's entry for it in devices.json does not say so. */
     public boolean adapterEnabled(String adapterId) {
-        return adapters.containsKey(adapterId);
-    }
-
-    /** True when the adapter is switched on and declares what {@code accepts} asks for on this device. */
-    private boolean accepts(Device device, String adapterId, Predicate<Set<Capability>> accepts) {
-        DeviceAdapter adapter = adapters.get(adapterId);
-        return adapter != null && accepts.test(adapter.capabilities(device));
-    }
-
-    /**
-     * Why none of a device's adapters could send, collected while falling through them in order:
-     * the first refusal (only stop falls through one) wins, then the first offline reason — an
-     * adapter without a live handle counts as offline — then the last unsupported one.
-     */
-    private static final class FallThrough {
-
-        private final Device device;
-        private ActionFailedException firstRefusal;
-        private DeviceOfflineException firstOffline;
-        private UnsupportedActionException lastUnsupported;
-
-        FallThrough(Device device) {
-            this.device = device;
-        }
-
-        /** False, with the device kept as offline, when the adapter has no live handle. */
-        boolean reachable(DeviceHandle handle) {
-            if (handle == null) {
-                offline(new DeviceOfflineException(device.name() + NOT_CONNECTED_SUFFIX));
-                return false;
-            }
-            return true;
-        }
-
-        /** Sends through the handle; false, with the reason kept, when it could not. A refusal propagates. */
-        boolean sent(DeviceHandle handle, Action action) {
-            if (!reachable(handle)) {
-                return false;
-            }
-            try {
-                handle.execute(action);
-                return true;
-            } catch (DeviceOfflineException e) {
-                offline(e);
-            } catch (UnsupportedActionException e) {
-                unsupported(e);
-            }
-            return false;
-        }
-
-        /** Like {@link #sent}, but a refusal is kept too, so the other adapters still get the stop. */
-        boolean stopped(DeviceHandle handle, Action stop) {
-            try {
-                return sent(handle, stop);
-            } catch (ActionFailedException e) {
-                if (firstRefusal == null) {
-                    firstRefusal = e;
-                }
-                return false;
-            }
-        }
-
-        void offline(DeviceOfflineException e) {
-            if (firstOffline == null) {
-                firstOffline = e;
-            }
-        }
-
-        void unsupported(UnsupportedActionException e) {
-            lastUnsupported = e;
-        }
-
-        /** The reason that wins, or {@code otherwise} when no adapter was even asked. */
-        RuntimeException reason(Supplier<UnsupportedActionException> otherwise) {
-            if (firstRefusal != null) {
-                return firstRefusal;
-            }
-            if (firstOffline != null) {
-                return firstOffline;
-            }
-            if (lastUnsupported != null) {
-                return lastUnsupported;
-            }
-            return otherwise.get();
-        }
+        return queries.adapterEnabled(adapterId);
     }
 
     /**
@@ -368,106 +204,38 @@ public class DeviceManager implements AutoCloseable {
         return merged;
     }
 
-    /**
-     * What a handle learned while connected ({@link LearnedSettings}): merged into the adapter's
-     * settings under {@link #lock}, without reconnecting. A no-op once the device was forgotten or
-     * lost the adapter (a late write must never resurrect it), or when nothing changes. A MAC
-     * address the user typed in is never replaced by a learned one.
-     */
+    /** What a handle learned while connected; see {@link AdapterSettingsStore#updateAdapterSettings}. */
     public void updateAdapterSettings(String id, String adapterId, Map<String, String> updates) {
-        synchronized (lock) {
-            Optional<Device> registered = registry.findById(id).filter(device -> device.hasAdapter(adapterId));
-            if (registered.isEmpty()) {
-                return;
-            }
-            Device device = registered.get();
-            Map<String, String> settings = new LinkedHashMap<>(device.adapterSettings(adapterId));
-            Map<String, String> accepted = new LinkedHashMap<>(updates);
-            if ("true".equals(settings.get(WakeOnLanAdapter.MAC_ADDRESS_MANUAL))) {
-                accepted.remove(WakeOnLanAdapter.MAC_ADDRESS);
-                accepted.remove(WakeOnLanAdapter.MAC_ADDRESS_MANUAL);
-            }
-            settings.putAll(accepted);
-            if (!settings.equals(device.adapterSettings(adapterId))) {
-                registry.save(device.withAdapter(adapterId, settings));
-            }
-        }
+        settings.updateAdapterSettings(id, adapterId, updates);
     }
 
     /** The best foreground-app reporting among the device's adapters; {@code NONE} for an unknown id. */
     public ForegroundAppReporting foregroundAppReporting(String id) {
-        return registry.findById(id)
-                .flatMap(device -> device.adapters().keySet().stream()
-                        .map(adapters::get)
-                        .filter(Objects::nonNull)
-                        .map(adapter -> adapter.foregroundAppReporting(device))
-                        .min(Comparator.naturalOrder()))
-                .orElse(ForegroundAppReporting.NONE);
+        return queries.foregroundAppReporting(id);
     }
 
     /** True when one of the device's adapters can switch it on with Wake-on-LAN. */
     public boolean wakesOnLan(String id) {
-        return registry.findById(id)
-                .map(device -> device.adapters().keySet().stream()
-                        .anyMatch(adapterId -> adapters.get(adapterId) instanceof WakeOnLanAdapter))
-                .orElse(false);
+        return settings.wakesOnLan(id);
     }
 
     public Optional<String> wakeOnLanMac(String id) {
-        return registry.findById(id).flatMap(device -> device.adapters().keySet().stream()
-                .filter(adapterId -> adapters.get(adapterId) instanceof WakeOnLanAdapter)
-                .map(adapterId -> device.adapterSettings(adapterId).get(WakeOnLanAdapter.MAC_ADDRESS))
-                .filter(mac -> mac != null && !mac.isBlank())
-                .findFirst());
+        return settings.wakeOnLanMac(id);
     }
 
-    /**
-     * Stores a hand-entered MAC on every Wake-on-LAN adapter of the device and stops adapters from
-     * replacing it; blank clears it so they learn it again. No reconnect: handles read the MAC from
-     * the registry when they wake the device. An invalid MAC throws {@link IllegalArgumentException}
-     * before anything is written.
-     */
+    /** Stores or clears a hand-entered MAC; see {@link AdapterSettingsStore#setWakeOnLanMac}. */
     public void setWakeOnLanMac(String id, String mac) {
-        boolean clear = mac == null || mac.isBlank();
-        String normalized = clear ? null : MacAddress.normalize(mac);
-        synchronized (lock) {
-            Device device = registry.findById(id)
-                    .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
-            Device updated = device;
-            for (String adapterId : device.adapters().keySet()) {
-                if (adapters.get(adapterId) instanceof WakeOnLanAdapter) {
-                    Map<String, String> settings = new LinkedHashMap<>(updated.adapterSettings(adapterId));
-                    if (clear) {
-                        settings.remove(WakeOnLanAdapter.MAC_ADDRESS);
-                        settings.remove(WakeOnLanAdapter.MAC_ADDRESS_MANUAL);
-                    } else {
-                        settings.put(WakeOnLanAdapter.MAC_ADDRESS, normalized);
-                        settings.put(WakeOnLanAdapter.MAC_ADDRESS_MANUAL, "true");
-                    }
-                    updated = updated.withAdapter(adapterId, settings);
-                }
-            }
-            registry.save(updated);
-        }
+        settings.setWakeOnLanMac(id, mac);
     }
 
     /** Grouping as seen by the first of the device's handles that knows it; empty otherwise. */
     public Optional<SpeakerTopology> speakerTopology(String id) {
-        return connections.handles(id).values().stream()
-                .filter(GroupListing.class::isInstance)
-                .map(handle -> ((GroupListing) handle).speakerTopology())
-                .flatMap(Optional::stream)
-                .findFirst();
+        return queries.speakerTopology(id);
     }
 
     /** Inputs from the first of the device's handles that lists any; empty when none does. */
     public List<TvInput> inputs(String id) {
-        return connections.handles(id).values().stream()
-                .filter(InputListing.class::isInstance)
-                .map(handle -> ((InputListing) handle).inputs())
-                .filter(list -> !list.isEmpty())
-                .findFirst()
-                .orElse(List.of());
+        return queries.inputs(id);
     }
 
     public List<DiscoveredDevice> discovered() {
