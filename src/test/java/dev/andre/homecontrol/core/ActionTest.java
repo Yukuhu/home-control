@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static dev.andre.homecontrol.core.Capability.CAST_RECEIVER;
+import static dev.andre.homecontrol.core.Capability.LOCAL_AUDIO_SINK;
 import static dev.andre.homecontrol.core.Capability.MEDIA_RENDERER;
 import static dev.andre.homecontrol.core.Capability.REMOTE_KEYS;
 import static dev.andre.homecontrol.core.Capability.VOLUME;
@@ -25,7 +26,7 @@ class ActionTest {
 
     @Test
     void aKeyPressRequiresRemoteKeys() {
-        assertThat(new Action.PressKey(RemoteKey.HOME).requires()).isEqualTo(Capability.REMOTE_KEYS);
+        assertThat(new Action.PressKey(RemoteKey.HOME).requires()).containsExactly(Capability.REMOTE_KEYS);
     }
 
     @Test
@@ -45,14 +46,14 @@ class ActionTest {
     @Test
     void openingAnAppLinkRequiresAppLink() {
         Action action = new Action.OpenAppLink(URI.create("https://www.youtube.com/watch?v=abc"));
-        assertThat(action.requires()).isEqualTo(Capability.APP_LINK);
+        assertThat(action.requires()).containsExactly(Capability.APP_LINK);
     }
 
     @Test
     void volumeActionsRequireVolumeAndStopRequiresACastReceiver() {
-        assertThat(new Action.SetVolume(40).requires()).isEqualTo(Capability.VOLUME);
-        assertThat(new Action.Mute(true).requires()).isEqualTo(Capability.VOLUME);
-        assertThat(new Action.Stop().requires()).isEqualTo(Capability.CAST_RECEIVER);
+        assertThat(new Action.SetVolume(40).requires()).containsExactly(Capability.VOLUME);
+        assertThat(new Action.Mute(true).requires()).containsExactly(Capability.VOLUME);
+        assertThat(new Action.Stop().requires()).containsExactlyInAnyOrder(CAST_RECEIVER, MEDIA_RENDERER, LOCAL_AUDIO_SINK);
     }
 
     @Test
@@ -71,7 +72,7 @@ class ActionTest {
         Action.CastLoad load = new Action.CastLoad("CC1AD845", body);
         body.put("autoplay", false);
 
-        assertThat(load.requires()).isEqualTo(Capability.CAST_RECEIVER);
+        assertThat(load.requires()).containsExactly(Capability.CAST_RECEIVER);
         assertThat(load.load()).containsEntry("autoplay", true);
         assertThat(load.toString()).isEqualTo("CastLoad[receiverAppId=CC1AD845]")
                 .doesNotContain("secret-key");
@@ -83,7 +84,7 @@ class ActionTest {
         Action.CastMessage message = new Action.CastMessage("F007D354", "urn:x-cast:com.connectsdk", body);
         body.put("accessToken", "changed");
 
-        assertThat(message.requires()).isEqualTo(Capability.CAST_RECEIVER);
+        assertThat(message.requires()).containsExactly(Capability.CAST_RECEIVER);
         assertThat(message.message()).containsEntry("accessToken", "secret-token");
         assertThat(message.toString()).doesNotContain("secret-token").contains("F007D354");
         assertThatThrownBy(() -> new Action.CastMessage("F007D354", "com.connectsdk", Map.of()))
@@ -91,21 +92,21 @@ class ActionTest {
     }
 
     @Test
-    void selectingAnInputRequiresRemoteKeys() {
-        assertThat(new Action.SelectInput("HDMI_1").requires()).isEqualTo(Capability.REMOTE_KEYS);
+    void selectingAnInputRequiresInputs() {
+        assertThat(new Action.SelectInput("HDMI_1").requires()).containsExactly(Capability.INPUTS);
     }
 
     @Test
-    void mediaRendererActionsRequireAMediaRenderer() {
+    void streamActionsRequireARendererOrALocalSink() {
         assertThat(new Action.PlayMedia(URI.create("http://nas/a.flac"), "audio/flac", "A", null).requires())
-                .isEqualTo(MEDIA_RENDERER);
-        assertThat(new Action.Pause().requires()).isEqualTo(MEDIA_RENDERER);
-        assertThat(new Action.Resume().requires()).isEqualTo(MEDIA_RENDERER);
+                .containsExactlyInAnyOrder(MEDIA_RENDERER, LOCAL_AUDIO_SINK);
+        assertThat(new Action.Pause().requires()).containsExactlyInAnyOrder(MEDIA_RENDERER, LOCAL_AUDIO_SINK);
+        assertThat(new Action.Resume().requires()).containsExactlyInAnyOrder(MEDIA_RENDERER, LOCAL_AUDIO_SINK);
     }
 
     @Test
-    void stopReachesCastReceiversAndMediaRenderers() {
-        assertThat(new Action.Stop().requires()).isEqualTo(CAST_RECEIVER);
+    void stopReachesCastReceiversMediaRenderersAndLocalSinks() {
+        assertThat(new Action.Stop().requires()).containsExactlyInAnyOrder(CAST_RECEIVER, MEDIA_RENDERER, LOCAL_AUDIO_SINK);
         assertThat(new Action.Stop().acceptedBy(EnumSet.of(MEDIA_RENDERER))).isTrue();
         assertThat(new Action.Stop().acceptedBy(EnumSet.of(CAST_RECEIVER))).isTrue();
         assertThat(new Action.Stop().acceptedBy(EnumSet.of(VOLUME, REMOTE_KEYS))).isFalse();
@@ -140,10 +141,9 @@ class ActionTest {
         assertThat(new Action.SetVolume(10).acceptedBy(EnumSet.of(Capability.LOCAL_AUDIO_SINK, VOLUME))).isTrue();
         assertThat(new Action.PressKey(RemoteKey.HOME).acceptedBy(sink)).isFalse();
 
-        assertThat(new Action.PlayMedia(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null).requires()).isEqualTo(MEDIA_RENDERER);
-        assertThat(new Action.Pause().requires()).isEqualTo(MEDIA_RENDERER);
-        assertThat(new Action.Resume().requires()).isEqualTo(MEDIA_RENDERER);
-        assertThat(new Action.Stop().requires()).isEqualTo(CAST_RECEIVER);
+        assertThat(new Action.PlayMedia(URI.create("http://nas/a.mp3"), "audio/mpeg", "A", null).requires())
+                .containsExactlyInAnyOrder(MEDIA_RENDERER, LOCAL_AUDIO_SINK);
+        assertThat(new Action.Stop().requires()).containsExactlyInAnyOrder(CAST_RECEIVER, MEDIA_RENDERER, LOCAL_AUDIO_SINK);
 
         // I's renderer and Cast assertions still hold.
         assertThat(new Action.Stop().acceptedBy(EnumSet.of(MEDIA_RENDERER))).isTrue();
@@ -151,11 +151,29 @@ class ActionTest {
     }
 
     @Test
-    void groupingRequiresAMediaRenderer() {
-        assertThat(new Action.JoinGroup("RINCON_1").requires()).isEqualTo(MEDIA_RENDERER);
-        assertThat(new Action.LeaveGroup().requires()).isEqualTo(MEDIA_RENDERER);
+    void groupingRequiresGrouping() {
+        assertThat(new Action.JoinGroup("RINCON_1").requires()).containsExactly(Capability.GROUPING);
+        assertThat(new Action.LeaveGroup().requires()).containsExactly(Capability.GROUPING);
         assertThatThrownBy(() -> new Action.JoinGroup(" "))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Pick a speaker to join");
+    }
+
+    @Test
+    void everyActionNamesItsPurpose() {
+        assertThat(new Action.PressKey(RemoteKey.HOME).purpose()).isEqualTo("take remote keys");
+        assertThat(new Action.OpenAppLink(URI.create("https://example.org")).purpose()).isEqualTo("open app links");
+        assertThat(new Action.SelectInput("HDMI_1").purpose()).isEqualTo("switch inputs");
+        assertThat(new Action.SetVolume(40).purpose()).isEqualTo("change the volume");
+        assertThat(new Action.Mute(true).purpose()).isEqualTo("mute");
+        assertThat(new Action.Stop().purpose()).isEqualTo("stop playback");
+        assertThat(new Action.PlayMedia(URI.create("http://nas/a.flac"), "audio/flac", "A", null).purpose())
+                .isEqualTo("play a stream");
+        assertThat(new Action.Pause().purpose()).isEqualTo("pause");
+        assertThat(new Action.Resume().purpose()).isEqualTo("resume");
+        assertThat(new Action.JoinGroup("RINCON_1").purpose()).isEqualTo("be grouped");
+        assertThat(new Action.LeaveGroup().purpose()).isEqualTo("be grouped");
+        assertThat(new Action.CastLoad("CC1AD845", Map.of()).purpose()).isEqualTo("receive Cast media");
+        assertThat(new Action.CastMessage("APP", "urn:x-cast:app", Map.of()).purpose()).isEqualTo("receive Cast media");
     }
 }

@@ -235,4 +235,56 @@ class DevicesExecuteTest {
             speakers.close();
         }
     }
+
+    @Test
+    void aSelectInputIsRefusedWithoutReachingAnAdapterThatCannotSwitchInputs() {
+        registry.save(new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.41", orderedAdapters("androidtv"),
+                Instant.now()));
+        StubAdapter remote = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, true, Capability.REMOTE_KEYS,
+                Capability.APP_LINK, Capability.ANDROID_APPS);
+        try (Devices tv = Devices.assemble(registry, List.of(remote), event -> { })) {
+            tv.start();
+            DeviceCommands commands = tv.commands();
+            var hdmi = new Action.SelectInput("HDMI_1");
+
+            assertThatThrownBy(() -> commands.execute("tv", hdmi))
+                    .isInstanceOf(UnsupportedActionException.class).hasMessage("TV cannot switch inputs");
+            assertThat(remote.handles.get("tv").executed).isEmpty();
+        }
+    }
+
+    @Test
+    void joiningAGroupNeverReachesARendererThatCannotGroup() {
+        registry.save(new Device("renderer", "Renderer", DeviceKind.UPNP, "10.0.0.42", orderedAdapters("upnp"),
+                Instant.now()));
+        StubAdapter upnp = new StubAdapter("upnp", DeviceKind.UPNP, true, false, Capability.MEDIA_RENDERER,
+                Capability.VOLUME);
+        try (Devices renderer = Devices.assemble(registry, List.of(upnp), event -> { })) {
+            renderer.start();
+            DeviceCommands commands = renderer.commands();
+            var join = new Action.JoinGroup("RINCON_1");
+
+            assertThatThrownBy(() -> commands.execute("renderer", join))
+                    .isInstanceOf(UnsupportedActionException.class).hasMessage("Renderer cannot be grouped");
+            assertThat(upnp.handles.get("renderer").executed).isEmpty();
+        }
+    }
+
+    @Test
+    void volumeOnAShieldWithCastReachesCastOnly() {
+        registry.save(new Device("living", "Living", DeviceKind.ANDROID_TV, "10.0.0.43",
+                orderedAdapters("androidtv", "cast"), Instant.now()));
+        StubAdapter shield = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, true, Capability.REMOTE_KEYS,
+                Capability.APP_LINK, Capability.ANDROID_APPS);
+        StubAdapter shieldCast = new StubAdapter("cast", DeviceKind.CAST, true, false, Capability.CAST_RECEIVER,
+                Capability.VOLUME);
+        try (Devices living = Devices.assemble(registry, List.of(shield, shieldCast), event -> { })) {
+            living.start();
+
+            living.commands().execute("living", new Action.SetVolume(30));
+
+            assertThat(shieldCast.handles.get("living").executed).containsExactly(new Action.SetVolume(30));
+            assertThat(shield.handles.get("living").executed).isEmpty();
+        }
+    }
 }

@@ -114,7 +114,7 @@ class DevicesFallThroughTest {
         DeviceCommands commands = devices.commands();
         assertThatThrownBy(() -> commands.execute("tv", stop))
                 .isInstanceOf(UnsupportedActionException.class)
-                .hasMessage("TV cannot perform " + stop);
+                .hasMessage("TV cannot stop playback");
         assertThat(remote.handles.get("tv").executed).isEmpty();
     }
 
