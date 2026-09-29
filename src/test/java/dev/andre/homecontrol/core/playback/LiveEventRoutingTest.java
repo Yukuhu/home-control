@@ -2,8 +2,6 @@ package dev.andre.homecontrol.core.playback;
 
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.content.PinOffers;
-import dev.andre.homecontrol.sources.jellyfin.JellyfinSessionStrategy;
-import dev.andre.homecontrol.sources.youtube.YouTubeConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -30,12 +28,9 @@ class LiveEventRoutingTest {
 
     private static final Pattern UPGRADE_OF = Pattern.compile("^[a-z0-9][a-z0-9._-]{0,63}/[A-Za-z0-9._:-]{1,128}$");
 
+    /** Live events carry only core's references, so core's strategies plan them as the application does. */
     private static PlaybackPlanner planner() {
-        // Same strategy list and order as HomeControlConfiguration#playbackPlanner (spec §5.3):
-        // an open Jellyfin app, an app link, then Cast in its own preference order, then media renderers.
-        return new PlaybackPlanner(List.of(new JellyfinSessionStrategy(), RouteStrategies.appLink(),
-                new YouTubeConfiguration().youTubeLoungeStrategy(), RouteStrategies.castMessage(), RouteStrategies.castLoad(),
-                RouteStrategies.castStream(), RouteStrategies.renderer()));
+        return new PlaybackPlanner(RouteStrategies.core());
     }
 
     private static ContentItem liveEvent(List<PlayableRef> playables) {

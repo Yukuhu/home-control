@@ -1,6 +1,7 @@
-package dev.andre.homecontrol.core.playback;
+package dev.andre.homecontrol.playback;
 
 import dev.andre.homecontrol.core.Action;
+import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinRoute;
 import dev.andre.homecontrol.sources.workflows.WorkflowCastRoute;
 import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRoute;

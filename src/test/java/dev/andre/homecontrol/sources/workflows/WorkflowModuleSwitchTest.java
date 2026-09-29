@@ -8,6 +8,8 @@ import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.content.ContentChangedEvent;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.ContentSource;
+import dev.andre.homecontrol.core.playback.RefStrategy;
+import dev.andre.homecontrol.core.playback.RouteStrategy;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.SecretStore;
 import dev.andre.homecontrol.testsupport.ModulesOffTest;
@@ -126,6 +128,8 @@ class WorkflowDisabledSetupTest extends ModulesOffTest {
         assertThat(context.getBeanNamesForType(WorkflowSetupController.class)).isEmpty();
         assertThat(context.getBeanNamesForType(WorkflowSetupAdvice.class)).isEmpty();
         assertThat(context.getBeanNamesForType(WorkflowTestService.class)).isEmpty();
+        assertThat(context.getBeansOfType(RouteStrategy.class).values())
+                .noneMatch(strategy -> strategy instanceof RefStrategy<?> ref && ref.type() == WorkflowCastRef.class);
         var html = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/setup"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
                 .andReturn().getResponse().getContentAsString();

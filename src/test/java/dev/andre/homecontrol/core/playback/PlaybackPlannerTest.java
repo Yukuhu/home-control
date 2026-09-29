@@ -2,33 +2,19 @@ package dev.andre.homecontrol.core.playback;
 
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;
-import dev.andre.homecontrol.sources.jellyfin.JellyfinPlayable;
-import dev.andre.homecontrol.sources.jellyfin.JellyfinRoute;
-import dev.andre.homecontrol.sources.jellyfin.JellyfinSessionStrategy;
-import dev.andre.homecontrol.sources.youtube.YouTubeConfiguration;
-import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRef;
-import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRoute;
-import dev.andre.homecontrol.testsupport.Planners;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PlaybackPlannerTest {
 
-    private final PlaybackPlanner planner = new PlaybackPlanner(
-            List.of(new JellyfinSessionStrategy(), RouteStrategies.appLink(), RouteStrategies.castMessage(),
-                    RouteStrategies.castLoad(), RouteStrategies.castStream(), RouteStrategies.renderer(),
-                    RouteStrategies.localSink()));
-
-    private static final JellyfinPlayable.Session OPEN_APP =
-            new JellyfinPlayable.Session("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV");
+    private final PlaybackPlanner planner = new PlaybackPlanner(RouteStrategies.core());
 
     private static final PlayableRef.CastLoad JELLYFIN_LOAD =
             new PlayableRef.CastLoad("F007D354", Map.of("media", Map.of("contentId", "item-1")));
@@ -70,28 +56,6 @@ class PlaybackPlannerTest {
     }
 
     @Test
-    void anUnresolvedJellyfinItemMeansTheSourceIsSwitchedOff() {
-        assertThat(planner.plan(item(new JellyfinPlayable.Item("srv", "item-1", 0)), EnumSet.allOf(Capability.class)).first())
-                .isEqualTo(new Route.Unroutable("Jellyfin is switched off on this server"));
-    }
-
-    @Test
-    void anOpenJellyfinAppComesFirst() {
-        Route route = planner.plan(item(LINK, JELLYFIN_MESSAGE, STREAM, OPEN_APP),
-                EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK, Capability.CAST_RECEIVER)).first();
-
-        assertThat(route).isEqualTo(new JellyfinRoute.Session("1d2c3b4a59687f6e5d4c3b2a19081726", "item-1", 600L, "Android TV"));
-        assertThat(route.describe()).isEqualTo("Play in the open Jellyfin app (Android TV)");
-        assertThat(new JellyfinRoute.Session("s", "i", 0, " ").describe()).isEqualTo("Play in the open Jellyfin app");
-    }
-
-    @Test
-    void aSessionReferenceWithoutTheLiveCapabilityDoesNotRoute() {
-        assertThat(planner.plan(item(OPEN_APP), EnumSet.of(Capability.APP_LINK)).first())
-                .isEqualTo(new Route.Unroutable("the open Jellyfin app cannot be controlled"));
-    }
-
-    @Test
     void jellyfinFallsBackFromSessionToReceiverToStream() {
         ContentItem resolved = item(JELLYFIN_MESSAGE, STREAM);
 
@@ -120,16 +84,6 @@ class PlaybackPlannerTest {
                 "urn:x-cast:com.connectsdk", JELLYFIN_MESSAGE.message().message()));
         assertThat(route.toString()).doesNotContain("tok-1");
         assertThat(JELLYFIN_MESSAGE.toString()).doesNotContain("tok-1");
-    }
-
-    @Test
-    void loungeNeedsACastReceiver() {
-        PlaybackPlanner withLounge = new PlaybackPlanner(List.of(RouteStrategies.appLink(), new YouTubeConfiguration().youTubeLoungeStrategy()));
-
-        assertThat(withLounge.plan(item(new YouTubeLoungeRef("aqz-KE-bpKQ")), EnumSet.of(Capability.APP_LINK)).first())
-                .isEqualTo(new Route.Unroutable("this device is not a Cast receiver"));
-        assertThat(withLounge.plan(item(new YouTubeLoungeRef("aqz-KE-bpKQ")), EnumSet.of(Capability.CAST_RECEIVER)).first())
-                .isEqualTo(new YouTubeLoungeRoute("aqz-KE-bpKQ"));
     }
 
     @Test
@@ -178,21 +132,6 @@ class PlaybackPlannerTest {
     }
 
     @Test
-    void theApplicationsPlannerUsesTheSpecOrder() {
-        PlaybackPlanner configured = Planners.production();
-        ContentItem everything = item(STREAM, JELLYFIN_LOAD, LINK);
-
-        assertThat(configured.plan(everything, EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)).first())
-                .isInstanceOf(Route.OpenAppLink.class);
-        assertThat(configured.plan(everything, EnumSet.of(Capability.CAST_RECEIVER)).first())
-                .isEqualTo(new Route.Cast("F007D354", JELLYFIN_LOAD.payload()));
-        assertThat(configured.plan(item(JELLYFIN_LOAD, JELLYFIN_MESSAGE), EnumSet.of(Capability.CAST_RECEIVER)).first())
-                .isInstanceOf(Route.CastMessage.class);
-        assertThat(configured.plan(item(LINK, OPEN_APP), EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK)).first())
-                .isInstanceOf(JellyfinRoute.Session.class);
-    }
-
-    @Test
     void aMediaRendererGetsTheStream() {
         assertThat(planner.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME)).first())
                 .isInstanceOfSatisfying(Route.Render.class, render -> assertThat(render.url()).isEqualTo(STREAM.url()));
@@ -216,17 +155,6 @@ class PlaybackPlannerTest {
         assertThat(withoutRenderers.plan(item(STREAM), EnumSet.of(Capability.REMOTE_KEYS)).first())
                 .isInstanceOfSatisfying(Route.Unroutable.class,
                         unroutable -> assertThat(unroutable.reason()).contains("this device cannot play a direct stream"));
-    }
-
-    @Test
-    void theApplicationsPlannerEndsWithTheMediaRenderer() {
-        PlaybackPlanner configured = Planners.production();
-
-        assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.MEDIA_RENDERER)).first()).isInstanceOf(Route.Render.class);
-        assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)).first())
-                .isInstanceOf(Route.Cast.class);
-        assertThat(configured.plan(item(STREAM), EnumSet.of(Capability.CAST_RECEIVER, Capability.MEDIA_RENDERER)).routes())
-                .extracting(Route::key).containsExactly("cast:CC1AD845", "render");
     }
 
     @Test
@@ -258,26 +186,6 @@ class PlaybackPlannerTest {
         assertThat(withoutLocalAudio.plan(item(AUDIO), EnumSet.of(Capability.REMOTE_KEYS)).first())
                 .isInstanceOfSatisfying(Route.Unroutable.class,
                         unroutable -> assertThat(unroutable.reason()).contains("this device cannot play a direct stream"));
-    }
-
-    @Test
-    void theApplicationsPlannerEndsWithTheLocalAudioSink() {
-        PlaybackPlanner configured = Planners.production();
-
-        assertThat(configured.plan(item(AUDIO), EnumSet.of(Capability.LOCAL_AUDIO_SINK)).first()).isInstanceOf(Route.PlayLocally.class);
-        assertThat(configured.plan(item(AUDIO), EnumSet.of(Capability.MEDIA_RENDERER, Capability.LOCAL_AUDIO_SINK)).first())
-                .isInstanceOf(Route.Render.class);
-    }
-
-    @Test
-    void listsEveryApplicableRouteInSpecOrder() {
-        List<Route> routes = planner.plan(item(STREAM, JELLYFIN_MESSAGE, LINK, OPEN_APP),
-                EnumSet.of(Capability.JELLYFIN_CLIENT, Capability.APP_LINK, Capability.CAST_RECEIVER)).routes();
-
-        assertThat(routes).extracting(Route::key)
-                .containsExactly("jellyfin-session", "app-link", "cast-message:F007D354", "cast:CC1AD845");
-        assertThat(planner.plan(item(STREAM, LINK), EnumSet.of(Capability.APP_LINK, Capability.CAST_RECEIVER)).first())
-                .isEqualTo(routes.get(1));
     }
 
     @Test

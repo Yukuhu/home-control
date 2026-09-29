@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.playback.RefStrategy;
+import dev.andre.homecontrol.core.playback.RouteStrategy;
 import dev.andre.homecontrol.testsupport.ModulesOffTest;
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +22,8 @@ class YouTubeModuleSwitchTest extends ModulesOffTest {
         assertThat(context.getBeanNamesForType(YouTubeSetupService.class)).isEmpty();
         assertThat(context.getBeanNamesForType(YouTubeSetupController.class)).isEmpty();
         assertThat(context.getBeanNamesForType(YouTubeSetupAdvice.class)).isEmpty();
+        assertThat(context.getBeansOfType(RouteStrategy.class).values())
+                .noneMatch(strategy -> strategy instanceof RefStrategy<?> ref && ref.type() == YouTubeLoungeRef.class);
 
         mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())

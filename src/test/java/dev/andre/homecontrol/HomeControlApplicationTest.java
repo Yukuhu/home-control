@@ -4,7 +4,10 @@ import dev.andre.homecontrol.adapters.tizen.TizenAdapter;
 import dev.andre.homecontrol.adapters.webos.WebOsAdapter;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.PromptPairing;
+import dev.andre.homecontrol.core.playback.PlaybackPlanner;
+import dev.andre.homecontrol.core.playback.Route;
 import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.testsupport.Planners;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -39,6 +42,14 @@ class HomeControlApplicationTest extends FullAppTest {
     @Test
     void contextLoads() {
         assertThat(context.getBean(HomeControlApplication.class)).isNotNull();
+    }
+
+    @Test
+    void theWiredPlannerPlansEveryRungInLadderOrder() {
+        PlaybackPlanner planner = context.getBean(PlaybackPlanner.class);
+
+        assertThat(planner.plan(Planners.ladderItem(), Planners.LADDER_DEVICE).routes()).extracting(Route::key)
+                .containsExactlyElementsOf(Planners.LADDER_KEYS);
     }
 
     @Test

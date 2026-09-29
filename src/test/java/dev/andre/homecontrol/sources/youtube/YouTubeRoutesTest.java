@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.PlaybackPlanner;
 import dev.andre.homecontrol.core.playback.Route;
+import dev.andre.homecontrol.core.playback.RouteStrategies;
 import dev.andre.homecontrol.testsupport.Planners;
 import org.junit.jupiter.api.Test;
 
@@ -72,5 +73,17 @@ class YouTubeRoutesTest {
     void aSpeakerCannotPlayYouTube() {
         assertThat(planner.plan(lounge, EnumSet.of(Capability.MEDIA_RENDERER, Capability.VOLUME)).first())
                 .isEqualTo(new Route.Unroutable("this device cannot open app links; this device is not a Cast receiver"));
+    }
+
+    @Test
+    void loungeNeedsACastReceiver() {
+        PlaybackPlanner withLounge = new PlaybackPlanner(List.of(RouteStrategies.appLink(),
+                new YouTubeConfiguration().youTubeLoungeStrategy()));
+        ContentItem loungeOnly = item.withPlayables(List.of(new YouTubeLoungeRef("aqz-KE-bpKQ")));
+
+        assertThat(withLounge.plan(loungeOnly, EnumSet.of(Capability.APP_LINK)).first())
+                .isEqualTo(new Route.Unroutable("this device is not a Cast receiver"));
+        assertThat(withLounge.plan(loungeOnly, EnumSet.of(Capability.CAST_RECEIVER)).first())
+                .isEqualTo(new YouTubeLoungeRoute("aqz-KE-bpKQ"));
     }
 }

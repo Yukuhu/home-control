@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.core.playback.RouteStrategy;
 import dev.andre.homecontrol.testsupport.ModulesOffTest;
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +21,7 @@ class JellyfinModuleSwitchTest extends ModulesOffTest {
         assertThat(context.getBeanNamesForType(JellyfinSetupService.class)).isEmpty();
         assertThat(context.getBeanNamesForType(JellyfinSetupController.class)).isEmpty();
         assertThat(context.getBeanNamesForType(JellyfinSetupAdvice.class)).isEmpty();
+        assertThat(context.getBeansOfType(RouteStrategy.class).values()).noneMatch(JellyfinSessionStrategy.class::isInstance);
 
         mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())
