@@ -3,6 +3,7 @@ package dev.andre.homecontrol.device;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
+import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
@@ -113,9 +114,10 @@ class DevicesMergeTest {
         assertThat(added.name()).isEqualTo("Kitchen");
         assertThat(registry.findById("cast-10-0-0-9")).isPresent();
         assertThat(devices.enrollment().addable()).isEmpty();
-        assertThatThrownBy(() -> devices.enrollment().addDiscovered("cast", "10.0.0.9", 8009))
+        DeviceEnrollment enrollment = devices.enrollment();
+        assertThatThrownBy(() -> enrollment.addDiscovered("cast", "10.0.0.9", 8009))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already added");
-        assertThatThrownBy(() -> devices.enrollment().addDiscovered("cast", "10.0.0.99", 8009))
+        assertThatThrownBy(() -> enrollment.addDiscovered("cast", "10.0.0.99", 8009))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("no longer visible");
     }
 
@@ -163,10 +165,11 @@ class DevicesMergeTest {
         registry.save(new Device("cast-10-0-0-5", "SHIELD", DeviceKind.CAST, "10.0.0.5",
                 Map.of("cast", Map.of("port", "8009")), Instant.EPOCH));
 
-        assertThatThrownBy(() -> devices.enrollment().merge("cast-10-0-0-5", "10-0-0-5"))
+        DeviceEnrollment enrollment = devices.enrollment();
+        assertThatThrownBy(() -> enrollment.merge("cast-10-0-0-5", "10-0-0-5"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("other way round");
         assertThat(registry.findAll()).hasSize(2);
-        assertThatThrownBy(() -> devices.enrollment().merge("10-0-0-5", "10-0-0-5")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> enrollment.merge("10-0-0-5", "10-0-0-5")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -192,9 +195,10 @@ class DevicesMergeTest {
         registry.save(new Device("cast-10-0-0-9", "Kitchen", DeviceKind.CAST, "10.0.0.9",
                 Map.of("cast", Map.of()), Instant.EPOCH));
 
-        assertThatThrownBy(() -> devices.enrollment().split("10-0-0-5", "androidtv"))
+        DeviceEnrollment enrollment = devices.enrollment();
+        assertThatThrownBy(() -> enrollment.split("10-0-0-5", "androidtv"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cannot be split off");
-        assertThatThrownBy(() -> devices.enrollment().split("cast-10-0-0-9", "cast"))
+        assertThatThrownBy(() -> enrollment.split("cast-10-0-0-9", "cast"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("only one connection");
     }
 
@@ -227,7 +231,8 @@ class DevicesMergeTest {
         assertThat(registry.findById("10-0-0-5").orElseThrow().adapterSettings("cast"))
                 .containsEntry("host", "10.0.0.77");
         assertThat(devices.enrollment().addable()).isEmpty();
-        assertThatThrownBy(() -> devices.enrollment().addDiscovered("cast", "10.0.0.77", 8009))
+        DeviceEnrollment enrollment = devices.enrollment();
+        assertThatThrownBy(() -> enrollment.addDiscovered("cast", "10.0.0.77", 8009))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("already added");
         devices.onDiscovered(new DeviceDiscoveredEvent(elsewhere));
         assertThat(registry.findAll()).hasSize(1);

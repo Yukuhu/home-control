@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -76,7 +77,8 @@ class DevicesQueryTest {
         register("androidtv", "cast");
         // not started: no handles
 
-        assertThatThrownBy(() -> devices.commands().query("shield", MDX))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.query("shield", MDX))
                 .isInstanceOf(DeviceOfflineException.class)
                 .hasMessage("Shield is not connected");
     }
@@ -86,7 +88,8 @@ class DevicesQueryTest {
         register("androidtv");
         devices.start();
 
-        assertThatThrownBy(() -> devices.commands().query("shield", MDX))
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.query("shield", MDX))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("Shield is not a Cast receiver");
         assertThat(androidtv.handles.get("shield").queried).isEmpty();
@@ -99,13 +102,15 @@ class DevicesQueryTest {
         ActionFailedException refused = new ActionFailedException("Shield refused the request (nope)");
         cast.handles.get("shield").failure = refused;
 
-        assertThatThrownBy(() -> devices.commands().query("shield", MDX)).isSameAs(refused);
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.query("shield", MDX)).isSameAs(refused);
     }
 
     @Test
     void unknownDevice() {
         register("cast");
 
-        assertThatThrownBy(() -> devices.commands().query("ghost", MDX)).isInstanceOf(DeviceNotFoundException.class);
+        DeviceCommands commands = devices.commands();
+        assertThatThrownBy(() -> commands.query("ghost", MDX)).isInstanceOf(DeviceNotFoundException.class);
     }
 }
