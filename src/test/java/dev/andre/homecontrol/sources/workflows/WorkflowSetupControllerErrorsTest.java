@@ -32,13 +32,26 @@ class WorkflowSetupControllerErrorsTest {
         when(login.isAuthenticated(any(HttpServletRequest.class))).thenReturn(true);
     }
 
-    /** A new single-tile workflow that passes validation, with mappings A and C. */
+    /** A new single-tile workflow that passes validation: one call, main, with values A and C. */
     private static WorkflowForm validNewForm() {
-        WorkflowForm form = WorkflowForm.from(new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, "w-0123456789ab", 1,
-                WorkflowFixtures.single(URI.create("https://api.example/catalog"))));
-        form.urlMode = form.templateMode = form.headersMode = WorkflowForm.Replacement.REPLACE;
-        form.url = "https://api.example/catalog";
+        return replaced(WorkflowForm.from(new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, "w-0123456789ab", 1,
+                WorkflowFixtures.single(URI.create("https://api.example/catalog")))));
+    }
+
+    /** A new generated workflow that passes validation: call main with C, and the entry field A. */
+    private static WorkflowForm validGeneratedForm() {
+        return replaced(WorkflowForm.from(new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, "w-0123456789ab", 1,
+                WorkflowFixtures.generated())));
+    }
+
+    private static WorkflowForm replaced(WorkflowForm form) {
+        form.templateMode = WorkflowForm.Replacement.REPLACE;
         form.template = "https://media.example/play?id={A}&token={C}";
+        for (var call : form.calls) {
+            call.urlMode = call.headersMode = WorkflowForm.Replacement.REPLACE;
+            call.savedName = "";
+            call.url = "https://api.example/catalog";
+        }
         return form;
     }
 
@@ -50,36 +63,86 @@ class WorkflowSetupControllerErrorsTest {
         return (List<WorkflowSetupController.ErrorView>) model.getAttribute("errors");
     }
 
-    private List<WorkflowSetupController.ErrorView> storeRejects(WorkflowException failure) {
+    private List<WorkflowSetupController.ErrorView> storeRejects(WorkflowForm form, WorkflowException failure) {
         when(store.create(any(), any(), any(), any())).thenThrow(failure);
-        WorkflowForm form = validNewForm();
         return save(form, new DirectFieldBindingResult(form, "workflowForm"));
+    }
+
+    private List<WorkflowSetupController.ErrorView> storeRejects(WorkflowException failure) {
+        return storeRejects(validNewForm(), failure);
     }
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-            invalid fetch URL                   | workflow-url
-            invalid media type                  | workflow-mimeType
-            invalid artwork URL                 | workflow-artwork
-            invalid name                        | workflow-name
-            kind must be video or audio         | workflow-kind
-            invalid tile title                  | workflow-title
-            invalid tile subtitle               | workflow-subtitle
-            invalid array pointer               | workflow-arrayPointer
-            invalid entry ID pointer            | workflow-idPointer
-            invalid entry title pointer         | workflow-titlePointer
-            invalid entry subtitle pointer      | workflow-subtitlePointer
-            invalid entry artwork pointer       | workflow-artworkPointer
-            invalid mapping C pointer           | workflow-variables-1-pointer
-            invalid mapping scope: C            | workflow-variables-1-scope
-            duplicate mapping name: C           | workflow-variables-1-name
-            too many headers                    | workflow-headersMode
-            could not allocate workflow ID      | workflow-form
+            call main: invalid fetch URL                                   | workflow-calls-0-urlMode
+            call main: invalid header name                                 | workflow-calls-0-headersMode
+            call main: invalid header value: Authorization                 | workflow-calls-0-headersMode
+            call main: too many headers                                    | workflow-calls-0-headersMode
+            call main: invalid scope                                       | workflow-calls-0-scope
+            call main: nothing uses this call                              | workflow-calls-0-name
+            call main: uses {x}, which is defined by a call further down  | workflow-calls-0-name
+            call main: uses {x}, which no call defines                     | workflow-calls-0-name
+            duplicate call name: main                                      | workflow-calls-0-name
+            invalid media type                                             | workflow-mimeType
+            invalid artwork URL                                            | workflow-artwork
+            invalid name                                                   | workflow-name
+            kind must be video or audio                                    | workflow-kind
+            invalid tile title                                             | workflow-title
+            invalid tile subtitle                                          | workflow-subtitle
+            the entry source must be a shared call                         | workflow-entryCall
+            invalid array pointer                                          | workflow-arrayPointer
+            invalid entry ID pointer                                       | workflow-idPointer
+            invalid entry title pointer                                    | workflow-titlePointer
+            invalid entry subtitle pointer                                 | workflow-subtitlePointer
+            unknown entry subtitle variable                                | workflow-subtitleVariable
+            entry subtitle variable {C} is marked sensitive                | workflow-subtitleVariable
+            invalid entry artwork pointer                                  | workflow-artworkPointer
+            unknown entry artwork variable                                 | workflow-artworkVariable
+            invalid mapping C pointer                                      | workflow-calls-0-variables-1-pointer
+            duplicate mapping name: C                                      | workflow-calls-0-variables-1-name
+            too many calls                                                 | workflow-form
+            could not allocate workflow ID                                 | workflow-form
             """)
     void aValidationFailurePointsAtItsField(String detail, String target) {
         assertThat(storeRejects(new WorkflowException(WorkflowException.Stage.WORKFLOW, detail)))
                 .extracting(WorkflowSetupController.ErrorView::target)
                 .containsExactly(target);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+            call main: uses {x}, which is defined by a call further down  | This call uses a value no call above it provides.
+            call main: uses {x}, which no call defines                     | This call uses a value that no call defines.
+            call main: uses the entry value {A}; make it a per-entry call  | This call uses an entry value; set it to run once per entry.
+            call main: nothing uses this call                              | Nothing uses this call. Use one of its values or remove it.
+            entry subtitle variable {C} is marked sensitive                | A tile cannot show a value marked sensitive.
+            the entry source must be a shared call                         | Choose a call that runs once as the source of entries.
+            call main: invalid fetch URL                                   | Check this field's format and limits.
+            could not allocate workflow ID                                 | Check the calls, media template, fields and headers.
+            """)
+    void aValidationFailureShowsLocallyWrittenGuidance(String detail, String message) {
+        assertThat(storeRejects(new WorkflowException(WorkflowException.Stage.WORKFLOW, detail)))
+                .extracting(WorkflowSetupController.ErrorView::message)
+                .containsExactly(message);
+    }
+
+    @Test
+    void anEntryFieldFailurePointsAtTheEntryFieldRow() {
+        assertThat(storeRejects(validGeneratedForm(),
+                new WorkflowException(WorkflowException.Stage.WORKFLOW, "invalid mapping A pointer")))
+                .extracting(WorkflowSetupController.ErrorView::target)
+                .containsExactly("workflow-entryVariables-0-pointer");
+    }
+
+    @Test
+    void aFailureOfTheSecondCallPointsAtThatCall() {
+        WorkflowForm form = validNewForm();
+        var second = new WorkflowForm.CallRow();
+        second.name = "stream";
+        form.calls.add(second);
+        assertThat(storeRejects(form, new WorkflowException(WorkflowException.Stage.WORKFLOW, "call stream: invalid fetch URL")))
+                .extracting(WorkflowSetupController.ErrorView::target)
+                .containsExactly("workflow-calls-1-urlMode");
     }
 
     @Test
@@ -90,13 +153,23 @@ class WorkflowSetupControllerErrorsTest {
     }
 
     @Test
-    void aMappingWithAnInvalidNameIsBlamedBeforeTheDetailIsRead() {
+    void aCallWithAnInvalidNameIsBlamed() {
         WorkflowForm form = validNewForm();
-        form.variables.getFirst().name = "1st";
+        form.calls.getFirst().name = "Main";
 
         assertThat(save(form, new DirectFieldBindingResult(form, "workflowForm")))
                 .extracting(WorkflowSetupController.ErrorView::target)
-                .containsExactly("workflow-variables-0-name");
+                .containsExactly("workflow-calls-0-name");
+    }
+
+    @Test
+    void aMappingWithAnInvalidNameIsBlamedBeforeTheDetailIsRead() {
+        WorkflowForm form = validNewForm();
+        form.calls.getFirst().variables.getFirst().name = "1st";
+
+        assertThat(save(form, new DirectFieldBindingResult(form, "workflowForm")))
+                .extracting(WorkflowSetupController.ErrorView::target)
+                .containsExactly("workflow-calls-0-variables-0-name");
     }
 
     @Test

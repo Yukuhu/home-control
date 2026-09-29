@@ -17,8 +17,10 @@ import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ExtendedServletRequestDataBinder;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -32,14 +34,20 @@ public final class WorkflowSetupController {
     private static final String VIEW = "workflow-editor";
     private static final String BASE = "/setup/workflows";
     private static final String ENABLED = "enabled";
-    private static final String VARIABLE_PREFIX = "variables[";
     private static final Set<String> SCALARS = Set.of("name", ENABLED, "mode", "kind", "title", "subtitle", "artwork",
-            "arrayPointer", "idPointer", "titlePointer", "subtitlePointer", "artworkPointer",
-            "includeSubtitlePointer", "includeArtworkPointer", "urlMode", "url", "templateMode", "template", "mimeType",
-            "headersMode", "expectedRevision", "loginPassword", "loginPasswordConfirmation");
-    private static final Set<String> CHECKBOXES = Set.of(ENABLED, "includeSubtitlePointer", "includeArtworkPointer");
-    private static final Pattern VARIABLE = Pattern.compile("variables\\[(0|[1-9]\\d?)\\]\\.(name|scope|pointer|sensitive)");
-    private static final Pattern HEADER = Pattern.compile("headers\\[(0|[1-9]\\d?)\\]\\.(name|value)");
+            "entryCall", "arrayPointer", "idPointer", "titlePointer", "subtitleFrom", "subtitlePointer",
+            "subtitleVariable", "artworkFrom", "artworkPointer", "artworkVariable", "templateMode", "template",
+            "mimeType", "expectedRevision", "loginPassword", "loginPasswordConfirmation");
+    private static final Set<String> CHECKBOXES = Set.of(ENABLED);
+    private static final String CALLS = "calls";
+    private static final int MAX_HEADER_ROWS = 16;
+    private static final int MAX_VARIABLE_ROWS = 64;
+    private static final Pattern CALL = Pattern.compile("calls\\[([0-7])\\]\\.(name|scope|savedName|urlMode|url|headersMode)");
+    private static final Pattern HEADER = Pattern.compile("(calls\\[[0-7]\\]\\.headers)\\[(0|[1-9]\\d?)\\]\\.(name|value)");
+    private static final Pattern VARIABLE = Pattern.compile(
+            "(calls\\[[0-7]\\]\\.variables|entryVariables)\\[(0|[1-9]\\d?)\\]\\.(name|pointer|sensitive)");
+    private static final Pattern CALL_NAME = Pattern.compile("[a-z][a-z0-9_]{0,23}");
+    private static final Pattern VARIABLE_NAME = Pattern.compile("[A-Za-z]\\w{0,31}");
     public record ErrorView(String target, String message) {}
     private final WorkflowStore store;
     private final LoginService login;
@@ -54,7 +62,7 @@ public final class WorkflowSetupController {
         WorkflowForm form = new WorkflowForm();
         if (!request.getRequestURI().equals(request.getContextPath() + BASE)
                 && !request.getRequestURI().endsWith("/new")) {
-            form.urlMode = form.templateMode = form.headersMode = WorkflowForm.Replacement.KEEP;
+            form.templateMode = WorkflowForm.Replacement.KEEP; // each call row brings its own modes
         }
         return form;
     }
@@ -65,7 +73,7 @@ public final class WorkflowSetupController {
             servletBinder.addHeaderPredicate(ignored -> false);
         }
         binder.initDirectFieldAccess();
-        binder.setAutoGrowCollectionLimit(32);
+        binder.setAutoGrowCollectionLimit(MAX_VARIABLE_ROWS);
         binder.setFieldDefaultPrefix(null); // Never accept Spring's !field client-selected defaults.
         BindingFields fields = allowedFields(request);
         binder.setAllowedFields(fields.allowed().toArray(String[]::new));
@@ -74,39 +82,52 @@ public final class WorkflowSetupController {
 
     private static BindingFields allowedFields(HttpServletRequest request) {
         Set<String> allowed = new HashSet<>(SCALARS);
-        Set<Integer> variables = new HashSet<>();
-        Set<Integer> headers = new HashSet<>();
+        Map<String, Set<Integer>> rows = new HashMap<>();
         boolean invalid = false;
         for (var parameter : request.getParameterMap().entrySet()) {
-            if (!allowParameter(parameter.getKey(), parameter.getValue(), allowed, variables, headers)) invalid = true;
+            if (!allowParameter(parameter.getKey(), parameter.getValue(), allowed, rows)) invalid = true;
         }
-        if (!contiguous(variables)) { allowed.removeIf(field -> field.startsWith(VARIABLE_PREFIX)); invalid = true; }
-        if (!contiguous(headers)) { allowed.removeIf(field -> field.startsWith("headers[")); invalid = true; }
+        Set<Integer> calls = rows.getOrDefault(CALLS, Set.of());
+        for (var family : rows.entrySet()) {
+            String prefix = family.getKey() + "[";
+            // A call's rows without the call itself, or rows with gaps, are not bound at all.
+            boolean orphan = family.getKey().startsWith("calls[") && !calls.contains(family.getKey().charAt(6) - '0');
+            if (orphan || !contiguous(family.getValue())) {
+                allowed.removeIf(field -> field.startsWith(orphan ? family.getKey() : prefix));
+                invalid = true;
+            }
+        }
         return new BindingFields(allowed, invalid);
     }
 
-    private static boolean allowParameter(String raw, String[] values, Set<String> allowed,
-                                          Set<Integer> variables, Set<Integer> headers) {
+    private static boolean allowParameter(String raw, String[] values, Set<String> allowed, Map<String, Set<Integer>> rows) {
         String field = raw.startsWith("_") ? raw.substring(1) : raw;
         boolean marker = raw.startsWith("_");
         if (SCALARS.contains(field) && (!marker || CHECKBOXES.contains(field))) return singleValue(values);
-        var variable = VARIABLE.matcher(field);
-        if (variable.matches() && (!marker || variable.group(2).equals("sensitive"))) {
-            int index = Integer.parseInt(variable.group(1));
-            if (index >= 32 || !singleValue(values)) return false;
-            variables.add(index);
+        if (!singleValue(values)) return false;
+        var call = CALL.matcher(field);
+        if (call.matches() && !marker) {
+            rows.computeIfAbsent(CALLS, k -> new HashSet<>()).add(Integer.parseInt(call.group(1)));
             allowed.add(field);
             return true;
         }
         var header = HEADER.matcher(field);
-        if (!marker && header.matches()) {
-            int index = Integer.parseInt(header.group(1));
-            if (index >= 16 || !singleValue(values)) return false;
-            headers.add(index);
-            allowed.add(field);
-            return true;
+        if (header.matches() && !marker) {
+            return row(header.group(1), Integer.parseInt(header.group(2)), MAX_HEADER_ROWS, field, allowed, rows);
+        }
+        var variable = VARIABLE.matcher(field);
+        if (variable.matches() && (!marker || variable.group(3).equals("sensitive"))) {
+            return row(variable.group(1), Integer.parseInt(variable.group(2)), MAX_VARIABLE_ROWS, field, allowed, rows);
         }
         return false;
+    }
+
+    private static boolean row(String family, int index, int limit, String field, Set<String> allowed,
+                               Map<String, Set<Integer>> rows) {
+        if (index >= limit) return false;
+        rows.computeIfAbsent(family, k -> new HashSet<>()).add(index);
+        allowed.add(field);
+        return true;
     }
 
     private static boolean singleValue(String[] values) {
@@ -118,7 +139,7 @@ public final class WorkflowSetupController {
     @GetMapping(BASE + "/new")
     public String createEditor(Model model, HttpServletResponse response) {
         privateResponse(response);
-        return editor(null, new WorkflowForm(), null, model);
+        return editor(null, WorkflowForm.blank(), null, model);
     }
 
     @GetMapping(BASE + "/{id}")
@@ -179,14 +200,29 @@ public final class WorkflowSetupController {
 
     private static void rejectSaveFailure(WorkflowException failure, WorkflowForm form, BindingResult binding,
                                           HttpServletResponse response) {
-        if ("Workflow: Workflow changed; reopen this item".equals(failure.getMessage())) {
+        if ("Workflow changed; reopen this item".equals(failure.detail())) {
             response.setStatus(409);
             binding.reject(CHANGED, "Workflow changed; reopen this item before saving.");
             return;
         }
         String field = validationField(failure, form);
-        if (field == null) binding.reject("settings", "Check the source URL, media template, fields and headers.");
-        else binding.rejectValue(field, "settings", "Check this field's format and limits.");
+        String message = guidance(failure.detail());
+        if (field == null) {
+            binding.reject("settings", message == null ? "Check the calls, media template, fields and headers." : message);
+        } else {
+            binding.rejectValue(field, "settings", message == null ? "Check this field's format and limits." : message);
+        }
+    }
+
+    /** Text written here, chosen by the kind of problem; the domain message itself is never shown. */
+    private static String guidance(String detail) {
+        if (detail.contains(" uses {") && detail.contains("further down")) return "This call uses a value no call above it provides.";
+        if (detail.contains(" uses {")) return "This call uses a value that no call defines.";
+        if (detail.contains("make it a per-entry call")) return "This call uses an entry value; set it to run once per entry.";
+        if (detail.endsWith("nothing uses this call")) return "Nothing uses this call. Use one of its values or remove it.";
+        if (detail.endsWith("is marked sensitive")) return "A tile cannot show a value marked sensitive.";
+        if (detail.equals("the entry source must be a shared call")) return "Choose a call that runs once as the source of entries.";
+        return null;
     }
 
     @PostMapping(BASE + "/{id}/test")
@@ -291,41 +327,72 @@ public final class WorkflowSetupController {
     /** Domain diagnostics choose a field only; their text/arguments are never copied to the view. */
     private static String validationField(WorkflowException failure, WorkflowForm form) {
         if (failure.stage() == WorkflowException.Stage.BUILD) return "templateMode";
-        String detail = failure.getMessage();
-        String field = scalarField(detail);
+        String detail = failure.detail();
+        String field = callField(detail, form);
         if (field == null) field = variableField(detail, form);
-        if (field == null && detail.contains("header")) field = "headersMode";
+        if (field == null) field = scalarField(detail);
         return field;
     }
 
-    private static String scalarField(String detail) {
-        if (detail.contains("fetch URL")) return "url";
-        if (detail.contains("media type")) return "mimeType";
-        if (detail.contains("artwork URL")) return "artwork";
-        if (detail.equals("Workflow: invalid name")) return "name";
-        if (detail.contains("kind must")) return "kind";
-        if (detail.contains("tile title")) return "title";
-        if (detail.contains("tile subtitle")) return "subtitle";
-        if (detail.contains("array pointer")) return "arrayPointer";
-        if (detail.contains("entry ID pointer")) return "idPointer";
-        if (detail.contains("entry title pointer")) return "titlePointer";
-        if (detail.contains("entry subtitle pointer")) return "subtitlePointer";
-        if (detail.contains("entry artwork pointer")) return "artworkPointer";
-        return null;
-    }
-
-    private static String variableField(String detail, WorkflowForm form) {
-        for (int i = 0; i < form.variables.size(); i++) {
-            var row = form.variables.get(i);
-            if (row.name == null || !row.name.matches("[A-Za-z]\\w{0,31}")) return VARIABLE_PREFIX + i + "].name";
-            if (detail.contains("mapping " + row.name + " pointer")) return VARIABLE_PREFIX + i + "].pointer";
-            if (detail.equals("Workflow: invalid mapping scope: " + row.name)) return VARIABLE_PREFIX + i + "].scope";
-            if (detail.equals("Workflow: duplicate mapping name: " + row.name)) return VARIABLE_PREFIX + i + "].name";
+    private static String callField(String detail, WorkflowForm form) {
+        for (int i = 0; i < form.calls.size(); i++) {
+            String name = form.calls.get(i).name;
+            String prefix = "calls[" + i + "].";
+            if (name == null || !CALL_NAME.matcher(name).matches()) {
+                if (detail.equals("invalid call name")) return prefix + "name";
+                continue;
+            }
+            if (detail.equals("duplicate call name: " + name)) return prefix + "name";
+            if (!detail.startsWith("call " + name + ": ")) continue;
+            if (detail.contains("fetch URL")) return prefix + "urlMode";
+            if (detail.contains("header")) return prefix + "headersMode";
+            if (detail.endsWith("invalid scope")) return prefix + "scope";
+            return prefix + "name";
         }
         return null;
     }
 
-    private static boolean safeField(String field) { return SCALARS.contains(field) || VARIABLE.matcher(field).matches() || HEADER.matcher(field).matches(); }
+    private static String variableField(String detail, WorkflowForm form) {
+        for (int i = 0; i < form.calls.size(); i++) {
+            String found = variableRows(detail, form.calls.get(i).variables, "calls[" + i + "].variables[");
+            if (found != null) return found;
+        }
+        return variableRows(detail, form.entryVariables, "entryVariables[");
+    }
+
+    private static String variableRows(String detail, List<WorkflowForm.VariableRow> rows, String prefix) {
+        for (int i = 0; i < rows.size(); i++) {
+            var row = rows.get(i);
+            if (row.name == null || !VARIABLE_NAME.matcher(row.name).matches()) return prefix + i + "].name";
+            if (detail.contains("mapping " + row.name + " pointer")) return prefix + i + "].pointer";
+            if (detail.equals("duplicate mapping name: " + row.name)) return prefix + i + "].name";
+        }
+        return null;
+    }
+
+    /** Order matters: a pointer-shaped display message must match before its broader "entry subtitle" check. */
+    private static String scalarField(String detail) {
+        if (detail.contains("media type")) return "mimeType";
+        if (detail.contains("artwork URL")) return "artwork";
+        if (detail.equals("invalid name")) return "name";
+        if (detail.contains("kind must")) return "kind";
+        if (detail.contains("tile title")) return "title";
+        if (detail.contains("tile subtitle")) return "subtitle";
+        if (detail.contains("entry source")) return "entryCall";
+        if (detail.contains("array pointer")) return "arrayPointer";
+        if (detail.contains("entry ID pointer")) return "idPointer";
+        if (detail.contains("entry title pointer")) return "titlePointer";
+        if (detail.contains("entry subtitle pointer")) return "subtitlePointer";
+        if (detail.contains("entry subtitle")) return "subtitleVariable";
+        if (detail.contains("entry artwork pointer")) return "artworkPointer";
+        if (detail.contains("entry artwork")) return "artworkVariable";
+        return null;
+    }
+
+    private static boolean safeField(String field) {
+        return SCALARS.contains(field) || CALL.matcher(field).matches() || HEADER.matcher(field).matches()
+                || VARIABLE.matcher(field).matches();
+    }
     private static String fieldId(String field) { return "workflow-" + field.replace("[", "-").replace("].", "-"); }
     private static boolean contiguous(Set<Integer> rows) {
         for (int i = 0; i < rows.size(); i++) if (!rows.contains(i)) return false;
