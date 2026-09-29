@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.core.playback;
 
+import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;
 import org.junit.jupiter.api.Test;
 
@@ -34,8 +35,8 @@ class PlaybackPlannerTest {
             new PlayableRef.StreamUrl(URI.create("http://nas/f.mp4"), "video/mp4");
     private static final PlayableRef.AppLink LINK =
             new PlayableRef.AppLink(URI.create("https://www.youtube.com/watch?v=abc"), "youtube");
-    private static final PlayableRef.CastMessage JELLYFIN_MESSAGE = new PlayableRef.CastMessage(
-            "F007D354", "urn:x-cast:com.connectsdk", Map.of("command", "PlayNow", "accessToken", "tok-1"), "the Jellyfin receiver");
+    private static final PlayableRef.CastMessage JELLYFIN_MESSAGE = new PlayableRef.CastMessage(new Action.CastMessage(
+            "F007D354", "urn:x-cast:com.connectsdk", Map.of("command", "PlayNow", "accessToken", "tok-1")), "the Jellyfin receiver");
 
     private static ContentItem item(PlayableRef... playables) {
         return new ContentItem("x", "test", ContentKind.VIDEO, "Title", null, null, List.of(playables));
@@ -105,11 +106,11 @@ class PlaybackPlannerTest {
     void castsACustomMessageBeforeACastLoadOrAStream() {
         Route route = planner.plan(item(STREAM, JELLYFIN_LOAD, JELLYFIN_MESSAGE), EnumSet.of(Capability.CAST_RECEIVER));
 
-        assertThat(route).isEqualTo(new Route.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
-                JELLYFIN_MESSAGE.message(), "the Jellyfin receiver"));
+        assertThat(route).isEqualTo(new Route.CastMessage(new Action.CastMessage("F007D354", "urn:x-cast:com.connectsdk",
+                JELLYFIN_MESSAGE.message().message()), "the Jellyfin receiver"));
         assertThat(route.describe()).isEqualTo("Cast with the Jellyfin receiver");
-        assertThat(((Route.CastMessage) route).action()).isEqualTo(new dev.andre.homecontrol.core.Action.CastMessage("F007D354",
-                "urn:x-cast:com.connectsdk", JELLYFIN_MESSAGE.message()));
+        assertThat(((Route.CastMessage) route).action()).isEqualTo(new Action.CastMessage("F007D354",
+                "urn:x-cast:com.connectsdk", JELLYFIN_MESSAGE.message().message()));
         assertThat(route.toString()).doesNotContain("tok-1");
         assertThat(JELLYFIN_MESSAGE.toString()).doesNotContain("tok-1");
     }

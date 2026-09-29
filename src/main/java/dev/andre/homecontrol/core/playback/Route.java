@@ -113,20 +113,15 @@ public sealed interface Route permits DeviceRoute, DelegatedRoute, Route.Unrouta
     }
 
     /** Run a Cast receiver app and send it a custom message (spec §5.3 rung 3). */
-    record CastMessage(String receiverAppId, String namespace, Map<String, Object> message, String receiverLabel)
-            implements DeviceRoute {
+    record CastMessage(Action.CastMessage message, String receiverLabel) implements DeviceRoute {
         @Override
         public String key() {
-            return "cast-message:" + receiverAppId;
-        }
-
-        public CastMessage {
-            message = message == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(message));
+            return "cast-message:" + message.receiverAppId();
         }
 
         @Override
         public Action action() {
-            return new Action.CastMessage(receiverAppId, namespace, message);
+            return message;
         }
 
         @Override
@@ -136,7 +131,7 @@ public sealed interface Route permits DeviceRoute, DelegatedRoute, Route.Unrouta
 
         @Override
         public String toString() {
-            return "CastMessage[receiverAppId=" + receiverAppId + ", namespace=" + namespace + "]";
+            return message.toString();
         }
     }
 
