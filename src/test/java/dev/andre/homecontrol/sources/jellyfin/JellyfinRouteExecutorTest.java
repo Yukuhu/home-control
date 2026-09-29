@@ -80,6 +80,7 @@ class JellyfinRouteExecutorTest {
 
         verify(sessions).playNow("s1", "item-1", 600L);
         verifyNoInteractions(commands);
+        verify(devices, never()).state(anyString());
     }
 
     /**

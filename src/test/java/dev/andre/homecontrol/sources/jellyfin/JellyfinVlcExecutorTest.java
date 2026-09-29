@@ -90,6 +90,7 @@ class JellyfinVlcExecutorTest {
         assertThatThrownBy(() -> executor.execute(route, shield))
                 .isInstanceOf(ActionFailedException.class).hasMessageContaining("no direct stream");
         verifyNoInteractions(commands);
+        verify(devices, never()).state(anyString());
     }
 
     @Test
@@ -128,6 +129,7 @@ class JellyfinVlcExecutorTest {
                     .isInstanceOf(ActionFailedException.class).hasMessageContaining("in time");
             assertThat(cancelled.await(1, TimeUnit.SECONDS)).isTrue();
             verifyNoInteractions(commands);
+            verify(devices, never()).state(anyString());
         } finally {
             releaseLookup.countDown();
         }
@@ -140,5 +142,6 @@ class JellyfinVlcExecutorTest {
 
         assertThatThrownBy(() -> executor.execute(route, shield)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(commands);
+        verify(devices, never()).state(anyString());
     }
 }

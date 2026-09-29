@@ -90,7 +90,7 @@ class WebOsAdapterTest {
     }
 
     @Test
-    void declaresKeysPowerVolumeAndAppLinks() throws IOException {
+    void declaresKeysAppLinksVolumeInputsAndWakeOnLan() throws IOException {
         WebOsAdapter adapter = adapter(notStarted(), properties(1));
 
         assertThat(adapter.capabilities(device()))

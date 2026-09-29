@@ -34,7 +34,7 @@ class YouTubeRoutesTest {
 
     @Test
     void smartTvsUseTheSameAppLink() {
-        // webOS and Tizen declare the same capabilities; their adapters translate the link to contentTarget / DIAL.
+        // webOS and Tizen both declare keys and app links; their adapters translate the link to contentTarget / DIAL.
         assertThat(planner.plan(lounge, EnumSet.of(Capability.REMOTE_KEYS, Capability.VOLUME,
                 Capability.APP_LINK))).isEqualTo(new Route.OpenAppLink(WATCH, "youtube"));
     }
