@@ -218,6 +218,9 @@ public final class WorkflowSetupController {
     private static String guidance(String detail) {
         if (detail.contains(" uses {") && detail.contains("further down")) return "This call uses a value no call above it provides.";
         if (detail.contains(" uses {")) return "This call uses a value that no call defines.";
+        if (detail.equals("definition exceeds storage limit")) {
+            return "This workflow is too large to save; remove calls, headers or variables.";
+        }
         if (detail.contains("make it a per-entry call")) return "This call uses an entry value; set it to run once per entry.";
         if (detail.endsWith("nothing uses this call")) return "Nothing uses this call. Use one of its values or remove it.";
         if (detail.endsWith("is marked sensitive")) return "A tile cannot show a value marked sensitive.";
@@ -345,7 +348,12 @@ public final class WorkflowSetupController {
             if (detail.equals("duplicate call name: " + name)) return prefix + "name";
             if (!detail.startsWith("call " + name + ": ")) continue;
             if (detail.contains("fetch URL")) return prefix + "urlMode";
-            if (detail.contains("header")) return prefix + "headersMode";
+            String rest = detail.substring(("call " + name + ": ").length());
+            if (rest.startsWith("invalid header") || rest.startsWith("header is") || rest.startsWith("duplicate header")
+                    || rest.startsWith("too many headers") || rest.startsWith("headers are required")) {
+                return prefix + "headersMode";
+            }
+            if (rest.endsWith("make it a per-entry call")) return prefix + "scope";
             if (detail.endsWith("invalid scope")) return prefix + "scope";
             return prefix + "name";
         }
@@ -357,13 +365,17 @@ public final class WorkflowSetupController {
             String found = variableRows(detail, form.calls.get(i).variables, "calls[" + i + "].variables[");
             if (found != null) return found;
         }
-        return variableRows(detail, form.entryVariables, "entryVariables[");
+        return form.mode == WorkflowDraft.Mode.GENERATED
+                ? variableRows(detail, form.entryVariables, "entryVariables[") : null;
     }
 
     private static String variableRows(String detail, List<WorkflowForm.VariableRow> rows, String prefix) {
         for (int i = 0; i < rows.size(); i++) {
             var row = rows.get(i);
-            if (row.name == null || !VARIABLE_NAME.matcher(row.name).matches()) return prefix + i + "].name";
+            if (row.name == null || !VARIABLE_NAME.matcher(row.name).matches()) {
+                if (detail.equals("invalid mapping name")) return prefix + i + "].name";
+                continue;
+            }
             if (detail.contains("mapping " + row.name + " pointer")) return prefix + i + "].pointer";
             if (detail.equals("duplicate mapping name: " + row.name)) return prefix + i + "].name";
         }

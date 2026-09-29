@@ -100,6 +100,13 @@ class WorkflowSetupControllerErrorsTest {
             unknown entry artwork variable                                 | workflow-artworkVariable
             invalid mapping C pointer                                      | workflow-calls-0-variables-1-pointer
             duplicate mapping name: C                                      | workflow-calls-0-variables-1-name
+            call main: uses {headerToken}, which no call defines           | workflow-calls-0-name
+            call main: uses the entry value {A}; make it a per-entry call  | workflow-calls-0-scope
+            call main: invalid header name                                 | workflow-calls-0-headersMode
+            call main: headers are required                                | workflow-calls-0-headersMode
+            call main: header is not allowed: Host                         | workflow-calls-0-headersMode
+            call main: duplicate header: X-A                               | workflow-calls-0-headersMode
+            definition exceeds storage limit                               | workflow-form
             too many calls                                                 | workflow-form
             could not allocate workflow ID                                 | workflow-form
             """)
@@ -117,6 +124,7 @@ class WorkflowSetupControllerErrorsTest {
             call main: nothing uses this call                              | Nothing uses this call. Use one of its values or remove it.
             entry subtitle variable {C} is marked sensitive                | A tile cannot show a value marked sensitive.
             the entry source must be a shared call                         | Choose a call that runs once as the source of entries.
+            definition exceeds storage limit                               | This workflow is too large to save; remove calls, headers or variables.
             call main: invalid fetch URL                                   | Check this field's format and limits.
             could not allocate workflow ID                                 | Check the calls, media template, fields and headers.
             """)
@@ -170,6 +178,27 @@ class WorkflowSetupControllerErrorsTest {
         assertThat(save(form, new DirectFieldBindingResult(form, "workflowForm")))
                 .extracting(WorkflowSetupController.ErrorView::target)
                 .containsExactly("workflow-calls-0-variables-0-name");
+    }
+
+    @Test
+    void aBlankLeftoverValueRowDoesNotCaptureAnUnrelatedError() {
+        WorkflowForm form = validNewForm();
+        form.entryVariables.add(new WorkflowForm.VariableRow());
+
+        assertThat(storeRejects(form, new WorkflowException(WorkflowException.Stage.WORKFLOW, "invalid name")))
+                .extracting(WorkflowSetupController.ErrorView::target)
+                .containsExactly("workflow-name");
+    }
+
+    @Test
+    void aBlankEntryValueRowInSingleModeIsNeverBlamed() {
+        WorkflowForm form = validNewForm();
+        form.name = "";
+        form.entryVariables.add(new WorkflowForm.VariableRow());
+
+        assertThat(save(form, new DirectFieldBindingResult(form, "workflowForm")))
+                .extracting(WorkflowSetupController.ErrorView::target)
+                .containsExactly("workflow-name");
     }
 
     @Test
