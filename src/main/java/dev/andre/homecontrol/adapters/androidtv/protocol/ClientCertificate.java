@@ -14,7 +14,6 @@ import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Date;
 import java.util.HexFormat;
 
 /** A self-signed RSA identity. Once paired, this certificate IS the credential. */
@@ -22,6 +21,8 @@ public record ClientCertificate(KeyPair keyPair, X509Certificate certificate) {
 
     private static final Duration VALIDITY = Duration.ofDays(365L * 20);
 
+    // BouncyCastle requires Date at this API boundary; all validity arithmetic uses Instant and Duration.
+    @SuppressWarnings("java:S2143")
     public static ClientCertificate generate(String commonName) {
         try {
             KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
@@ -38,8 +39,8 @@ public record ClientCertificate(KeyPair keyPair, X509Certificate certificate) {
                     new JcaX509v3CertificateBuilder(
                             subject,
                             new BigInteger(64, new SecureRandom()),
-                            Date.from(now),
-                            Date.from(now.plus(VALIDITY)),
+                            java.util.Date.from(now),
+                            java.util.Date.from(now.plus(VALIDITY)),
                             subject,
                             keyPair.getPublic()
                     ).build(signer));

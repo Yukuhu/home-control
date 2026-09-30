@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Maps a TMDB watch provider to one of Home Control's streaming-service keys ({@link StreamingProviders#KNOWN}),
@@ -60,13 +61,8 @@ public final class ProviderMatcher {
                 keyOf(provider).ifPresent(subscribed::add);
             }
         }
-        List<String> result = new ArrayList<>();
-        for (String key : configuredKeys) {
-            if (subscribed.contains(key)) {
-                result.add(key);
-            }
-        }
-        return result;
+        return configuredKeys.stream().filter(subscribed::contains)
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     static String normalise(String name) {

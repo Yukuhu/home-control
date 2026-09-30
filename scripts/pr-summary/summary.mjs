@@ -9,6 +9,7 @@ const MAX_COMMENT = 60000;
 const MAX_FAILURES = 10;
 const MAX_MESSAGE = 300;
 const MAX_TRACE_LINES = 30;
+const REPORT_READ_BATCH_SIZE = 4;
 
 // The row order of the comment. `job` is the job's display name in ci.yml, which is how the
 // GitHub API identifies it; `suite` names the JUnit results that belong to the job. A job that
@@ -95,18 +96,27 @@ export async function collectSuite(directory) {
         if (error.code === "ENOENT") return result;
         throw error;
     }
-    for (const name of names) {
-        result.found = true;
-        try {
-            const parsed = parseJUnit(await readFile(path.join(directory, name), "utf8"));
+    result.found = names.length > 0;
+    for (let index = 0; index < names.length; index += REPORT_READ_BATCH_SIZE) {
+        const batch = names.slice(index, index + REPORT_READ_BATCH_SIZE);
+        const reports = await Promise.all(batch.map(async (name) => { // NOSONAR: Limit concurrent reads of potentially large JUnit files to four.
+            try {
+                return parseJUnit(await readFile(path.join(directory, name), "utf8"));
+            } catch {
+                // A test JVM that died mid-write leaves a truncated file; the others still count.
+                return null;
+            }
+        }));
+        for (const parsed of reports) {
+            if (parsed === null) {
+                result.unreadable++;
+                continue;
+            }
             result.passed += parsed.passed;
             result.failed += parsed.failed;
             result.skipped += parsed.skipped;
             result.failures.push(...parsed.failures);
             result.flaky.push(...parsed.flaky);
-        } catch {
-            // A test JVM that died mid-write leaves a truncated file; the others still count.
-            result.unreadable++;
         }
     }
     return result;

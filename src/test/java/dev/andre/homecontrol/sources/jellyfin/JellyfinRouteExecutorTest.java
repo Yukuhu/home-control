@@ -64,6 +64,8 @@ class JellyfinRouteExecutorTest {
     }
 
     @Test
+    // These production constants are the actual values; independently constructed durations are the expectations.
+    @SuppressWarnings("java:S3415")
     void productionWaitsAreTwoSecondsBetweenCommandsAndAQuarterSecondPerStep() {
         assertThat(JellyfinRouteExecutor.RETRY).isEqualTo(Duration.ofSeconds(2));
         assertThat(JellyfinRouteExecutor.PAUSE_STEP).isEqualTo(Duration.ofMillis(250));

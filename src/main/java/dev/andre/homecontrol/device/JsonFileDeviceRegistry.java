@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Registry backed by devices.json, version 3: {@code {"version": 3, "devices": [...]}}. It is read once, then served
@@ -129,10 +130,9 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
         if (!array.isArray()) {
             throw new IllegalArgumentException("devices must be a JSON array");
         }
-        List<Device> devices = new ArrayList<>();
-        for (JsonNode node : array) {
-            devices.add(MAPPER.treeToValue(node, Device.class));
-        }
+        List<Device> devices = array.valueStream()
+                .map(node -> MAPPER.treeToValue(node, Device.class))
+                .collect(Collectors.toCollection(ArrayList::new));
         validateDevices(devices);
         return List.copyOf(devices);
     }

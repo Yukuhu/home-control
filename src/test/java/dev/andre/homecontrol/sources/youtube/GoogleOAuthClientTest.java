@@ -181,6 +181,8 @@ class GoogleOAuthClientTest {
     }
 
     @Test
+    // The production poll floor is the actual value; Duration.ofSeconds(1) is the independent expectation.
+    @SuppressWarnings("java:S3415")
     void theReportedPollIntervalNeverGoesBelowTheFloor() throws IOException {
         start();
         String immediate = FakeGoogleServer.fixture("oauth-device-code.json").replace("\"interval\": 5", "\"interval\": 0");

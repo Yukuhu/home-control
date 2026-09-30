@@ -144,12 +144,12 @@ public final class LegacyPropertyNames implements EnvironmentPostProcessor, Orde
             Found found = firstContaining(sources, rename.newName());
             if (found != null && sources.precedenceOf(found.source()) <= sources.precedenceOf(old.source())) {
                 log.warn(warning + " (ignored: " + rename.newName() + " is also set)");
-                continue;
+            } else {
+                Object value = old.value();
+                copies.computeIfAbsent(old.source().getName(), name -> new LinkedHashMap<>())
+                        .put(rename.newName(), rename.seconds() ? String.valueOf(value).strip() + "s" : value);
+                log.warn(warning);
             }
-            Object value = old.value();
-            copies.computeIfAbsent(old.source().getName(), name -> new LinkedHashMap<>())
-                    .put(rename.newName(), rename.seconds() ? String.valueOf(value).strip() + "s" : value);
-            log.warn(warning);
         }
         copies.forEach((sourceName, values) ->
                 sources.addAfter(sourceName, new MapPropertySource(SOURCE_PREFIX + sourceName, values)));
