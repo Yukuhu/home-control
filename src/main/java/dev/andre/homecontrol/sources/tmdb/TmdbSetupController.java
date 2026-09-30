@@ -3,9 +3,9 @@ package dev.andre.homecontrol.sources.tmdb;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -30,9 +30,9 @@ public class TmdbSetupController {
     public String connect(@RequestParam(required = false) String credential,
                           @RequestParam(required = false) String loginPassword,
                           @RequestParam(required = false) String loginPasswordConfirmation,
-                          HttpServletRequest request, RedirectAttributes redirect) {
+                          LoginContext context, RedirectAttributes redirect) {
         try {
-            setup.connect(new TmdbSetupService.ConnectRequest(credential, loginPassword, loginPasswordConfirmation), request);
+            setup.connect(new TmdbSetupService.ConnectRequest(credential, loginPassword, loginPasswordConfirmation), context);
             redirect.addFlashAttribute(MESSAGE, "TMDB connected");
         } catch (ContentSourceException | PasswordRejectedException e) {
             redirect.addFlashAttribute(ERROR, e.getMessage());

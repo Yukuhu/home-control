@@ -1,10 +1,9 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
-import dev.andre.homecontrol.security.LoginRequiredException;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
-import jakarta.servlet.http.HttpServletRequest;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
@@ -46,9 +45,11 @@ public class JellyfinSetupService {
                 .map(token -> new JellyfinConnection(settings.serverUrl(), token, settings.deviceId(), settings.userId())));
     }
 
-    public JellyfinSettings connect(ConnectRequest request, HttpServletRequest http) {
+    public JellyfinSettings connect(ConnectRequest request, LoginContext context) {
         JellyfinSettings.AuthMode mode = request.mode() == null ? JellyfinSettings.AuthMode.PASSWORD : request.mode();
-        passLoginGate(request, http);
+        // The login gate comes first, so a rejected request never touches Jellyfin and never learns whether its
+        // other fields would have been valid.
+        login.permitSecrets(context, request.loginPassword(), request.loginPasswordConfirmation());
         URI server = JellyfinClient.normalizeServerUrl(request.serverUrl());
         URI deviceServer = request.deviceServerUrl() == null || request.deviceServerUrl().isBlank()
                 ? server : JellyfinClient.normalizeServerUrl(request.deviceServerUrl());
@@ -76,7 +77,7 @@ public class JellyfinSetupService {
                 previous.map(JellyfinSettings::players).orElse(Map.of()));
         try {
             login.storeSecrets(Map.of(JellyfinSettings.TOKEN_SECRET, token), request.loginPassword(),
-                    request.loginPasswordConfirmation(), http);
+                    request.loginPasswordConfirmation(), context);
         } catch (RuntimeException e) {
             if (mode == JellyfinSettings.AuthMode.PASSWORD) {
                 revokeQuietly(new JellyfinConnection(server, token, deviceId, next.userId()));
@@ -88,21 +89,6 @@ public class JellyfinSetupService {
                 .ifPresent(old -> previousToken.filter(oldToken -> !oldToken.equals(token))
                         .ifPresent(oldToken -> revokeQuietly(new JellyfinConnection(old.serverUrl(), oldToken, old.deviceId(), old.userId()))));
         return next;
-    }
-
-    /**
-     * Whichever gate applies (a fresh login password, or this browser's own session) is checked
-     * before anything else, including parsing the rest of the request, so a rejected request
-     * never touches Jellyfin and never learns whether its other fields would have been valid.
-     */
-    private void passLoginGate(ConnectRequest request, HttpServletRequest http) {
-        if (login.loginRequired()) {
-            if (!login.isAuthenticated(http)) {
-                throw new LoginRequiredException();
-            }
-        } else {
-            login.checkNewPassword(request.loginPassword(), request.loginPasswordConfirmation());
-        }
     }
 
     /** What Jellyfin granted: an access token and the user it belongs to. */

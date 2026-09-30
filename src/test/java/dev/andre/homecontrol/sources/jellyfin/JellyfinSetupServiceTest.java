@@ -1,9 +1,11 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.security.Argon2PasswordHasher;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretKeySource;
 import dev.andre.homecontrol.storage.SecretStore;
@@ -55,7 +57,7 @@ class JellyfinSetupServiceTest {
 
     @Test
     void connectsWithAPasswordAndStoresOnlyTheToken() throws IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
 
         JellyfinSettings result = setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), request);
 
@@ -74,12 +76,12 @@ class JellyfinSetupServiceTest {
         assertThat(raw).doesNotContain(FakeJellyfinServer.ACCESS_TOKEN).doesNotContain("user pw");
 
         assertThat(loginService.loginRequired()).isTrue();
-        assertThat(loginService.isAuthenticated(request)).isTrue();
+        assertThat(request.loggedIn()).isTrue();
     }
 
     @Test
     void theLoginPasswordIsCheckedBeforeContactingJellyfin() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
 
         var weakPassword = passwordRequest("short", "short");
         assertThatThrownBy(() -> setup.connect(weakPassword, request))
@@ -92,9 +94,9 @@ class JellyfinSetupServiceTest {
 
     @Test
     void unauthenticatedRequestsAreRejectedBeforeTheServerUrlIsValidated() {
-        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new MockHttpServletRequest());
+        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new RequestLoginContext(new MockHttpServletRequest(), loginService));
 
-        MockHttpServletRequest unauthenticated = new MockHttpServletRequest();
+        LoginContext unauthenticated = new RequestLoginContext(new MockHttpServletRequest(), loginService);
         JellyfinSetupService.ConnectRequest badUrl = new JellyfinSetupService.ConnectRequest(
                 "not a url", null, JellyfinSettings.AuthMode.PASSWORD, "andre", "user pw", null, null, null);
 
@@ -104,7 +106,7 @@ class JellyfinSetupServiceTest {
     @Test
     void connectsWithAnApiKeyByUserName() {
         fake.respond("GET", "/Users", 200, "users.json");
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
         JellyfinSetupService.ConnectRequest connectRequest = new JellyfinSetupService.ConnectRequest(
                 fake.url() + "/", null, JellyfinSettings.AuthMode.API_KEY, "andre", null, "api-key-123",
                 LOGIN_PASSWORD, LOGIN_PASSWORD);
@@ -121,7 +123,7 @@ class JellyfinSetupServiceTest {
     @Test
     void anUnknownUserIsNamed() {
         fake.respond("GET", "/Users", 200, "users.json");
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
         JellyfinSetupService.ConnectRequest connectRequest = new JellyfinSetupService.ConnectRequest(
                 fake.url() + "/", null, JellyfinSettings.AuthMode.API_KEY, "nobody", null, "api-key-123",
                 LOGIN_PASSWORD, LOGIN_PASSWORD);
@@ -137,11 +139,11 @@ class JellyfinSetupServiceTest {
 
     @Test
     void reconnectingKeepsTheDeviceIdAndLinksAndNeedsTheLogin() {
-        MockHttpServletRequest first = new MockHttpServletRequest();
+        LoginContext first = new RequestLoginContext(new MockHttpServletRequest(), loginService);
         JellyfinSettings connected = setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), first);
         setup.save(connected.withSessionLink("shield", "jf-dev").withPlayer("shield", JellyfinSettings.Player.VLC));
 
-        MockHttpServletRequest unauthenticated = new MockHttpServletRequest();
+        LoginContext unauthenticated = new RequestLoginContext(new MockHttpServletRequest(), loginService);
         var reconnect = passwordRequest(null, null);
         assertThatThrownBy(() -> setup.connect(reconnect, unauthenticated))
                 .isInstanceOf(LoginRequiredException.class);
@@ -156,14 +158,14 @@ class JellyfinSetupServiceTest {
 
     @Test
     void checkReportsServerVersionAndUser() {
-        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new MockHttpServletRequest());
+        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new RequestLoginContext(new MockHttpServletRequest(), loginService));
 
         assertThat(setup.check()).isEqualTo("Connected to nas (Jellyfin 10.11.2) as Andre");
     }
 
     @Test
     void disconnectRevokesAPasswordTokenAndKeepsTheLogin() {
-        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new MockHttpServletRequest());
+        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new RequestLoginContext(new MockHttpServletRequest(), loginService));
 
         setup.disconnect();
 
@@ -175,7 +177,7 @@ class JellyfinSetupServiceTest {
 
     @Test
     void disconnectStillWorksWhenJellyfinIsDown() {
-        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new MockHttpServletRequest());
+        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new RequestLoginContext(new MockHttpServletRequest(), loginService));
         fake.close();
 
         setup.disconnect();
@@ -185,7 +187,7 @@ class JellyfinSetupServiceTest {
 
     @Test
     void linkingASessionReplacesItsPreviousDeviceAndBlankUnlinks() {
-        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new MockHttpServletRequest());
+        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new RequestLoginContext(new MockHttpServletRequest(), loginService));
 
         setup.link("jf-1", "shield");
         setup.link("jf-1", "bedroom");

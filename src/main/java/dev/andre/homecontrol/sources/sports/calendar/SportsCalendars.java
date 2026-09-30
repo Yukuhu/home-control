@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import dev.andre.homecontrol.sources.sports.SportsSettings;
@@ -8,7 +9,6 @@ import dev.andre.homecontrol.sources.sports.ics.IcsCalendar;
 import dev.andre.homecontrol.sources.sports.ics.IcsFormatException;
 import dev.andre.homecontrol.sources.sports.ics.IcsParser;
 import dev.andre.homecontrol.storage.SecretStore;
-import jakarta.servlet.http.HttpServletRequest;
 
 import java.net.URI;
 import java.security.SecureRandom;
@@ -58,7 +58,7 @@ public class SportsCalendars {
         return "sports.calendar." + calendarId;
     }
 
-    public synchronized SportsSettings.CalendarEntry add(AddCalendar request, HttpServletRequest http) {
+    public synchronized SportsSettings.CalendarEntry add(AddCalendar request, LoginContext context) {
         URI uri = policy.parse(request.url());
         String label = request.label() == null ? "" : request.label().strip();
         if (label.length() > 80) {
@@ -74,9 +74,7 @@ public class SportsCalendars {
         if (duplicate) {
             throw new IllegalArgumentException("That calendar is already added");
         }
-        if (!login.loginRequired()) {
-            login.checkNewPassword(request.loginPassword(), request.loginPasswordConfirmation());
-        }
+        login.permitSecrets(context, request.loginPassword(), request.loginPasswordConfirmation());
         String text = fetcher.fetch(uri);
         IcsCalendar parsed;
         try {
@@ -86,7 +84,7 @@ public class SportsCalendars {
         }
         String id = newId(settings);
         login.storeSecrets(Map.of(secretName(id), uriString), request.loginPassword(),
-                request.loginPasswordConfirmation(), http);
+                request.loginPasswordConfirmation(), context);
         SportsSettings.CalendarEntry entry = new SportsSettings.CalendarEntry(
                 id, resolvedLabel(label, parsed, uri), uri.getHost(), null, clock.instant());
         try {

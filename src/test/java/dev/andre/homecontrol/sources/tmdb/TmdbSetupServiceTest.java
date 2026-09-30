@@ -1,9 +1,11 @@
 package dev.andre.homecontrol.sources.tmdb;
 
 import dev.andre.homecontrol.security.Argon2PasswordHasher;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretKeySource;
 import dev.andre.homecontrol.storage.SecretStore;
@@ -62,7 +64,7 @@ class TmdbSetupServiceTest {
 
     @Test
     void connectsWithABearerTokenAndSetsTheLoginPassword() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
 
         TmdbSettings result = setup.connect(
                 new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD), request);
@@ -80,7 +82,7 @@ class TmdbSetupServiceTest {
 
     @Test
     void connectsWithAnApiKey() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
 
         TmdbSettings result = setup.connect(
                 new TmdbSetupService.ConnectRequest(FakeTmdbServer.API_KEY, LOGIN_PASSWORD, LOGIN_PASSWORD), request);
@@ -92,7 +94,7 @@ class TmdbSetupServiceTest {
     @Test
     void aRejectedCredentialStoresNothing() {
         fake.respond("GET", "/3/authentication", 401, "authentication-invalid.json");
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
 
         var rejectedToken = new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD);
         assertThatThrownBy(() -> setup.connect(rejectedToken, request))
@@ -107,7 +109,7 @@ class TmdbSetupServiceTest {
 
     @Test
     void aMalformedCredentialIsInvalidInput() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
 
         var malformedCredential = new TmdbSetupService.ConnectRequest("nope", LOGIN_PASSWORD, LOGIN_PASSWORD);
         assertThatThrownBy(() -> setup.connect(malformedCredential, request))
@@ -121,7 +123,7 @@ class TmdbSetupServiceTest {
 
     @Test
     void theFirstSecretNeedsAGoodPassword() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
 
         var weakPassword = new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, "short", "short");
         assertThatThrownBy(() -> setup.connect(weakPassword, request))
@@ -133,10 +135,10 @@ class TmdbSetupServiceTest {
     @Test
     void laterConnectsNeedALoggedInBrowser() {
         setup.connect(new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD),
-                new MockHttpServletRequest());
+                new RequestLoginContext(new MockHttpServletRequest(), loginService));
 
         var reconnect = new TmdbSetupService.ConnectRequest(FakeTmdbServer.API_KEY, null, null);
-        var anonymous = new MockHttpServletRequest();
+        var anonymous = new RequestLoginContext(new MockHttpServletRequest(), loginService);
         assertThatThrownBy(() -> setup.connect(reconnect, anonymous))
                 .isInstanceOf(LoginRequiredException.class);
     }
@@ -144,7 +146,7 @@ class TmdbSetupServiceTest {
     @Test
     void checkSaysWhatWorks() {
         setup.connect(new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD),
-                new MockHttpServletRequest());
+                new RequestLoginContext(new MockHttpServletRequest(), loginService));
 
         assertThat(setup.check()).isEqualTo("TMDB accepted the read access token");
     }
@@ -161,7 +163,7 @@ class TmdbSetupServiceTest {
     @Test
     void disconnectRemovesSecretAndSettings() {
         setup.connect(new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD),
-                new MockHttpServletRequest());
+                new RequestLoginContext(new MockHttpServletRequest(), loginService));
 
         setup.disconnect();
 
@@ -173,7 +175,7 @@ class TmdbSetupServiceTest {
     @Test
     void credentialNeedsBothSettingsAndSecret() {
         setup.connect(new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD),
-                new MockHttpServletRequest());
+                new RequestLoginContext(new MockHttpServletRequest(), loginService));
 
         loginService.removeSecrets(java.util.List.of(TmdbSettings.CREDENTIAL_SECRET));
 

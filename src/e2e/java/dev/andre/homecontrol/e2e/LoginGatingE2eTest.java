@@ -7,6 +7,7 @@ import com.microsoft.playwright.options.AriaRole;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +31,7 @@ class LoginGatingE2eTest extends E2eApplicationTest {
 
     @BeforeEach
     void storeASecretAndRequireLogin() {
-        login.storeSecrets(Map.of("e2e.token", TOKEN), PASSWORD, PASSWORD, new MockHttpServletRequest());
+        login.storeSecrets(Map.of("e2e.token", TOKEN), PASSWORD, PASSWORD, new RequestLoginContext(new MockHttpServletRequest(), login));
     }
 
     @AfterEach

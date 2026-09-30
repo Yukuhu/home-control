@@ -4,9 +4,9 @@ import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,13 +41,13 @@ public class JellyfinSetupController {
                           @RequestParam(required = false) String apiKey,
                           @RequestParam(required = false) String loginPassword,
                           @RequestParam(required = false) String loginPasswordConfirmation,
-                          HttpServletRequest request, RedirectAttributes redirect) {
+                          LoginContext context, RedirectAttributes redirect) {
         JellyfinSettings.AuthMode authMode = "api-key".equals(mode)
                 ? JellyfinSettings.AuthMode.API_KEY : JellyfinSettings.AuthMode.PASSWORD;
         JellyfinSetupService.ConnectRequest connectRequest = new JellyfinSetupService.ConnectRequest(
                 serverUrl, deviceServerUrl, authMode, userName, password, apiKey, loginPassword, loginPasswordConfirmation);
         try {
-            JellyfinSettings connected = setup.connect(connectRequest, request);
+            JellyfinSettings connected = setup.connect(connectRequest, context);
             redirect.addFlashAttribute(MESSAGE, "Connected to " + connected.serverName() + " as " + connected.userName());
         } catch (JellyfinException | PasswordRejectedException | LoginRequiredException | IllegalStateException e) {
             redirect.addFlashAttribute(ERROR, e.getMessage());

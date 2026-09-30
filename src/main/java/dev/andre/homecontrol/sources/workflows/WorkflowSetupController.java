@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
@@ -153,18 +154,18 @@ public final class WorkflowSetupController {
 
     @PostMapping(BASE)
     public String create(@ModelAttribute(WORKFLOW_FORM) WorkflowForm form, BindingResult binding,
-                         HttpServletRequest request, HttpServletResponse response, Model model) {
-        return save(null, form, binding, request, response, model);
+                         HttpServletRequest request, LoginContext context, HttpServletResponse response, Model model) {
+        return save(null, form, binding, request, context, response, model);
     }
 
     @PostMapping(BASE + "/{id}")
     public String update(@PathVariable String id, @ModelAttribute(WORKFLOW_FORM) WorkflowForm form, BindingResult binding,
-                         HttpServletRequest request, HttpServletResponse response, Model model) {
-        return save(id, form, binding, request, response, model);
+                         HttpServletRequest request, LoginContext context, HttpServletResponse response, Model model) {
+        return save(id, form, binding, request, context, response, model);
     }
 
     private String save(String id, WorkflowForm form, BindingResult binding, HttpServletRequest request,
-                        HttpServletResponse response, Model model) {
+                        LoginContext context, HttpServletResponse response, Model model) {
         privateResponse(response);
         // Spring also adds the route's id to property values; it is not a client-editable form field.
         boolean suppressed = java.util.Arrays.stream(binding.getSuppressedFields())
@@ -173,7 +174,7 @@ public final class WorkflowSetupController {
             binding.reject(INVALID, "Some submitted fields are invalid. Check the form and try again.");
         }
         try {
-            authenticate(request);
+            context.requireLogin();
             WorkflowDefinition saved = id == null ? null : store.find(id).orElse(null);
             if (id != null && saved == null) {
                 response.setStatus(404); binding.reject("missing", "This workflow no longer exists.");
@@ -183,8 +184,8 @@ public final class WorkflowSetupController {
             if (binding.hasErrors()) return editor(id, form, binding, model);
             var draft = form.toDraft(saved);
             WorkflowValidator.validate(draft);
-            var changed = id == null ? store.create(draft, form.loginPassword, form.loginPasswordConfirmation, request)
-                    : store.update(id, form.expectedRevision, draft, request);
+            var changed = id == null ? store.create(draft, form.loginPassword, form.loginPasswordConfirmation, context)
+                    : store.update(id, form.expectedRevision, draft, context);
             form.clearSecrets();
             return "redirect:" + BASE + "/" + changed.id();
         } catch (LoginRequiredException _) {
@@ -230,17 +231,18 @@ public final class WorkflowSetupController {
     }
 
     @PostMapping(BASE + "/{id}/test")
-    public String test(@PathVariable String id, HttpServletRequest request, HttpServletResponse response, Model model) {
+    public String test(@PathVariable String id, HttpServletRequest request, LoginContext context,
+                       HttpServletResponse response, Model model) {
         privateResponse(response);
         WorkflowForm form = new WorkflowForm();
         var binding = new DirectFieldBindingResult(form, WORKFLOW_FORM);
         try {
-            authenticate(request);
+            context.requireLogin();
             var saved = store.find(id).orElse(null);
             if (saved == null) return missing(model, response);
             form = WorkflowForm.from(saved);
             binding = new DirectFieldBindingResult(form, WORKFLOW_FORM);
-            var result = tests.test(id, revision(request), request);
+            var result = tests.test(id, revision(request), context);
             model.addAttribute("testResult", result);
         } catch (LoginRequiredException _) {
             response.setStatus(401); binding.reject("login", "Log in again before testing workflows.");
@@ -253,29 +255,31 @@ public final class WorkflowSetupController {
     }
 
     @PostMapping(BASE + "/{id}/enabled")
-    public String enabled(@PathVariable String id, HttpServletRequest request, HttpServletResponse response, Model model) {
-        return mutate(id, request, response, model, () -> {
+    public String enabled(@PathVariable String id, HttpServletRequest request, LoginContext context,
+                          HttpServletResponse response, Model model) {
+        return mutate(id, context, response, model, () -> {
             String value = request.getParameter(ENABLED);
             if (!"true".equals(value) && !"false".equals(value)) throw new IllegalArgumentException();
-            store.setEnabled(id, revision(request), Boolean.parseBoolean(value), request);
+            store.setEnabled(id, revision(request), Boolean.parseBoolean(value), context);
         });
     }
 
     @PostMapping(BASE + "/{id}/remove")
-    public String remove(@PathVariable String id, HttpServletRequest request, HttpServletResponse response, Model model) {
-        return mutate(id, request, response, model, () -> store.remove(id, revision(request), request));
+    public String remove(@PathVariable String id, HttpServletRequest request, LoginContext context,
+                         HttpServletResponse response, Model model) {
+        return mutate(id, context, response, model, () -> store.remove(id, revision(request), context));
     }
 
     @PostMapping(BASE + "/{id}/remove-invalid")
-    public String removeInvalid(@PathVariable String id, HttpServletRequest request, HttpServletResponse response, Model model) {
-        return mutate(null, request, response, model,
-                () -> store.removeInvalid(WorkflowRecoveryToken.decodeRecorded(id, store.problems()), request));
+    public String removeInvalid(@PathVariable String id, LoginContext context, HttpServletResponse response, Model model) {
+        return mutate(null, context, response, model,
+                () -> store.removeInvalid(WorkflowRecoveryToken.decodeRecorded(id, store.problems()), context));
     }
 
-    private String mutate(String id, HttpServletRequest request, HttpServletResponse response, Model model, Runnable operation) {
+    private String mutate(String id, LoginContext context, HttpServletResponse response, Model model, Runnable operation) {
         privateResponse(response);
         try {
-            authenticate(request); operation.run(); return "redirect:/setup#workflows";
+            context.requireLogin(); operation.run(); return "redirect:/setup#workflows";
         } catch (LoginRequiredException _) {
             response.setStatus(401);
         } catch (IllegalArgumentException _) {
@@ -423,7 +427,6 @@ public final class WorkflowSetupController {
         if (revision < 1) throw new IllegalArgumentException();
         return revision;
     }
-    private void authenticate(HttpServletRequest request) { if (!login.isAuthenticated(request)) throw new LoginRequiredException(); }
     private static void privateResponse(HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store"); response.setHeader("Referrer-Policy", "same-origin");
     }

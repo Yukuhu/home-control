@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.storage.SecretStore;
 import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.AfterEach;
@@ -43,7 +44,7 @@ class LoginGateEndToEndTest extends FullAppTest {
 
     @BeforeEach
     void storeAFirstSecret() {
-        login.storeSecrets(Map.of("jellyfin.token", "0123456789abcdef"), PASSWORD, PASSWORD, new MockHttpServletRequest());
+        login.storeSecrets(Map.of("jellyfin.token", "0123456789abcdef"), PASSWORD, PASSWORD, new RequestLoginContext(new MockHttpServletRequest(), login));
     }
 
     @AfterEach

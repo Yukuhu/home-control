@@ -1,9 +1,8 @@
 package dev.andre.homecontrol.sources.youtube;
 
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /** Uses the same browser-facing origin for starting sign-in and receiving its session cookie. */
 final class YouTubeOAuthCallback {
@@ -13,9 +12,9 @@ final class YouTubeOAuthCallback {
 
     private YouTubeOAuthCallback() { }
 
-    static URI uri(HttpServletRequest request) {
-        return ServletUriComponentsBuilder.fromRequestUri(request)
-                .replacePath(request.getContextPath() + PATH).replaceQuery(null).build().toUri();
+    /** The callback under {@code contextUrl}, this server's root as the browser reaches it. */
+    static URI uri(URI contextUrl) {
+        return UriComponentsBuilder.fromUri(contextUrl).path(PATH).replaceQuery(null).build().toUri();
     }
 
     static boolean supported(URI uri) {

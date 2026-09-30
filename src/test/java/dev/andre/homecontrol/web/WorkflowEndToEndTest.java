@@ -108,8 +108,8 @@ class WorkflowEndToEndTest {
     @AfterEach void cleanup() {
         try {
             if (!workflows.all().isEmpty()) {
-                var request = new MockHttpServletRequest();
-                assertThat(login.authenticate(PASSWORD, new RequestLoginContext(request, login))).isTrue();
+                var request = new RequestLoginContext(new MockHttpServletRequest(), login);
+                assertThat(login.authenticate(PASSWORD, request)).isTrue();
                 for (var definition : workflows.all()) workflows.remove(definition.id(), definition.revision(), request);
             }
             if (login.loginRequired()) {

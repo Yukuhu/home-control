@@ -45,8 +45,8 @@ class WorkflowE2eTest extends E2eApplicationTest {
 
     @AfterEach void clearWorkflowsAndTheLogin() {
         if (!workflows.all().isEmpty()) {
-            var request = new MockHttpServletRequest();
-            org.assertj.core.api.Assertions.assertThat(login.authenticate(PASSWORD, new RequestLoginContext(request, login))).isTrue();
+            var request = new RequestLoginContext(new MockHttpServletRequest(), login);
+            org.assertj.core.api.Assertions.assertThat(login.authenticate(PASSWORD, request)).isTrue();
             for (var definition : workflows.all()) workflows.remove(definition.id(), definition.revision(), request);
         }
         if (login.loginRequired()) {
@@ -415,7 +415,7 @@ class WorkflowE2eTest extends E2eApplicationTest {
                                    {"name":"C","scope":"ROOT","pointer":"/auth/token","sensitive":true}],
                       "cast":{"template":"%s?id={A}&token={C}","mimeType":"video/mp4"}}}
                     """.formatted(id, upstream.url("/feed"), upstream.url("/media/" + MEDIA_SECRET));
-            login.storeSecrets(java.util.Map.of("workflow." + id, v1), PASSWORD, PASSWORD, new MockHttpServletRequest());
+            login.storeSecrets(java.util.Map.of("workflow." + id, v1), PASSWORD, PASSWORD, new RequestLoginContext(new MockHttpServletRequest(), login));
             workflows.reload();
             var migrated = workflows.find(id).orElseThrow();
             org.assertj.core.api.Assertions.assertThat(migrated.draft().calls()).singleElement()

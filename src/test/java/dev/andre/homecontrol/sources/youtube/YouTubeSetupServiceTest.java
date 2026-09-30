@@ -4,12 +4,13 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
+import dev.andre.homecontrol.testsupport.FakeLoginContext;
 import dev.andre.homecontrol.testsupport.MutableClock;
-import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -60,7 +61,7 @@ class YouTubeSetupServiceTest {
     private YouTubeAuthorizationService authorization;
     private JsonFileSourceSettings sourceSettings;
     private YouTubeSetupService service;
-    private HttpServletRequest httpRequest;
+    private FakeLoginContext httpRequest;
     private ObjectProvider<YouTubeAccount> account;
     private QuotaLedger ledger;
     private ObjectProvider<YouTubeContentSource> source;
@@ -82,7 +83,7 @@ class YouTubeSetupServiceTest {
         devices = mock(ObjectProvider.class);
         service = new YouTubeSetupService(secrets, login, sourceSettings, oauth, tokens, authorization, account, ledger,
                 source, playlists, devices);
-        httpRequest = mock(HttpServletRequest.class);
+        httpRequest = FakeLoginContext.loggedInBrowser();
     }
 
     @ParameterizedTest
@@ -132,7 +133,7 @@ class YouTubeSetupServiceTest {
         service.connect(request, httpRequest);
 
         ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(login).storeSecrets(captor.capture(), anyString(), anyString(), any(HttpServletRequest.class));
+        verify(login).storeSecrets(captor.capture(), anyString(), anyString(), any(LoginContext.class));
         assertThat(captor.getValue()).containsOnlyKeys(YouTubeSettings.CLIENT_ID);
 
         given(secrets.secret(YouTubeSettings.CLIENT_SECRET)).willReturn(Optional.empty());
@@ -148,7 +149,7 @@ class YouTubeSetupServiceTest {
     @Test
     void aPasswordProblemStoresNothing() {
         willThrow(new PasswordRejectedException("The two passwords do not match"))
-                .given(login).storeSecrets(any(), any(), any(), any(HttpServletRequest.class));
+                .given(login).storeSecrets(any(), any(), any(), any(LoginContext.class));
         YouTubeSetupService.ConnectRequest request =
                 new YouTubeSetupService.ConnectRequest(VALID_CLIENT_ID, "GOCSPX-abc", "pw-1", "pw-2");
 
