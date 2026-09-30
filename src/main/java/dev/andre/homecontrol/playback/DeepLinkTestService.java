@@ -77,8 +77,10 @@ public class DeepLinkTestService {
         try {
             try {
                 commands.execute(deviceId, new Action.OpenAppLink(properties.youtubeUrl()));
-            } catch (ActionFailedException | DeviceNotFoundException | DeviceOfflineException
-                     | UnsupportedActionException e) {
+            } catch (DeviceNotFoundException e) {
+                // Forgotten since the lookup above: the same 404 as an unknown device, not a test result.
+                throw e;
+            } catch (ActionFailedException | DeviceOfflineException | UnsupportedActionException e) {
                 // Written for the user: the device and what it could not do.
                 return new DeepLinkTestResult(FAILED, before, null, "The test link was not opened: " + e.getMessage());
             } catch (RuntimeException e) {
