@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.storage;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.content.SourcePreferences;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -30,7 +31,7 @@ public class JsonFileSourceSettings {
     private static final String SOURCES = "sources";
     private static final String UNMIGRATED = "unmigrated";
     private static final String PREFERENCES = "preferences";
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final JsonMapper MAPPER = Json.MAPPER;
 
     /** The whole file. {@code preferences} is null until they are first saved. */
     record Document(Map<String, JsonNode> sources, Map<String, Map<String, String>> unmigrated, JsonNode preferences) {

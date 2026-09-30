@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.workflows;
 
+import dev.andre.homecontrol.config.Json;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -7,7 +8,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** JSON boundary for encrypted workflow definitions. It never propagates parser excerpts. */
 public final class WorkflowCodec {
     private static final int MAX_LENGTH = 16_384;
-    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final JsonMapper JSON = Json.MAPPER;
 
     public String encode(WorkflowDefinition definition) {
         validate(definition);

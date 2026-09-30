@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.content.StreamingProviders;
 import dev.andre.homecontrol.storage.VersionedJsonFile;
 import org.slf4j.Logger;
@@ -43,7 +44,7 @@ public class JsonFileSportsStore {
     private static final int MAX_NAME = 120;
     private static final int MAX_FIELD = 60;
 
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final JsonMapper MAPPER = Json.MAPPER;
 
     private final VersionedJsonFile<SportsSettings> file;
 

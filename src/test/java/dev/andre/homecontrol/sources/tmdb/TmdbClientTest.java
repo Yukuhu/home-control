@@ -228,4 +228,13 @@ class TmdbClientTest {
             assertNoLeak(() -> refusing.get(apiKey, "/authentication", Map.of()));
         }
     }
+    /** A hostile or broken server cannot exhaust the stack with nesting: the shared mapper stops at 64 levels. */
+    @Test
+    void refusesDeeplyNestedJson() {
+        fake.respondJson("GET", "/3/deep", 200, "{\"a\":".repeat(100) + "{}" + "}".repeat(100));
+
+        assertThatThrownBy(() -> client.get(bearer, "/deep", Map.of()))
+                .isInstanceOf(TmdbException.class)
+                .hasMessage("TMDB answered with something that is not JSON");
+    }
 }

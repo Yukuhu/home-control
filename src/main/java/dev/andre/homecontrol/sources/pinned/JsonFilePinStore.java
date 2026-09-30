@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.pinned;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.playback.AppLinks;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.storage.VersionedJsonFile;
@@ -38,7 +39,7 @@ public class JsonFilePinStore {
             Pattern.compile("^[a-z0-9][a-z0-9._-]{0,63}/[A-Za-z0-9._:-]{1,128}$");
     private static final int MAX_TITLE = 120;
 
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final JsonMapper MAPPER = Json.MAPPER;
 
     private final VersionedJsonFile<List<Pin>> file;
 

@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.http.GuardedHttpClient;
 import dev.andre.homecontrol.sources.http.HttpUrls;
@@ -28,7 +29,7 @@ public class TmdbClient implements AutoCloseable {
     /** Rail refreshes, the setup page and pinned items share these. */
     private static final int MAX_CONCURRENT = 8;
     private static final HttpUrls.Rules API_URLS = new HttpUrls.Rules(true, false, true, false, 0);
-    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final JsonMapper JSON = Json.MAPPER;
 
     private final TmdbProperties properties;
     private final GuardedHttpClient http;

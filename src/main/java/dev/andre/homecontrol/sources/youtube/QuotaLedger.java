@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.storage.StorageException;
 import dev.andre.homecontrol.storage.VersionedJsonFile;
@@ -26,7 +27,7 @@ import java.util.Map;
 public class QuotaLedger {
 
     private static final Logger log = LoggerFactory.getLogger(QuotaLedger.class);
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final JsonMapper MAPPER = Json.MAPPER;
     public static final ZoneId PACIFIC = ZoneId.of("America/Los_Angeles");
 
     public enum Call {

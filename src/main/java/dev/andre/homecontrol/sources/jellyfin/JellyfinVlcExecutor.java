@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Capability;
@@ -33,7 +34,7 @@ public class JellyfinVlcExecutor implements RouteExecutor {
     private static final String VLC_PACKAGE = "org.videolan.vlc";
     private static final double TICKS_PER_SECOND = 10_000_000.0;
     private static final Logger log = LoggerFactory.getLogger(JellyfinVlcExecutor.class);
-    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final JsonMapper JSON = Json.MAPPER;
     private final JellyfinSetupService setup;
     private final JellyfinClient client;
     private final DeviceQueries devices;

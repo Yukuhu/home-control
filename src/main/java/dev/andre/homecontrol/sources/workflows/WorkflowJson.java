@@ -1,8 +1,7 @@
 package dev.andre.homecontrol.sources.workflows;
 
+import dev.andre.homecontrol.config.Json;
 import tools.jackson.core.JacksonException;
-import tools.jackson.core.StreamReadConstraints;
-import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.cfg.JsonNodeFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -27,10 +26,8 @@ import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
 /** Pure JSON selection for a single workflow response. */
 public final class WorkflowJson {
     private static final int MAX_NUMBER_DIGITS = 1000;
-    private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()
-            .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64)
-                    .maxNumberLength(MAX_NUMBER_DIGITS).build()).build())
-            .enable(JsonNodeFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
+    /** The shared mapper's limits, with exact decimals: a workflow compares and prints values as they were sent. */
+    private static final JsonMapper JSON = Json.MAPPER.rebuild().enable(JsonNodeFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
     // IANA IPv6 Global Unicast Address Space, RIR-designated ALLOCATED rows (2025-10-10):
     // https://www.iana.org/assignments/ipv6-unicast-address-assignments
     private static final List<Ipv6Prefix> ALLOCATED_RIR_IPV6 = List.of(
