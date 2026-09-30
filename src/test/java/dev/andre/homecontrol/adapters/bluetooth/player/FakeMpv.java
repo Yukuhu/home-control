@@ -92,10 +92,17 @@ public final class FakeMpv implements AutoCloseable {
     }
 
     public static FakeMpv serve(Path socket, Options options, double initialVolume, Consumer<String> log) throws IOException {
+        return serve(socket, options, initialVolume, log, fake -> { });
+    }
+
+    /** Registers the fake before any IPC request can be handled. */
+    static FakeMpv serve(Path socket, Options options, double initialVolume, Consumer<String> log,
+                         Consumer<FakeMpv> beforeServing) throws IOException {
         Files.deleteIfExists(socket);
         ServerSocketChannel server = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
         server.bind(UnixDomainSocketAddress.of(socket));
         FakeMpv fake = new FakeMpv(server, socket, options, initialVolume, log);
+        beforeServing.accept(fake);
         Thread.ofVirtual().name("fake-mpv-accept").start(fake::acceptLoop);
         Thread.ofVirtual().name("fake-mpv-clock").start(fake::clockLoop);
         return fake;

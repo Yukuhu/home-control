@@ -49,9 +49,10 @@ public final class InProcessMpvLauncher implements MpvLauncher {
                 process.exit.complete(143);
                 return;
             }
-            try (FakeMpv fake = FakeMpv.serve(socket, currentOptions, volume, line -> { })) {
-                process.attach(fake);
-                players.add(fake);
+            try (FakeMpv fake = FakeMpv.serve(socket, currentOptions, volume, line -> { }, started -> {
+                process.attach(started);
+                players.add(started);
+            })) {
                 fake.awaitQuit();
                 // A real OS process's exit is detected with some latency (a reaper thread, waitpid);
                 // this keeps the fake from "exiting" before an already-sent IPC event (e.g. end-file,
