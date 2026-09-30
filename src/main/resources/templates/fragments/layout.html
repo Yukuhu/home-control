@@ -1,28 +1,23 @@
-<!DOCTYPE html>
-<!--/* What every page shares. A page includes pageHead first in its own <head>, then adds its title and scripts. */-->
-<html xmlns:th="http://www.thymeleaf.org" lang="en">
-<head>
-    <th:block th:fragment="pageHead(resizesContent)">
-        <meta charset="UTF-8">
-        <meta name="viewport" th:content="${resizesContent}
-                ? 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content'
-                : 'width=device-width, initial-scale=1, viewport-fit=cover'">
-        <meta name="theme-color" content="#101917">
-        <!--/* The Content-Security-Policy forbids eval, and no htmx attribute here needs it. */-->
-        <meta name="htmx-config" content='{"allowEval":false}'>
-        <meta name="mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="apple-mobile-web-app-title" content="Home">
-        <link rel="manifest" href="/manifest.webmanifest">
-        <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-        <link rel="stylesheet" th:href="@{/app.css}">
-        <link rel="stylesheet" th:href="@{/themes/cyberpunk.css}">
-        <script th:src="@{/js/theme.js}"></script>
-    </th:block>
-</head>
-<body>
+<!--/* What every page shares. A page includes pageHead first in its own head element, then adds its title and scripts. */-->
+<th:block th:fragment="pageHead(resizesContent)">
+    <meta charset="UTF-8">
+    <meta name="viewport" th:content="${resizesContent}
+            ? 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content'
+            : 'width=device-width, initial-scale=1, viewport-fit=cover'">
+    <meta name="theme-color" content="#101917">
+    <!--/* The Content-Security-Policy forbids eval, and no htmx attribute here needs it. */-->
+    <meta name="htmx-config" content='{"allowEval":false}'>
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Home">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="stylesheet" th:href="@{/app.css}">
+    <link rel="stylesheet" th:href="@{/themes/cyberpunk.css}">
+    <script th:src="@{/js/theme.js}"></script>
+</th:block>
 
 <a th:fragment="brand" class="brand" th:href="@{/}" aria-label="Home Control home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg></span><span>Home<span class="brand-light">Control</span></span></a>
 
@@ -54,5 +49,3 @@
     </label>
 </th:block>
 
-</body>
-</html>
