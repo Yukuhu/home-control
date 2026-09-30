@@ -450,13 +450,13 @@ class WorkflowHttpClientTest {
                     out.write('x');
                 }
             });
+            var never = new CountDownLatch(1);
             server.route("/secret-path/slow", exchange -> {
                 exchange.sendResponseHeaders(200, 0);
                 try (exchange; var out = exchange.getResponseBody()) {
-                    for (int i = 0; i < 50; i++) {
+                    for (int i = 0; i < 50 && !never.await(100, TimeUnit.MILLISECONDS); i++) {
                         out.write('x');
                         out.flush();
-                        Thread.sleep(100);
                     }
                 } catch (InterruptedException _) {
                     Thread.currentThread().interrupt();
