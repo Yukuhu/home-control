@@ -21,6 +21,8 @@ home-control:
     api-base-url: http://127.0.0.1:9/3
     connect-timeout: 1s
     request-timeout: 2s
+    # The fakes run on this machine.
+    allow-loopback: true
   sports:
     calendar:
       connect-timeout: 1s
@@ -29,6 +31,7 @@ home-control:
       api-base-url: http://127.0.0.1:9/api/v1/json
       connect-timeout: 1s
       request-timeout: 2s
+      allow-loopback: true
   youtube:
     oauth-base-url: http://127.0.0.1:9
     api-base-url: http://127.0.0.1:9

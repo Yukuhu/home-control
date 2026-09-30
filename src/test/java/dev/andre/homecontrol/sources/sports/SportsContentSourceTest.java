@@ -30,7 +30,7 @@ class SportsContentSourceTest {
             new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(5), Duration.ofSeconds(15),
             5242880, 3, false),
             new SportsProperties.TheSportsDb(true, URI.create("https://www.thesportsdb.com/api/v1/json"), "123",
-                    Duration.ofHours(24), Duration.ofSeconds(5), Duration.ofSeconds(15), null));
+                    Duration.ofHours(24), Duration.ofSeconds(5), Duration.ofSeconds(15), null, true));
 
     private static SportsSettingsService settingsWith(List<SportsSettings.CalendarEntry> calendars) {
         SportsSettingsService service = mock(SportsSettingsService.class);

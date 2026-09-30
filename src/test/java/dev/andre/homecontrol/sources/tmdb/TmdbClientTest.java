@@ -31,7 +31,7 @@ class TmdbClientTest {
         fake = new FakeTmdbServer().withStandardResponses();
         TmdbProperties properties = new TmdbProperties(true, fake.apiBase(), null, Duration.ofSeconds(1),
                 Duration.ofSeconds(1), 20, 40,
-                Duration.ofHours(24), Duration.ofHours(24), null);
+                Duration.ofHours(24), Duration.ofHours(24), null, true);
         client = new TmdbClient(properties);
         bearer = TmdbCredential.parse(FakeTmdbServer.READ_TOKEN);
         apiKey = TmdbCredential.parse(FakeTmdbServer.API_KEY);
@@ -81,6 +81,7 @@ class TmdbClientTest {
             "401, UNAUTHORIZED, TMDB rejected the API key or read access token",
             "403, UNAUTHORIZED, TMDB rejected the API key or read access token",
             "404, NOT_FOUND, TMDB does not know this title",
+            "410, NOT_FOUND, TMDB does not know this title",
             "429, RATE_LIMITED, 'TMDB is limiting requests; try again in a moment'",
             "500, SERVER_ERROR, TMDB had a server error (HTTP 500)",
             "503, SERVER_ERROR, TMDB had a server error (HTTP 503)",
@@ -127,19 +128,20 @@ class TmdbClientTest {
 
         assertThatThrownBy(() -> client.get(bearer, "/big", Map.of()))
                 .isInstanceOf(TmdbException.class)
-                .hasMessage("TMDB answered with more data than expected");
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.TOO_LARGE)
+                .hasMessage("TMDB at 127.0.0.1 sent more than 2 MB");
     }
 
     @Test
     void unreachableAndSlowServersAreUnreachable() {
         TmdbProperties properties = new TmdbProperties(true, URI.create("http://127.0.0.1:9/3"), null,
                 Duration.ofSeconds(1), Duration.ofSeconds(1), 20, 40,
-                Duration.ofHours(24), Duration.ofHours(24), null);
+                Duration.ofHours(24), Duration.ofHours(24), null, true);
         TmdbClient unreachableClient = new TmdbClient(properties);
 
         assertThatThrownBy(() -> unreachableClient.get(bearer, "/authentication", Map.of()))
                 .isInstanceOf(TmdbException.class)
-                .hasMessage("Could not reach TMDB at 127.0.0.1");
+                .hasMessage("Could not reach TMDB at 127.0.0.1 (connection refused)");
     }
 
     @Test
@@ -148,7 +150,7 @@ class TmdbClientTest {
 
         assertThatThrownBy(() -> client.get(bearer, "/authentication", Map.of()))
                 .isInstanceOf(TmdbException.class)
-                .hasMessage("Could not reach TMDB at 127.0.0.1")
+                .hasMessage("Could not reach TMDB at 127.0.0.1 (request timed out)")
                 .extracting(e -> ((TmdbException) e).kind()).isEqualTo(ContentSourceException.Kind.UNREACHABLE);
     }
 
@@ -205,10 +207,7 @@ class TmdbClientTest {
                             .doesNotContain(FakeTmdbServer.API_KEY)
                             .doesNotContain(FakeTmdbServer.READ_TOKEN)
                             .doesNotContain("api_key");
-                    assertThat(String.valueOf(exception.getCause()))
-                            .doesNotContain(FakeTmdbServer.API_KEY)
-                            .doesNotContain(FakeTmdbServer.READ_TOKEN)
-                            .doesNotContain("api_key");
+                    assertThat(exception).hasNoCause();
                 });
     }
 
@@ -216,5 +215,17 @@ class TmdbClientTest {
     void aTmdbExceptionIsAContentSourceException() {
         assertThat(new TmdbException(ContentSourceException.Kind.INVALID_INPUT, "x"))
                 .isInstanceOf(dev.andre.homecontrol.core.content.ContentSourceException.class);
+    }
+    /** A public API: a DNS answer of this machine is refused unless the setting allows it. */
+    @Test
+    void refusesLoopbackByDefault() {
+        TmdbProperties production = new TmdbProperties(true, fake.apiBase(), null, Duration.ofSeconds(1),
+                Duration.ofSeconds(1), 20, 40, Duration.ofHours(24), Duration.ofHours(24), null, false);
+        try (TmdbClient refusing = new TmdbClient(production)) {
+            assertThatThrownBy(() -> refusing.get(bearer, "/authentication", Map.of()))
+                    .isInstanceOf(TmdbException.class)
+                    .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BLOCKED);
+            assertNoLeak(() -> refusing.get(apiKey, "/authentication", Map.of()));
+        }
     }
 }

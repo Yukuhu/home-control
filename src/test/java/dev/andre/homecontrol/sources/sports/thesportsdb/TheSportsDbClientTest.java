@@ -27,7 +27,7 @@ class TheSportsDbClientTest {
         server = new FakeTheSportsDbServer().withStandardResponses();
         SportsProperties.TheSportsDb properties = new SportsProperties.TheSportsDb(
                 true, server.apiBase(), "123", Duration.ofHours(24), Duration.ofSeconds(1), Duration.ofSeconds(2),
-                null);
+                null, true);
         client = new TheSportsDbClient(properties);
     }
 
@@ -108,7 +108,7 @@ class TheSportsDbClientTest {
 
         server.respondJson("lookupleague.php", Map.of("id", "e404"), 404, "{}");
         assertThatThrownBy(() -> client.lookupLeague("123", "e404"))
-                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.NOT_FOUND)
                 .hasMessage("TheSportsDB answered HTTP 404");
 
         server.respondJson("lookupleague.php", Map.of("id", "arr"), 200, "[]");
@@ -144,14 +144,14 @@ class TheSportsDbClientTest {
         assertThatThrownBy(() -> client.lookupLeague("123", "4331"))
                 .isInstanceOf(TheSportsDbException.class)
                 .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
-                .hasMessage("Could not reach TheSportsDB");
+                .hasMessage("Could not reach TheSportsDB at 127.0.0.1 (request timed out)");
         server.delay(Duration.ZERO);
 
         String huge = "{\"leagues\":\"" + "x".repeat(2 * 1024 * 1024 + 10) + "\"}";
         server.respondJson("lookupleague.php", Map.of("id", "huge"), 200, huge);
         assertThatThrownBy(() -> client.lookupLeague("123", "huge"))
-                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
-                .hasMessage("TheSportsDB answered with more data than expected");
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.TOO_LARGE)
+                .hasMessage("TheSportsDB at 127.0.0.1 sent more than 2 MB");
     }
 
     @Test
@@ -174,5 +174,31 @@ class TheSportsDbClientTest {
         assertThatThrownBy(() -> client.lookupLeague("123", "redirect"))
                 .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
                 .hasMessage("TheSportsDB answered HTTP 302");
+    }
+    /** A public API: a DNS answer of this machine is refused unless the setting allows it. */
+    @Test
+    void refusesLoopbackByDefault() {
+        SportsProperties.TheSportsDb production = new SportsProperties.TheSportsDb(true, server.apiBase(), "123",
+                Duration.ofHours(24), Duration.ofSeconds(1), Duration.ofSeconds(2), null, false);
+        try (TheSportsDbClient refusing = new TheSportsDbClient(production)) {
+            TheSportsDbException e = assertThrows(TheSportsDbException.class,
+                    () -> refusing.lookupLeague(FakeTheSportsDbServer.PERSONAL_KEY, "4331"));
+
+            assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.BLOCKED);
+            assertThat(e.getMessage()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
+            assertThat(e).hasNoCause();
+        }
+        assertThat(server.count("lookupleague.php")).isZero();
+    }
+
+    @Test
+    void neverLeaksTheKeyWhenRefused() {
+        server.close();
+
+        TheSportsDbException e = assertThrows(TheSportsDbException.class,
+                () -> client.lookupLeague(FakeTheSportsDbServer.PERSONAL_KEY, "4331"));
+
+        assertThat(e.getMessage()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
+        assertThat(e).hasNoCause();
     }
 }

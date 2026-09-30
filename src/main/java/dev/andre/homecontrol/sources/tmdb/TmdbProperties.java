@@ -26,7 +26,8 @@ public record TmdbProperties(@DefaultValue("true") boolean enabled,
                              @DefaultValue("40") @Positive int trendingCandidates,
                              @DefaultValue("24h") Duration providerCacheTtl,
                              @DefaultValue("24h") Duration configurationCacheTtl,
-                             Map<String, List<Integer>> providerIds) {
+                             Map<String, List<Integer>> providerIds,
+                             @DefaultValue("false") boolean allowLoopback) {
 
     public static final Map<String, List<Integer>> DEFAULT_PROVIDER_IDS =
             Map.of("netflix", List.of(8, 1796), "primevideo", List.of(9, 119, 2100));

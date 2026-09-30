@@ -38,7 +38,7 @@ class TmdbContentSourceTest {
         fake = new FakeTmdbServer().withStandardResponses();
         properties = new TmdbProperties(true, fake.apiBase(), null, Duration.ofSeconds(1), Duration.ofSeconds(2), 20,
                 40,
-                Duration.ofHours(24), Duration.ofHours(24), null);
+                Duration.ofHours(24), Duration.ofHours(24), null, true);
         client = new TmdbClient(properties);
         images = new TmdbImages(client, properties, Clock.systemUTC());
         providers = new TmdbWatchProviders(client, properties, Clock.systemUTC());

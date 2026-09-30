@@ -56,7 +56,7 @@ class TheSportsDbScheduleRetryTest {
                 new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
                 5242880, 3, true),
                 new SportsProperties.TheSportsDb(true, server.apiBase(), "123", Duration.ofHours(24),
-                Duration.ofSeconds(1), Duration.ofSeconds(2), null));
+                Duration.ofSeconds(1), Duration.ofSeconds(2), null, true));
         clock = MutableClock.at(Instant.parse("2026-09-19T14:00:00Z"));
         TheSportsDbClient client = new TheSportsDbClient(properties.theSportsDb());
         TheSportsDbKeys keys = new TheSportsDbKeys(settingsService, mock(SecretStore.class), properties);
