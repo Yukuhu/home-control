@@ -3,6 +3,8 @@ updates:
   # Every dependency in this project is pinned to an exact version, so without
   # these PRs it rots silently.
   - package-ecosystem: gradle
+    # dependency-checksums.yml prepares a review patch because Dependabot cannot
+    # update verification metadata. A maintainer reviews and commits it before CI passes.
     directory: /
     schedule:
       interval: weekly

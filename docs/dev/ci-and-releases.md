@@ -25,6 +25,12 @@ What runs on every push and pull request, and how releases are made.
 | Release the Bluetooth image | After the release, publishes and attests the tested `-bluetooth` images, if they passed their smoke tests. |
 | CI passed | The one check `main` requires: it passes only if every job it needs passed or was left out on purpose. |
 
+`.github/workflows/dependency-checksums.yml` prepares a checksum review artifact for Dependabot's Gradle
+updates. It uses a fresh cache and read-only permissions, and runs a build with candidate checksums so a
+maintainer can inspect the update. A maintainer must review and commit the new checksums before ordinary
+CI can pass; this preparation job does not satisfy the required check. See
+[Dependabot updates](testing.md#dependabot-updates) for the review and commit steps.
+
 ## CI quality gate
 
 The `SonarCloud quality gate` job scans the results of the `Build and test` and
