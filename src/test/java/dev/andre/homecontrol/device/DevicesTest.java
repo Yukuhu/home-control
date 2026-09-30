@@ -473,6 +473,19 @@ class DevicesTest {
     }
 
     @Test
+    void anUnknownDeviceIsNotFoundEvenWithAMistypedMac() {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        try (Devices devices = wakingDevices(registry)) {
+            var settings = devices.settings();
+
+            assertThatThrownBy(() -> settings.setWakeOnLanMac("ghost", "nope"))
+                    .isInstanceOf(DeviceNotFoundException.class).hasMessage("No device with id ghost");
+            assertThatThrownBy(() -> settings.setWakeOnLanMac("ghost", "a8-23-fe-01-02-03"))
+                    .isInstanceOf(DeviceNotFoundException.class).hasMessage("No device with id ghost");
+        }
+    }
+
+    @Test
     void aBlankMacClearsItSoItIsLearnedAgain() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
         try (Devices devices = wakingDevices(registry)) {
