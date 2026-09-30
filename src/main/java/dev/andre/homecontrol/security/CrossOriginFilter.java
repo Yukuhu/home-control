@@ -19,6 +19,15 @@ public class CrossOriginFilter extends OncePerRequestFilter {
 
     static final int MISDIRECTED_REQUEST = 421;
 
+    /**
+     * Scripts only from this server, so an injected script tag or handler does not run. Inline styles stay allowed
+     * (htmx's indicator, the rails' card widths); images may come from any HTTPS host, as workflow artwork does. No
+     * form-action: browsers apply it to the redirect after a form post, which would block YouTube's sign-in hop.
+     */
+    static final String CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self'; "
+            + "style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; manifest-src 'self'; "
+            + "worker-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+
     private final CrossOriginGuard guard;
     private final HostAllowlist hosts;
 
@@ -51,12 +60,12 @@ public class CrossOriginFilter extends OncePerRequestFilter {
 
     /**
      * Every response, refused or not and whether or not a login exists: nothing may be framed (the setup page
-     * works without a login too) or content-sniffed. Set before the chain runs, so a page can still choose a
-     * stricter Referrer-Policy of its own, as the YouTube sign-in callback does.
+     * works without a login too), run another site's script or be content-sniffed. Set before the chain runs,
+     * so a page can still choose a stricter Referrer-Policy of its own, as the YouTube sign-in callback does.
      */
     private static void secure(HttpServletResponse response) {
         response.setHeader("X-Frame-Options", "DENY");
-        response.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+        response.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
         response.setHeader("X-Content-Type-Options", "nosniff");
         response.setHeader("Referrer-Policy", "same-origin"); // no-referrer would make Chrome send Origin: null
     }

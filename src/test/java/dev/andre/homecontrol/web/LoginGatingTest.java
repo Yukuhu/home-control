@@ -67,7 +67,7 @@ class LoginGatingTest extends FullAppTest {
                 .andExpect(header().doesNotExist("Set-Cookie"))
                 // No login, but the page still cannot be framed.
                 .andExpect(header().string("X-Frame-Options", "DENY"))
-                .andExpect(header().string("Content-Security-Policy", "frame-ancestors 'none'"));
+                .andExpect(header().string("Content-Security-Policy", containsString("frame-ancestors 'none'")));
         mockMvc.perform(post("/devices/nope/key/HOME").header("Host", "localhost").header("Origin", "http://localhost"))
                 .andExpect(status().isNotFound());
         mockMvc.perform(post("/devices/nope/key/HOME")).andExpect(status().isNotFound());
@@ -97,7 +97,8 @@ class LoginGatingTest extends FullAppTest {
     void onceASecretExistsEveryPathButTheLoginPageIsGated() throws Exception {
         storeAFirstSecret();
 
-        mockMvc.perform(get("/setup").accept("text/html")).andExpect(redirectedUrl("/login?next=%2Fsetup"));
+        mockMvc.perform(get("/setup").accept("text/html")).andExpect(redirectedUrl("/login?next=%2Fsetup"))
+                .andExpect(header().string("Content-Security-Policy", containsString("script-src 'self';")));
         mockMvc.perform(get("/events")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/vendor/htmx.min.js")).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/devices/nope/key/HOME").header("HX-Request", "true"))
