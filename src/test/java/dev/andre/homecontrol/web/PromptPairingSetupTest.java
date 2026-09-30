@@ -2,6 +2,7 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.PromptPairingResult;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
@@ -150,10 +151,12 @@ class PromptPairingSetupTest extends WebSliceTest {
 
     @Test
     void theMacOfAnUnknownDeviceIsNotFound() throws Exception {
-        given(devices.device("ghost")).willReturn(Optional.empty());
+        willThrow(new DeviceNotFoundException("No device with id ghost"))
+                .given(deviceSettings).setWakeOnLanMac("ghost", "a8-23-fe-01-02-03");
 
         mockMvc.perform(post("/setup/devices/ghost/mac").param("mac", "a8-23-fe-01-02-03"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("No device with id ghost"));
     }
 
     @Test

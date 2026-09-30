@@ -5,6 +5,7 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.CodePairingOutcome;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.storage.StorageException;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
@@ -225,6 +226,27 @@ class SetupControllerTest extends WebSliceTest {
 
         verify(enrollment).merge("10-0-0-5", "cast-10-0-0-5");
         verify(enrollment).split("10-0-0-5", "cast");
+    }
+
+    @Test
+    void anUnknownDeviceInAMergeOrSplitIsNotFound() throws Exception {
+        given(enrollment.merge("ghost", "b")).willThrow(new DeviceNotFoundException("No device with id ghost"));
+        given(enrollment.split("ghost", "cast")).willThrow(new DeviceNotFoundException("No device with id ghost"));
+
+        mockMvc.perform(post("/setup/merge").param("target", "ghost").param("source", "b"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("No device with id ghost"));
+        mockMvc.perform(post("/setup/split").param("id", "ghost").param("adapter", "cast"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("No device with id ghost"));
+    }
+
+    @Test
+    void forgettingADeviceThatIsAlreadyGoneGoesBackToSetup() throws Exception {
+        mockMvc.perform(post("/setup/forget").param("id", "ghost"))
+                .andExpect(redirectedUrl("/setup"));
+
+        verify(enrollment).forget("ghost");
     }
 
     @Test
