@@ -16,6 +16,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -104,6 +105,26 @@ public final class FakeHttpServer implements AutoCloseable {
     /** Lets {@code handler} answer {@code method path}. The server closes the exchange afterwards. */
     public FakeHttpServer handle(String method, String path, HttpHandler handler) {
         return route(method, path, request -> true, handler);
+    }
+
+    /** Answers {@code method path} with {@code answer} once {@code release} opens; the request is recorded on arrival. */
+    public FakeHttpServer hold(String method, String path, CountDownLatch release, Response answer) {
+        return hold(method, path, request -> true, release, answer);
+    }
+
+    /** Like {@link #hold(String, String, CountDownLatch, Response)}, for requests {@code when} accepts. */
+    public FakeHttpServer hold(String method, String path, Predicate<Request> when, CountDownLatch release,
+                               Response answer) {
+        return route(method, path, when, exchange -> {
+            try {
+                release.await();
+            } catch (InterruptedException _) {
+                // The server is closing: the exchange ends unanswered.
+                Thread.currentThread().interrupt();
+                return;
+            }
+            write(exchange, answer);
+        });
     }
 
     /** Answers 200 with a JSON body that never ends: one space every 50 ms until the client or the server closes. */
