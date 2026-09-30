@@ -19,11 +19,11 @@ import dev.andre.homecontrol.sources.workflows.WorkflowSetupController;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupAdvice;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupController;
 import dev.andre.homecontrol.sources.youtube.YouTubeThumbnailController;
-import dev.andre.homecontrol.web.ContentController;
 import dev.andre.homecontrol.web.ContentPlayController;
 import dev.andre.homecontrol.web.DashboardController;
 import dev.andre.homecontrol.web.DeepLinkTestController;
 import dev.andre.homecontrol.web.DeviceController;
+import dev.andre.homecontrol.web.ErrorAdvice;
 import dev.andre.homecontrol.web.IconController;
 import dev.andre.homecontrol.web.LoginController;
 import dev.andre.homecontrol.web.PwaController;
@@ -55,7 +55,7 @@ class SharedWebSliceTest extends WebSliceTest {
                 PinnedSetupController.class, SportsSetupAdvice.class, SportsSetupController.class,
                 TheSportsDbSetupController.class, TmdbSetupAdvice.class, TmdbSetupController.class,
                 WorkflowSetupAdvice.class, WorkflowSetupController.class, YouTubeSetupAdvice.class,
-                YouTubeSetupController.class, YouTubeThumbnailController.class, ContentController.class,
+                YouTubeSetupController.class, YouTubeThumbnailController.class, ErrorAdvice.class,
                 ContentPlayController.class, DashboardController.class, DeepLinkTestController.class,
                 DeviceController.class, IconController.class, LoginController.class, PwaController.class,
                 RailController.class, SearchController.class, SetupController.class, SourcesSetupAdvice.class,

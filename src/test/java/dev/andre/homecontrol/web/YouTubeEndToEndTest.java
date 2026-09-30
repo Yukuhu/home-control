@@ -11,6 +11,7 @@ import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.sources.youtube.FakeGoogleServer;
 import dev.andre.homecontrol.sources.youtube.YouTubeLoungeRouteExecutor;
 import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.testsupport.RailHtml;
 import dev.andre.homecontrol.testsupport.SharedFakes;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -172,7 +173,7 @@ class YouTubeEndToEndTest extends FullAppTest {
                         .anyMatch(r -> "true".equals(r.query().get("mine"))));
 
                 // 4. Everything is gated for a client without the session cookie.
-                assertThat(send(stranger, get("/sources/youtube/rails/subscriptions")).statusCode()).isEqualTo(401);
+                assertThat(send(stranger, get("/rails/youtube/subscriptions")).statusCode()).isEqualTo(401);
                 assertThat(send(stranger, page("/")).statusCode()).isEqualTo(302);
 
                 // 5. The connected channel and quota now show on the setup page; the background
@@ -186,17 +187,15 @@ class YouTubeEndToEndTest extends FullAppTest {
                 assertThat(setupHolder[0].body()).contains("of 10000 units");
 
                 // 6. Refresh the subscriptions rail; poll until it is READY (D1's rail cache).
-                assertThat(send(browser, post("/sources/youtube/rails/subscriptions/refresh", Map.of())).statusCode()).isEqualTo(202);
+                assertThat(send(browser, post("/rails/youtube/subscriptions/refresh", Map.of())).statusCode()).isEqualTo(200);
                 HttpResponse<String>[] railHolder = new HttpResponse[1];
                 await().atMost(Duration.ofSeconds(10)).until(() -> {
-                    railHolder[0] = send(browser, get("/sources/youtube/rails/subscriptions"));
-                    return railHolder[0].statusCode() == 200 && "READY".equals(json(railHolder[0]).path("status").asString(""));
+                    railHolder[0] = send(browser, get("/rails/youtube/subscriptions"));
+                    return "READY".equals(RailHtml.status(railHolder[0].body()));
                 });
-                JsonNode rail = json(railHolder[0]);
-                List<String> itemIds = new ArrayList<>();
-                rail.path("items").forEach(item -> itemIds.add(item.path("id").asString("")));
+                List<String> itemIds = RailHtml.tiles(railHolder[0].body()).stream().map(tile -> tile.get("data-item")).toList();
                 assertThat(itemIds).containsExactly("Kz1aT5nM3pQ", "Pm6Jd3Fg0kU", "aqz-KE-bpKQ", "Hh7Lq2Wv9sE");
-                assertThat(rail.toString()).contains("/sources/youtube/thumbnails/Kz1aT5nM3pQ");
+                assertThat(railHolder[0].body()).contains("/sources/youtube/thumbnails/Kz1aT5nM3pQ");
 
                 // 7. Thumbnails are proxied through Home Control, never straight to Google.
                 HttpResponse<String> thumbnail = send(browser, get("/sources/youtube/thumbnails/aqz-KE-bpKQ"));

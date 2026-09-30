@@ -9,6 +9,7 @@ import dev.andre.homecontrol.sources.sports.calendar.FakeCalendarServer;
 import dev.andre.homecontrol.sources.sports.thesportsdb.FakeTheSportsDbServer;
 import dev.andre.homecontrol.storage.SecretStore;
 import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.testsupport.RailHtml;
 import dev.andre.homecontrol.testsupport.SharedFakes;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -37,11 +38,8 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,11 +50,8 @@ import static org.awaitility.Awaitility.await;
  * TheSportsDB ↔ the sports source ↔ the planner ↔ a fake Android TV Shield ↔ HTTP, with the login
  * gate in front. Mirrors the shape of {@link JellyfinEndToEndTest} (same client/helper pattern).
  *
- * <p>The brief for this test assumed a JSON rails endpoint ({@code GET /sources/{s}/rails/{r}}
- * returning {@code "status":"READY"} and item objects); the real endpoint is
- * {@code GET /rails/{sourceId}/{railId}} (see {@link RailController}), which renders the same HTML
- * tile fragment the dashboard uses. This test reads that fragment's {@code data-*} tile attributes
- * instead of JSON fields — the same information, in the shape the real server actually returns.
+ * <p>It reads rails as the dashboard does: {@code GET /rails/{sourceId}/{railId}} (see {@link RailController})
+ * renders the HTML tile fragment, and {@link RailHtml} reads its {@code data-*} tile attributes.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class SportsEndToEndTest extends FullAppTest {
@@ -139,27 +134,6 @@ class SportsEndToEndTest extends FullAppTest {
     private static String utcBasic(Instant instant) {
         return DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC).format(instant);
     }
-
-    /** The rail tile fragment's {@code data-*} attributes, one map per tile, in document order. */
-    private static List<Map<String, String>> tiles(String html) {
-        List<Map<String, String>> tiles = new ArrayList<>();
-        // Whole <button ...> tags first (linear, no backtracking), then keep the tile buttons.
-        Matcher buttonTag = Pattern.compile("<button[^>]*+>").matcher(html);
-        Pattern attr = Pattern.compile("(data-[a-z-]+)=\"([^\"]*)\"");
-        while (buttonTag.find()) {
-            String tag = buttonTag.group();
-            if (tag.contains("class=\"tile\"")) {
-                Map<String, String> attrs = new LinkedHashMap<>();
-                Matcher a = attr.matcher(tag);
-                while (a.find()) {
-                    attrs.put(a.group(1), a.group(2));
-                }
-                tiles.add(attrs);
-            }
-        }
-        return tiles;
-    }
-
     // One journey (add a calendar, map it to DAZN, open, paste a link, remove); each step builds on the last.
     @SuppressWarnings("java:S5961")
     @Test
@@ -207,7 +181,7 @@ class SportsEndToEndTest extends FullAppTest {
                 assertThat(addCalendar.statusCode()).isEqualTo(302);
                 String setupAfterCalendar = send(browser, page("/setup")).body();
                 assertThat(setupAfterCalendar).contains("E2E league").contains("127.0.0.1").doesNotContain(TOKEN);
-                assertThat(send(stranger, get("/sources")).statusCode()).isEqualTo(401);
+                assertThat(send(stranger, get("/rails")).statusCode()).isEqualTo(401);
 
                 // Step 5.
                 assertThat(send(browser, post("/setup/sources/preferences/locale",
@@ -240,7 +214,7 @@ class SportsEndToEndTest extends FullAppTest {
                             && holder[0].body().contains("data-subtitle=\"Live · German Bundesliga · DAZN (your setting)\"");
                 });
                 String railBody = holder[0].body();
-                List<Map<String, String>> items = tiles(railBody);
+                List<Map<String, String>> items = RailHtml.tiles(railBody);
                 assertThat(items).hasSizeGreaterThanOrEqualTo(2);
                 Map<String, String> calendarTile = items.stream()
                         .filter(t -> "Calendar Live Match".equals(t.get("data-title"))).findFirst().orElseThrow();
@@ -291,7 +265,7 @@ class SportsEndToEndTest extends FullAppTest {
                     holder[0] = send(browser, get("/rails/sports/live-today"));
                     return holder[0].statusCode() == 200 && holder[0].body().contains("Live · E2E league</span>");
                 });
-                Map<String, String> unmappedCalendarTile = tiles(holder[0].body()).stream()
+                Map<String, String> unmappedCalendarTile = RailHtml.tiles(holder[0].body()).stream()
                         .filter(t -> "Calendar Live Match".equals(t.get("data-title"))).findFirst().orElseThrow();
                 String calendarItemId = unmappedCalendarTile.get("data-item");
                 HttpResponse<String> unmappedPreview = send(browser,

@@ -207,7 +207,7 @@ class BluetoothJellyfinEndToEndTest {
 
                 // The rail cache answers while it loads in the background: poll until the rail is there.
                 await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
-                        assertThat(send(browser, get("/sources/jellyfin/rails/music-recent")).body()).contains("Bunny Song"));
+                        assertThat(send(browser, get("/rails/jellyfin/music-recent")).body()).contains("Bunny Song"));
                 assertThat(send(browser, get("/devices/" + ID + "/route?source=jellyfin&item=" + TRACK)).body())
                         .isEqualTo("Play through the server on this Bluetooth speaker");
                 HttpResponse<String> played = send(browser, post("/devices/" + ID + "/play", Map.of("source", "jellyfin", "item", TRACK)));
