@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.sources.sports.calendar;
+package dev.andre.homecontrol.sources.sports.feed;
 
 import java.time.Instant;
 

@@ -5,6 +5,8 @@ import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.ServiceLinks;
+import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 
 import java.net.URI;
 import java.time.Instant;

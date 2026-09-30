@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
-import dev.andre.homecontrol.sources.sports.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;

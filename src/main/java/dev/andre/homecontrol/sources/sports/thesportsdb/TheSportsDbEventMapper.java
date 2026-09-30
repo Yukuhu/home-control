@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
-import dev.andre.homecontrol.sources.sports.SportsEvent;
+import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;

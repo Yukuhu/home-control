@@ -1,10 +1,10 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
 import dev.andre.homecontrol.security.LoginService;
-import dev.andre.homecontrol.sources.sports.JsonFileSportsStore;
-import dev.andre.homecontrol.sources.sports.SportsProperties;
-import dev.andre.homecontrol.sources.sports.SportsSettings;
-import dev.andre.homecontrol.sources.sports.SportsSettingsService;
+import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
 import dev.andre.homecontrol.testsupport.FakeLoginContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,8 +59,8 @@ class SportsCompetitionsTest {
 
         TheSportsDbClient client = new TheSportsDbClient(properties.theSportsDb());
         TheSportsDbKeys keys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), properties);
-        dev.andre.homecontrol.sources.sports.SportsTimeZones zones =
-                mock(dev.andre.homecontrol.sources.sports.SportsTimeZones.class);
+        dev.andre.homecontrol.sources.sports.settings.SportsTimeZones zones =
+                mock(dev.andre.homecontrol.sources.sports.settings.SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
         schedule = new TheSportsDbSchedule(client, keys, settingsService, properties,
                 zones, Clock.fixed(Instant.parse("2026-09-19T14:00:00Z"), ZoneOffset.UTC));

@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.sources.sports;
+package dev.andre.homecontrol.sources.sports.settings;
 
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;

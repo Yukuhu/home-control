@@ -1,12 +1,12 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
-import dev.andre.homecontrol.sources.sports.SportsEvent;
-import dev.andre.homecontrol.sources.sports.SportsProperties;
-import dev.andre.homecontrol.sources.sports.SportsSettings;
-import dev.andre.homecontrol.sources.sports.SportsSettingsService;
-import dev.andre.homecontrol.sources.sports.SportsTimeZones;
-import dev.andre.homecontrol.sources.sports.calendar.FeedStatus;
+import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
+import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
+import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;

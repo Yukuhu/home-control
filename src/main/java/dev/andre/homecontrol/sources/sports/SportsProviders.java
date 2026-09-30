@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.sports;
 
 import dev.andre.homecontrol.core.content.StreamingProviders;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 
 import java.util.ArrayList;
 import java.util.List;

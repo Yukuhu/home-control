@@ -8,7 +8,7 @@ import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.sources.http.OutboundRequest;
 import dev.andre.homecontrol.sources.http.OutboundResponse;
 import dev.andre.homecontrol.sources.http.Statuses;
-import dev.andre.homecontrol.sources.sports.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;

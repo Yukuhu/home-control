@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.sources.sports;
+package dev.andre.homecontrol.sources.sports.feed;
 
 import java.net.URI;
 import java.time.Instant;

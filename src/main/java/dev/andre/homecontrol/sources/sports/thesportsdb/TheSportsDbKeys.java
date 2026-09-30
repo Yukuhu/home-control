@@ -1,9 +1,9 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
-import dev.andre.homecontrol.sources.sports.SportsProperties;
-import dev.andre.homecontrol.sources.sports.SportsSettings;
-import dev.andre.homecontrol.sources.sports.SportsSettingsService;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
 import dev.andre.homecontrol.storage.SecretStore;
 
 /** Which TheSportsDB key is in effect: the documented free key, or the household's own, as a secret. */

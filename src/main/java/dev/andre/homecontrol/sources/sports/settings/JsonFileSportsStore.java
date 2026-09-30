@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.sources.sports;
+package dev.andre.homecontrol.sources.sports.settings;
 
 import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.content.StreamingProviders;

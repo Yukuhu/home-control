@@ -1,7 +1,7 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
-import dev.andre.homecontrol.sources.sports.SportsEvent;
-import dev.andre.homecontrol.sources.sports.SportsProperties;
+import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;

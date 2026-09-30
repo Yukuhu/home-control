@@ -1,8 +1,8 @@
 package dev.andre.homecontrol.sources.sports.ics;
 
-import dev.andre.homecontrol.sources.sports.SportsEvent;
+import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
 import dev.andre.homecontrol.sources.sports.SportsItems;
-import dev.andre.homecontrol.sources.sports.SportsSettings;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import org.junit.jupiter.api.Test;
 

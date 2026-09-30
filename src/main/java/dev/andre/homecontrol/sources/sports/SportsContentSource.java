@@ -6,6 +6,11 @@ import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.content.SourcePreferences;
 import dev.andre.homecontrol.core.playback.ContentItem;
+import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
+import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Clock;

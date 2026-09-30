@@ -5,7 +5,7 @@ import dev.andre.homecontrol.sources.jellyfin.JellyfinClient;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinConnection;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinException;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinProperties;
-import dev.andre.homecontrol.sources.sports.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarFetchException;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarFetcher;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbClient;

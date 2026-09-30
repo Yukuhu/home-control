@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports;
 
+import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
