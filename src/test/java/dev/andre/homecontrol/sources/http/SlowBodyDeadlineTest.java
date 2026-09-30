@@ -101,13 +101,13 @@ class SlowBodyDeadlineTest {
         URI base = server.url("");
         YouTubeHttp http = new YouTubeHttp(new YouTubeProperties(true, base, base, base, base, Duration.ofSeconds(1),
                 Duration.ofSeconds(1), 10000, 20, 30,
-                30, 5, Duration.ofHours(24), 20, Duration.ofMinutes(60), Duration.ofMinutes(15), Duration.ofHours(6)));
+                30, 5, Duration.ofHours(24), 20, Duration.ofMinutes(60), Duration.ofMinutes(15), Duration.ofHours(6), true));
         URI subscriptions = server.url("/youtube/v3/subscriptions");
 
         assertThatThrownBy(() -> http.get(subscriptions, Map.of()))
                 .isInstanceOf(YouTubeException.class)
                 .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
-                .hasMessage("Could not reach 127.0.0.1");
+                .hasMessage("Could not reach Google at 127.0.0.1 (request timed out)");
         assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
 

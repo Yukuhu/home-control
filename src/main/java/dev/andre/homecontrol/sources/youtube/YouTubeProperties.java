@@ -36,5 +36,6 @@ public record YouTubeProperties(@DefaultValue("true") boolean enabled,
                                 @DefaultValue("20") @Positive int maxSubscriptionPages,
                                 @DefaultValue("60m") Duration refreshInterval,
                                 @DefaultValue("15m") Duration minRefreshSpacing,
-                                @DefaultValue("6h") Duration searchCacheTtl) {
+                                @DefaultValue("6h") Duration searchCacheTtl,
+                                @DefaultValue("false") boolean allowLoopback) {
 }

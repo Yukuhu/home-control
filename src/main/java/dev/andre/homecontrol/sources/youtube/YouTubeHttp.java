@@ -1,31 +1,33 @@
 package dev.andre.homecontrol.sources.youtube;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
-import dev.andre.homecontrol.sources.http.BoundedBody;
+import dev.andre.homecontrol.sources.http.GuardedHttpClient;
+import dev.andre.homecontrol.sources.http.HttpUrls;
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
+import dev.andre.homecontrol.sources.http.OutboundRequest;
+import dev.andre.homecontrol.sources.http.OutboundResponse;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
 
 /** Plain HTTPS to Google: no redirects, timeouts, errors that never echo credentials. */
-public class YouTubeHttp {
+public class YouTubeHttp implements AutoCloseable {
 
     // A cap, not a limit we expect to hit: a well-behaved Google answer never comes close, and a
     // misbehaving or hostile server (or a misconfigured oauth/api base URL) can't make us buffer an
     // unbounded amount of it into heap.
     static final int MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+    /** Thumbnails are proxied for the dashboard, many at once. */
+    private static final int MAX_CONCURRENT = 16;
+    private static final HttpUrls.Rules GOOGLE_URLS = new HttpUrls.Rules(true, false, true, false, 0);
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
@@ -65,52 +67,42 @@ public class YouTubeHttp {
         }
     }
 
-    private final HttpClient http;
-    private final Duration requestTimeout;
+    private final GuardedHttpClient http;
 
     public YouTubeHttp(YouTubeProperties properties) {
-        this.http = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .connectTimeout(properties.connectTimeout())
-                .build();
-        this.requestTimeout = properties.requestTimeout();
+        // Every caller reads Google's error bodies (OAuth error codes, quota reasons), so every request asks for them.
+        this.http = new GuardedHttpClient(new GuardedHttpClient.Profile("Google", GuardedHttpClient.Redirects.NONE, 0,
+                MAX_RESPONSE_BYTES, properties.connectTimeout(), properties.requestTimeout(), MAX_CONCURRENT,
+                GOOGLE_URLS), new OutboundAddressPolicy(properties.allowLoopback()),
+                failure -> new YouTubeException(failure.kind(), failure.describe("Google")));
     }
 
     public Response get(URI uri, Map<String, String> headers) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(requestTimeout).GET();
-        headers.forEach(builder::header);
-        return send(uri, builder);
+        return send(withHeaders(OutboundRequest.get(uri), headers));
     }
 
     public Response postForm(URI uri, Map<String, String> form, Map<String, String> headers) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(requestTimeout)
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Accept", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(form(form), StandardCharsets.UTF_8));
-        headers.forEach(builder::header);
-        return send(uri, builder);
+        return send(withHeaders(OutboundRequest.post(uri, form(form).getBytes(StandardCharsets.UTF_8),
+                "application/x-www-form-urlencoded").header("Accept", "application/json"), headers));
     }
 
-    private Response send(URI uri, HttpRequest.Builder builder) {
-        HttpResponse<byte[]> response;
-        try {
-            response = http.send(builder.build(), BoundedBody.handler(MAX_RESPONSE_BYTES, requestTimeout));
-        } catch (IOException _) {
-            throw new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Could not reach " + uri.getHost());
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            throw new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Interrupted while calling " + uri.getHost());
+    private static OutboundRequest withHeaders(OutboundRequest request, Map<String, String> headers) {
+        OutboundRequest with = request.withErrorBody();
+        for (Map.Entry<String, String> header : headers.entrySet()) {
+            with = with.header(header.getKey(), header.getValue());
         }
-        byte[] bytes = response.body();
-        if (contentLengthExceeds(response, MAX_RESPONSE_BYTES) || bytes.length > MAX_RESPONSE_BYTES) {
-            throw new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE, "Google sent an oversized response");
-        }
-        return new Response(response.statusCode(), response.headers().firstValue("Content-Type").orElse(""), bytes);
+        return with;
     }
 
-    /** Rejects an oversized body before it is streamed, when the server is honest enough to declare its length. */
-    private static boolean contentLengthExceeds(HttpResponse<?> response, int max) {
-        return response.headers().firstValueAsLong("Content-Length").orElse(-1) > max;
+    private Response send(OutboundRequest request) {
+        OutboundResponse response = http.send(request);
+        return new Response(response.status(), response.contentType() == null ? "" : response.contentType(),
+                response.body());
+    }
+
+    @Override
+    public void close() {
+        http.close();
     }
 
     /** {@code base + path + ?query}; null values are skipped; insertion order is kept. */
