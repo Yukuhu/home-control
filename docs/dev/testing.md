@@ -74,6 +74,28 @@ off Spring Framework 7's pausing, because `RailCache` cannot restart after a pau
   debugger is attached. A test that needs longer declares `@Timeout` on the method, or on the class for its test
   methods; a long `@BeforeAll` or `@BeforeEach` needs its own.
 
+## Dependency verification
+
+Gradle verifies dependencies and build plugins against the SHA-256 checksums committed in
+`gradle/verification-metadata.xml`, including their POM and module metadata. A missing or mismatched checksum
+fails the build before the affected artifact is used.
+
+After adding or upgrading a dependency, generate the new entries:
+
+```bash
+scripts/gradle.sh --write-verification-metadata sha256 build e2eClasses
+```
+
+Review the diff and compare the new checksums with fresh artifacts from Maven Central or the Gradle Plugin
+Portal before committing them. Generation trusts the artifacts it finds, including the local cache; it does
+not establish that those artifacts are authentic. Keep checksum generation out of normal builds and CI, which
+must enforce the committed metadata.
+
+The metadata also covers the published `protoc` executables for Linux, macOS and Windows. When upgrading
+protobuf, update those platform checksums too: generation on one machine discovers only its own compiler.
+Run generation on the other platforms, or download their compiler artifacts from Maven Central and calculate
+their SHA-256 checksums. Run `scripts/gradle.sh build` again without the generation flag to check enforcement.
+
 ## Fakes and fixtures
 
 - A fake of a device or a service is named `Fake…` and sits in the test package of the code it fakes, for example

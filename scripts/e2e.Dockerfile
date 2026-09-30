@@ -23,3 +23,6 @@ RUN set -eux; \
     (cd driver/package && "../$node_dir/node" cli.js install --with-deps chromium firefox webkit); \
     chmod -R a+rX /ms-playwright; \
     cd /; rm -rf "$work" /var/lib/apt/lists/*
+
+# Installing OS packages needs root; running the browsers and tests does not.
+USER gradle
