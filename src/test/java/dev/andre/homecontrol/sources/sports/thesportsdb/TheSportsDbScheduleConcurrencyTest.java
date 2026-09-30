@@ -193,19 +193,20 @@ class TheSportsDbScheduleConcurrencyTest {
     }
 
     @Test
-    void aKeyChangeDuringAPassKeepsOnlyWhatTheNewKeyFetched() throws Exception {
+    void aKeyChangeDuringAPassFetchesEverythingAgainWithTheNewKey() throws Exception {
         holdDay("2026-09-19", "4331", "eventsday-2026-09-19-4331.json");
         Future<FeedResult> pass = passHeldAfter(2);
 
         switchToThePersonalKey();
         release.countDown();
-        pass.get(10, TimeUnit.SECONDS);
+        FeedResult result = pass.get(10, TimeUnit.SECONDS);
 
-        assertThat(schedule.find(BUNDESLIGA_ITEM)).isEmpty();
-        assertThat(schedule.status("4331").orElseThrow().events()).isZero();
-        assertThat(keysSent()).containsExactly(FREE_KEY, FREE_KEY, PERSONAL_KEY, PERSONAL_KEY);
-        schedule.events();
+        // 4328's days after the change, then 4331's again: the old key's answers were dropped.
         assertThat(keysSent()).containsExactly(FREE_KEY, FREE_KEY, PERSONAL_KEY, PERSONAL_KEY, PERSONAL_KEY, PERSONAL_KEY);
+        assertThat(result.succeeded()).isEqualTo(2);
+        assertThat(result.events()).extracting(SportsEvent::itemId).contains(BUNDESLIGA_ITEM);
+        schedule.events();
+        assertThat(server.count(EVENTS_DAY)).isEqualTo(6);
     }
 
     @Test
@@ -214,11 +215,14 @@ class TheSportsDbScheduleConcurrencyTest {
         Future<FeedResult> pass = passHeldAfter(1);
 
         switchToThePersonalKey();
+        // The new key is not limited: the next request for that day is answered.
+        server.respond(EVENTS_DAY, Map.of("d", "2026-09-18", "l", "4331"), 200, "eventsday-2026-09-18-4331.json");
         release.countDown();
         FeedResult result = pass.get(10, TimeUnit.SECONDS);
 
         assertThat(result.errors()).isEmpty();
-        assertThat(keysSent()).containsExactly(FREE_KEY, PERSONAL_KEY, PERSONAL_KEY, PERSONAL_KEY);
+        assertThat(result.succeeded()).isEqualTo(2);
+        assertThat(keysSent()).containsExactly(FREE_KEY, PERSONAL_KEY, PERSONAL_KEY, PERSONAL_KEY, PERSONAL_KEY);
     }
 
     @Test
