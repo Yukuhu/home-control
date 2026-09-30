@@ -29,7 +29,8 @@ class WorkflowTestServiceTest {
             var runner = mock(WorkflowRunner.class);
             var service = new WorkflowTestService(store, runner, http);
             saved = definition(7, WorkflowFixtures.chain(server.url("/")));
-            assertThatThrownBy(() -> service.test(id, 7, FakeLoginContext.loggedOutBrowser()))
+            FakeLoginContext loggedOut = FakeLoginContext.loggedOutBrowser();
+            assertThatThrownBy(() -> service.test(id, 7, loggedOut))
                     .isInstanceOf(LoginRequiredException.class);
             verifyNoInteractions(store, runner);
             assertThatThrownBy(() -> service.test(id, 6, request)).isInstanceOf(WorkflowException.class);

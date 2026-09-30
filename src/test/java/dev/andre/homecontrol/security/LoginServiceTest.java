@@ -77,10 +77,11 @@ class LoginServiceTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
 
         var secrets = Map.of("jellyfin.token", "t");
-        assertThatThrownBy(() -> login.storeSecrets(secrets, "short", "short", context(login, request)))
+        LoginContext requestContext = context(login, request);
+        assertThatThrownBy(() -> login.storeSecrets(secrets, "short", "short", requestContext))
                 .isInstanceOf(PasswordRejectedException.class)
                 .hasMessage("The login password needs at least 10 characters");
-        assertThatThrownBy(() -> login.storeSecrets(secrets, "long enough 1", "long enough 2", context(login, request)))
+        assertThatThrownBy(() -> login.storeSecrets(secrets, "long enough 1", "long enough 2", requestContext))
                 .isInstanceOf(PasswordRejectedException.class)
                 .hasMessage("The two passwords do not match");
         assertThat(store.hasSecrets()).isFalse();
@@ -102,7 +103,8 @@ class LoginServiceTest {
 
         var otherSecret = Map.of("other.token", "u");
         var anonymous = new MockHttpServletRequest();
-        assertThatThrownBy(() -> login.storeSecrets(otherSecret, null, null, context(login, anonymous)))
+        LoginContext anonymousContext = context(login, anonymous);
+        assertThatThrownBy(() -> login.storeSecrets(otherSecret, null, null, anonymousContext))
                 .isInstanceOf(LoginRequiredException.class)
                 .hasMessage("Log in first");
         assertThat(store.secret("other.token")).isEmpty();
@@ -151,7 +153,8 @@ class LoginServiceTest {
         assertThat(login.authenticate(PASSWORD, context(login, a))).isTrue();
         assertThat(login.authenticate(PASSWORD, context(login, b))).isTrue();
 
-        assertThatThrownBy(() -> login.changePassword("not the password", "a new password!", "a new password!", context(login, a)))
+        LoginContext aContext = context(login, a);
+        assertThatThrownBy(() -> login.changePassword("not the password", "a new password!", "a new password!", aContext))
                 .isInstanceOf(WrongPasswordException.class)
                 .hasMessage("The current password is wrong");
         login.changePassword(PASSWORD, "a new password!", "a new password!", context(login, a));
@@ -187,7 +190,8 @@ class LoginServiceTest {
         login.setPassword(PASSWORD, PASSWORD, context(login, new MockHttpServletRequest()));
         var request = new MockHttpServletRequest();
 
-        assertThatThrownBy(() -> login.setPassword("another password", "another password", context(login, request)))
+        LoginContext requestContext = context(login, request);
+        assertThatThrownBy(() -> login.setPassword("another password", "another password", requestContext))
                 .isInstanceOf(PasswordRejectedException.class)
                 .hasMessage("A login password is already set; change it instead");
     }
@@ -258,7 +262,8 @@ class LoginServiceTest {
         firstSecretStored();
 
         var anonymous = new MockHttpServletRequest();
-        assertThatThrownBy(() -> login.changePassword("not the password", "short", "short", context(login, anonymous)))
+        LoginContext anonymousContext = context(login, anonymous);
+        assertThatThrownBy(() -> login.changePassword("not the password", "short", "short", anonymousContext))
                 .isInstanceOf(PasswordRejectedException.class)
                 .isNotInstanceOf(WrongPasswordException.class)
                 .hasMessage("The login password needs at least 10 characters");
@@ -317,7 +322,8 @@ class LoginServiceTest {
     void thereIsNoPasswordToChangeBeforeTheFirstSecret() {
         var request = new MockHttpServletRequest();
 
-        assertThatThrownBy(() -> login.changePassword(PASSWORD, "a new password!", "a new password!", context(login, request)))
+        LoginContext requestContext = context(login, request);
+        assertThatThrownBy(() -> login.changePassword(PASSWORD, "a new password!", "a new password!", requestContext))
                 .isInstanceOf(PasswordRejectedException.class)
                 .hasMessage("There is no login password to change");
         assertThat(store.hasSecrets()).isFalse();
@@ -334,7 +340,8 @@ class LoginServiceTest {
         });
         var request = new MockHttpServletRequest();
 
-        assertThatThrownBy(() -> racing.changePassword(PASSWORD, "a new password!", "a new password!", context(racing, request)))
+        LoginContext racingRequestContext = context(racing, request);
+        assertThatThrownBy(() -> racing.changePassword(PASSWORD, "a new password!", "a new password!", racingRequestContext))
                 .isInstanceOf(PasswordRejectedException.class)
                 .isNotInstanceOf(WrongPasswordException.class)
                 .hasMessage("The password was changed meanwhile; try again");
@@ -361,7 +368,8 @@ class LoginServiceTest {
             assertThat(checking.await(5, SECONDS)).isTrue();
             var third = new MockHttpServletRequest();
 
-            assertThatThrownBy(() -> limited.authenticate(PASSWORD, context(limited, third))).isInstanceOf(LoginBusyException.class);
+            LoginContext limitedThirdContext = context(limited, third);
+            assertThatThrownBy(() -> limited.authenticate(PASSWORD, limitedThirdContext)).isInstanceOf(LoginBusyException.class);
 
             finish.countDown();
             for (Future<Boolean> guess : slow) {
@@ -380,7 +388,8 @@ class LoginServiceTest {
         var request = new MockHttpServletRequest();
         Thread.currentThread().interrupt();
         try {
-            assertThatThrownBy(() -> login.authenticate(PASSWORD, context(login, request))).isInstanceOf(LoginBusyException.class);
+            LoginContext requestContext = context(login, request);
+            assertThatThrownBy(() -> login.authenticate(PASSWORD, requestContext)).isInstanceOf(LoginBusyException.class);
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
         } finally {
             Thread.interrupted();
