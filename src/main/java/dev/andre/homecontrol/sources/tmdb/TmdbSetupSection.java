@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnModule(Module.TMDB)
-public class TmdbSetupSection implements SetupSection {
+public class TmdbSetupSection extends SetupSection {
 
     /** What the setup page shows about TMDB. Never holds a credential. */
     public record View(boolean configured, String credentialKind, boolean needsLoginPassword) {
@@ -20,33 +20,9 @@ public class TmdbSetupSection implements SetupSection {
     private final ObjectProvider<LoginService> login;
 
     public TmdbSetupSection(ObjectProvider<TmdbSetupService> setup, ObjectProvider<LoginService> login) {
+        super("tmdb", "Movies & series", Group.CONTENT_SOURCES, 30);
         this.setup = setup;
         this.login = login;
-    }
-
-    @Override
-    public String id() {
-        return "tmdb";
-    }
-
-    @Override
-    public String title() {
-        return "Movies & series";
-    }
-
-    @Override
-    public String fragment() {
-        return "fragments/tmdb-setup";
-    }
-
-    @Override
-    public Group group() {
-        return Group.CONTENT_SOURCES;
-    }
-
-    @Override
-    public int order() {
-        return 30;
     }
 
     @Override

@@ -11,38 +11,15 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnModule(Module.WORKFLOWS)
-public final class WorkflowSetupSection implements SetupSection {
+public final class WorkflowSetupSection extends SetupSection {
     public record Summary(String id, String name, WorkflowDraft.Mode mode, boolean enabled, long revision) {}
     public record Problem(String token, String message) {}
     public record View(List<Summary> definitions, List<Problem> problems, boolean needsLoginPassword) {}
     private final ObjectProvider<WorkflowStore> store;
     private final ObjectProvider<LoginService> login;
     public WorkflowSetupSection(ObjectProvider<WorkflowStore> store, ObjectProvider<LoginService> login) {
+        super("workflows", "Workflows", Group.CONTENT_SOURCES, 50);
         this.store = store; this.login = login;
-    }
-    @Override
-    public String id() {
-        return "workflows";
-    }
-
-    @Override
-    public String title() {
-        return "Workflows";
-    }
-
-    @Override
-    public String fragment() {
-        return "fragments/workflows-setup";
-    }
-
-    @Override
-    public Group group() {
-        return Group.CONTENT_SOURCES;
-    }
-
-    @Override
-    public int order() {
-        return 50;
     }
 
     @Override

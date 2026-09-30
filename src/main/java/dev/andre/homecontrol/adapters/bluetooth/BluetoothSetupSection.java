@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 /** The Bluetooth speakers section of the setup page. */
 @Component
 @ConditionalOnModule(Module.BLUETOOTH)
-public class BluetoothSetupSection implements SetupSection {
+public class BluetoothSetupSection extends SetupSection {
 
     public record SpeakerRow(String id, String name, String address, String status, String audioDevice) {
     }
@@ -31,35 +31,11 @@ public class BluetoothSetupSection implements SetupSection {
 
     public BluetoothSetupSection(ObjectProvider<BluetoothHostChecks> checks, ObjectProvider<BluetoothPairingService> pairing,
                                 ObjectProvider<DeviceQueries> devices, ObjectProvider<BluetoothProperties> properties) {
+        super("bluetooth", "Bluetooth speakers", Group.DEVICES, 10);
         this.checks = checks;
         this.pairing = pairing;
         this.devices = devices;
         this.properties = properties;
-    }
-
-    @Override
-    public String id() {
-        return "bluetooth";
-    }
-
-    @Override
-    public String title() {
-        return "Bluetooth speakers";
-    }
-
-    @Override
-    public String fragment() {
-        return "fragments/bluetooth-setup";
-    }
-
-    @Override
-    public Group group() {
-        return Group.DEVICES;
-    }
-
-    @Override
-    public int order() {
-        return 10;
     }
 
     @Override

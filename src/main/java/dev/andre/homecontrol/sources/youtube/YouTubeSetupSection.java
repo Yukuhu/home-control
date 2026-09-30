@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnModule(Module.YOUTUBE)
-public class YouTubeSetupSection implements SetupSection {
+public class YouTubeSetupSection extends SetupSection {
 
     /** One API call's usage today, e.g. {@code playlistItems.list: 103 calls, 103 units}. */
     public record CallCount(String api, int count, int units) {
@@ -53,36 +53,12 @@ public class YouTubeSetupSection implements SetupSection {
     public YouTubeSetupSection(ObjectProvider<YouTubeSetupService> setup, ObjectProvider<LoginService> login,
                               ObjectProvider<QuotaLedger> ledger, ObjectProvider<YouTubePlaylists> playlists,
                               ObjectProvider<DeviceQueries> devices) {
+        super("youtube", "YouTube", Group.CONTENT_SOURCES, 20);
         this.setup = setup;
         this.login = login;
         this.ledger = ledger;
         this.playlists = playlists;
         this.devices = devices;
-    }
-
-    @Override
-    public String id() {
-        return "youtube";
-    }
-
-    @Override
-    public String title() {
-        return "YouTube";
-    }
-
-    @Override
-    public String fragment() {
-        return "fragments/youtube-setup";
-    }
-
-    @Override
-    public Group group() {
-        return Group.CONTENT_SOURCES;
-    }
-
-    @Override
-    public int order() {
-        return 20;
     }
 
     @Override
@@ -120,11 +96,10 @@ public class YouTubeSetupSection implements SetupSection {
     private List<PlaylistOption> playlistOptions(YouTubeSettings settings) {
         YouTubePlaylists p = playlists.getIfAvailable();
         List<YouTubePlaylists.PlaylistSummary> loaded = p == null ? List.of() : p.loadedList();
-        List<PlaylistOption> options = new ArrayList<>();
-        for (YouTubePlaylists.PlaylistSummary summary : loaded) {
-            options.add(new PlaylistOption(summary.id(), summary.title(), summary.itemCount(),
-                    settings.playlists().containsKey(summary.id())));
-        }
+        List<PlaylistOption> options = new ArrayList<>(loaded.stream()
+                .map(summary -> new PlaylistOption(summary.id(), summary.title(), summary.itemCount(),
+                        settings.playlists().containsKey(summary.id())))
+                .toList());
         Set<String> loadedIds = loaded.stream().map(YouTubePlaylists.PlaylistSummary::id).collect(Collectors.toSet());
         settings.playlists().forEach((id, title) -> {
             if (!loadedIds.contains(id)) {

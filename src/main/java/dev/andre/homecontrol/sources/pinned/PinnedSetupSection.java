@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnModule(Module.PINNED)
-public class PinnedSetupSection implements SetupSection {
+public class PinnedSetupSection extends SetupSection {
 
     public record PinView(String id, String title, String subtitle, String url, boolean first, boolean last) {
     }
@@ -24,33 +24,9 @@ public class PinnedSetupSection implements SetupSection {
     private final ObjectProvider<PinnedProperties> properties;
 
     public PinnedSetupSection(ObjectProvider<PinnedShortcuts> shortcuts, ObjectProvider<PinnedProperties> properties) {
+        super("pinned", "Pinned links", Group.CONTENT_SOURCES, 40);
         this.shortcuts = shortcuts;
         this.properties = properties;
-    }
-
-    @Override
-    public String id() {
-        return "pinned";
-    }
-
-    @Override
-    public String title() {
-        return "Pinned links";
-    }
-
-    @Override
-    public String fragment() {
-        return "fragments/pinned-setup";
-    }
-
-    @Override
-    public Group group() {
-        return Group.CONTENT_SOURCES;
-    }
-
-    @Override
-    public int order() {
-        return 40;
     }
 
     @Override

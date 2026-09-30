@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<!--/* What every page shares. A page includes pageHead first in its own <head>, then adds its own scripts. */-->
+<!--/* What every page shares. A page includes pageHead first in its own <head>, then adds its title and scripts. */-->
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <th:block th:fragment="pageHead(title, resizesContent)">
+    <th:block th:fragment="pageHead(resizesContent)">
         <meta charset="UTF-8">
         <meta name="viewport" th:content="${resizesContent}
                 ? 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content'
@@ -17,7 +17,6 @@
         <link rel="manifest" href="/manifest.webmanifest">
         <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-        <title th:text="${title}">Home Control</title>
         <link rel="stylesheet" th:href="@{/app.css}">
         <link rel="stylesheet" th:href="@{/themes/cyberpunk.css}">
         <script th:src="@{/js/theme.js}"></script>
@@ -29,7 +28,7 @@
 
 <!--/* current: 'home' or 'setup'; the dashboard also shows its connection status. */-->
 <header th:fragment="appHeader(current)" class="app-header">
-    <a th:replace="~{fragments/layout :: brand}"></a>
+    <th:block th:replace="~{fragments/layout :: brand}"></th:block>
     <nav class="header-nav" aria-label="Main navigation">
         <a th:href="@{/}" th:attr="aria-current=${current == 'home'} ? 'page' : null">Home</a>
         <a th:href="@{/setup}" th:attr="aria-current=${current == 'setup'} ? 'page' : null">Setup</a>

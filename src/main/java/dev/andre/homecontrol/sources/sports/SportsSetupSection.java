@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 /** What the setup page shows about the sports source: time zone, calendar and TheSportsDB status. */
 @Component
 @ConditionalOnModule(Module.SPORTS)
-public class SportsSetupSection implements SetupSection {
+public class SportsSetupSection extends SetupSection {
 
     public record CalendarView(String id, String label, String host, String status, String provider) {
     }
@@ -49,37 +49,13 @@ public class SportsSetupSection implements SetupSection {
                              ObjectProvider<LoginService> loginProvider,
                              ObjectProvider<SportsProperties> propertiesProvider,
                              ObjectProvider<TheSportsDbSchedule> theSportsDbScheduleProvider) {
+        super("sports", "Sports", Group.CONTENT_SOURCES, 60);
         this.settingsProvider = settingsProvider;
         this.zonesProvider = zonesProvider;
         this.scheduleProvider = scheduleProvider;
         this.loginProvider = loginProvider;
         this.propertiesProvider = propertiesProvider;
         this.theSportsDbScheduleProvider = theSportsDbScheduleProvider;
-    }
-
-    @Override
-    public String id() {
-        return "sports";
-    }
-
-    @Override
-    public String title() {
-        return "Sports";
-    }
-
-    @Override
-    public String fragment() {
-        return "fragments/sports-setup";
-    }
-
-    @Override
-    public Group group() {
-        return Group.CONTENT_SOURCES;
-    }
-
-    @Override
-    public int order() {
-        return 60;
     }
 
     @Override

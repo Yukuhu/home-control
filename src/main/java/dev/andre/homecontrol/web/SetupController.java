@@ -63,6 +63,8 @@ public class SetupController {
      * {@code deepLinkTest}: its timeout is shown next to the "Test deep link" button.
      * {@code sections}: one per enabled module that has something to set up.
      */
+    // The page's device half (pairing, enrollment, settings, the deep-link test), its sections and its account.
+    @SuppressWarnings("java:S107")
     public SetupController(ObjectProvider<CodePairing> codePairings, DeviceQueries devices,
                            DeviceEnrollment enrollment, DeviceSettings deviceSettings,
                            List<PromptPairing> promptPairings, DeepLinkTestProperties deepLinkTest,
