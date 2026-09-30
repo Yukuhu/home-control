@@ -173,6 +173,17 @@ class DeepLinkTestServiceTest {
     }
 
     @Test
+    void aDeviceForgottenBeforeTheLinkIsSentIsNotFoundAndReleasesTheDevice() {
+        doThrow(new DeviceNotFoundException("No device with id lg")).when(commands).execute(eq("lg"), any());
+
+        assertThatThrownBy(() -> service.run("lg"))
+                .isInstanceOf(DeviceNotFoundException.class).hasMessage("No device with id lg");
+
+        doThrow(new ActionFailedException("LG TV could not open the link")).when(commands).execute(eq("lg"), any());
+        assertThat(service.run("lg").message()).contains("could not open the link");
+    }
+
+    @Test
     void anUnexpectedFailureIsReportedWithoutItsInternals() {
         doThrow(new IllegalStateException("Cannot invoke \"Session.send()\" because \"this.session\" is null"))
                 .when(commands).execute(eq("lg"), any());
