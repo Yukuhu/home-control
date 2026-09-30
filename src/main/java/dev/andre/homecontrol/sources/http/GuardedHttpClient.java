@@ -273,8 +273,9 @@ public final class GuardedHttpClient implements AutoCloseable {
                 .setResponseTimeout(timeout(exchange.remaining())).build());
         request.headers().forEach(message::setHeader);
         if (request.body() != null) {
+            // A request that names no content type sends none, as the JDK client did for an empty POST.
             message.setEntity(new ByteArrayEntity(request.body(), request.contentType() == null
-                    ? ContentType.APPLICATION_OCTET_STREAM : ContentType.parse(request.contentType())));
+                    ? null : ContentType.parse(request.contentType())));
         }
         exchange.active.set(message);
         try {

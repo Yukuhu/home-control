@@ -89,7 +89,7 @@ class SlowBodyDeadlineTest {
         assertThatThrownBy(() -> client.get(connection, "/Items", Map.of()))
                 .isInstanceOf(JellyfinException.class)
                 .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
-                .hasMessageContaining("(no answer in time)");
+                .hasMessageContaining("(request timed out)");
         assertThatThrownBy(() -> client.image(serverUrl, "abc", "Primary", null, 480))
                 .isInstanceOf(JellyfinException.class)
                 .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE);
