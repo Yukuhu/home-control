@@ -56,7 +56,7 @@ public class SecretStore implements DeviceSecrets {
     private static final int MAX_VALUE_CHARS = 16_384;
     private static final int MAX_KDF_MEMORY_KIB = 262_144;
 
-    private final JsonMapper mapper = Json.MAPPER;
+    private static final JsonMapper MAPPER = Json.MAPPER;
     private final Path file;
     private final SecretKeySource keys;
     private final SecureRandom random;
@@ -226,7 +226,7 @@ public class SecretStore implements DeviceSecrets {
         byte[] nonce;
         byte[] ciphertext;
         try {
-            JsonNode root = mapper.readTree(Files.readAllBytes(file));
+            JsonNode root = MAPPER.readTree(Files.readAllBytes(file));
             if (root == null || !FORMAT.equals(root.path("format").asString(""))
                     || root.path(VERSION_KEY).asInt(0) != VERSION || !CIPHER.equals(root.path("cipher").asString(""))) {
                 throw new StorageException(file + " is not a version " + VERSION + " Home Control secrets file", null);
@@ -242,7 +242,7 @@ public class SecretStore implements DeviceSecrets {
         }
         byte[] plaintext = decrypt(keys.keyFor(parsed), nonce, ciphertext, parsed);
         try {
-            JsonNode document = mapper.readTree(plaintext);
+            JsonNode document = MAPPER.readTree(plaintext);
             JsonNode loginNode = document.path(LOGIN);
             LoginCredential loaded = loginNode.isObject()
                     ? new LoginCredential(loginNode.path("passwordHash").asString(""), loginNode.path(VERSION_KEY).asString(""))
@@ -293,7 +293,7 @@ public class SecretStore implements DeviceSecrets {
     }
 
     private void write(LoginCredential nextLogin, Map<String, String> nextSecrets) {
-        ObjectNode document = mapper.createObjectNode();
+        ObjectNode document = MAPPER.createObjectNode();
         if (nextLogin == null) {
             document.putNull(LOGIN);
         } else {
@@ -303,7 +303,7 @@ public class SecretStore implements DeviceSecrets {
         }
         ObjectNode secretsNode = document.putObject("secrets");
         new TreeMap<>(nextSecrets).forEach(secretsNode::put);
-        byte[] plaintext = mapper.writeValueAsBytes(document);
+        byte[] plaintext = MAPPER.writeValueAsBytes(document);
 
         SecretKeySource.Keyed keyed;
         byte[] nonce = new byte[NONCE_BYTES];
@@ -321,7 +321,7 @@ public class SecretStore implements DeviceSecrets {
             Arrays.fill(plaintext, (byte) 0);
         }
 
-        ObjectNode root = mapper.createObjectNode();
+        ObjectNode root = MAPPER.createObjectNode();
         root.put("format", FORMAT);
         root.put(VERSION_KEY, VERSION);
         ObjectNode key = root.putObject("key");
@@ -339,7 +339,7 @@ public class SecretStore implements DeviceSecrets {
         root.put("ciphertext", Base64.getEncoder().encodeToString(ciphertext));
 
         try {
-            AtomicFiles.write(file, mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(root), true);
+            AtomicFiles.write(file, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(root), true);
         } catch (IOException e) {
             throw new StorageException("Could not write " + file + "; check that /data is bind-mounted and writable", e);
         }
