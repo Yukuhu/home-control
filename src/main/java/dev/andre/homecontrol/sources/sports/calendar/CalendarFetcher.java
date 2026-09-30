@@ -43,7 +43,7 @@ public class CalendarFetcher implements AutoCloseable {
         if (status == 200) {
             return new String(response.body(), charsetOf(response.contentType()));
         }
-        String host = url.getHost();
+        String host = response.uri().getHost();
         Kind kind = Statuses.kindOf(status);
         throw new CalendarFetchException(kind, switch (kind) {
             case UNAUTHORIZED -> host + " refused access to the calendar";

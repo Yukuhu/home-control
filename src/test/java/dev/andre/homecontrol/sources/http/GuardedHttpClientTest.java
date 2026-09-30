@@ -172,7 +172,9 @@ class GuardedHttpClientTest {
         server.respond("GET", "/b", Response.of(200, "text/plain", "b"));
         server.respond("GET", "/metadata", Response.empty(302).withHeader("Location", "http://metadata.test/latest"));
         try (var client = client(Redirects.CHECKED)) {
-            assertThat(client.send(OutboundRequest.get(at("source.test", "/away"))).body()).asString().isEqualTo("b");
+            OutboundResponse away = client.send(OutboundRequest.get(at("source.test", "/away")));
+            assertThat(away.body()).asString().isEqualTo("b");
+            assertThat(away.uri()).isEqualTo(at("other.test", "/b"));
 
             assertThat(failureOf(() -> client.send(OutboundRequest.get(at("source.test", "/metadata")))).kind())
                     .isEqualTo(Kind.BLOCKED);
@@ -289,7 +291,7 @@ class GuardedHttpClientTest {
         try (var socket = new ServerSocket(0, 50, InetAddress.ofLiteral("127.0.0.1"))) {
             Thread.ofVirtual().start(() -> {
                 while (!socket.isClosed()) {
-                    try (var connection = socket.accept()) {
+                    try (var _ = socket.accept()) {
                         accepted.incrementAndGet();
                     } catch (IOException _) {
                         // closed at the end of the test

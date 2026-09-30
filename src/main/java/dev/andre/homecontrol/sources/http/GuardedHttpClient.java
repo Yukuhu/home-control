@@ -284,12 +284,12 @@ public final class GuardedHttpClient implements AutoCloseable {
                 int status = response.getCode();
                 // Never drain a redirect being followed, nor an error body nobody asked for: it may never end.
                 if (follows(request.method(), status) || (!successful(status) && !request.errorBody())) {
-                    return new OutboundResponse(status, contentType, new byte[0], headers);
+                    return new OutboundResponse(status, contentType, new byte[0], headers, uri);
                 }
                 int cap = request.maxBytes() > 0 ? request.maxBytes() : profile.maxBytes();
                 byte[] body = body(response.getEntity(), response.getHeaders("Content-Encoding"), host(uri), cap);
                 exchange.check();
-                return new OutboundResponse(status, contentType, body, headers);
+                return new OutboundResponse(status, contentType, body, headers, uri);
             } finally {
                 // Keep cancellation active through cleanup; never drain a body gracefully.
                 message.cancel();
