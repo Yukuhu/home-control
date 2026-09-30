@@ -127,6 +127,11 @@ public class TheSportsDbSchedule implements SportsFeed {
             return keyUnavailable(settings, e, started);
         }
         refreshDue(settings.competitions(), dates, new Round(now, zone));
+        if (generation.get() != started) {
+            // A key change cleared what this pass had fetched, and the refresh it asks for is skipped while this one
+            // runs: start over with the new key.
+            return pass();
+        }
         return publish(dates);
     }
 
