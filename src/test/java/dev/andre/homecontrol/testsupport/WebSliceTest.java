@@ -4,6 +4,7 @@ import dev.andre.homecontrol.adapters.bluetooth.BluetoothHostChecks;
 import dev.andre.homecontrol.adapters.bluetooth.BluetoothPairingService;
 import dev.andre.homecontrol.adapters.bluetooth.BluetoothProperties;
 import dev.andre.homecontrol.adapters.bluetooth.BluetoothScan;
+import dev.andre.homecontrol.adapters.bluetooth.BluetoothSetupSection;
 import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.content.SearchService;
 import dev.andre.homecontrol.content.SourcePreferencesService;
@@ -21,24 +22,30 @@ import dev.andre.homecontrol.playback.PlaybackService;
 import dev.andre.homecontrol.security.LoginRateLimiter;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinClient;
+import dev.andre.homecontrol.sources.jellyfin.JellyfinSetupSection;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinSetupService;
 import dev.andre.homecontrol.sources.pinned.PinnedProperties;
+import dev.andre.homecontrol.sources.pinned.PinnedSetupSection;
 import dev.andre.homecontrol.sources.pinned.PinnedShortcuts;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import dev.andre.homecontrol.sources.sports.SportsSettings;
 import dev.andre.homecontrol.sources.sports.SportsSettingsService;
+import dev.andre.homecontrol.sources.sports.SportsSetupSection;
 import dev.andre.homecontrol.sources.sports.SportsTimeZones;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import dev.andre.homecontrol.sources.sports.calendar.SportsCalendars;
 import dev.andre.homecontrol.sources.sports.thesportsdb.SportsCompetitions;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
+import dev.andre.homecontrol.sources.tmdb.TmdbSetupSection;
 import dev.andre.homecontrol.sources.tmdb.TmdbSetupService;
+import dev.andre.homecontrol.sources.workflows.WorkflowSetupSection;
 import dev.andre.homecontrol.sources.workflows.WorkflowStore;
 import dev.andre.homecontrol.sources.workflows.WorkflowTestService;
 import dev.andre.homecontrol.sources.youtube.YouTubeAuthorizationService;
 import dev.andre.homecontrol.sources.youtube.YouTubeHttp;
 import dev.andre.homecontrol.sources.youtube.YouTubeProperties;
 import dev.andre.homecontrol.sources.youtube.YouTubeSettings;
+import dev.andre.homecontrol.sources.youtube.YouTubeSetupSection;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupService;
 import dev.andre.homecontrol.web.EventStream;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +71,9 @@ import static org.mockito.BDDMockito.given;
  * with {@code null}.
  */
 @WebMvcTest(properties = "home-control.bluetooth.enabled=true")
-@Import(WebSliceTest.SliceBeans.class)
+@Import({WebSliceTest.SliceBeans.class, BluetoothSetupSection.class, JellyfinSetupSection.class,
+        YouTubeSetupSection.class, TmdbSetupSection.class, PinnedSetupSection.class, WorkflowSetupSection.class,
+        SportsSetupSection.class})
 public abstract class WebSliceTest {
 
     @MockitoBean

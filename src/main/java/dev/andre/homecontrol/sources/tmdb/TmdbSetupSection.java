@@ -2,15 +2,15 @@ package dev.andre.homecontrol.sources.tmdb;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.config.SetupSection;
 import dev.andre.homecontrol.security.LoginService;
-import dev.andre.homecontrol.web.SetupController;
+import java.net.URI;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.stereotype.Component;
 
-@ControllerAdvice(assignableTypes = SetupController.class)
+@Component
 @ConditionalOnModule(Module.TMDB)
-public class TmdbSetupAdvice {
+public class TmdbSetupSection implements SetupSection {
 
     /** What the setup page shows about TMDB. Never holds a credential. */
     public record View(boolean configured, String credentialKind, boolean needsLoginPassword) {
@@ -19,13 +19,38 @@ public class TmdbSetupAdvice {
     private final ObjectProvider<TmdbSetupService> setup;
     private final ObjectProvider<LoginService> login;
 
-    public TmdbSetupAdvice(ObjectProvider<TmdbSetupService> setup, ObjectProvider<LoginService> login) {
+    public TmdbSetupSection(ObjectProvider<TmdbSetupService> setup, ObjectProvider<LoginService> login) {
         this.setup = setup;
         this.login = login;
     }
 
-    @ModelAttribute("tmdb")
-    public View tmdb() {
+    @Override
+    public String id() {
+        return "tmdb";
+    }
+
+    @Override
+    public String title() {
+        return "Movies & series";
+    }
+
+    @Override
+    public String fragment() {
+        return "fragments/tmdb-setup";
+    }
+
+    @Override
+    public Group group() {
+        return Group.CONTENT_SOURCES;
+    }
+
+    @Override
+    public int order() {
+        return 30;
+    }
+
+    @Override
+    public View view(URI baseUrl) {
         TmdbSetupService service = setup.getIfAvailable();
         LoginService loginService = login.getIfAvailable();
         boolean needsPassword = loginService == null || !loginService.loginRequired();

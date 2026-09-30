@@ -43,7 +43,7 @@
     <nav class="setup-nav" aria-label="Setup sections">
         <p class="eyebrow">SETUP</p>
         <a href="#devices"><span aria-hidden="true">01</span> Devices</a>
-        <a href="#connections" th:if="${jellyfin != null or youtube != null or tmdb != null or sports != null or pinned != null or workflows != null}"><span aria-hidden="true">02</span> Content sources</a>
+        <a href="#connections" th:unless="${sourceSections.isEmpty()}"><span aria-hidden="true">02</span> Content sources</a>
         <a href="#workflows" th:if="${workflows != null}"><span aria-hidden="true">↳</span> Workflows</a>
         <a href="#sources" th:if="${sourcesSetup != null}"><span aria-hidden="true">03</span> Dashboard</a>
         <a href="#account"><span aria-hidden="true">04</span> Account</a>
@@ -224,43 +224,21 @@
         </form>
     </section>
 
-    <th:block th:if="${bluetooth != null}">
-        <section th:replace="~{fragments/bluetooth-setup :: section}"></section>
+    <th:block th:each="section : ${deviceSections}">
+        <section th:replace="~{__${section.fragment()}__ :: section}"></section>
     </th:block>
 
-    <div id="connections" class="setup-category" th:if="${jellyfin != null or youtube != null or tmdb != null or sports != null or pinned != null or workflows != null}">
+    <div id="connections" class="setup-category" th:unless="${sourceSections.isEmpty()}">
         <p class="eyebrow">CONTENT SOURCES</p>
         <h2>All your favorites, together</h2>
         <p>Choose the libraries and services you want to see at home.</p>
         <nav class="source-links" aria-label="Content source settings">
-            <a href="#jellyfin" th:if="${jellyfin != null}">Jellyfin</a>
-            <a href="#youtube" th:if="${youtube != null}">YouTube</a>
-            <a href="#tmdb" th:if="${tmdb != null}">Movies &amp; series</a>
-            <a href="#pinned" th:if="${pinned != null}">Pinned links</a>
-            <a href="#sports" th:if="${sports != null}">Sports</a>
+            <a th:each="section : ${sourceSections}" th:href="|#${section.id()}|" th:text="${section.title()}">Jellyfin</a>
         </nav>
     </div>
 
-    <th:block th:if="${jellyfin != null}">
-        <section th:replace="~{fragments/jellyfin-setup :: section}"></section>
-    </th:block>
-
-    <th:block th:if="${youtube != null}">
-        <section th:replace="~{fragments/youtube-setup :: section}"></section>
-    </th:block>
-
-    <th:block th:if="${tmdb != null}">
-        <section th:replace="~{fragments/tmdb-setup :: section}"></section>
-    </th:block>
-
-    <th:block th:if="${pinned != null}">
-        <section th:replace="~{fragments/pinned-setup :: section}"></section>
-    </th:block>
-
-    <th:block th:if="${workflows != null}"><section th:replace="~{fragments/workflows-setup :: section}"></section></th:block>
-
-    <th:block th:if="${sports != null}">
-        <section th:replace="~{fragments/sports-setup :: section}"></section>
+    <th:block th:each="section : ${sourceSections}">
+        <section th:replace="~{__${section.fragment()}__ :: section}"></section>
     </th:block>
 
     <section th:if="${sourcesSetup != null}" th:replace="~{fragments/sources-setup :: sources(${sourcesSetup})}"></section>

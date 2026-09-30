@@ -2,20 +2,20 @@ package dev.andre.homecontrol.adapters.bluetooth;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.config.SetupSection;
 import dev.andre.homecontrol.core.DeviceQueries;
-import dev.andre.homecontrol.web.SetupController;
+import java.net.URI;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ModelAttribute;
 
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Component;
 
-/** Adds the {@code bluetooth} model attribute to every {@link SetupController} response. */
-@ControllerAdvice(assignableTypes = SetupController.class)
+/** The Bluetooth speakers section of the setup page. */
+@Component
 @ConditionalOnModule(Module.BLUETOOTH)
-public class BluetoothSetupAdvice {
+public class BluetoothSetupSection implements SetupSection {
 
     public record SpeakerRow(String id, String name, String address, String status, String audioDevice) {
     }
@@ -29,7 +29,7 @@ public class BluetoothSetupAdvice {
     private final ObjectProvider<DeviceQueries> devices;
     private final ObjectProvider<BluetoothProperties> properties;
 
-    public BluetoothSetupAdvice(ObjectProvider<BluetoothHostChecks> checks, ObjectProvider<BluetoothPairingService> pairing,
+    public BluetoothSetupSection(ObjectProvider<BluetoothHostChecks> checks, ObjectProvider<BluetoothPairingService> pairing,
                                 ObjectProvider<DeviceQueries> devices, ObjectProvider<BluetoothProperties> properties) {
         this.checks = checks;
         this.pairing = pairing;
@@ -37,8 +37,33 @@ public class BluetoothSetupAdvice {
         this.properties = properties;
     }
 
-    @ModelAttribute("bluetooth")
-    public View bluetooth() {
+    @Override
+    public String id() {
+        return "bluetooth";
+    }
+
+    @Override
+    public String title() {
+        return "Bluetooth speakers";
+    }
+
+    @Override
+    public String fragment() {
+        return "fragments/bluetooth-setup";
+    }
+
+    @Override
+    public Group group() {
+        return Group.DEVICES;
+    }
+
+    @Override
+    public int order() {
+        return 10;
+    }
+
+    @Override
+    public View view(URI baseUrl) {
         BluetoothHostChecks hostChecks = checks.getIfAvailable();
         BluetoothPairingService service = pairing.getIfAvailable();
         DeviceQueries registered = devices.getIfAvailable();

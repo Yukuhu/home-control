@@ -2,23 +2,22 @@ package dev.andre.homecontrol.sources.youtube;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.config.SetupSection;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginService;
-import dev.andre.homecontrol.web.SetupController;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Component;
 
-@ControllerAdvice(assignableTypes = SetupController.class)
+@Component
 @ConditionalOnModule(Module.YOUTUBE)
-public class YouTubeSetupAdvice {
+public class YouTubeSetupSection implements SetupSection {
 
     /** One API call's usage today, e.g. {@code playlistItems.list: 103 calls, 103 units}. */
     public record CallCount(String api, int count, int units) {
@@ -39,20 +38,11 @@ public class YouTubeSetupAdvice {
     /** What the setup page shows about YouTube. Never holds a secret, a device code or a lounge token. */
     public record View(boolean hasClient, boolean connected, boolean revoked, String channelTitle,
                        YouTubeAuthorizationService.Status authorization, boolean needsLoginPassword, QuotaView quota,
-                       boolean watchLater, List<PlaylistOption> playlists, List<LoungeDeviceView> loungeDevices) {
+                       boolean watchLater, List<PlaylistOption> playlists, List<LoungeDeviceView> loungeDevices,
+                       String callbackUrl, boolean browserSupported) {
     }
 
     private static final QuotaView EMPTY_QUOTA = new QuotaView(0, 0, 0, 0, "", List.of());
-
-    @ModelAttribute("youtubeCallbackUrl")
-    public String callbackUrl(HttpServletRequest request) {
-        return YouTubeSetupController.callback(request).toString();
-    }
-
-    @ModelAttribute("youtubeBrowserSupported")
-    public boolean browserSupported(HttpServletRequest request) {
-        return YouTubeOAuthCallback.supported(YouTubeSetupController.callback(request));
-    }
 
     private final ObjectProvider<YouTubeSetupService> setup;
     private final ObjectProvider<LoginService> login;
@@ -60,7 +50,7 @@ public class YouTubeSetupAdvice {
     private final ObjectProvider<YouTubePlaylists> playlists;
     private final ObjectProvider<DeviceQueries> devices;
 
-    public YouTubeSetupAdvice(ObjectProvider<YouTubeSetupService> setup, ObjectProvider<LoginService> login,
+    public YouTubeSetupSection(ObjectProvider<YouTubeSetupService> setup, ObjectProvider<LoginService> login,
                               ObjectProvider<QuotaLedger> ledger, ObjectProvider<YouTubePlaylists> playlists,
                               ObjectProvider<DeviceQueries> devices) {
         this.setup = setup;
@@ -70,20 +60,48 @@ public class YouTubeSetupAdvice {
         this.devices = devices;
     }
 
-    @ModelAttribute("youtube")
-    public View youtube() {
+    @Override
+    public String id() {
+        return "youtube";
+    }
+
+    @Override
+    public String title() {
+        return "YouTube";
+    }
+
+    @Override
+    public String fragment() {
+        return "fragments/youtube-setup";
+    }
+
+    @Override
+    public Group group() {
+        return Group.CONTENT_SOURCES;
+    }
+
+    @Override
+    public int order() {
+        return 20;
+    }
+
+    @Override
+    public View view(URI baseUrl) {
+        URI callback = YouTubeOAuthCallback.uri(baseUrl);
+        String callbackUrl = callback.toString();
+        boolean browserSupported = YouTubeOAuthCallback.supported(callback);
         YouTubeSetupService service = setup.getIfAvailable();
         LoginService loginService = login.getIfAvailable();
         boolean needsPassword = loginService == null || !loginService.loginRequired();
         if (service == null) {
             return new View(false, false, false, null,
                     YouTubeAuthorizationService.Status.of(YouTubeAuthorizationService.State.IDLE, null), needsPassword,
-                    EMPTY_QUOTA, false, List.of(), List.of());
+                    EMPTY_QUOTA, false, List.of(), List.of(), callbackUrl, browserSupported);
         }
         YouTubeSettings settings = service.settings();
         return new View(service.hasClient(), service.connected(), service.revoked(), settings.channelTitle(),
                 service.authorizationStatus(), needsPassword, quota(), settings.watchLater(), playlistOptions(settings),
-                loungeDevices(settings));
+                loungeDevices(settings), callbackUrl, browserSupported);
     }
 
     /** Every registered Cast receiver, in the device list's order. */

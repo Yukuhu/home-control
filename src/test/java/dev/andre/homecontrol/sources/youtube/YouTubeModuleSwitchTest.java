@@ -21,7 +21,7 @@ class YouTubeModuleSwitchTest extends ModulesOffTest {
         assertThat(context.getBeanNamesForType(GoogleOAuthClient.class)).isEmpty();
         assertThat(context.getBeanNamesForType(YouTubeSetupService.class)).isEmpty();
         assertThat(context.getBeanNamesForType(YouTubeSetupController.class)).isEmpty();
-        assertThat(context.getBeanNamesForType(YouTubeSetupAdvice.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(YouTubeSetupSection.class)).isEmpty();
         assertThat(context.getBeansOfType(RouteStrategy.class).values())
                 .noneMatch(strategy -> strategy instanceof RefStrategy<?> ref && ref.type() == YouTubeLoungeRef.class);
 

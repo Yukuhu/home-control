@@ -39,14 +39,14 @@ class WorkflowModuleSwitchTest {
             .withBean(DeviceQueries.class, () -> mock(DeviceQueries.class))
             .withBean(DeviceCommands.class, () -> mock(DeviceCommands.class))
             .withBean(RailPreferences.class, () -> preferences)
-            .withUserConfiguration(WorkflowConfiguration.class, WorkflowSetupController.class, WorkflowSetupAdvice.class, WorkflowTestService.class);
+            .withUserConfiguration(WorkflowConfiguration.class, WorkflowSetupController.class, WorkflowSetupSection.class, WorkflowTestService.class);
 
     @Test void disabledModuleDoesNotReadDefinitionsOrCreateExecutionBeans() {
         context.withPropertyValues("home-control.workflows.enabled=false").run(app -> {
             assertThat(app).doesNotHaveBean(WorkflowStore.class).doesNotHaveBean(WorkflowContentSource.class)
                     .doesNotHaveBean(WorkflowRunner.class).doesNotHaveBean(WorkflowHttpClient.class)
                     .doesNotHaveBean(WorkflowCastRouteExecutor.class).doesNotHaveBean(WorkflowSetupController.class)
-                    .doesNotHaveBean(WorkflowSetupAdvice.class).doesNotHaveBean(WorkflowTestService.class);
+                    .doesNotHaveBean(WorkflowSetupSection.class).doesNotHaveBean(WorkflowTestService.class);
             verifyNoInteractions(secrets);
         });
     }
@@ -126,7 +126,7 @@ class WorkflowModuleSwitchTest {
 class WorkflowDisabledSetupTest extends ModulesOffTest {
     @Test void noEditorAdviceServiceOrRoutesExistWhenModuleIsDisabled() throws Exception {
         assertThat(context.getBeanNamesForType(WorkflowSetupController.class)).isEmpty();
-        assertThat(context.getBeanNamesForType(WorkflowSetupAdvice.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(WorkflowSetupSection.class)).isEmpty();
         assertThat(context.getBeanNamesForType(WorkflowTestService.class)).isEmpty();
         assertThat(context.getBeansOfType(RouteStrategy.class).values())
                 .noneMatch(strategy -> strategy instanceof RefStrategy<?> ref && ref.type() == WorkflowCastRef.class);
