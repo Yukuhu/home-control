@@ -222,7 +222,7 @@ class TheSportsDbScheduleConcurrencyTest {
     }
 
     @Test
-    void aMissingKeyFoundBeforeAKeyChangeLeavesNoError() throws Exception {
+    void aKeyEnteredWhileAPassFoundItMissingIsUsedAtOnce() throws Exception {
         settingsService.update(s -> s.withKeyKind(SportsSettings.KeyKind.PERSONAL));
         CountDownLatch asked = new CountDownLatch(1);
         CountDownLatch answer = new CountDownLatch(1);
@@ -230,14 +230,17 @@ class TheSportsDbScheduleConcurrencyTest {
             asked.countDown();
             answer.await();
             return Optional.empty();
-        });
+        }).willReturn(Optional.of(PERSONAL_KEY));
         Future<FeedResult> pass = pool.submit(schedule::events);
         assertThat(asked.await(10, TimeUnit.SECONDS)).isTrue();
 
         schedule.clear();   // the key was entered again while the pass still thought it missing
         answer.countDown();
-        pass.get(10, TimeUnit.SECONDS);
+        FeedResult result = pass.get(10, TimeUnit.SECONDS);
 
+        assertThat(result.errors()).isEmpty();
+        assertThat(result.succeeded()).isEqualTo(2);
+        assertThat(keysSent()).containsOnly(PERSONAL_KEY);
         assertThat(schedule.status("4331").orElseThrow().error()).isNull();
     }
 
