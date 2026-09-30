@@ -10,7 +10,9 @@ import com.microsoft.playwright.Tracing;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Stream;
 
 /** One Playwright and one browser per kind for the whole JVM; a fresh context per test. */
@@ -72,8 +74,14 @@ public final class Browsers {
         Path trace = Path.of(System.getProperty("e2e.artifacts", "build/e2e-artifacts"),
                 traceName.replaceAll("[^A-Za-z0-9._-]", "_") + "-" + browser + ".zip");
         try {
+            List<String> cspViolations = new CopyOnWriteArrayList<>();
+            context.exposeBinding("__cspViolation", (source, args) -> cspViolations.add((String) args[0]));
+            context.addInitScript("""
+                    document.addEventListener("securitypolicyviolation", (e) => window.__cspViolation(
+                            e.violatedDirective + " " + (e.blockedURI || "inline") + " at " + e.sourceFile + ":" + e.lineNumber));
+                    """);
             Page page = context.newPage();
-            return new BrowserSession(context, page, trace, BrowserCoverage.start(page, browser, trace));
+            return new BrowserSession(context, page, trace, BrowserCoverage.start(page, browser, trace), cspViolations);
         } catch (RuntimeException e) {
             context.close();
             throw e;

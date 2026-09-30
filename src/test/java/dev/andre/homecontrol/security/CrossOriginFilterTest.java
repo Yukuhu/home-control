@@ -123,9 +123,26 @@ class CrossOriginFilterTest {
         assertThat(misdirected.getStatus()).isEqualTo(421);
         for (MockHttpServletResponse response : List.of(allowed, refused, misdirected)) {
             assertThat(response.getHeader("X-Frame-Options")).isEqualTo("DENY");
-            assertThat(response.getHeader("Content-Security-Policy")).isEqualTo("frame-ancestors 'none'");
+            assertThat(response.getHeader("Content-Security-Policy")).isEqualTo(CrossOriginFilter.CONTENT_SECURITY_POLICY);
             assertThat(response.getHeader("X-Content-Type-Options")).isEqualTo("nosniff");
             assertThat(response.getHeader("Referrer-Policy")).isEqualTo("same-origin");
+        }
+    }
+
+    /** No form-action: browsers apply it to the redirect after a form post, which would block YouTube's sign-in hop. */
+    @Test
+    void everyResponseCarriesTheContentSecurityPolicy() throws Exception {
+        MockHttpServletResponse allowed = new MockHttpServletResponse();
+        run(filter, request("GET", "/"), allowed);
+        MockHttpServletResponse refused = new MockHttpServletResponse();
+        run(filter, request("POST", "/setup/forget", "Sec-Fetch-Site", "cross-site"), refused);
+
+        for (MockHttpServletResponse response : List.of(allowed, refused)) {
+            assertThat(response.getHeader("Content-Security-Policy"))
+                    .isEqualTo("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                            + "img-src 'self' data: https:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; "
+                            + "object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
+                    .doesNotContain("form-action");
         }
     }
 
