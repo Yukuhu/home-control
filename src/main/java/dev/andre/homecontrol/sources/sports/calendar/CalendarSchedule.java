@@ -71,6 +71,8 @@ public class CalendarSchedule implements SportsFeed {
     private final AtomicReference<Map<String, SportsEvent>> byItemId = new AtomicReference<>(Map.of());
     /** Set when a pass ends, so a lookup that arrives during the first pass runs one too and joins its downloads. */
     private volatile boolean ranOnce;
+    /** Set when a pass begins: a status shows what is cached rather than wait for a pass that is already running. */
+    private volatile boolean passStarted;
 
     public CalendarSchedule(SportsSettingsService settingsService, CalendarFetcher fetcher, SecretStore secrets,
                             SportsProperties properties, SportsTimeZones zones, Clock clock) {
@@ -94,6 +96,7 @@ public class CalendarSchedule implements SportsFeed {
 
     @Override
     public FeedResult events() {
+        passStarted = true;
         try {
             return pass();
         } finally {
@@ -212,7 +215,7 @@ public class CalendarSchedule implements SportsFeed {
     }
 
     public Optional<FeedStatus> status(String calendarId) {
-        if (!ranOnce) {
+        if (!passStarted) {
             events();
         }
         SportsSettings settings = settingsService.current();

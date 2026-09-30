@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.sports.calendar;
 
 import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.sources.sports.feed.FeedResult;
+import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
 import dev.andre.homecontrol.sources.sports.ics.IcsParser;
 import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
@@ -191,6 +192,19 @@ class CalendarScheduleConcurrencyTest {
         assertThat(result.feeds()).isEqualTo(3);
         assertThat(result.errors()).isEmpty();
         assertThat(result.events()).anyMatch(e -> e.competitionKey().equals("calendar:" + added));
+    }
+
+    @Test
+    void aStatusDuringTheFirstPassDoesNotWaitForIt() throws Exception {
+        server.holdFixture(BUNDESLIGA_PATH, "bundesliga.ics", release);
+        Future<FeedResult> pass = passHeldAt(BUNDESLIGA_PATH, 1);
+
+        Optional<FeedStatus> status = pool.submit(() -> schedule.status(WEEKLY)).get(5, TimeUnit.SECONDS);
+
+        assertThat(status).hasValueSatisfying(s -> assertThat(s.fetchedAt()).isNull());
+        assertThat(pass).isNotDone();
+        release.countDown();
+        pass.get(10, TimeUnit.SECONDS);
     }
 
     @Test

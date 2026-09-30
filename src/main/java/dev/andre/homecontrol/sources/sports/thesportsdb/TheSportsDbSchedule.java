@@ -36,6 +36,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * finds one running waits for it. {@link #lock} guards only short steps: writing a download's outcome, publishing a
  * pass, {@link #forget} and {@link #clear}. Those two advance {@link #generation}, and a download that started under
  * an older generation drops its outcome, so neither a removal nor a new key is undone by a download already running.
+ * Each download reads the key after the generation: a key change stores the key before it clears, so what an old key
+ * fetched is never kept.
  */
 public class TheSportsDbSchedule implements SportsFeed {
 
@@ -60,6 +62,8 @@ public class TheSportsDbSchedule implements SportsFeed {
     private final AtomicLong generation = new AtomicLong();
     /** Set when a pass ends, so a lookup that arrives during the first pass runs one too and joins its downloads. */
     private volatile boolean ranOnce;
+    /** Set when a pass begins: a status shows what is cached rather than wait for a pass that is already running. */
+    private volatile boolean passStarted;
 
     public TheSportsDbSchedule(TheSportsDbClient client, TheSportsDbKeys keys, SportsSettingsService settingsService,
                                SportsProperties properties, SportsTimeZones zones, Clock clock) {
@@ -96,6 +100,7 @@ public class TheSportsDbSchedule implements SportsFeed {
 
     @Override
     public FeedResult events() {
+        passStarted = true;
         try {
             return pass();
         } finally {
@@ -110,26 +115,30 @@ public class TheSportsDbSchedule implements SportsFeed {
         Set<LocalDate> dates = utcDates(now, zone);
         dropUnknownAndOld(settings, dates);
 
-        String key;
+        long started = generation.get();
         try {
-            key = keys.current();
+            // Every download reads the key again; this only finds out before the first one that there is none.
+            keys.current();
         } catch (TheSportsDbException e) {
-            return keyUnavailable(settings, e);
+            return keyUnavailable(settings, e, started);
         }
-        refreshDue(settings.competitions(), dates, new Round(key, now, zone));
+        refreshDue(settings.competitions(), dates, new Round(now, zone));
         return publish(dates);
     }
 
-    /** One {@link #events()} pass: once TheSportsDB rate-limits a request, the rest of the pass stays on the cache. */
+    /**
+     * One {@link #events()} pass: once TheSportsDB rate-limits a request, the rest of the pass stays on the cache, unless
+     * the key has changed since.
+     */
     private static final class Round {
 
-        private final String key;
         private final Instant now;
         private final ZoneId zone;
         private boolean rateLimited;
+        /** The generation the rate limit was met under. */
+        private long limitedUnder;
 
-        Round(String key, Instant now, ZoneId zone) {
-            this.key = key;
+        Round(Instant now, ZoneId zone) {
             this.now = now;
             this.zone = zone;
         }
@@ -145,11 +154,16 @@ public class TheSportsDbSchedule implements SportsFeed {
         errors.keySet().removeIf(leagueId -> !known.contains(leagueId));
     }
 
-    private FeedResult keyUnavailable(SportsSettings settings, TheSportsDbException e) {
+    private FeedResult keyUnavailable(SportsSettings settings, TheSportsDbException e, long started) {
         List<String> errorList = new ArrayList<>();
         for (SportsSettings.CompetitionEntry competition : settings.competitions()) {
-            errors.put(competition.leagueId(), e.getMessage());
             errorList.add(competition.name() + ": " + e.getMessage());
+        }
+        synchronized (lock) {
+            // A key entered since this pass looked makes the error stale.
+            if (generation.get() == started) {
+                settings.competitions().forEach(competition -> errors.put(competition.leagueId(), e.getMessage()));
+            }
         }
         return new FeedResult(List.of(), errorList, settings.competitions().size(), 0);
     }
@@ -173,11 +187,21 @@ public class TheSportsDbSchedule implements SportsFeed {
         if (fresh(entry, round.now)) {
             return;
         }
-        if (!failedRecently(cacheKey, round.now) && !round.rateLimited) {
+        boolean limited = limited(round);
+        if (!failedRecently(cacheKey, round.now) && !limited) {
             fetches.run(cacheKey, () -> fetchIfStillDue(competition, date, cacheKey, round));
-        } else if (round.rateLimited && entry == null) {
-            errors.put(competition.leagueId(), LIMITED);
+        } else if (limited && entry == null) {
+            synchronized (lock) {
+                if (generation.get() == round.limitedUnder) {
+                    errors.put(competition.leagueId(), LIMITED);
+                }
+            }
         }
+    }
+
+    /** Whether this pass met a rate limit under the key still in use. */
+    private boolean limited(Round round) {
+        return round.rateLimited && generation.get() == round.limitedUnder;
     }
 
     private boolean fresh(Entry entry, Instant now) {
@@ -198,7 +222,7 @@ public class TheSportsDbSchedule implements SportsFeed {
             return;
         }
         try {
-            List<JsonNode> raw = client.eventsDay(round.key, date, competition.leagueId());
+            List<JsonNode> raw = client.eventsDay(keys.current(), date, competition.leagueId());
             List<SportsEvent> mapped = new ArrayList<>();
             for (JsonNode node : raw) {
                 TheSportsDbEventMapper.toEvent(node, competition.leagueId(), competition.badge(), round.zone,
@@ -213,16 +237,19 @@ public class TheSportsDbSchedule implements SportsFeed {
                 }
             }
         } catch (TheSportsDbException e) {
+            boolean kept;
             synchronized (lock) {
-                if (generation.get() == started) {
+                kept = generation.get() == started;
+                if (kept) {
                     lastFailure.put(cacheKey, round.now);
                     errors.put(competition.leagueId(), e.getMessage());
                 }
             }
             log.warn("TheSportsDB fixtures for competition {} on {} failed ({})",
                     competition.leagueId(), date, e.kind());
-            if (e.kind() == ContentSourceException.Kind.RATE_LIMITED) {
+            if (kept && e.kind() == ContentSourceException.Kind.RATE_LIMITED) {
                 round.rateLimited = true;
+                round.limitedUnder = started;
             }
         }
     }
@@ -271,7 +298,7 @@ public class TheSportsDbSchedule implements SportsFeed {
     }
 
     public Optional<FeedStatus> status(String leagueId) {
-        if (!ranOnce) {
+        if (!passStarted) {
             events();
         }
         if (settingsService.current().competition(leagueId).isEmpty()) {
