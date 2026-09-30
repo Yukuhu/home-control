@@ -263,6 +263,46 @@ class RailCacheTest {
     }
 
     @Test
+    void aRailRemovedDuringFetchingKeepsItsLastItemsWithAnActionableError() {
+        cache.snapshots();
+        executor.runAll();
+        List<ContentItem> lastItems = a().items();
+        source.failure = new IllegalArgumentException("unknown rail");
+
+        cache.refresh("stub", "a");
+        executor.runAll();
+
+        assertThat(a().status()).isEqualTo(RailStatus.FAILED);
+        assertThat(a().error()).isEqualTo("Stub no longer offers Rail A");
+        assertThat(a().items()).isEqualTo(lastItems);
+        assertThat(a().refreshing()).isFalse();
+    }
+
+    @Test
+    void anInterruptedFetchCanBeStartedAgain() {
+        cache.snapshot("stub", "a");
+        events.clear();
+        Thread.currentThread().interrupt();
+        try {
+            executor.runAll();
+
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            assertThat(events).isEmpty();
+            assertThat(cache.peek()).filteredOn(snapshot -> snapshot.railId().equals("a"))
+                    .singleElement().satisfies(snapshot -> assertThat(snapshot.status()).isEqualTo(RailStatus.LOADING));
+        } finally {
+            Thread.interrupted();
+        }
+
+        cache.refresh("stub", "a");
+        executor.runAll();
+
+        assertThat(a().status()).isEqualTo(RailStatus.READY);
+        assertThat(a().items()).extracting(ContentItem::id).containsExactly("i-1");
+        assertThat(a().refreshing()).isFalse();
+    }
+
+    @Test
     void railsThatDisappearAreDroppedAndLateResultsDiscarded() {
         cache.snapshots();
         source.available = false;

@@ -10,13 +10,16 @@ import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretKeySource;
 import dev.andre.homecontrol.storage.SecretStore;
+import dev.andre.homecontrol.storage.StorageException;
 import java.time.Duration;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.Map;
@@ -49,6 +52,15 @@ class JellyfinSetupServiceTest {
                 Duration.ofSeconds(30)), "0.8.0");
         setup = new JellyfinSetupService(client, sources, secretStore, loginService);
         fake = new FakeJellyfinServer().withConnectableServer();
+    }
+
+    @AfterEach
+    void tearDown() {
+        try {
+            if (client != null) client.close();
+        } finally {
+            if (fake != null) fake.close();
+        }
     }
 
     private JellyfinSetupService.ConnectRequest passwordRequest(String loginPassword, String loginConfirmation) {
@@ -122,6 +134,68 @@ class JellyfinSetupServiceTest {
     }
 
     @Test
+    void aSecretPersistenceFailureRevokesTheNewPasswordToken() throws IOException {
+        preventSecretPersistence();
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
+
+        assertThatThrownBy(() -> setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), request))
+                .isInstanceOf(StorageException.class).hasMessageContaining("Could not write")
+                .hasMessageNotContaining(FakeJellyfinServer.ACCESS_TOKEN).hasMessageNotContaining("user pw");
+
+        assertThat(fake.requests("POST", "/Users/AuthenticateByName")).hasSize(1);
+        assertThat(fake.requests("POST", "/Sessions/Logout")).hasSize(1);
+        assertThat(fake.last("POST", "/Sessions/Logout").header("authorization"))
+                .contains("Token=\"" + FakeJellyfinServer.ACCESS_TOKEN + "\"");
+        assertNoConnectionWasPersisted();
+    }
+
+    @Test
+    void aSecretPersistenceFailureDoesNotRevokeAnExternallyManagedApiKey() throws IOException {
+        preventSecretPersistence();
+        fake.respond("GET", "/Users", 200, "users.json");
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
+        JellyfinSetupService.ConnectRequest connectRequest = new JellyfinSetupService.ConnectRequest(
+                fake.url() + "/", null, JellyfinSettings.AuthMode.API_KEY, "andre", null, "api-key-123",
+                LOGIN_PASSWORD, LOGIN_PASSWORD);
+
+        assertThatThrownBy(() -> setup.connect(connectRequest, request))
+                .isInstanceOf(StorageException.class).hasMessageContaining("Could not write")
+                .hasMessageNotContaining("api-key-123");
+
+        assertThat(fake.requests("GET", "/Users")).hasSize(1);
+        assertThat(fake.last("GET", "/Users").header("authorization")).contains("Token=\"api-key-123\"");
+        assertThat(fake.requests("POST", "/Sessions/Logout")).isEmpty();
+        assertNoConnectionWasPersisted();
+    }
+
+    @Test
+    void aFailedTokenRevocationPreservesTheSecretPersistenceError() throws IOException {
+        preventSecretPersistence();
+        fake.respondJson("POST", "/Sessions/Logout", 500, "{}");
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
+
+        assertThatThrownBy(() -> setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), request))
+                .isInstanceOf(StorageException.class).hasMessageContaining("Could not write");
+
+        assertThat(fake.requests("POST", "/Sessions/Logout")).hasSize(1);
+        assertNoConnectionWasPersisted();
+    }
+
+    private void preventSecretPersistence() throws IOException {
+        // Atomic replacement cannot overwrite a nonempty directory, even when tests run as root.
+        Path secretFile = Files.createDirectory(dir.resolve("secrets.json"));
+        Files.writeString(secretFile.resolve("existing-entry"), "keep");
+    }
+
+    private void assertNoConnectionWasPersisted() {
+        assertThat(setup.settings()).isEmpty();
+        assertThat(setup.connection()).isEmpty();
+        assertThat(secretStore.secret(JellyfinSettings.TOKEN_SECRET)).isEmpty();
+        assertThat(loginService.loginRequired()).isFalse();
+        assertThat(dir.resolve("sources.json")).doesNotExist();
+    }
+
+    @Test
     void anUnknownUserIsNamed() {
         fake.respond("GET", "/Users", 200, "users.json");
         LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
@@ -184,6 +258,22 @@ class JellyfinSetupServiceTest {
         setup.disconnect();
 
         assertThat(setup.settings()).isEmpty();
+    }
+
+    @Test
+    void disconnectDoesNotRevokeAnExternallyManagedApiKey() {
+        fake.respond("GET", "/Users", 200, "users.json");
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
+        setup.connect(new JellyfinSetupService.ConnectRequest(fake.url() + "/", null,
+                JellyfinSettings.AuthMode.API_KEY, "andre", null, "api-key-123", LOGIN_PASSWORD, LOGIN_PASSWORD), request);
+
+        setup.disconnect();
+
+        assertThat(fake.requests("POST", "/Sessions/Logout")).isEmpty();
+        assertThat(setup.settings()).isEmpty();
+        assertThat(setup.connection()).isEmpty();
+        assertThat(secretStore.secret(JellyfinSettings.TOKEN_SECRET)).isEmpty();
+        assertThat(loginService.loginRequired()).isTrue();
     }
 
     @Test

@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /** In-process fake mpv launcher for unit tests: starts real {@link FakeMpv} instances, no subprocess. */
 public final class InProcessMpvLauncher implements MpvLauncher {
@@ -18,6 +19,7 @@ public final class InProcessMpvLauncher implements MpvLauncher {
     public volatile IOException startFailure;
     public volatile Duration startDelay = Duration.ZERO;
     public volatile String version = FakeMpv.VERSION;
+    public volatile Consumer<FakeMpv> beforeServing = fake -> { };
 
     public final List<List<String>> starts = new CopyOnWriteArrayList<>();
     public final List<List<String>> runs = new CopyOnWriteArrayList<>();
@@ -37,6 +39,7 @@ public final class InProcessMpvLauncher implements MpvLauncher {
         FakeStartedProcess process = new FakeStartedProcess(nextPid.getAndIncrement());
         Duration delay = startDelay;
         FakeMpv.Options currentOptions = options;
+        Consumer<FakeMpv> configure = beforeServing;
         Thread.ofVirtual().name("in-process-mpv-" + process.pid()).start(() -> {
             try {
                 simulateLatency(delay);
@@ -52,6 +55,7 @@ public final class InProcessMpvLauncher implements MpvLauncher {
             try (FakeMpv fake = FakeMpv.serve(socket, currentOptions, volume, line -> { }, started -> {
                 process.attach(started);
                 players.add(started);
+                configure.accept(started);
             })) {
                 fake.awaitQuit();
                 // A real OS process's exit is detected with some latency (a reaper thread, waitpid);
