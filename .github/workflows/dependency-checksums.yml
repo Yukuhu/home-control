@@ -1,0 +1,77 @@
+name: Review dependency checksums
+
+on:
+  pull_request:
+    paths:
+      - '**/*.gradle.kts'
+      - 'gradle/**'
+
+# Dependabot cannot update verification metadata. Prepare a candidate for a human to
+# review; ordinary CI still requires the reviewed checksums to be committed.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  candidate:
+    name: Prepare checksums for review
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DEPENDENCY_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Use a fresh dependency cache
+        # These downloads are unreviewed and must not reach strict CI.
+        run: echo "GRADLE_USER_HOME=$RUNNER_TEMP/gradle-checksum-review" >> "$GITHUB_ENV"
+
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          cache-disabled: true
+
+      # This preview can test the update, but it does not approve or commit its hashes.
+      - name: Generate candidate checksums and test the update
+        run: ./gradlew --no-daemon --write-verification-metadata sha256 build e2eClasses
+
+      - name: Prepare the review patch
+        id: patch
+        # Gradle can write useful metadata even when compilation or tests fail.
+        if: always()
+        shell: bash
+        run: |
+          if git diff --quiet -- gradle/verification-metadata.xml; then
+            echo "No checksum changes were generated. Check the build result above." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/checksum-review"
+          git diff -- gradle/verification-metadata.xml > "$RUNNER_TEMP/checksum-review/verification-metadata.patch"
+          printf '%s\n' "$DEPENDENCY_HEAD" > "$RUNNER_TEMP/checksum-review/head-sha.txt"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          {
+            printf 'Candidate checksums for commit `%s`.\n\n' "$DEPENDENCY_HEAD"
+            echo 'Download the artifact, compare every new checksum with fresh official artifacts, and commit the reviewed patch to this PR.'
+            echo 'For protobuf updates, also add the other published protoc platform checksums.'
+            echo 'See docs/dev/testing.md#dependabot-updates for the commands. Strict CI stays required and does not use this candidate.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload candidate checksums
+        if: always() && steps.patch.outputs.changed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dependency-checksums-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/checksum-review/
+          if-no-files-found: error
+          retention-days: 14

@@ -88,13 +88,42 @@ scripts/gradle.sh --write-verification-metadata sha256 build e2eClasses
 
 Review the diff and compare the new checksums with fresh artifacts from Maven Central or the Gradle Plugin
 Portal before committing them. Generation trusts the artifacts it finds, including the local cache; it does
-not establish that those artifacts are authentic. Keep checksum generation out of normal builds and CI, which
-must enforce the committed metadata.
+not establish that those artifacts are authentic. Normal builds and required CI enforce the committed
+metadata; generation is only a preparation step for review.
 
 The metadata also covers the published `protoc` executables for Linux, macOS and Windows. When upgrading
 protobuf, update those platform checksums too: generation on one machine discovers only its own compiler.
 Run generation on the other platforms, or download their compiler artifacts from Maven Central and calculate
 their SHA-256 checksums. Run `scripts/gradle.sh build` again without the generation flag to check enforcement.
+
+### Dependabot updates
+
+Dependabot does not update Gradle verification metadata
+([upstream request](https://github.com/dependabot/dependabot-core/issues/1996)). A dependency update therefore
+needs a maintainer to review and commit its new checksums before strict CI can pass.
+
+The `Review dependency checksums` workflow runs on Dependabot PRs that change the Gradle build or catalog.
+It checks out the PR's exact head commit, downloads into a fresh cache, generates candidate metadata and runs
+the build and test compilation. It uploads a patch and the head SHA as an artifact, including when tests fail
+after metadata generation. This job has a read-only token, saves no dependency cache, and does not commit or
+approve the checksums. Its result does not replace the required `CI passed` check.
+
+To complete an update:
+
+1. Check out the Dependabot PR with `gh pr checkout <number>` and download the matching workflow artifact
+   with `gh run download <run-id> --name dependency-checksums-<number>-<head-sha> --dir /tmp/checksum-review`.
+2. Confirm `git rev-parse HEAD` matches the artifact's `head-sha.txt`. If Dependabot rebased the PR, use the
+   new run instead. Read `verification-metadata.patch` and compare every new checksum with fresh Maven
+   Central or Gradle Plugin Portal artifacts. Investigate any added checksum for an already trusted artifact.
+3. After review, run `git apply --check /tmp/checksum-review/verification-metadata.patch`, then
+   `git apply /tmp/checksum-review/verification-metadata.patch`. For protobuf updates, add the other
+   published `protoc` platform checksums as described above.
+4. Run `scripts/gradle.sh build` without the generation flag, commit only the reviewed metadata, and push
+   the commit to the dependency PR. The normal CI run now verifies it and must pass before merging.
+
+You can also generate the candidate locally with the command above. Never add the generation flag to the
+normal CI jobs or automatically commit this workflow's downloads: neither would verify newly fetched bytes
+against a previously reviewed value.
 
 ## Fakes and fixtures
 
