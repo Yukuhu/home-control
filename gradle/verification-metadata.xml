@@ -97,12 +97,25 @@
             <sha256 value="3851df627faeb46887b956104630b74a8bbb5f7de22e974cf15982e20e0373de" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="com.fasterxml.jackson" name="jackson-parent" version="2.22">
+         <artifact name="jackson-parent-2.22.pom">
+            <sha256 value="7d45a7efb69df207bed7cc54b87a0bb012f10952c095570a273b49485da0d129" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
       <component group="com.fasterxml.jackson.core" name="jackson-annotations" version="2.21">
          <artifact name="jackson-annotations-2.21.jar">
             <sha256 value="53ca085f4a150f703f49e1aabd935bd03b43e1ea3d55d135438292af22cef56b" origin="Verified against Maven Central" />
          </artifact>
          <artifact name="jackson-annotations-2.21.module">
             <sha256 value="cae8ffecec3328b6ecbb138e274218f2fe1c7729a0e824da559268810095ad44" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.fasterxml.jackson.core" name="jackson-annotations" version="2.22">
+         <artifact name="jackson-annotations-2.22.jar">
+            <sha256 value="21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="jackson-annotations-2.22.module">
+            <sha256 value="3d22704448e98dfd578c5df5646dd0a98aec04080b08a3245cf8beb8a25dcb5d" origin="Verified against Maven Central" />
          </artifact>
       </component>
       <component group="com.github.hypfvieh" name="bluez-dbus" version="0.3.5">
@@ -1875,6 +1888,11 @@
             <sha256 value="7285af7629720e24db11084bc5a89cb7af4d4d35339e7163902958a5cdfd10fe" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="tools.jackson" name="jackson-base" version="3.2.3">
+         <artifact name="jackson-base-3.2.3.pom">
+            <sha256 value="8f7ce73ab560fb52c545c44876ae602f18ebabd18217ab2746f17f65acb6da29" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
       <component group="tools.jackson" name="jackson-bom" version="3.1.5">
          <artifact name="jackson-bom-3.1.5.pom">
             <sha256 value="14fdbdcbb6a6023cadbffaadc878d66c5cf94f51c8162b9ffefc257e742412f4" origin="Verified against Maven Central" />
@@ -1885,6 +1903,11 @@
             <sha256 value="26c28ddf86ee17de2da550e0e8e88a14ed22370c880d813c88618df5f67e27ff" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="tools.jackson" name="jackson-bom" version="3.2.3">
+         <artifact name="jackson-bom-3.2.3.pom">
+            <sha256 value="ad181b150b3f22bcf8ead7227d51ccc09e610c457c8bcc97d8958d2439ef16ec" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
       <component group="tools.jackson.core" name="jackson-core" version="3.1.7">
          <artifact name="jackson-core-3.1.7.jar">
             <sha256 value="7608c367fd8a92666d28711519599543c180298259963184ce04d2947a8f71e7" origin="Verified against Maven Central" />
@@ -1893,12 +1916,28 @@
             <sha256 value="e24a6c9226e14019dde799c55cec01463a9c53a5cd9a4d25508d88556c463c6a" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="tools.jackson.core" name="jackson-core" version="3.2.3">
+         <artifact name="jackson-core-3.2.3.jar">
+            <sha256 value="a0c17e7e665a5e95c82f5fb45c0fec2ae3dc556c80f0016452c9c84cd23f3817" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="jackson-core-3.2.3.module">
+            <sha256 value="cdac5e5ac0110f41330ce4e1fa3f0bcdd6e795acd58b8458b702771472c5ea4a" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
       <component group="tools.jackson.core" name="jackson-databind" version="3.1.7">
          <artifact name="jackson-databind-3.1.7.jar">
             <sha256 value="48c781de87e2016e1f0d973748a27130f11643e7ac080173f40e2d9669d84be3" origin="Verified against Maven Central" />
          </artifact>
          <artifact name="jackson-databind-3.1.7.module">
             <sha256 value="7e2a1aebbb0c2358cc49cbd121e678ae6fe2f48d715d779d5c8271d54d86d01a" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="tools.jackson.core" name="jackson-databind" version="3.2.3">
+         <artifact name="jackson-databind-3.2.3.jar">
+            <sha256 value="235b72436af983857e44efa42449f4f0a2c571e69d6c5d9dd1253ae7d192dcf2" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="jackson-databind-3.2.3.module">
+            <sha256 value="6cada451bdcc655bb877050a1094b7aca3cf4edb5812b6c8f4a7e644b756dabf" origin="Verified against Maven Central" />
          </artifact>
       </component>
    </components>
