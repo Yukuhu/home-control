@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -22,7 +23,7 @@ import java.util.Set;
 public class LoungeClient {
 
     public static final String NAME = "Home Control";
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final JsonMapper MAPPER = Json.MAPPER;
 
     /** A bound remote-control session. Its ids are credentials for that screen: never printed. */
     public record LoungeSession(String sid, String gsessionId, long lastEventId) {

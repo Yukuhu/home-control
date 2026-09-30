@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.storage;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.DeviceSecrets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +56,7 @@ public class SecretStore implements DeviceSecrets {
     private static final int MAX_VALUE_CHARS = 16_384;
     private static final int MAX_KDF_MEMORY_KIB = 262_144;
 
-    private final JsonMapper mapper = JsonMapper.builder().build();
+    private final JsonMapper mapper = Json.MAPPER;
     private final Path file;
     private final SecretKeySource keys;
     private final SecureRandom random;

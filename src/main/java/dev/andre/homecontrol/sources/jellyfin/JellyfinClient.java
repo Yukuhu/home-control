@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.http.GuardedHttpClient;
 import dev.andre.homecontrol.sources.http.HttpUrls;
@@ -48,7 +49,7 @@ public class JellyfinClient implements AutoCloseable {
     private final GuardedHttpClient http;
     private final JellyfinProperties properties;
     private final String version;
-    private final JsonMapper mapper = JsonMapper.builder().build();
+    private final JsonMapper mapper = Json.MAPPER;
 
     public JellyfinClient(JellyfinProperties properties) {
         this(properties, Optional.ofNullable(JellyfinClient.class.getPackage().getImplementationVersion()).orElse("0.0.0"));

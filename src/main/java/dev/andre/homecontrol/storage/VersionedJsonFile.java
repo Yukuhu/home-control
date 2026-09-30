@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.storage;
 
+import dev.andre.homecontrol.config.Json;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -25,7 +26,7 @@ public final class VersionedJsonFile<T> {
 
     private static final String VERSION_FIELD = "version";
     private static final String JSON = ".json";
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final JsonMapper MAPPER = Json.MAPPER;
 
     private final Path file;
     private final String description;

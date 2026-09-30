@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.http.GuardedHttpClient;
 import dev.andre.homecontrol.sources.http.HttpUrls;
@@ -29,7 +30,7 @@ public class YouTubeHttp implements AutoCloseable {
     private static final int MAX_CONCURRENT = 16;
     private static final HttpUrls.Rules GOOGLE_URLS = new HttpUrls.Rules(true, false, true, false, 0);
 
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final JsonMapper MAPPER = Json.MAPPER;
 
     /** An HTTP answer; compared by its body's content, and printed with the body's size only. */
     public record Response(int status, String contentType, byte[] body) {

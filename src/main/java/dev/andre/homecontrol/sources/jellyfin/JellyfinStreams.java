@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -23,7 +24,7 @@ public class JellyfinStreams {
     private static final String AUDIO = "Audio";
 
     static final long MAX_BITRATE = 120_000_000L;
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final JsonMapper MAPPER = Json.MAPPER;
     private static final Map<String, String> VIDEO_TYPES = Map.of("mp4", "video/mp4", "m4v", "video/mp4", "webm", "video/webm");
     private static final Map<String, String> AUDIO_TYPES = Map.of("mp3", "audio/mpeg", "m4a", "audio/mp4", "mp4", "audio/mp4",
             "flac", "audio/flac", "ogg", "audio/ogg", "webm", "audio/webm");

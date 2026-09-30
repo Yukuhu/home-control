@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.device;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.storage.VersionedJsonFile;
@@ -25,7 +26,7 @@ public class JsonFileDeviceRegistry implements DeviceRegistry {
     private static final int VERSION = 3;
     private static final String DEVICES = "devices";
     private static final String ADAPTERS = "adapters";
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final JsonMapper MAPPER = Json.MAPPER;
 
     private final VersionedJsonFile<List<Device>> file;
 

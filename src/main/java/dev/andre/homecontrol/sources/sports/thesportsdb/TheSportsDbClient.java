@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.http.GuardedHttpClient;
 import dev.andre.homecontrol.sources.http.HttpUrls;
@@ -36,7 +37,7 @@ public class TheSportsDbClient implements AutoCloseable {
     private static final int MAX_CONCURRENT = 8;
     private static final HttpUrls.Rules API_URLS = new HttpUrls.Rules(true, false, true, false, 0);
     private static final Pattern KEY = Pattern.compile("^[A-Za-z0-9]{1,64}$");
-    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final JsonMapper JSON = Json.MAPPER;
 
     private final SportsProperties.TheSportsDb properties;
     private final GuardedHttpClient http;
