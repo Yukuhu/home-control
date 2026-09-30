@@ -34,6 +34,8 @@ public class JellyfinClient implements AutoCloseable {
     private static final String APPLICATION_JSON = "application/json";
 
     static final String CLIENT_NAME = "Home Control";
+    /** How messages name this source. */
+    private static final String NAME = "Jellyfin";
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9-]{1,64}");
     private static final Pattern SERVER_VERSION_PATTERN = Pattern.compile("^(\\d+)\\.(\\d+)");
     /** A generous cap on any Jellyfin JSON answer; a well-behaved server never comes close. */
@@ -47,26 +49,24 @@ public class JellyfinClient implements AutoCloseable {
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
 
     private final GuardedHttpClient http;
-    private final JellyfinProperties properties;
     private final String version;
-    private final JsonMapper mapper = Json.MAPPER;
+    private static final JsonMapper MAPPER = Json.MAPPER;
 
     public JellyfinClient(JellyfinProperties properties) {
         this(properties, Optional.ofNullable(JellyfinClient.class.getPackage().getImplementationVersion()).orElse("0.0.0"));
     }
 
     JellyfinClient(JellyfinProperties properties, String version) {
-        this.properties = properties;
         this.version = version;
         // Jellyfin often runs on this machine, so loopback is allowed. Redirects are refused: they would replay the
         // Authorization header.
-        this.http = new GuardedHttpClient(new GuardedHttpClient.Profile("Jellyfin", GuardedHttpClient.Redirects.NONE,
+        this.http = new GuardedHttpClient(new GuardedHttpClient.Profile(NAME, GuardedHttpClient.Redirects.NONE,
                 0, MAX_JSON_BYTES, properties.connectTimeout(), properties.requestTimeout(), MAX_CONCURRENT, SERVER_URLS),
                 new OutboundAddressPolicy(true), JellyfinClient::failure);
     }
 
     private static JellyfinException failure(OutboundFailure failure) {
-        String message = failure.describe("Jellyfin");
+        String message = failure.describe(NAME);
         return new JellyfinException(failure.kind(), failure.kind() == ContentSourceException.Kind.UNREACHABLE
                 ? message + ". Check the address and that Home Control can reach it." : message);
     }
@@ -123,12 +123,12 @@ public class JellyfinClient implements AutoCloseable {
     }
 
     public JsonNode authenticateByName(URI serverUrl, String deviceId, String userName, String password) {
-        ObjectNode body = mapper.createObjectNode();
+        ObjectNode body = MAPPER.createObjectNode();
         body.put("Username", userName);
         body.put("Pw", password);
         try {
             return send(serverUrl, signed(OutboundRequest.post(uri(serverUrl, "/Users/AuthenticateByName", Map.of()),
-                    mapper.writeValueAsBytes(body), APPLICATION_JSON), deviceId, null));
+                    MAPPER.writeValueAsBytes(body), APPLICATION_JSON), deviceId, null));
         } catch (JellyfinException e) {
             if (e.kind() == ContentSourceException.Kind.UNAUTHORIZED) {
                 throw new JellyfinException(ContentSourceException.Kind.UNAUTHORIZED, "Jellyfin rejected the user name or password");
@@ -146,7 +146,7 @@ public class JellyfinClient implements AutoCloseable {
     public JsonNode post(JellyfinConnection connection, String path, Map<String, String> query, JsonNode body) {
         OutboundRequest request = body == null
                 ? OutboundRequest.post(uri(connection.serverUrl(), path, query), new byte[0], null)
-                : OutboundRequest.post(uri(connection.serverUrl(), path, query), mapper.writeValueAsBytes(body), APPLICATION_JSON);
+                : OutboundRequest.post(uri(connection.serverUrl(), path, query), MAPPER.writeValueAsBytes(body), APPLICATION_JSON);
         return send(connection.serverUrl(), signed(request, connection.deviceId(), connection.token()));
     }
 
@@ -248,7 +248,7 @@ public class JellyfinClient implements AutoCloseable {
 
     private JsonNode parse(URI serverUrl, byte[] bytes) {
         try {
-            return mapper.readTree(bytes);
+            return MAPPER.readTree(bytes);
         } catch (JacksonException _) {
             throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an unreadable answer");
         }
