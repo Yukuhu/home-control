@@ -47,7 +47,7 @@ public class TheSportsDbSchedule implements SportsFeed {
     private record Entry(List<SportsEvent> events, Instant fetchedAt) {
     }
 
-    /** A day's last failed download: when, whether TheSportsDB was limiting requests, and under which key generation. */
+    /** A day's last failed download: when, whether TheSportsDB was limiting requests, and under which generation. */
     private record Failure(Instant at, boolean rateLimited, long generation) {
     }
 
@@ -127,17 +127,14 @@ public class TheSportsDbSchedule implements SportsFeed {
             return keyUnavailable(settings, e, started);
         }
         refreshDue(settings.competitions(), dates, new Round(now, zone));
-        if (generation.get() != started) {
-            // A key change cleared what this pass had fetched, and the refresh it asks for is skipped while this one
-            // runs: start over with the new key.
-            return pass();
-        }
-        return publish(dates);
+        // A key change clears what this pass fetched, and the refresh it asks for is skipped while this one runs: a
+        // pass that a key change overtook starts over with the new key instead of publishing.
+        return publish(dates, started).orElseGet(this::pass);
     }
 
     /**
-     * One {@link #events()} pass: once TheSportsDB rate-limits a request, the rest of the pass stays on the cache, unless
-     * the key has changed since.
+     * One {@link #events()} pass: once TheSportsDB rate-limits a request, the rest of the pass stays on the cache,
+     * unless the key has changed since.
      */
     private static final class Round {
 
@@ -278,9 +275,16 @@ public class TheSportsDbSchedule implements SportsFeed {
         }
     }
 
-    /** The result for the competitions configured now, from the cache. */
-    private FeedResult publish(Set<LocalDate> dates) {
+    /**
+     * The result for the competitions configured now, from the cache; empty when a key change came since
+     * {@code started}.
+     */
+    private Optional<FeedResult> publish(Set<LocalDate> dates, long started) {
         synchronized (lock) {
+            // Checked in the same step as the cache is read, so a key change either waits for this or is seen here.
+            if (generation.get() != started) {
+                return Optional.empty();
+            }
             SportsSettings settings = settingsService.current();
             List<String> errorList = new ArrayList<>();
             List<SportsEvent> allEvents = new ArrayList<>();
@@ -302,7 +306,7 @@ public class TheSportsDbSchedule implements SportsFeed {
                     errorList.add(competition.name() + ": " + competitionError);
                 }
             }
-            return new FeedResult(allEvents, errorList, settings.competitions().size(), succeeded);
+            return Optional.of(new FeedResult(allEvents, errorList, settings.competitions().size(), succeeded));
         }
     }
 
