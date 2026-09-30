@@ -4,16 +4,14 @@ import com.github.hypfvieh.bluetooth.wrapper.BluetoothAdapter;
 import com.github.hypfvieh.bluetooth.wrapper.BluetoothDevice;
 import org.bluez.Adapter1;
 import org.bluez.Device1;
-import org.bluez.exceptions.BluezAlreadyConnectedException;
-import org.bluez.exceptions.BluezAlreadyExistsException;
-import org.bluez.exceptions.BluezInProgressException;
-import org.bluez.exceptions.BluezNotConnectedException;
 import org.freedesktop.dbus.DBusPath;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
 import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.exceptions.DBusExecutionException;
 import org.freedesktop.dbus.interfaces.ObjectManager;
+import org.freedesktop.dbus.messages.Error;
+import org.freedesktop.dbus.messages.Message;
 import org.freedesktop.dbus.messages.MethodCall;
 import org.freedesktop.dbus.types.Variant;
 import org.slf4j.Logger;
@@ -89,13 +87,10 @@ public final class DbusBluezClient implements BluezClient {
     @Override
     public List<BluetoothDeviceInfo> discover(String adapterAddress, Duration duration) throws BluezException {
         Adapter1 adapter = call("start scanning", connection -> {
-            Adapter1 remote = connection.getRemoteObject(BLUEZ, adapterPath(managedObjects(connection), adapterAddress), Adapter1.class);
-            try {
-                remote.StartDiscovery();
-            } catch (BluezInProgressException _) {
-                // another client (bluetoothctl, a desktop) is scanning: the results are shared
-            }
-            return remote;
+            String path = adapterPath(managedObjects(connection), adapterAddress);
+            // Another client (bluetoothctl, a desktop) may already be scanning; the results are shared.
+            invoke(connection, path, ADAPTER_INTERFACE, "StartDiscovery", "InProgress");
+            return connection.getRemoteObject(BLUEZ, path, Adapter1.class);
         });
         try {
             Thread.sleep(duration.toMillis());
@@ -135,11 +130,7 @@ public final class DbusBluezClient implements BluezClient {
     @Override
     public void pair(String adapterAddress, String address) throws BluezException {
         call("pair " + address, connection -> {
-            try {
-                device1(connection, adapterAddress, address).Pair();
-            } catch (BluezAlreadyExistsException _) {
-                // paired before
-            }
+            invoke(connection, devicePath(connection, adapterAddress, address), DEVICE_INTERFACE, "Pair", "AlreadyExists");
             return null;
         });
     }
@@ -160,11 +151,7 @@ public final class DbusBluezClient implements BluezClient {
     @Override
     public void connect(String adapterAddress, String address) throws BluezException {
         call("connect " + address, connection -> {
-            try {
-                device1(connection, adapterAddress, address).Connect();
-            } catch (BluezAlreadyConnectedException _) {
-                // fine
-            }
+            invoke(connection, devicePath(connection, adapterAddress, address), DEVICE_INTERFACE, "Connect", "AlreadyConnected");
             return null;
         });
     }
@@ -172,11 +159,7 @@ public final class DbusBluezClient implements BluezClient {
     @Override
     public void disconnect(String adapterAddress, String address) throws BluezException {
         call("disconnect " + address, connection -> {
-            try {
-                device1(connection, adapterAddress, address).Disconnect();
-            } catch (BluezNotConnectedException _) {
-                // fine
-            }
+            invoke(connection, devicePath(connection, adapterAddress, address), DEVICE_INTERFACE, "Disconnect", "NotConnected");
             return null;
         });
     }
@@ -269,12 +252,27 @@ public final class DbusBluezClient implements BluezClient {
                 .findFirst();
     }
 
-    private static Device1 device1(DBusConnection connection, String adapterAddress, String address)
+    private static String devicePath(DBusConnection connection, String adapterAddress, String address)
             throws DBusException, BluezException {
         Map<DBusPath, Map<String, Map<String, Variant<?>>>> objects = managedObjects(connection);
-        String path = devicePath(objects, adapterPath(objects, adapterAddress), address)
+        return devicePath(objects, adapterPath(objects, adapterAddress), address)
                 .orElseThrow(() -> new BluezException(BluezFailure.NOT_FOUND, BluezFailures.message(BluezFailure.NOT_FOUND, address)));
-        return connection.getRemoteObject(BLUEZ, path, Device1.class);
+    }
+
+    private static void invoke(DBusConnection connection, String path, String interfaceName, String method, String benignError)
+            throws DBusException {
+        // bluez-dbus declares checked exceptions which dbus-java cannot reconstruct. Keep the wire error name
+        // before Error.getException() replaces it with a generic runtime exception.
+        MethodCall request = connection.getMessageFactory().createMethodCall(BLUEZ, path, interfaceName, method, (byte) 0, null);
+        connection.sendMessage(request);
+        Message reply = request.getReply();
+        if (reply == null) {
+            throw new DBusExecutionException("org.freedesktop.DBus.Error.NoReply: no reply to " + method);
+        }
+        if (reply instanceof Error error && !(BLUEZ + ".Error." + benignError).equals(error.getName())) {
+            DBusExecutionException cause = error.getException();
+            throw new DBusExecutionException(error.getName() + ": " + cause.getMessage(), cause);
+        }
     }
 
     private static BluetoothDeviceInfo device(Map<String, Variant<?>> properties) {
