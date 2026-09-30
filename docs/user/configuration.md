@@ -41,8 +41,10 @@ Every setting, as a Spring property or an environment variable.
 | `home-control.youtube.searches-per-day` | `20` | On-demand searches allowed per day (100 quota units each) |
 | `home-control.youtube.channels-per-refresh` | `30` | Subscribed channels read per subscriptions refresh |
 | `home-control.youtube.refresh-interval` | `60m` | How often every YouTube rail (subscriptions, Watch Later, chosen playlists) refreshes in the background |
+| `home-control.youtube.allow-loopback` | `false` | Allow YouTube and Google sign-in to reach this machine's own address, for a mirror served here (`HOME_CONTROL_YOUTUBE_ALLOW_LOOPBACK`) |
 | `HOME_CONTROL_TMDB_ENABLED` | `true` | Turn the TMDB module off entirely |
 | `HOME_CONTROL_TMDB_API_BASE_URL` | `https://api.themoviedb.org/3` | TMDB API base URL |
+| `HOME_CONTROL_TMDB_ALLOW_LOOPBACK` | `false` | Allow TMDB to reach this machine's own address, for an API mirror served here |
 | `HOME_CONTROL_TMDB_IMAGE_BASE_URL` | discovered from TMDB's `/configuration` | Override the poster CDN, e.g. with a mirror, for privacy |
 | `HOME_CONTROL_TMDB_PROVIDER_IDS_NETFLIX` | `8,1796` | TMDB watch-provider ids counted as Netflix |
 | `HOME_CONTROL_TMDB_PROVIDER_IDS_PRIMEVIDEO` | `9,119,2100` | TMDB watch-provider ids counted as Prime Video |
@@ -63,6 +65,7 @@ Every setting, as a Spring property or an environment variable.
 | `HOME_CONTROL_SPORTS_CALENDAR_ALLOW_LOOPBACK` | `false` | Allow calendar links that resolve to this machine's own address (only if a calendar is served here) |
 | `HOME_CONTROL_SPORTS_THESPORTSDB_ENABLED` | `true` | Turn TheSportsDB fixtures off; calendars keep working |
 | `HOME_CONTROL_SPORTS_THESPORTSDB_API_BASE_URL` | `https://www.thesportsdb.com/api/v1/json` | TheSportsDB API base URL |
+| `HOME_CONTROL_SPORTS_THESPORTSDB_ALLOW_LOOPBACK` | `false` | Allow TheSportsDB to reach this machine's own address, for an API mirror served here |
 | `HOME_CONTROL_SPORTS_THESPORTSDB_FIXTURES_TTL` | `24h` | How long a competition's daily fixtures are cached |
 | `home-control.bluetooth.enabled` | `false` | Bluetooth speaker module |
 | `home-control.bluetooth.dbus-address` | `unix:path=/run/dbus/system_bus_socket` | Host D-Bus system bus |
