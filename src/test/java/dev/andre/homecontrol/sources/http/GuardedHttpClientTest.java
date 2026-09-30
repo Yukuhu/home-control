@@ -542,4 +542,16 @@ class GuardedHttpClientTest {
             assertThat(Duration.ofNanos(System.nanoTime() - sent)).isGreaterThan(Duration.ofMillis(300));
         }
     }
+
+    /** Jellyfin's session commands post nothing; the JDK client sent no content type for them, and neither do we. */
+    @Test
+    void aPostWithoutAContentTypeSendsNone() {
+        server.respond("POST", "/command", Response.empty(204));
+        try (var client = client(Redirects.NONE)) {
+            client.send(OutboundRequest.post(at("source.test", "/command"), new byte[0], null));
+        }
+
+        assertThat(server.last("POST", "/command").headers()).doesNotContainKey("content-type");
+        assertThat(server.last("POST", "/command").body()).isEmpty();
+    }
 }

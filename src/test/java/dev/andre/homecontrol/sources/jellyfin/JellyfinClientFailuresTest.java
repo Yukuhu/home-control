@@ -1,6 +1,8 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.testsupport.FakeHttpServer;
+import dev.andre.homecontrol.testsupport.Response;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 /** How transport failures and unusable answers are named, and how an {@link JellyfinClient.Image} compares. */
 class JellyfinClientFailuresTest {
@@ -55,7 +58,7 @@ class JellyfinClientFailuresTest {
             assertThatThrownBy(() -> client.get(connection(server), "/x", Map.of()))
                     .isInstanceOfSatisfying(JellyfinException.class,
                             e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.UNREACHABLE))
-                    .hasMessageContaining("(no answer in time)");
+                    .hasMessageContaining("(request timed out)");
         }
     }
 
@@ -76,7 +79,7 @@ class JellyfinClientFailuresTest {
             assertThatThrownBy(() -> client.image(server, "abc", "Primary", null, 480))
                     .isInstanceOfSatisfying(JellyfinException.class,
                             e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.UNREACHABLE))
-                    .hasMessageStartingWith("Could not reach Jellyfin at " + server + " (");
+                    .hasMessageStartingWith("Could not reach Jellyfin at 127.0.0.1 (");
         }
     }
 
@@ -89,7 +92,7 @@ class JellyfinClientFailuresTest {
                 assertThatThrownBy(() -> client.publicInfo(server))
                         .isInstanceOfSatisfying(JellyfinException.class,
                                 e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.UNREACHABLE))
-                        .hasMessageContaining("(interrupted)");
+                        .hasMessageContaining("(request interrupted)");
                 assertThat(Thread.currentThread().isInterrupted()).isTrue();
             } finally {
                 Thread.interrupted();
@@ -109,5 +112,33 @@ class JellyfinClientFailuresTest {
                 .hasToString("Image[contentType=image/jpeg, bytes=3 bytes]");
         assertThat(new JellyfinClient.Image("image/png", null)).hasToString("Image[contentType=image/png, bytes=none]")
                 .isEqualTo(new JellyfinClient.Image("image/png", null));
+    }
+
+    @Test
+    void noFailureRevealsTheTokenOrThePath() throws IOException {
+        int closedPort;
+        try (var socket = new ServerSocket(0)) {
+            closedPort = socket.getLocalPort();
+        }
+        try (FakeHttpServer server = FakeHttpServer.start()) {
+            server.respond("GET", "/secret-path/large", Response.of(200, "application/json", "x".repeat(2 * 1024 * 1024 + 1)));
+            server.respond("GET", "/secret-path/gzip", Response.of(200, "application/json", "{}").withHeader("Content-Encoding", "gzip"));
+            server.trickle("GET", "/secret-path/slow");
+            var secret = new JellyfinConnection(server.url(), "secret-token", "dev", "user");
+            var closed = new JellyfinConnection(URI.create("http://127.0.0.1:" + closedPort), "secret-token", "dev", "user");
+            for (Runnable call : new Runnable[] {
+                    () -> client.get(secret, "/secret-path/large", Map.of("q", "secret-query")),
+                    () -> client.get(secret, "/secret-path/gzip", Map.of("q", "secret-query")),
+                    () -> client.get(secret, "/secret-path/slow", Map.of("q", "secret-query")),
+                    () -> client.get(closed, "/secret-path/x", Map.of("q", "secret-query"))}) {
+                JellyfinException failure = catchThrowableOfType(JellyfinException.class, call::run);
+
+                assertThat(failure).hasNoCause();
+                assertThat(failure.getMessage()).doesNotContain("secret");
+            }
+            assertThat(catchThrowableOfType(JellyfinException.class,
+                    () -> client.get(closed, "/x", Map.of()))).hasMessageEndingWith(
+                    ". Check the address and that Home Control can reach it.");
+        }
     }
 }

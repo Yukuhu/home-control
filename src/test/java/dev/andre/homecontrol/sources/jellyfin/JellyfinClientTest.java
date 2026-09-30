@@ -13,6 +13,7 @@ import java.net.URI;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JellyfinClientTest {
@@ -170,7 +171,7 @@ class JellyfinClientTest {
                 .extracting(e -> ((JellyfinException) e).kind())
                 .isEqualTo(ContentSourceException.Kind.UNREACHABLE);
         assertThatThrownBy(() -> client.get(connection, "/x", Map.of()))
-                .hasMessageStartingWith("Could not reach Jellyfin at http://127.0.0.1:")
+                .hasMessageStartingWith("Could not reach Jellyfin at 127.0.0.1 (")
                 .satisfies(e -> assertThat(e.getMessage()).doesNotContain("secret-token-xyz"));
     }
 
@@ -197,9 +198,9 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.get(connection, "/big", Map.of()))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
+                .isEqualTo(ContentSourceException.Kind.TOO_LARGE);
         assertThatThrownBy(() -> client.get(connection, "/big", Map.of()))
-                .hasMessage("Jellyfin at " + fake.url() + " sent an oversized response");
+                .hasMessage("Jellyfin at 127.0.0.1 sent more than 2 MB");
     }
 
     @Test
@@ -246,7 +247,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.image(oversizedImageServerUrl, itemId, "Primary", null, 480))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
+                .isEqualTo(ContentSourceException.Kind.TOO_LARGE);
     }
 
     @Test
@@ -256,5 +257,32 @@ class JellyfinClientTest {
         for (String invalid : new String[] {"../Users", "", "a/b"}) {
             assertThatThrownBy(() -> JellyfinClient.id(invalid)).isInstanceOf(IllegalArgumentException.class);
         }
+    }
+
+    /** Jellyfin often runs on the same machine: loopback needs no setting. */
+    @Test
+    void aServerOnThisMachineIsReachedWithoutASetting() throws IOException {
+        fake = new FakeJellyfinServer().withConnectableServer();
+
+        assertThatCode(() -> client.publicInfo(fake.url())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void aLinkLocalServerIsBlocked() {
+        URI linkLocal = URI.create("http://169.254.10.20:8096");
+
+        assertThatThrownBy(() -> client.publicInfo(linkLocal))
+                .isInstanceOfSatisfying(JellyfinException.class,
+                        e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.BLOCKED))
+                .hasMessage("Home Control does not connect to 169.254.10.20 (address not allowed)");
+    }
+
+    @Test
+    void anImageMayBeLargerThanAnAnswer() throws IOException {
+        byte[] poster = new byte[3 * 1024 * 1024];
+        fake = new FakeJellyfinServer().respondBytes("GET", "/Items/abc123/Images/Primary", 200, "image/jpeg", poster);
+
+        assertThat(client.image(fake.url(), "abc123", "Primary", null, 300))
+                .hasValueSatisfying(image -> assertThat(image.bytes()).hasSize(poster.length));
     }
 }

@@ -1,24 +1,20 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
-import dev.andre.homecontrol.sources.http.BoundedBody;
+import dev.andre.homecontrol.sources.http.GuardedHttpClient;
 import dev.andre.homecontrol.sources.http.HttpUrls;
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
+import dev.andre.homecontrol.sources.http.OutboundFailure;
+import dev.andre.homecontrol.sources.http.OutboundRequest;
+import dev.andre.homecontrol.sources.http.OutboundResponse;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.MissingNode;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.io.IOException;
-import java.net.ConnectException;
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpConnectTimeoutException;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.net.http.HttpTimeoutException;
-import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -32,9 +28,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** The only class that speaks HTTP to Jellyfin (spec §7: only sources speak content APIs). */
-public class JellyfinClient {
+public class JellyfinClient implements AutoCloseable {
 
-    private static final String CONTENT_TYPE = "Content-Type";
     private static final String APPLICATION_JSON = "application/json";
 
     static final String CLIENT_NAME = "Home Control";
@@ -45,10 +40,12 @@ public class JellyfinClient {
     private static final HttpUrls.Rules SERVER_URLS = new HttpUrls.Rules(false, false, true, false, 0);
     /** A generous cap on one artwork image; a well-behaved server never comes close. */
     static final int MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+    /** Artwork and session pages load many at once from the LAN server. */
+    private static final int MAX_CONCURRENT = 16;
     /** Raster types only: an SVG served from our own origin could carry a script. */
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
 
-    private final HttpClient http;
+    private final GuardedHttpClient http;
     private final JellyfinProperties properties;
     private final String version;
     private final JsonMapper mapper = JsonMapper.builder().build();
@@ -60,10 +57,22 @@ public class JellyfinClient {
     JellyfinClient(JellyfinProperties properties, String version) {
         this.properties = properties;
         this.version = version;
-        this.http = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NEVER) // a redirect would replay the Authorization header
-                .connectTimeout(properties.connectTimeout())
-                .build();
+        // Jellyfin often runs on this machine, so loopback is allowed. Redirects are refused: they would replay the
+        // Authorization header.
+        this.http = new GuardedHttpClient(new GuardedHttpClient.Profile("Jellyfin", GuardedHttpClient.Redirects.NONE,
+                0, MAX_JSON_BYTES, properties.connectTimeout(), properties.requestTimeout(), MAX_CONCURRENT, SERVER_URLS),
+                new OutboundAddressPolicy(true), JellyfinClient::failure);
+    }
+
+    private static JellyfinException failure(OutboundFailure failure) {
+        String message = failure.describe("Jellyfin");
+        return new JellyfinException(failure.kind(), failure.kind() == ContentSourceException.Kind.UNREACHABLE
+                ? message + ". Check the address and that Home Control can reach it." : message);
+    }
+
+    @Override
+    public void close() {
+        http.close();
     }
 
     /** http(s) scheme, a host, no user info, query or fragment; trailing slashes removed. */
@@ -91,7 +100,7 @@ public class JellyfinClient {
     public JsonNode publicInfo(URI serverUrl) {
         JsonNode info;
         try {
-            info = send(serverUrl, request(serverUrl, "/System/Info/Public", Map.of(), null, null).GET());
+            info = send(serverUrl, signed(OutboundRequest.get(uri(serverUrl, "/System/Info/Public", Map.of())), null, null));
         } catch (JellyfinException e) {
             if (e.kind() == ContentSourceException.Kind.NOT_FOUND || e.kind() == ContentSourceException.Kind.BAD_RESPONSE) {
                 throw notJellyfin(serverUrl);
@@ -117,9 +126,8 @@ public class JellyfinClient {
         body.put("Username", userName);
         body.put("Pw", password);
         try {
-            return send(serverUrl, request(serverUrl, "/Users/AuthenticateByName", Map.of(), deviceId, null)
-                    .header(CONTENT_TYPE, APPLICATION_JSON)
-                    .POST(HttpRequest.BodyPublishers.ofByteArray(mapper.writeValueAsBytes(body))));
+            return send(serverUrl, signed(OutboundRequest.post(uri(serverUrl, "/Users/AuthenticateByName", Map.of()),
+                    mapper.writeValueAsBytes(body), APPLICATION_JSON), deviceId, null));
         } catch (JellyfinException e) {
             if (e.kind() == ContentSourceException.Kind.UNAUTHORIZED) {
                 throw new JellyfinException(ContentSourceException.Kind.UNAUTHORIZED, "Jellyfin rejected the user name or password");
@@ -129,20 +137,16 @@ public class JellyfinClient {
     }
 
     public JsonNode get(JellyfinConnection connection, String path, Map<String, String> query) {
-        return send(connection.serverUrl(),
-                request(connection.serverUrl(), path, query, connection.deviceId(), connection.token()).GET());
+        return send(connection.serverUrl(), signed(OutboundRequest.get(uri(connection.serverUrl(), path, query)),
+                connection.deviceId(), connection.token()));
     }
 
     /** {@code body} may be null for commands such as {@code /Sessions/{id}/Playing}. */
     public JsonNode post(JellyfinConnection connection, String path, Map<String, String> query, JsonNode body) {
-        HttpRequest.Builder builder = request(connection.serverUrl(), path, query, connection.deviceId(), connection.token());
-        if (body == null) {
-            builder.POST(HttpRequest.BodyPublishers.noBody());
-        } else {
-            builder.header(CONTENT_TYPE, APPLICATION_JSON)
-                    .POST(HttpRequest.BodyPublishers.ofByteArray(mapper.writeValueAsBytes(body)));
-        }
-        return send(connection.serverUrl(), builder);
+        OutboundRequest request = body == null
+                ? OutboundRequest.post(uri(connection.serverUrl(), path, query), new byte[0], null)
+                : OutboundRequest.post(uri(connection.serverUrl(), path, query), mapper.writeValueAsBytes(body), APPLICATION_JSON);
+        return send(connection.serverUrl(), signed(request, connection.deviceId(), connection.token()));
     }
 
     String authorization(String deviceId, String token) {
@@ -184,27 +188,17 @@ public class JellyfinClient {
         if (tag != null) {
             query.put("tag", tag);
         }
-        HttpRequest request = HttpRequest.newBuilder(
-                        URI.create(serverUrl + "/Items/" + id(itemId) + "/Images/" + type + queryString(query)))
-                .timeout(properties.requestTimeout())
-                .header("Accept", "image/*")
-                .GET()
-                .build();
-        HttpResponse<byte[]> response = exchange(serverUrl, request, MAX_IMAGE_BYTES);
-        if (response.statusCode() == 404) {
+        OutboundResponse response = http.send(OutboundRequest.get(uri(serverUrl, "/Items/" + id(itemId) + "/Images/" + type, query))
+                .header("Accept", "image/*").limitedTo(MAX_IMAGE_BYTES));
+        if (response.status() == 404) {
             return Optional.empty();
         }
-        String contentType = response.headers().firstValue(CONTENT_TYPE).orElse("");
+        String contentType = response.contentType() == null ? "" : response.contentType();
         String bareType = contentType.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
-        if (response.statusCode() != 200 || !ALLOWED_IMAGE_TYPES.contains(bareType)
-                || contentLengthExceeds(response, MAX_IMAGE_BYTES)) {
+        if (response.status() != 200 || !ALLOWED_IMAGE_TYPES.contains(bareType)) {
             throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent no image");
         }
-        byte[] bytes = response.body();
-        if (bytes.length > MAX_IMAGE_BYTES) {
-            throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized image");
-        }
-        return Optional.of(new Image(contentType, bytes));
+        return Optional.of(new Image(contentType, response.body()));
     }
 
     private static String queryString(Map<String, String> query) {
@@ -218,42 +212,19 @@ public class JellyfinClient {
         return joined.toString();
     }
 
-    private HttpRequest.Builder request(URI serverUrl, String path, Map<String, String> query, String deviceId, String token) {
-        return HttpRequest.newBuilder(URI.create(serverUrl + path + queryString(query)))
-                .timeout(properties.requestTimeout())
-                .header("Accept", APPLICATION_JSON)
-                .header("Authorization", authorization(deviceId, token));
+    private static URI uri(URI serverUrl, String path, Map<String, String> query) {
+        return URI.create(serverUrl + path + queryString(query));
     }
 
-    private JsonNode send(URI serverUrl, HttpRequest.Builder builder) {
-        HttpResponse<byte[]> response = exchange(serverUrl, builder.build(), MAX_JSON_BYTES);
-        requireSuccess(serverUrl, response.statusCode());
-        // A cap, not a limit we expect to hit: a well-behaved Jellyfin answer never comes close, and a
-        // misbehaving or hostile server can't make us buffer an unbounded amount of it into heap.
+    private OutboundRequest signed(OutboundRequest request, String deviceId, String token) {
+        return request.header("Accept", APPLICATION_JSON).header("Authorization", authorization(deviceId, token));
+    }
+
+    private JsonNode send(URI serverUrl, OutboundRequest request) {
+        OutboundResponse response = http.send(request);
+        requireSuccess(serverUrl, response.status());
         byte[] bytes = response.body();
-        if (contentLengthExceeds(response, MAX_JSON_BYTES) || bytes.length > MAX_JSON_BYTES) {
-            throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized response");
-        }
         return bytes.length == 0 ? MissingNode.getInstance() : parse(serverUrl, bytes);
-    }
-
-    /** Sends the request and reads a body of at most {@code maxBytes + 1} bytes; a transport failure becomes an UNREACHABLE naming what went wrong. */
-    private HttpResponse<byte[]> exchange(URI serverUrl, HttpRequest request, int maxBytes) {
-        try {
-            return http.send(request,
-                    BoundedBody.handler(maxBytes, properties.requestTimeout()));
-        } catch (HttpConnectTimeoutException _) {
-            throw unreachable(serverUrl, "connection timed out");
-        } catch (HttpTimeoutException _) {
-            throw unreachable(serverUrl, "no answer in time");
-        } catch (ConnectException e) {
-            throw unreachable(serverUrl, e.getCause() instanceof UnresolvedAddressException ? "unknown host" : "connection refused");
-        } catch (IOException e) {
-            throw unreachable(serverUrl, e.getClass().getSimpleName());
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            throw unreachable(serverUrl, "interrupted");
-        }
     }
 
     /** Redirects, rejected credentials, unknown paths and every other 4xx/5xx answer end the call. */
@@ -280,16 +251,6 @@ public class JellyfinClient {
         } catch (JacksonException _) {
             throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an unreadable answer");
         }
-    }
-
-    /** Rejects an oversized body before it is streamed, when the server is honest enough to declare its length. */
-    private static boolean contentLengthExceeds(HttpResponse<?> response, int max) {
-        return response.headers().firstValueAsLong("Content-Length").orElse(-1) > max;
-    }
-
-    private static JellyfinException unreachable(URI serverUrl, String reason) {
-        return new JellyfinException(ContentSourceException.Kind.UNREACHABLE, "Could not reach Jellyfin at " + serverUrl
-                + " (" + reason + "). Check the address and that Home Control can reach it.");
     }
 
     private static JellyfinException notJellyfin(URI serverUrl) {
