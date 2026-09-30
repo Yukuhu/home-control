@@ -231,4 +231,17 @@ class CalendarFetcherTest {
         }
         assertThat(server.count("/cal.ics")).isZero();
     }
+    @Test
+    void aStatusSentenceNamesTheHostThatAnswered() {
+        server.redirect("/moved.ics", 302, unresolvable("/gone.ics").toString());
+        server.respond("/gone.ics", 404, "text/plain", "");
+        OutboundAddressPolicy.Resolver loopback = host -> new InetAddress[] {InetAddress.ofLiteral("127.0.0.1")};
+        try (CalendarFetcher redirected = new CalendarFetcher(properties, new OutboundAddressPolicy(true, loopback))) {
+            URI moved = server.url("/moved.ics");
+
+            assertThatThrownBy(() -> redirected.fetch(moved))
+                    .isInstanceOf(CalendarFetchException.class)
+                    .hasMessage("calendar.test has no calendar at that link");
+        }
+    }
 }
