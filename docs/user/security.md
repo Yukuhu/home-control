@@ -47,3 +47,7 @@ ending in `.local`, `.lan`, `.home.arpa` or `.internal`. Any other name gets
 reverse proxy, add that name to `HOME_CONTROL_ALLOWED_HOSTS` (or its origin to
 `HOME_CONTROL_TRUSTED_ORIGINS`). Changes (POST and other non-read requests) from another
 site's page are refused with `403`, whether or not a login exists.
+
+Every page also sends a Content-Security-Policy that lets the browser run scripts only from
+Home Control itself, and keeps the pages out of other sites' frames. If a reverse proxy adds
+security headers of its own, have it pass this one through rather than replace it.
