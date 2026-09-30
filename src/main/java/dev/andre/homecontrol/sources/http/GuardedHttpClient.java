@@ -282,8 +282,9 @@ public final class GuardedHttpClient implements AutoCloseable {
                 Map<String, String> headers = headersOf(response.getHeaders());
                 String contentType = headers.get("content-type");
                 int status = response.getCode();
-                // Never drain a redirect being followed, nor an error body nobody asked for: it may never end.
-                if (follows(request.method(), status) || (!successful(status) && !request.errorBody())) {
+                // Read only a 200's body unless asked for the others: a redirect being followed or a status the
+                // caller rejects may carry a body that never ends, and it would hold the slot until the deadline.
+                if (follows(request.method(), status) || (status != 200 && !request.errorBody())) {
                     return new OutboundResponse(status, contentType, new byte[0], headers, uri);
                 }
                 int cap = request.maxBytes() > 0 ? request.maxBytes() : profile.maxBytes();
@@ -299,10 +300,6 @@ public final class GuardedHttpClient implements AutoCloseable {
             message.cancel();
             exchange.active.compareAndSet(message, null);
         }
-    }
-
-    private static boolean successful(int status) {
-        return status >= 200 && status < 300;
     }
 
     private static byte[] body(HttpEntity entity, Header[] encodings, String host, int cap) throws IOException {
