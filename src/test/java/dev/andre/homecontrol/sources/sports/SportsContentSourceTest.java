@@ -3,13 +3,12 @@ package dev.andre.homecontrol.sources.sports;
 import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.content.SourcePreferences;
-import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
+import dev.andre.homecontrol.sources.sports.feed.SportsFeed;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
 import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
-import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 
@@ -50,11 +49,17 @@ class SportsContentSourceTest {
         return provider;
     }
 
+    private static SportsFeed feed(String itemPrefix, boolean configured) {
+        SportsFeed feed = mock(SportsFeed.class);
+        given(feed.itemPrefix()).willReturn(itemPrefix);
+        given(feed.configured()).willReturn(configured);
+        return feed;
+    }
+
     @Test
     void isUnavailableWithoutFeeds() {
-        CalendarSchedule calendarSchedule = mock(CalendarSchedule.class);
-        given(calendarSchedule.hasCalendars()).willReturn(false);
-        SportsSchedule schedule = new SportsSchedule(calendarSchedule, null);
+        SportsFeed calendarSchedule = feed("ics:", false);
+        SportsSchedule schedule = new SportsSchedule(List.of(calendarSchedule));
         SportsTimeZones zones = mock(SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
 
@@ -67,9 +72,8 @@ class SportsContentSourceTest {
 
     @Test
     void offersTheLiveTodayRailWhenAvailable() {
-        CalendarSchedule calendarSchedule = mock(CalendarSchedule.class);
-        given(calendarSchedule.hasCalendars()).willReturn(true);
-        SportsSchedule schedule = new SportsSchedule(calendarSchedule, null);
+        SportsFeed calendarSchedule = feed("ics:", true);
+        SportsSchedule schedule = new SportsSchedule(List.of(calendarSchedule));
         SportsTimeZones zones = mock(SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
 
@@ -88,9 +92,8 @@ class SportsContentSourceTest {
 
     @Test
     void readsItems() {
-        CalendarSchedule calendarSchedule = mock(CalendarSchedule.class);
-        given(calendarSchedule.hasCalendars()).willReturn(true);
-        SportsSchedule schedule = new SportsSchedule(calendarSchedule, null);
+        SportsFeed calendarSchedule = feed("ics:", true);
+        SportsSchedule schedule = new SportsSchedule(List.of(calendarSchedule));
         SportsTimeZones zones = mock(SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
 
@@ -111,11 +114,9 @@ class SportsContentSourceTest {
 
     @Test
     void availableWithOnlyACompetition() {
-        CalendarSchedule calendarSchedule = mock(CalendarSchedule.class);
-        given(calendarSchedule.hasCalendars()).willReturn(false);
-        TheSportsDbSchedule competitions = mock(TheSportsDbSchedule.class);
-        given(competitions.hasCompetitions()).willReturn(true);
-        SportsSchedule withCompetition = new SportsSchedule(calendarSchedule, competitions);
+        SportsFeed calendarSchedule = feed("ics:", false);
+        SportsFeed competitions = feed("tsdb:", true);
+        SportsSchedule withCompetition = new SportsSchedule(List.of(calendarSchedule, competitions));
         SportsTimeZones zones = mock(SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
 
@@ -123,7 +124,7 @@ class SportsContentSourceTest {
                 () -> SourcePreferences.defaults("de-DE", "DE"), CLOCK, noPinnedLinks(), PROPERTIES);
         assertThat(source.available()).isTrue();
 
-        SportsSchedule withoutCompetitions = new SportsSchedule(calendarSchedule, null);
+        SportsSchedule withoutCompetitions = new SportsSchedule(List.of(calendarSchedule));
         SportsContentSource source2 = new SportsContentSource(settingsWith(List.of()), withoutCompetitions, zones,
                 () -> SourcePreferences.defaults("de-DE", "DE"), CLOCK, noPinnedLinks(), PROPERTIES);
         assertThat(source2.available()).isFalse();
@@ -131,10 +132,9 @@ class SportsContentSourceTest {
 
     @Test
     void readsTheSportsDbItems() {
-        CalendarSchedule calendarSchedule = mock(CalendarSchedule.class);
-        given(calendarSchedule.hasCalendars()).willReturn(true);
-        TheSportsDbSchedule competitions = mock(TheSportsDbSchedule.class);
-        SportsSchedule schedule = new SportsSchedule(calendarSchedule, competitions);
+        SportsFeed calendarSchedule = feed("ics:", true);
+        SportsFeed competitions = feed("tsdb:", true);
+        SportsSchedule schedule = new SportsSchedule(List.of(calendarSchedule, competitions));
         SportsTimeZones zones = mock(SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
 

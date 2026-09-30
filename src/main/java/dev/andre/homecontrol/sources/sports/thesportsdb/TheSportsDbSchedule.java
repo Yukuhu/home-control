@@ -1,12 +1,14 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
 import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
 import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
+import dev.andre.homecontrol.sources.sports.feed.SportsFeed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
@@ -26,17 +28,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** Daily TheSportsDB fixtures for every chosen competition, cached per (league, UTC date) pair. */
-public class TheSportsDbSchedule {
+public class TheSportsDbSchedule implements SportsFeed {
 
     private static final Logger log = LoggerFactory.getLogger(TheSportsDbSchedule.class);
     private static final Duration RETRY_BACKOFF = Duration.ofMinutes(10);
-
-    public record Result(List<SportsEvent> events, List<String> errors, int feeds, int succeeded) {
-        public Result {
-            events = List.copyOf(events);
-            errors = List.copyOf(errors);
-        }
-    }
 
     private record Entry(List<SportsEvent> events, Instant fetchedAt) {
     }
@@ -63,7 +58,13 @@ public class TheSportsDbSchedule {
         this.clock = clock;
     }
 
-    public boolean hasCompetitions() {
+    @Override
+    public String itemPrefix() {
+        return "tsdb:";
+    }
+
+    @Override
+    public boolean configured() {
         return !settingsService.current().competitions().isEmpty();
     }
 
@@ -80,7 +81,8 @@ public class TheSportsDbSchedule {
         return dates;
     }
 
-    public synchronized Result events() {
+    @Override
+    public synchronized FeedResult events() {
         ranOnce = true;
         SportsSettings settings = settingsService.current();
         Instant now = clock.instant();
@@ -116,7 +118,7 @@ public class TheSportsDbSchedule {
                 errorList.add(competition.name() + ": " + competitionError);
             }
         }
-        return new Result(allEvents, errorList, settings.competitions().size(), succeeded);
+        return new FeedResult(allEvents, errorList, settings.competitions().size(), succeeded);
     }
 
     /** One {@link #events()} pass: once TheSportsDB rate-limits a request, the rest of the pass stays on the cache. */
@@ -144,13 +146,13 @@ public class TheSportsDbSchedule {
         errors.keySet().removeIf(leagueId -> !known.contains(leagueId));
     }
 
-    private Result keyUnavailable(SportsSettings settings, TheSportsDbException e) {
+    private FeedResult keyUnavailable(SportsSettings settings, TheSportsDbException e) {
         List<String> errorList = new ArrayList<>();
         for (SportsSettings.CompetitionEntry competition : settings.competitions()) {
             errors.put(competition.leagueId(), e.getMessage());
             errorList.add(competition.name() + ": " + e.getMessage());
         }
-        return new Result(List.of(), errorList, settings.competitions().size(), 0);
+        return new FeedResult(List.of(), errorList, settings.competitions().size(), 0);
     }
 
     /** The cached day, refetched first when stale and no recent failure or rate limit holds it back. */
@@ -194,6 +196,7 @@ public class TheSportsDbSchedule {
         }
     }
 
+    @Override
     public Optional<SportsEvent> find(String itemId) {
         if (!ranOnce) {
             events();
