@@ -6,11 +6,16 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ControllerAdvice;
+import tools.jackson.databind.json.JsonMapper;
 
 import static com.tngtech.archunit.base.DescribedPredicate.alwaysTrue;
 import static com.tngtech.archunit.base.DescribedPredicate.not;
+import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
@@ -54,6 +59,21 @@ class ArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage("java.net.http..", "org.apache.hc..", "javax.jmdns..",
                     "org.freedesktop.dbus..", "com.github.hypfvieh..")
             .because("only adapters speak device protocols and only sources speak content APIs");
+
+    @ArchTest
+    static final ArchRule sourcesReachTheNetworkOnlyThroughTheGuardedClient = noClasses()
+            .that().resideInAPackage("dev.andre.homecontrol.sources..")
+            .and().resideOutsideOfPackage("dev.andre.homecontrol.sources.http..")
+            .should().dependOnClassesThat().resideInAnyPackage("java.net.http..", "org.apache.hc..")
+            .because("the guarded client pins addresses, bounds bodies and time, and keeps URLs out of errors; "
+                    + "see ADR 0005");
+
+    @ArchTest
+    static final ArchRule onlyTheConfigurationBuildsAJsonMapper = noClasses()
+            .that().resideOutsideOfPackages("dev.andre.homecontrol.config..", "dev.andre.homecontrol.adapters..")
+            .should().callMethodWhere(target(name("builder")).and(target(owner(assignableTo(JsonMapper.class)))))
+            .because("one mapper, hardened against hostile JSON, reads every data file and every source's answer; "
+                    + "device protocols keep their own");
 
     @ArchTest
     static final ArchRule onlyTheConfigurationReachesIntoDevice = noClasses()
