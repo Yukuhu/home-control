@@ -51,3 +51,25 @@ site's page are refused with `403`, whether or not a login exists.
 Every page also sends a Content-Security-Policy that lets the browser run scripts only from
 Home Control itself, and keeps the pages out of other sites' frames. If a reverse proxy adds
 security headers of its own, have it pass this one through rather than replace it.
+
+## What content sources may connect to
+
+Jellyfin, TMDB, YouTube, TheSportsDB, sports calendars and workflows fetch from the network
+on the server. They never connect to this machine's wildcard address, its link-local network
+(where cloud metadata services live) or a multicast address, and every connection goes to the
+address that was checked, so a DNS answer cannot change between the check and the connection.
+Your LAN is allowed, so a calendar or workflow on your NAS works.
+
+This machine itself (loopback) is allowed for Jellyfin, which often runs next to Home Control.
+For the others it is off unless you turn it on, for example to reach a local mirror:
+
+| Source | Setting |
+| --- | --- |
+| TMDB | `home-control.tmdb.allow-loopback` |
+| TheSportsDB | `home-control.sports.thesportsdb.allow-loopback` |
+| YouTube and Google sign-in | `home-control.youtube.allow-loopback` |
+| Sports calendars | `home-control.sports.calendar.allow-loopback` |
+| Workflows | `HOME_CONTROL_WORKFLOWS_ALLOW_LOOPBACK` |
+
+Redirects are not followed, except by calendars, which check every hop again, and by
+workflows, which follow one only within the same server.
