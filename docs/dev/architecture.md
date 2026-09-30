@@ -18,8 +18,8 @@ root.
 | `sources` | One package per content source: `jellyfin`, `youtube`, `tmdb`, `sports`, `pinned`, `workflows`. Each is a module that can be switched off. A source that plays through its own references declares them, their routes and its route strategy in its package, and runs a content service's playback API with a `RouteExecutor`; see [ADR 0004](../adr/0004-device-control-from-sources.md). `sources.http` is shared: HTTP clients that connect only to vetted addresses and bound response bodies in size and time. |
 | `content` | The rail cache, search across sources, and source preferences. |
 | `playback` | `PlaybackService`, which plans a route for an item on a device, carries it out and reports the outcome, and the deep-link test. |
-| `web` | Controllers, view models and the server-sent event stream behind the dashboard and setup pages. |
-| `security` | Login, the host allowlist, cross-origin protection and the security headers. |
+| `web` | Controllers, view models and the event stream behind the dashboard and setup pages. `ErrorAdvice` answers every controller's core exceptions with one status and a plain-text body, for example 404 for an unknown device. `EventStream` sends each open tab device state, rail updates and rail lists over server-sent events, with a heartbeat comment so a reverse proxy keeps a quiet stream open. |
+| `security` | Login, the host allowlist, cross-origin protection and the security headers. A controller that needs the login takes a `LoginContext` argument and passes it on; `LoginService` and services and stores decide with it, so nothing outside the web edge reads the HTTP request or session. |
 | `storage` | The data directory, the one writer for its files (`AtomicFiles`), the versioned JSON files the stores hold (`VersionedJsonFile`), the encrypted secret store and its key, and source settings. See [ADR 0002](../adr/0002-versioned-data-files-and-device-secrets.md). |
 | `crypto` | Argon2id hashing for the login password and the secret key. |
 
@@ -63,12 +63,12 @@ package sees devices.
 | Device adapters are independent of each other, apart from the shared `adapters.net`, `adapters.links` and `adapters.support`, and Sonos using `adapters.upnp.protocol` | strict |
 | `java.net.http`, Apache HttpClient 5, jmDNS and D-Bus are used only in `adapters`, `sources` and `discovery` | strict |
 | Nothing outside `device` depends on it, except the application's configuration (`HomeControlConfiguration`): callers use the four `core` device interfaces | strict |
+| `jakarta.servlet` is used only in `web`, `security`, controllers and controller advice | strict |
 | `..protocol..` packages depend on neither Spring nor any application package other than `adapters.net` and other protocol packages | frozen: 42 |
 | No cycles between the top-level packages | frozen: 1 |
 | `sources` does not depend on `adapters` | frozen: 0 |
 | `adapters` depends on neither `sources` nor `web` | frozen: 1 |
 | `web` does not depend on `adapters` | frozen: 0 |
-| `jakarta.servlet` is used only in `web`, `security`, controllers and controller advice | frozen: 24 |
 
 `src/test/java/dev/andre/homecontrol/TestArchitectureTest.java` checks one rule on the tests: tests under `core` do
 not use `sources`. A source's own types are tested in its module; tests that need every module, such as the route

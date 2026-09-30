@@ -77,7 +77,9 @@ off Spring Framework 7's pausing, because `RailCache` cannot restart after a pau
 - A fake of a device or a service is named `Fake…` and sits in the test package of the code it fakes, for example
   `FakeCastReceiver` or `FakeJellyfinServer`. It speaks the real protocol, so the production client runs unchanged.
 - Shared helpers live in `dev.andre.homecontrol.testsupport`: `FakeHttpServer` for any HTTP or HTTPS fake,
-  `TestTls` for a self-signed server certificate, `MutableClock`, `RecordingStateListener` and `EventStreamReader`.
+  `TestTls` for a self-signed server certificate, `MutableClock`, `RecordingStateListener`, `EventStreamReader`,
+  `RailHtml` to read a rendered rail, and `FakeLoginContext` for a browser's login where `LoginService` is a mock
+  (with a real `LoginService`, wrap a `MockHttpServletRequest` in `RequestLoginContext`).
   A fake of a web API (Jellyfin, TMDB, Google, TheSportsDB, calendars, workflows) is a thin wrapper over
   `FakeHttpServer` that keeps the service's own vocabulary; a fake of a socket protocol (UPnP, Tizen, Cast, Android
   TV, mpv) stays protocol-specific.
