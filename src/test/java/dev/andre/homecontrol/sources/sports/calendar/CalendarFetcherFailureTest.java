@@ -2,7 +2,7 @@ package dev.andre.homecontrol.sources.sports.calendar;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
-import dev.andre.homecontrol.sources.sports.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.testsupport.FakeHttpServer;
 import dev.andre.homecontrol.testsupport.Response;
 import org.junit.jupiter.api.AfterEach;

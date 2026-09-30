@@ -1,6 +1,8 @@
 package dev.andre.homecontrol.sources.sports;
 
 import dev.andre.homecontrol.core.content.ContentSources;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
 import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -3,9 +3,9 @@ package dev.andre.homecontrol.sources.sports.thesportsdb;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
-import dev.andre.homecontrol.sources.sports.SportsProperties;
-import dev.andre.homecontrol.sources.sports.SportsSettings;
-import dev.andre.homecontrol.sources.sports.SportsSettingsService;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
 
 import java.time.Clock;
 import java.util.ArrayList;

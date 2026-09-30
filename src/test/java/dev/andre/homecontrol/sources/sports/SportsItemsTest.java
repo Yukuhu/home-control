@@ -3,6 +3,8 @@ package dev.andre.homecontrol.sources.sports;
 import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.content.StreamingProviders;
 import dev.andre.homecontrol.core.playback.PlayableRef;
+import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;

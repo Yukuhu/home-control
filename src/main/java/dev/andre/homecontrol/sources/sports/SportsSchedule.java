@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.sports;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
+import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
 
 import java.util.ArrayList;

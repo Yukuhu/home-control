@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports;
 
+import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;

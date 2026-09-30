@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.sources.sports;
 
-import dev.andre.homecontrol.sources.sports.calendar.FeedStatus;
+import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;

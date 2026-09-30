@@ -1,10 +1,10 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
-import dev.andre.homecontrol.sources.sports.JsonFileSportsStore;
-import dev.andre.homecontrol.sources.sports.SportsProperties;
-import dev.andre.homecontrol.sources.sports.SportsSettings;
-import dev.andre.homecontrol.sources.sports.SportsSettingsService;
-import dev.andre.homecontrol.sources.sports.SportsTimeZones;
+import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
+import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
 import dev.andre.homecontrol.storage.SecretStore;
 import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;

@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.sources.sports;
+package dev.andre.homecontrol.sources.sports.settings;
 
 import dev.andre.homecontrol.storage.StorageException;
 import org.junit.jupiter.api.Test;

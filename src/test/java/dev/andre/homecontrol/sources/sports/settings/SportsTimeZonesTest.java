@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.sources.sports;
+package dev.andre.homecontrol.sources.sports.settings;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

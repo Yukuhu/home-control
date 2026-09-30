@@ -1,6 +1,9 @@
 package dev.andre.homecontrol.sources.sports;
 
 import dev.andre.homecontrol.sources.sports.calendar.SportsCalendars;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
+import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
 import dev.andre.homecontrol.storage.StorageException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
