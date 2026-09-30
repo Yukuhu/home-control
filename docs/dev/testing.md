@@ -25,6 +25,8 @@ context per test JVM.
   would give it a context of its own, and `SharedContextRulesTest` fails.
 - A controller that needs a new collaborator gets it as a `@MockitoBean` in `WebSliceTest`. If every `/setup` render
   calls it and Mockito's `null` would break the page, `stubSafeDefaults()` gives it a safe value.
+- A module's setup section (`config.SetupSection`) is a plain component, which a `@WebMvcTest` does not pick up.
+  Add a new one to `WebSliceTest`'s `@Import`, or the slice's setup page leaves it out.
 - Every `/setup` render carries every module's section, so a check on the setup page reads its own section with
   `section(page, id)`, or asserts text only that section renders. A form field or a word that another section also
   renders would otherwise pass for the wrong reason.
@@ -128,3 +130,8 @@ Without a local JDK, `scripts/e2e.sh` builds a `gradle:jdk25`-based image with a
 already installed and runs `e2eTest` inside it (a tracked copy of the same
 `.superpowers/e2e.sh` this project's agents use). Playwright traces from any run land in
 `build/e2e-artifacts/<test>-<browser>.zip`; open one at https://trace.playwright.dev.
+
+The pages send a Content-Security-Policy that allows scripts only from this server. Every `BrowserSession` records what
+the policy blocks, and a test whose pages broke it fails when its session closes, listing each violation. A page's
+code belongs in its ES module under `static/js`; `InlineCodeTest` also refuses inline scripts, `on…=` handler
+attributes and `hx-on` in the templates, without a browser.
