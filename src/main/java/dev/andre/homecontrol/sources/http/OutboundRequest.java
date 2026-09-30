@@ -15,9 +15,11 @@ import java.util.OptionalLong;
  * @param maxBytes    the body cap for this request, or 0 for the profile's
  * @param waitForSlot whether to wait for a free slot (until the deadline) rather than fail at once when all are busy
  * @param notAfter    a {@link System#nanoTime()} the whole exchange must end by, on top of the profile's deadline
+ * @param errorBody   whether to read the body of an unsuccessful answer; otherwise it is dropped unread
  */
 public record OutboundRequest(String method, URI uri, Map<String, String> headers, byte[] body, String contentType,
-                              int maxBytes, boolean waitForSlot, OptionalLong notAfter) {
+                              int maxBytes, boolean waitForSlot, OptionalLong notAfter,
+                              boolean errorBody) {
 
     public OutboundRequest {
         if (!"GET".equals(method) && !"POST".equals(method)) {
@@ -32,32 +34,37 @@ public record OutboundRequest(String method, URI uri, Map<String, String> header
     }
 
     public static OutboundRequest get(URI uri) {
-        return new OutboundRequest("GET", uri, Map.of(), null, null, 0, true, OptionalLong.empty());
+        return new OutboundRequest("GET", uri, Map.of(), null, null, 0, true, OptionalLong.empty(), false);
     }
 
     public static OutboundRequest post(URI uri, byte[] body, String contentType) {
-        return new OutboundRequest("POST", uri, Map.of(), body.clone(), contentType, 0, true, OptionalLong.empty());
+        return new OutboundRequest("POST", uri, Map.of(), body.clone(), contentType, 0, true, OptionalLong.empty(), false);
     }
 
     public OutboundRequest header(String name, String value) {
         Map<String, String> more = new LinkedHashMap<>(headers);
         more.put(name, value);
-        return new OutboundRequest(method, uri, more, body, contentType, maxBytes, waitForSlot, notAfter);
+        return new OutboundRequest(method, uri, more, body, contentType, maxBytes, waitForSlot, notAfter, errorBody);
     }
 
     /** A body cap for this request instead of the profile's, higher or lower. */
     public OutboundRequest limitedTo(int bytes) {
-        return new OutboundRequest(method, uri, headers, body, contentType, bytes, waitForSlot, notAfter);
+        return new OutboundRequest(method, uri, headers, body, contentType, bytes, waitForSlot, notAfter, errorBody);
     }
 
     /** Fails at once with {@link OutboundFailure#BUSY} when every slot is taken. */
     public OutboundRequest failingFastWhenBusy() {
-        return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, false, notAfter);
+        return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, false, notAfter, errorBody);
     }
 
     /** Waits for a slot until {@code nanoTime} and ends the exchange by then at the latest. */
     public OutboundRequest endingBy(long nanoTime) {
-        return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, true, OptionalLong.of(nanoTime));
+        return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, true, OptionalLong.of(nanoTime), errorBody);
+    }
+
+    /** Reads the body of an unsuccessful answer too, for a source whose errors explain themselves there. */
+    public OutboundRequest withErrorBody() {
+        return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, waitForSlot, notAfter, true);
     }
 
     @Override
@@ -65,12 +72,12 @@ public record OutboundRequest(String method, URI uri, Map<String, String> header
         return other instanceof OutboundRequest that && method.equals(that.method) && uri.equals(that.uri)
                 && headers.equals(that.headers) && Arrays.equals(body, that.body)
                 && Objects.equals(contentType, that.contentType) && maxBytes == that.maxBytes
-                && waitForSlot == that.waitForSlot && notAfter.equals(that.notAfter);
+                && waitForSlot == that.waitForSlot && notAfter.equals(that.notAfter) && errorBody == that.errorBody;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(method, uri, headers, Arrays.hashCode(body), contentType, maxBytes, waitForSlot, notAfter);
+        return Objects.hash(method, uri, headers, Arrays.hashCode(body), contentType, maxBytes, waitForSlot, notAfter, errorBody);
     }
 
     @Override

@@ -1,11 +1,13 @@
 package dev.andre.homecontrol.sources.workflows;
 
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -28,7 +30,7 @@ class WorkflowHttpClientTest {
 
     private static WorkflowHttpClient client(Duration timeout, int permits) {
         return new WorkflowHttpClient(new WorkflowProperties(true, true, Duration.ofSeconds(1), timeout, permits, 2_097_152, 3),
-                new WorkflowUrlPolicy(true, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}));
+                new OutboundAddressPolicy(true, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}));
     }
 
     private static long in(Duration wait) { return System.nanoTime() + wait.toNanos(); }
@@ -83,9 +85,9 @@ class WorkflowHttpClientTest {
         } finally { release.countDown(); }
     }
 
-    private static WorkflowHttpClient client(Duration timeout, WorkflowUrlPolicy.HostResolver resolver) {
+    private static WorkflowHttpClient client(Duration timeout, OutboundAddressPolicy.Resolver resolver) {
         return new WorkflowHttpClient(new WorkflowProperties(true, true, Duration.ofSeconds(1), timeout, 4, 2_097_152, 3),
-                new WorkflowUrlPolicy(true, resolver));
+                new OutboundAddressPolicy(true, resolver));
     }
 
     private static WorkflowHttpClient.Request request(URI uri) {
@@ -308,7 +310,7 @@ class WorkflowHttpClientTest {
     @Test void rejectsLiteralLoopbackWithoutConsultingAnAllowedDnsAnswer() throws Exception {
         try (var server = new FakeWorkflowServer(); var client = new WorkflowHttpClient(
                 new WorkflowProperties(true, false, Duration.ofSeconds(1), Duration.ofSeconds(2), 4, 2_097_152, 3),
-                new WorkflowUrlPolicy(false, host -> new InetAddress[]{InetAddress.ofLiteral("192.168.1.1")}))) {
+                new OutboundAddressPolicy(false, host -> new InetAddress[]{InetAddress.ofLiteral("192.168.1.1")}))) {
             var feedRequest = request(server.url("/feed"));
             assertThatThrownBy(() -> client.fetch(feedRequest)).isInstanceOf(WorkflowException.class);
             assertThat(server.count("/feed")).isZero();
@@ -415,5 +417,65 @@ class WorkflowHttpClientTest {
     @ValueSource(strings = {"file:///tmp/token", "ftp://host/a", "https://secret@host/a", "https://host/a#token", "//host/a", "http://host:0/a", "http://host:65536/a", "http://[fe80::1%25eth0]/"})
     void rejectsUnsafeUriSyntax(String url) {
         assertThatThrownBy(() -> WorkflowHttpClient.parse(url)).isInstanceOf(WorkflowException.class).hasMessageNotContaining("token");
+    }
+
+    @Test void aBlockedAddressSaysSo() throws Exception {
+        try (var server = new FakeWorkflowServer(); var client = new WorkflowHttpClient(
+                new WorkflowProperties(true, false, Duration.ofSeconds(1), Duration.ofSeconds(3), 4, 2_097_152, 3),
+                new OutboundAddressPolicy(false, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}))) {
+            server.respond("/data", 200, "{}");
+            var data = request(named(server.url("/data")));
+
+            assertThatThrownBy(() -> client.fetch(data)).isInstanceOf(WorkflowException.class)
+                    .hasMessageContaining("address not allowed");
+            assertThat(server.count("/data")).isZero();
+        }
+    }
+
+    @Test void noFailureRevealsTheUrlOrAHeaderValue() throws Exception {
+        int closedPort;
+        try (var socket = new ServerSocket(0)) {
+            closedPort = socket.getLocalPort();
+        }
+        var loopback = (OutboundAddressPolicy.Resolver) host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")};
+        var properties = new WorkflowProperties(true, true, Duration.ofSeconds(1), Duration.ofMillis(600), 4, 1_024, 3);
+        try (var server = new FakeWorkflowServer();
+             var client = new WorkflowHttpClient(properties, new OutboundAddressPolicy(true, loopback));
+             var refusing = new WorkflowHttpClient(properties, new OutboundAddressPolicy(false, loopback))) {
+            server.respond("/secret-path/large", 200, "x".repeat(2_000));
+            server.route("/secret-path/gzip", exchange -> {
+                exchange.getResponseHeaders().set("Content-Encoding", "gzip");
+                exchange.sendResponseHeaders(200, 1);
+                try (exchange; var out = exchange.getResponseBody()) {
+                    out.write('x');
+                }
+            });
+            server.route("/secret-path/slow", exchange -> {
+                exchange.sendResponseHeaders(200, 0);
+                try (exchange; var out = exchange.getResponseBody()) {
+                    for (int i = 0; i < 50; i++) {
+                        out.write('x');
+                        out.flush();
+                        Thread.sleep(100);
+                    }
+                } catch (InterruptedException _) {
+                    Thread.currentThread().interrupt();
+                } catch (java.io.IOException _) {
+                    // the client gave up
+                }
+            });
+            String query = "?token=secret-token";
+            for (Runnable call : new Runnable[] {
+                    () -> client.fetch(request(URI.create(server.url("/secret-path/large") + query))),
+                    () -> client.fetch(request(URI.create(server.url("/secret-path/gzip") + query))),
+                    () -> client.fetch(request(URI.create(server.url("/secret-path/slow") + query))),
+                    () -> client.fetch(request(URI.create("http://127.0.0.1:" + closedPort + "/secret-path" + query))),
+                    () -> refusing.fetch(request(URI.create(server.url("/secret-path/large") + query)))}) {
+                WorkflowException failure = catchThrowableOfType(WorkflowException.class, call::run);
+
+                assertThat(failure).hasNoCause();
+                assertThat(failure.getMessage()).doesNotContain("secret");
+            }
+        }
     }
 }

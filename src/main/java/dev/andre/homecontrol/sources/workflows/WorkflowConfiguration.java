@@ -12,6 +12,7 @@ import dev.andre.homecontrol.core.playback.RefStrategy;
 import dev.andre.homecontrol.core.playback.RouteStrategy;
 import dev.andre.homecontrol.core.playback.Rung;
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -21,7 +22,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import java.net.InetAddress;
 import java.security.SecureRandom;
 
 /** The complete workflow runtime disappears when its server module is disabled. */
@@ -36,13 +36,9 @@ public class WorkflowConfiguration {
         return new WorkflowStore(secrets, login, codec, events, new SecureRandom());
     }
 
-    @Bean public WorkflowUrlPolicy workflowUrlPolicy(WorkflowProperties properties) {
-        return new WorkflowUrlPolicy(properties.allowLoopback(), InetAddress::getAllByName);
-    }
-
     @Bean(destroyMethod = "close")
-    public WorkflowHttpClient workflowHttpClient(WorkflowProperties properties, WorkflowUrlPolicy policy) {
-        return new WorkflowHttpClient(properties, policy);
+    public WorkflowHttpClient workflowHttpClient(WorkflowProperties properties) {
+        return new WorkflowHttpClient(properties, new OutboundAddressPolicy(properties.allowLoopback()));
     }
 
     @Bean public WorkflowRunner workflowRunner(WorkflowHttpClient http, WorkflowProperties properties) {

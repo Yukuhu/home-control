@@ -280,13 +280,15 @@ public final class GuardedHttpClient implements AutoCloseable {
             try {
                 Map<String, String> headers = headersOf(response.getHeaders());
                 String contentType = headers.get("content-type");
-                if (follows(request.method(), response.getCode())) {
-                    return new OutboundResponse(response.getCode(), contentType, new byte[0], headers);
+                int status = response.getCode();
+                // Never drain a redirect being followed, nor an error body nobody asked for: it may never end.
+                if (follows(request.method(), status) || (!successful(status) && !request.errorBody())) {
+                    return new OutboundResponse(status, contentType, new byte[0], headers);
                 }
                 int cap = request.maxBytes() > 0 ? request.maxBytes() : profile.maxBytes();
                 byte[] body = body(response.getEntity(), response.getHeaders("Content-Encoding"), host(uri), cap);
                 exchange.check();
-                return new OutboundResponse(response.getCode(), contentType, body, headers);
+                return new OutboundResponse(status, contentType, body, headers);
             } finally {
                 // Keep cancellation active through cleanup; never drain a body gracefully.
                 message.cancel();
@@ -296,6 +298,10 @@ public final class GuardedHttpClient implements AutoCloseable {
             message.cancel();
             exchange.active.compareAndSet(message, null);
         }
+    }
+
+    private static boolean successful(int status) {
+        return status >= 200 && status < 300;
     }
 
     private static byte[] body(HttpEntity entity, Header[] encodings, String host, int cap) throws IOException {
@@ -325,7 +331,7 @@ public final class GuardedHttpClient implements AutoCloseable {
         return headers;
     }
 
-    private static boolean sameOrigin(URI first, URI second) {
+    static boolean sameOrigin(URI first, URI second) {
         return first.getScheme().equalsIgnoreCase(second.getScheme())
                 && first.getHost().equalsIgnoreCase(second.getHost()) && port(first) == port(second);
     }

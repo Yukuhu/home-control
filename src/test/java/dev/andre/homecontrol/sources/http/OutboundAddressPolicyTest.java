@@ -103,4 +103,23 @@ class OutboundAddressPolicyTest {
 
         assertThat(checked[0].getHostAddress()).isEqualTo("192.168.1.20");
     }
+
+    @Test
+    void allowingLoopbackNeverAllowsLinkLocal() {
+        assertThatThrownBy(() -> resolvingTo(true, "169.254.1.1").addresses("media.example"))
+                .isInstanceOf(OutboundAddressPolicy.BlockedAddressException.class);
+    }
+
+    @Test
+    void looksAHostUpOnce() {
+        AtomicInteger lookups = new AtomicInteger();
+        var policy = new OutboundAddressPolicy(false, host -> {
+            lookups.incrementAndGet();
+            return new InetAddress[] {InetAddress.ofLiteral("192.168.1.2"), InetAddress.ofLiteral("127.0.0.1")};
+        });
+
+        assertThatThrownBy(() -> policy.addresses("media.example"))
+                .isInstanceOf(OutboundAddressPolicy.BlockedAddressException.class);
+        assertThat(lookups).hasValue(1);
+    }
 }
