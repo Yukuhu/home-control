@@ -512,4 +512,34 @@ class GuardedHttpClientTest {
             assertThat(answered.body()).isEmpty();
         }
     }
+    /**
+     * A caller with a deadline of its own (a workflow run) waits for a slot until then, not only for the profile's
+     * deadline; once admitted, the exchange still ends within the profile's deadline. Here the only slot is held past
+     * the profile's 300 ms by a lookup that ignores interrupts, and the waiting call still gets through.
+     */
+    @Test
+    void aCallerWithItsOwnDeadlineWaitsForASlotBeyondTheProfilesDeadline() throws InterruptedException {
+        server.respond("GET", "/next", Response.of(200, "text/plain", "next"));
+        CountDownLatch holding = new CountDownLatch(1);
+        var slowForOneHost = new OutboundAddressPolicy(true, host -> {
+            if (host.equals("held.test")) {
+                holding.countDown();
+                awaitIgnoringInterrupts(release);
+            }
+            return new InetAddress[] {InetAddress.ofLiteral("127.0.0.1")};
+        });
+        try (var client = new GuardedHttpClient(profile(Redirects.NONE, Duration.ofMillis(300), 1), slowForOneHost,
+                failure -> new ContentSourceException(failure.kind(), failure.describe("the source")))) {
+            CompletableFuture.runAsync(() -> failureOf(() -> client.send(OutboundRequest.get(at("held.test", "/x")))));
+            assertThat(holding.await(5, TimeUnit.SECONDS)).isTrue();
+            CompletableFuture.delayedExecutor(1, TimeUnit.SECONDS).execute(release::countDown);
+            long sent = System.nanoTime();
+
+            OutboundResponse next = client.send(OutboundRequest.get(at("source.test", "/next"))
+                    .endingBy(sent + Duration.ofSeconds(5).toNanos()));
+
+            assertThat(next.body()).asString().isEqualTo("next");
+            assertThat(Duration.ofNanos(System.nanoTime() - sent)).isGreaterThan(Duration.ofMillis(300));
+        }
+    }
 }

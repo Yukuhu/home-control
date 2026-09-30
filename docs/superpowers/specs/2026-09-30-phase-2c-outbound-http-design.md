@@ -97,7 +97,10 @@ stay separate because they answer another question: `WorkflowJson.safeArtworkUri
   approved, and TLS still verifies the host name.
 - **One deadline** (the profile's) runs from `send` until the body is read: waiting for a slot, DNS, connecting, every
   redirect and the whole body. The work runs on a virtual-thread worker that is cancelled at the deadline; `close()`
-  cancels every exchange in flight. This is `WorkflowHttpClient`'s worker model, generalized.
+  cancels every exchange in flight. This is `WorkflowHttpClient`'s worker model, generalized, and it keeps that
+  client's queueing: a caller with a deadline of its own (a workflow run, through `OutboundRequest.endingBy`) may wait
+  for a slot until its own deadline, and once admitted its exchange ends within the profile's deadline or its own,
+  whichever comes first. (Amended during PR 1's review.)
 - **Body:** it asks for no compression and refuses a `Content-Encoding` other than identity. A Content-Length above the
   cap fails before any of the body is read; otherwise it reads at most the cap plus one byte.
 - **Redirects:** only GET follows them. `NONE` returns the 3xx to the caller. `SAME_ORIGIN` follows within the same

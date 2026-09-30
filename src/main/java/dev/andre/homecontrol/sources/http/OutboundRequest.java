@@ -57,7 +57,11 @@ public record OutboundRequest(String method, URI uri, Map<String, String> header
         return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, false, notAfter, errorBody);
     }
 
-    /** Waits for a slot until {@code nanoTime} and ends the exchange by then at the latest. */
+    /**
+     * Waits for a slot until {@code nanoTime}, which may be later than the profile's deadline allows (a workflow run
+     * queues its calls); once admitted, the exchange ends within the profile's deadline or by {@code nanoTime},
+     * whichever comes first.
+     */
     public OutboundRequest endingBy(long nanoTime) {
         return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, true, OptionalLong.of(nanoTime), errorBody);
     }
