@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 import static dev.andre.homecontrol.testsupport.FakeHttpServer.ANY_METHOD;
 
@@ -39,11 +40,21 @@ public final class FakeCalendarServer implements AutoCloseable {
     }
 
     public FakeCalendarServer respondFixture(String path, String fixtureName) {
+        return respondBytes(path, 200, "text/calendar; charset=utf-8", fixtureBytes(fixtureName));
+    }
+
+    /** Answers {@code path} with the fixture only once {@code release} opens; the request is recorded on arrival. */
+    public FakeCalendarServer holdFixture(String path, String fixtureName, CountDownLatch release) {
+        server.hold(ANY_METHOD, path, release, Response.of(200, "text/calendar; charset=utf-8", fixtureBytes(fixtureName)));
+        return this;
+    }
+
+    private static byte[] fixtureBytes(String fixtureName) {
         try (InputStream in = FakeCalendarServer.class.getResourceAsStream("/fixtures/ics/" + fixtureName)) {
             if (in == null) {
                 throw new IllegalArgumentException("No fixture " + fixtureName);
             }
-            return respondBytes(path, 200, "text/calendar; charset=utf-8", in.readAllBytes());
+            return in.readAllBytes();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

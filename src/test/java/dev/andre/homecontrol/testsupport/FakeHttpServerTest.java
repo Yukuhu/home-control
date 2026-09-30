@@ -13,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static dev.andre.homecontrol.testsupport.FakeHttpServer.ANY_METHOD;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +58,21 @@ class FakeHttpServerTest {
         assertThat(response.body()).isEqualTo("{\"ok\":true}");
         assertThat(response.headers().firstValue("Content-Type")).contains(Response.JSON);
         assertThat(response.headers().firstValue("Location")).contains("http://elsewhere.invalid/");
+    }
+
+    @Test
+    void aHeldRouteRecordsTheRequestAtOnceAndAnswersWhenReleased() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        server.hold(ANY_METHOD, "/held", release, Response.of(200, "text/plain", "late"));
+
+        CompletableFuture<HttpResponse<String>> answer = client.sendAsync(
+                HttpRequest.newBuilder(server.url("/held")).build(), HttpResponse.BodyHandlers.ofString());
+        await().until(() -> server.count(ANY_METHOD, "/held") == 1);
+        assertThat(answer).isNotDone();
+
+        release.countDown();
+
+        assertThat(answer.get(5, TimeUnit.SECONDS).body()).isEqualTo("late");
     }
 
     @Test

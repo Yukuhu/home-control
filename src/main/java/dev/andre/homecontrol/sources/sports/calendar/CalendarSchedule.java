@@ -1,19 +1,20 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.sources.sports.feed.FeedFetches;
 import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
 import dev.andre.homecontrol.sources.sports.feed.SportsFeed;
-import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
-import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
-import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
-import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
 import dev.andre.homecontrol.sources.sports.ics.IcsCalendar;
 import dev.andre.homecontrol.sources.sports.ics.IcsFormatException;
 import dev.andre.homecontrol.sources.sports.ics.IcsOccurrence;
 import dev.andre.homecontrol.sources.sports.ics.IcsOccurrences;
 import dev.andre.homecontrol.sources.sports.ics.IcsParser;
+import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
+import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
+import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,17 +34,22 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
  * Every configured calendar, refetched on a schedule and expanded into a rolling window. Only fails a
  * calendar; a calendar keeps its last good parse across a transient failure.
+ *
+ * <p>No lock is held while a calendar downloads: {@link FeedFetches} runs one download per calendar at a time, and a
+ * pass that finds one running waits for it. {@link #lock} guards only short steps: writing a download's outcome,
+ * publishing a pass, and {@link #forget}. {@code forget} advances {@link #generation}, and a download that started
+ * under an older generation drops its outcome, so a removal is never undone by a download that was already running.
  */
 public class CalendarSchedule implements SportsFeed {
 
     private static final Logger log = LoggerFactory.getLogger(CalendarSchedule.class);
-    private static final Duration RETRY_BACKOFF = Duration.ofMinutes(10);
     private static final Duration WINDOW_BEFORE = Duration.ofDays(1);
     private static final Duration WINDOW_AFTER = Duration.ofDays(8);
 
@@ -57,9 +63,13 @@ public class CalendarSchedule implements SportsFeed {
     private final SportsTimeZones zones;
     private final Clock clock;
 
+    private final Object lock = new Object();
     private final ConcurrentHashMap<String, Cached> cache = new ConcurrentHashMap<>();
-    /** {@link #events()} replaces it under this object's lock; {@link #forget} edits it without that lock, atomically. */
+    private final FeedFetches<String> fetches = new FeedFetches<>();
+    private final AtomicLong generation = new AtomicLong();
+    /** Replaced under {@link #lock}, by a pass's publish step and by {@link #forget}; read without it. */
     private final AtomicReference<Map<String, SportsEvent>> byItemId = new AtomicReference<>(Map.of());
+    /** Set when a pass ends, so a lookup that arrives during the first pass runs one too and joins its downloads. */
     private volatile boolean ranOnce;
 
     public CalendarSchedule(SportsSettingsService settingsService, CalendarFetcher fetcher, SecretStore secrets,
@@ -83,48 +93,87 @@ public class CalendarSchedule implements SportsFeed {
     }
 
     @Override
-    public synchronized FeedResult events() {
-        ranOnce = true;
+    public FeedResult events() {
+        try {
+            return pass();
+        } finally {
+            ranOnce = true;
+        }
+    }
+
+    private FeedResult pass() {
         SportsSettings settings = settingsService.current();
         Instant now = clock.instant();
-        Instant windowStart = now.minus(WINDOW_BEFORE);
-        Instant windowEnd = now.plus(WINDOW_AFTER);
-
         Set<String> known = settings.calendars().stream()
                 .map(SportsSettings.CalendarEntry::id).collect(Collectors.toSet());
         cache.keySet().removeIf(id -> !known.contains(id));
-
-        List<SportsEvent> events = new ArrayList<>();
-        List<String> errors = new ArrayList<>();
-        int succeeded = 0;
-        Map<String, SportsEvent> byId = new HashMap<>();
-
         for (SportsSettings.CalendarEntry entry : settings.calendars()) {
-            Cached cached = cache.get(entry.id());
-            boolean stale = cached == null || cached.fetchedAt() == null
-                    || !cached.fetchedAt().plus(properties.calendar().refresh()).isAfter(now);
-            boolean cooledDown = cached == null || cached.error() == null || cached.lastAttempt() == null
-                    || !cached.lastAttempt().plus(RETRY_BACKOFF).isAfter(now);
-            if (stale && cooledDown) {
-                cached = refresh(entry, cached, now);
-                cache.put(entry.id(), cached);
+            // A pass whose wait was interrupted downloads nothing more; it still publishes what is cached.
+            if (Thread.currentThread().isInterrupted()) {
+                break;
             }
-            if (cached != null && cached.calendar() != null) {
-                succeeded++;
-                IcsOccurrences.Result expanded = IcsOccurrences.expand(cached.calendar(), zones.effective(),
-                        windowStart, windowEnd, properties.defaultEventDuration());
-                for (IcsOccurrence occurrence : expanded.occurrences()) {
-                    SportsEvent event = toEvent(entry.id(), occurrence);
-                    events.add(event);
-                    byId.put(event.itemId(), event);
-                }
-            }
-            if (cached != null && cached.error() != null) {
-                errors.add(entry.label() + ": " + cached.error());
+            if (due(cache.get(entry.id()), now)) {
+                fetches.run(entry.id(), () -> refreshIfStillDue(entry, now));
             }
         }
-        byItemId.set(Map.copyOf(byId));
-        return new FeedResult(events, errors, settings.calendars().size(), succeeded);
+        return publish(now);
+    }
+
+    private boolean due(Cached cached, Instant now) {
+        boolean stale = cached == null || cached.fetchedAt() == null
+                || !cached.fetchedAt().plus(properties.calendar().refresh()).isAfter(now);
+        boolean cooledDown = cached == null || cached.error() == null || cached.lastAttempt() == null
+                || !cached.lastAttempt().plus(FeedFetches.RETRY_BACKOFF).isAfter(now);
+        return stale && cooledDown;
+    }
+
+    /** One download: checks again, downloads without a lock, and writes the outcome unless a forget came between. */
+    private void refreshIfStillDue(SportsSettings.CalendarEntry entry, Instant now) {
+        long started = generation.get();
+        if (settingsService.current().calendar(entry.id()).isEmpty()) {
+            return;
+        }
+        Cached previous = cache.get(entry.id());
+        if (!due(previous, now)) {
+            return;
+        }
+        Cached next = refresh(entry, previous, now);
+        synchronized (lock) {
+            if (generation.get() == started) {
+                cache.put(entry.id(), next);
+            }
+        }
+    }
+
+    /** The result for the calendars configured now, from the cache; also replaces the item index. */
+    private FeedResult publish(Instant now) {
+        synchronized (lock) {
+            SportsSettings settings = settingsService.current();
+            Instant windowStart = now.minus(WINDOW_BEFORE);
+            Instant windowEnd = now.plus(WINDOW_AFTER);
+            List<SportsEvent> events = new ArrayList<>();
+            List<String> errors = new ArrayList<>();
+            int succeeded = 0;
+            Map<String, SportsEvent> byId = new HashMap<>();
+            for (SportsSettings.CalendarEntry entry : settings.calendars()) {
+                Cached cached = cache.get(entry.id());
+                if (cached != null && cached.calendar() != null) {
+                    succeeded++;
+                    IcsOccurrences.Result expanded = IcsOccurrences.expand(cached.calendar(), zones.effective(),
+                            windowStart, windowEnd, properties.defaultEventDuration());
+                    for (IcsOccurrence occurrence : expanded.occurrences()) {
+                        SportsEvent event = toEvent(entry.id(), occurrence);
+                        events.add(event);
+                        byId.put(event.itemId(), event);
+                    }
+                }
+                if (cached != null && cached.error() != null) {
+                    errors.add(entry.label() + ": " + cached.error());
+                }
+            }
+            byItemId.set(Map.copyOf(byId));
+            return new FeedResult(events, errors, settings.calendars().size(), succeeded);
+        }
     }
 
     private Cached refresh(SportsSettings.CalendarEntry entry, Cached previous, Instant now) {
@@ -196,14 +245,18 @@ public class CalendarSchedule implements SportsFeed {
     }
 
     public void forget(String calendarId) {
-        cache.remove(calendarId);
-        String key = SportsSettings.calendarKey(calendarId);
-        byItemId.updateAndGet(current -> {
-            Map<String, SportsEvent> next = new HashMap<>(current);
-            next.values().removeIf(event -> event.competitionKey().equals(key));
-            return Map.copyOf(next);
-        });
+        synchronized (lock) {
+            generation.incrementAndGet();
+            cache.remove(calendarId);
+            String key = SportsSettings.calendarKey(calendarId);
+            byItemId.updateAndGet(current -> {
+                Map<String, SportsEvent> next = new HashMap<>(current);
+                next.values().removeIf(event -> event.competitionKey().equals(key));
+                return Map.copyOf(next);
+            });
+        }
     }
+
 
     public static SportsEvent toEvent(String calendarId, IcsOccurrence occurrence) {
         String stripped = occurrence.summary() == null ? "" : occurrence.summary().strip();

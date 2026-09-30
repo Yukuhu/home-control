@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 import static dev.andre.homecontrol.testsupport.FakeHttpServer.ANY_METHOD;
 
@@ -72,6 +73,17 @@ public final class FakeTheSportsDbServer implements AutoCloseable {
 
     public FakeTheSportsDbServer respondJson(String endpoint, Map<String, String> query, int status, String json) {
         return route(endpoint, query, json(status, json == null ? new byte[0] : json.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    /** Like {@link #respond}, but the answer waits until {@code release} opens; the request is recorded on arrival. */
+    public FakeTheSportsDbServer hold(String endpoint, Map<String, String> query, int status, String fixture,
+                                      CountDownLatch release) {
+        Map<String, String> expected = Map.copyOf(query);
+        for (String key : KEYS) {
+            server.hold(ANY_METHOD, PREFIX + key + "/" + endpoint, request -> request.query().equals(expected), release,
+                    json(status, fixtureBytes(fixture)));
+        }
+        return this;
     }
 
     public FakeTheSportsDbServer delay(Duration duration) {

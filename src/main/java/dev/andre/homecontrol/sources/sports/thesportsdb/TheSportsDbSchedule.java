@@ -1,14 +1,15 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.sources.sports.feed.FeedFetches;
 import dev.andre.homecontrol.sources.sports.feed.FeedResult;
+import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
+import dev.andre.homecontrol.sources.sports.feed.SportsFeed;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
 import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
-import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
-import dev.andre.homecontrol.sources.sports.feed.SportsFeed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
@@ -26,12 +27,20 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
-/** Daily TheSportsDB fixtures for every chosen competition, cached per (league, UTC date) pair. */
+/**
+ * Daily TheSportsDB fixtures for every chosen competition, cached per (league, UTC date) pair.
+ *
+ * <p>No lock is held while a day downloads: {@link FeedFetches} runs one download per day at a time, and a pass that
+ * finds one running waits for it. {@link #lock} guards only short steps: writing a download's outcome, publishing a
+ * pass, {@link #forget} and {@link #clear}. Those two advance {@link #generation}, and a download that started under
+ * an older generation drops its outcome, so neither a removal nor a new key is undone by a download already running.
+ */
 public class TheSportsDbSchedule implements SportsFeed {
 
     private static final Logger log = LoggerFactory.getLogger(TheSportsDbSchedule.class);
-    private static final Duration RETRY_BACKOFF = Duration.ofMinutes(10);
+    private static final String LIMITED = "TheSportsDB is limiting requests; try again in a minute";
 
     private record Entry(List<SportsEvent> events, Instant fetchedAt) {
     }
@@ -43,9 +52,13 @@ public class TheSportsDbSchedule implements SportsFeed {
     private final SportsTimeZones zones;
     private final Clock clock;
 
+    private final Object lock = new Object();
     private final Map<String, Entry> cache = new ConcurrentHashMap<>();
     private final Map<String, Instant> lastFailure = new ConcurrentHashMap<>();
     private final Map<String, String> errors = new ConcurrentHashMap<>();
+    private final FeedFetches<String> fetches = new FeedFetches<>();
+    private final AtomicLong generation = new AtomicLong();
+    /** Set when a pass ends, so a lookup that arrives during the first pass runs one too and joins its downloads. */
     private volatile boolean ranOnce;
 
     public TheSportsDbSchedule(TheSportsDbClient client, TheSportsDbKeys keys, SportsSettingsService settingsService,
@@ -82,8 +95,15 @@ public class TheSportsDbSchedule implements SportsFeed {
     }
 
     @Override
-    public synchronized FeedResult events() {
-        ranOnce = true;
+    public FeedResult events() {
+        try {
+            return pass();
+        } finally {
+            ranOnce = true;
+        }
+    }
+
+    private FeedResult pass() {
         SportsSettings settings = settingsService.current();
         Instant now = clock.instant();
         ZoneId zone = zones.effective();
@@ -96,29 +116,8 @@ public class TheSportsDbSchedule implements SportsFeed {
         } catch (TheSportsDbException e) {
             return keyUnavailable(settings, e);
         }
-
-        Round round = new Round(key, now, zone);
-        List<String> errorList = new ArrayList<>();
-        List<SportsEvent> allEvents = new ArrayList<>();
-        int succeeded = 0;
-        for (SportsSettings.CompetitionEntry competition : settings.competitions()) {
-            boolean hasEntry = false;
-            for (LocalDate date : dates) {
-                Entry entry = entry(competition, date, round);
-                if (entry != null) {
-                    hasEntry = true;
-                    allEvents.addAll(entry.events());
-                }
-            }
-            if (hasEntry) {
-                succeeded++;
-            }
-            String competitionError = errors.get(competition.leagueId());
-            if (competitionError != null) {
-                errorList.add(competition.name() + ": " + competitionError);
-            }
-        }
-        return new FeedResult(allEvents, errorList, settings.competitions().size(), succeeded);
+        refreshDue(settings.competitions(), dates, new Round(key, now, zone));
+        return publish(dates);
     }
 
     /** One {@link #events()} pass: once TheSportsDB rate-limits a request, the rest of the pass stays on the cache. */
@@ -155,25 +154,49 @@ public class TheSportsDbSchedule implements SportsFeed {
         return new FeedResult(List.of(), errorList, settings.competitions().size(), 0);
     }
 
-    /** The cached day, refetched first when stale and no recent failure or rate limit holds it back. */
-    private Entry entry(SportsSettings.CompetitionEntry competition, LocalDate date, Round round) {
-        String cacheKey = cacheKey(competition.leagueId(), date);
-        Entry entry = cache.get(cacheKey);
-        boolean fresh = entry != null
-                && entry.fetchedAt().plus(properties.theSportsDb().fixturesTtl()).isAfter(round.now);
-        if (!fresh) {
-            Instant failedAt = lastFailure.get(cacheKey);
-            boolean recentFailure = failedAt != null && failedAt.plus(RETRY_BACKOFF).isAfter(round.now);
-            if (!recentFailure && !round.rateLimited) {
-                fetch(competition, date, cacheKey, round);
-            } else if (round.rateLimited && entry == null) {
-                errors.put(competition.leagueId(), "TheSportsDB is limiting requests; try again in a minute");
+    private void refreshDue(List<SportsSettings.CompetitionEntry> competitions, Set<LocalDate> dates, Round round) {
+        for (SportsSettings.CompetitionEntry competition : competitions) {
+            for (LocalDate date : dates) {
+                // A pass whose wait was interrupted downloads nothing more; it still publishes what is cached.
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+                refreshIfDue(competition, date, round);
             }
         }
-        return cache.get(cacheKey);
     }
 
-    private void fetch(SportsSettings.CompetitionEntry competition, LocalDate date, String cacheKey, Round round) {
+    /** Downloads the day when it is stale and no recent failure or rate limit holds it back. */
+    private void refreshIfDue(SportsSettings.CompetitionEntry competition, LocalDate date, Round round) {
+        String cacheKey = cacheKey(competition.leagueId(), date);
+        Entry entry = cache.get(cacheKey);
+        if (fresh(entry, round.now)) {
+            return;
+        }
+        if (!failedRecently(cacheKey, round.now) && !round.rateLimited) {
+            fetches.run(cacheKey, () -> fetchIfStillDue(competition, date, cacheKey, round));
+        } else if (round.rateLimited && entry == null) {
+            errors.put(competition.leagueId(), LIMITED);
+        }
+    }
+
+    private boolean fresh(Entry entry, Instant now) {
+        return entry != null && entry.fetchedAt().plus(properties.theSportsDb().fixturesTtl()).isAfter(now);
+    }
+
+    private boolean failedRecently(String cacheKey, Instant now) {
+        Instant failedAt = lastFailure.get(cacheKey);
+        return failedAt != null && failedAt.plus(FeedFetches.RETRY_BACKOFF).isAfter(now);
+    }
+
+    /** One download: checks again, downloads without a lock, and writes unless a forget or clear came between. */
+    private void fetchIfStillDue(SportsSettings.CompetitionEntry competition, LocalDate date, String cacheKey,
+                                 Round round) {
+        long started = generation.get();
+        if (settingsService.current().competition(competition.leagueId()).isEmpty()
+                || fresh(cache.get(cacheKey), round.now) || failedRecently(cacheKey, round.now)) {
+            return;
+        }
         try {
             List<JsonNode> raw = client.eventsDay(round.key, date, competition.leagueId());
             List<SportsEvent> mapped = new ArrayList<>();
@@ -182,17 +205,53 @@ public class TheSportsDbSchedule implements SportsFeed {
                         sport -> properties.theSportsDb().durationFor(sport, properties.defaultEventDuration()))
                         .ifPresent(mapped::add);
             }
-            cache.put(cacheKey, new Entry(mapped, round.now));
-            lastFailure.remove(cacheKey);
-            errors.remove(competition.leagueId());
+            synchronized (lock) {
+                if (generation.get() == started) {
+                    cache.put(cacheKey, new Entry(mapped, round.now));
+                    lastFailure.remove(cacheKey);
+                    errors.remove(competition.leagueId());
+                }
+            }
         } catch (TheSportsDbException e) {
-            lastFailure.put(cacheKey, round.now);
-            errors.put(competition.leagueId(), e.getMessage());
+            synchronized (lock) {
+                if (generation.get() == started) {
+                    lastFailure.put(cacheKey, round.now);
+                    errors.put(competition.leagueId(), e.getMessage());
+                }
+            }
             log.warn("TheSportsDB fixtures for competition {} on {} failed ({})",
                     competition.leagueId(), date, e.kind());
             if (e.kind() == ContentSourceException.Kind.RATE_LIMITED) {
                 round.rateLimited = true;
             }
+        }
+    }
+
+    /** The result for the competitions configured now, from the cache. */
+    private FeedResult publish(Set<LocalDate> dates) {
+        synchronized (lock) {
+            SportsSettings settings = settingsService.current();
+            List<String> errorList = new ArrayList<>();
+            List<SportsEvent> allEvents = new ArrayList<>();
+            int succeeded = 0;
+            for (SportsSettings.CompetitionEntry competition : settings.competitions()) {
+                boolean hasEntry = false;
+                for (LocalDate date : dates) {
+                    Entry entry = cache.get(cacheKey(competition.leagueId(), date));
+                    if (entry != null) {
+                        hasEntry = true;
+                        allEvents.addAll(entry.events());
+                    }
+                }
+                if (hasEntry) {
+                    succeeded++;
+                }
+                String competitionError = errors.get(competition.leagueId());
+                if (competitionError != null) {
+                    errorList.add(competition.name() + ": " + competitionError);
+                }
+            }
+            return new FeedResult(allEvents, errorList, settings.competitions().size(), succeeded);
         }
     }
 
@@ -235,15 +294,21 @@ public class TheSportsDbSchedule implements SportsFeed {
     }
 
     public void forget(String leagueId) {
-        cache.keySet().removeIf(key -> leagueIdOf(key).equals(leagueId));
-        lastFailure.keySet().removeIf(key -> leagueIdOf(key).equals(leagueId));
-        errors.remove(leagueId);
+        synchronized (lock) {
+            generation.incrementAndGet();
+            cache.keySet().removeIf(key -> leagueIdOf(key).equals(leagueId));
+            lastFailure.keySet().removeIf(key -> leagueIdOf(key).equals(leagueId));
+            errors.remove(leagueId);
+        }
     }
 
     public void clear() {
-        cache.clear();
-        lastFailure.clear();
-        errors.clear();
+        synchronized (lock) {
+            generation.incrementAndGet();
+            cache.clear();
+            lastFailure.clear();
+            errors.clear();
+        }
     }
 
     private static String cacheKey(String leagueId, LocalDate date) {
