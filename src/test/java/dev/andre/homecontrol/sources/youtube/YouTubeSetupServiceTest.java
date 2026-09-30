@@ -132,7 +132,7 @@ class YouTubeSetupServiceTest {
         service.connect(request, httpRequest);
 
         ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(login).storeSecrets(captor.capture(), anyString(), anyString(), any());
+        verify(login).storeSecrets(captor.capture(), anyString(), anyString(), any(HttpServletRequest.class));
         assertThat(captor.getValue()).containsOnlyKeys(YouTubeSettings.CLIENT_ID);
 
         given(secrets.secret(YouTubeSettings.CLIENT_SECRET)).willReturn(Optional.empty());
@@ -148,7 +148,7 @@ class YouTubeSetupServiceTest {
     @Test
     void aPasswordProblemStoresNothing() {
         willThrow(new PasswordRejectedException("The two passwords do not match"))
-                .given(login).storeSecrets(any(), any(), any(), any());
+                .given(login).storeSecrets(any(), any(), any(), any(HttpServletRequest.class));
         YouTubeSetupService.ConnectRequest request =
                 new YouTubeSetupService.ConnectRequest(VALID_CLIENT_ID, "GOCSPX-abc", "pw-1", "pw-2");
 

@@ -74,7 +74,7 @@ public class LoginService {
         listeners.add(listener);
     }
 
-    public boolean authenticate(String password, HttpServletRequest request) {
+    public boolean authenticate(String password, LoginContext context) {
         Optional<LoginCredential> login = store.login();
         if (login.isEmpty()) {
             return true;
@@ -82,19 +82,12 @@ public class LoginService {
         if (!verify(password, login.get())) {
             return false;
         }
-        startSession(request, login.get());
+        context.startSession(login.get().version());
         return true;
     }
 
-    public void logout(HttpServletRequest request) {
-        HttpSession session = request.getSession(false);
-        if (session != null) {
-            try {
-                session.invalidate();
-            } catch (IllegalStateException _) {
-                // nothing left to end
-            }
-        }
+    public void logout(LoginContext context) {
+        context.endSession();
         changed();
     }
 
@@ -111,14 +104,14 @@ public class LoginService {
     }
 
     /**
-     * The first account credentials need a new login password and log this browser in; later ones need an
-     * already authenticated request. Nothing is stored before the password is accepted.
+     * The first account credentials need a new login password and log this browser in; later ones need a
+     * logged-in browser. Nothing is stored before the password is accepted.
      */
     public void storeSecrets(Map<String, String> secrets, String newPassword, String confirmation,
-                             HttpServletRequest request) {
+                             LoginContext context) {
         synchronized (this) {
             if (store.login().isPresent()) {
-                if (!isAuthenticated(request)) {
+                if (!context.loggedIn()) {
                     throw new LoginRequiredException();
                 }
                 store.putSecrets(secrets);
@@ -127,9 +120,27 @@ public class LoginService {
             checkNewPassword(newPassword, confirmation);
             LoginCredential credential = newCredential(newPassword);
             store.putFirstSecrets(secrets, credential);
-            startSession(request, credential);
+            context.startSession(credential.version());
         }
         changed();
+    }
+
+    /** For the sources until they take a {@link LoginContext}. */
+    public void storeSecrets(Map<String, String> secrets, String newPassword, String confirmation,
+                             HttpServletRequest request) {
+        storeSecrets(secrets, newPassword, confirmation, new RequestLoginContext(request, this));
+    }
+
+    /**
+     * Before work that ends in {@link #storeSecrets}: this browser is logged in, or, while no password is set, the new
+     * one is acceptable. Throws what {@code storeSecrets} would, before anything is fetched or stored.
+     */
+    public void permitSecrets(LoginContext context, String newPassword, String confirmation) {
+        if (loginRequired()) {
+            context.requireLogin();
+        } else {
+            checkNewPassword(newPassword, confirmation);
+        }
     }
 
     public void removeSecrets(Collection<String> names) {
@@ -151,7 +162,7 @@ public class LoginService {
     }
 
     /** Sets the first login password and logs this browser in. The slow hash runs outside the lock. */
-    public void setPassword(String password, String confirmation, HttpServletRequest request) {
+    public void setPassword(String password, String confirmation, LoginContext context) {
         checkNewPassword(password, confirmation);
         LoginCredential credential = newCredential(password);
         synchronized (this) {
@@ -159,7 +170,7 @@ public class LoginService {
                 throw new PasswordRejectedException("A login password is already set; change it instead");
             }
             store.setLogin(credential);
-            startSession(request, credential);
+            context.startSession(credential.version());
         }
         changed();
     }
@@ -203,7 +214,7 @@ public class LoginService {
      * guess of the current one. The slow checks run outside the lock; the login is only replaced if
      * nobody changed it meanwhile.
      */
-    public void changePassword(String current, String next, String confirmation, HttpServletRequest request) {
+    public void changePassword(String current, String next, String confirmation, LoginContext context) {
         LoginCredential login = store.login()
                 .orElseThrow(() -> new PasswordRejectedException("There is no login password to change"));
         checkNewPassword(next, confirmation);
@@ -216,7 +227,7 @@ public class LoginService {
                 throw new PasswordRejectedException("The password was changed meanwhile; try again");
             }
             store.replaceLogin(credential);
-            startSession(request, credential);
+            context.startSession(credential.version());
         }
         changed();
     }
@@ -257,11 +268,5 @@ public class LoginService {
         byte[] version = new byte[16];
         random.nextBytes(version);
         return new LoginCredential(hasher.hash(password), Base64.getUrlEncoder().withoutPadding().encodeToString(version));
-    }
-
-    private static void startSession(HttpServletRequest request, LoginCredential credential) {
-        HttpSession session = request.getSession(true);
-        request.changeSessionId(); // no session fixation
-        session.setAttribute(SESSION_ATTRIBUTE, credential.version());
     }
 }
