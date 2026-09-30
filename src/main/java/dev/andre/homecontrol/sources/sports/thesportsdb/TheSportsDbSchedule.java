@@ -159,15 +159,20 @@ public class TheSportsDbSchedule implements SportsFeed {
     }
 
     private FeedResult keyUnavailable(SportsSettings settings, TheSportsDbException e, long started) {
-        List<String> errorList = settings.competitions().stream()
-                .map(competition -> competition.name() + ": " + e.getMessage())
-                .toList();
+        boolean stale;
         synchronized (lock) {
-            // A key entered since this pass looked makes the error stale.
-            if (generation.get() == started) {
+            stale = generation.get() != started;
+            if (!stale) {
                 settings.competitions().forEach(competition -> errors.put(competition.leagueId(), e.getMessage()));
             }
         }
+        if (stale) {
+            // A key was entered while this pass found none: start over with it.
+            return pass();
+        }
+        List<String> errorList = settings.competitions().stream()
+                .map(competition -> competition.name() + ": " + e.getMessage())
+                .toList();
         return new FeedResult(List.of(), errorList, settings.competitions().size(), 0);
     }
 
