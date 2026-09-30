@@ -5,6 +5,7 @@ import dev.andre.homecontrol.security.LoginRateLimiter;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.security.WrongPasswordException;
+import dev.andre.homecontrol.testsupport.FakeLoginContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,6 +45,7 @@ class LoginControllerTest {
 
     private final LoginService login = mock(LoginService.class);
     private final MockHttpServletRequest request = new MockHttpServletRequest();
+    private final FakeLoginContext context = FakeLoginContext.loggedOutBrowser();
     private final MockHttpServletResponse response = new MockHttpServletResponse();
     private final ExtendedModelMap model = new ExtendedModelMap();
 
@@ -63,7 +65,7 @@ class LoginControllerTest {
     }
 
     private String submit(String password) {
-        return controller.submit(password, "/devices", request, response, model);
+        return controller.submit(password, "/devices", request, context, response, model);
     }
 
     /** Typed as {@code Map<String, Object>} so AssertJ can compare entries; Spring hands out {@code Map<String, ?>}. */
@@ -75,28 +77,28 @@ class LoginControllerTest {
     void theLoginPageSendsVisitorsHomeWhenThereIsNothingToLogInTo() {
         given(login.loginRequired()).willReturn(false);
 
-        assertThat(controller.page("/devices", request, model)).isEqualTo("redirect:/");
+        assertThat(controller.page("/devices", context, model)).isEqualTo("redirect:/");
         assertThat(submit("guess")).isEqualTo("redirect:/");
         verify(login, never()).authenticate(any(), any());
     }
 
     @Test
     void theLoginPageSendsAnAlreadyLoggedInBrowserOnToItsSafeNextPage() {
-        given(login.isAuthenticated(request)).willReturn(true);
+        FakeLoginContext loggedIn = FakeLoginContext.loggedInBrowser();
 
-        assertThat(controller.page("/devices", request, model)).isEqualTo("redirect:/devices");
-        assertThat(controller.page("//evil.example", request, model)).isEqualTo("redirect:/");
+        assertThat(controller.page("/devices", loggedIn, model)).isEqualTo("redirect:/devices");
+        assertThat(controller.page("//evil.example", loggedIn, model)).isEqualTo("redirect:/");
     }
 
     @Test
     void theLoginPageRemembersOnlyASafeNextPage() {
-        assertThat(controller.page("https://evil.example/", request, model)).isEqualTo("login");
+        assertThat(controller.page("https://evil.example/", context, model)).isEqualTo("login");
         assertThat(model.getAttribute("next")).isEqualTo("/");
     }
 
     @Test
     void theRightPasswordFollowsNextAndClearsTheAddress() {
-        given(login.authenticate("right", request)).willReturn(true);
+        given(login.authenticate("right", context)).willReturn(true);
 
         assertThat(submit("right")).isEqualTo("redirect:/devices");
         assertThat(limiter.blockedFor(ADDRESS)).isEmpty();
@@ -104,14 +106,14 @@ class LoginControllerTest {
 
     @Test
     void aWrongPasswordCountsAsAGuessAndTheNextAttemptWaits() {
-        given(login.authenticate("wrong", request)).willReturn(false);
+        given(login.authenticate("wrong", context)).willReturn(false);
 
         assertThat(submit("wrong")).isEqualTo("login");
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(model.getAttribute("error")).isEqualTo("Wrong password");
 
         MockHttpServletResponse second = new MockHttpServletResponse();
-        assertThat(controller.submit("wrong", "/devices", request, second, model)).isEqualTo("login");
+        assertThat(controller.submit("wrong", "/devices", request, context, second, model)).isEqualTo("login");
         assertThat(second.getStatus()).isEqualTo(429);
         assertThat(second.getHeader("Retry-After")).isEqualTo("900");
         assertThat(model.getAttribute("error")).isEqualTo("Too many attempts. Try again in 15 minutes.");
@@ -121,11 +123,11 @@ class LoginControllerTest {
     @Test
     void theWaitIsRoundedUpToWholeMinutesAndAtLeastOneSecond() {
         useWindow(Duration.ofSeconds(30));
-        given(login.authenticate("wrong", request)).willReturn(false);
+        given(login.authenticate("wrong", context)).willReturn(false);
         submit("wrong");
 
         MockHttpServletResponse blocked = new MockHttpServletResponse();
-        controller.submit("wrong", "/", request, blocked, model);
+        controller.submit("wrong", "/", request, context, blocked, model);
 
         assertThat(blocked.getHeader("Retry-After")).isEqualTo("30");
         assertThat(model.getAttribute("error")).isEqualTo("Too many attempts. Try again in 1 minute.");
@@ -133,7 +135,7 @@ class LoginControllerTest {
 
     @Test
     void aBusyVerifierIsNotCountedAsAGuess() {
-        willThrow(new LoginBusyException()).given(login).authenticate("right", request);
+        willThrow(new LoginBusyException()).given(login).authenticate("right", context);
 
         assertThat(submit("right")).isEqualTo("login");
         assertThat(response.getStatus()).isEqualTo(429);
@@ -144,7 +146,7 @@ class LoginControllerTest {
 
     @Test
     void anUnexpectedFailureIsNotCountedAsAGuessAndStillSurfaces() {
-        willThrow(new IllegalStateException("disk gone")).given(login).authenticate("right", request);
+        willThrow(new IllegalStateException("disk gone")).given(login).authenticate("right", context);
 
         assertThatThrownBy(() -> submit("right")).isInstanceOf(IllegalStateException.class).hasMessage("disk gone");
         assertThat(limiter.blockedFor(ADDRESS)).isEmpty();
@@ -152,20 +154,20 @@ class LoginControllerTest {
 
     @Test
     void loggingOutGoesToTheLoginPageOnlyWhileALoginExists() {
-        assertThat(controller.logout(request)).isEqualTo("redirect:/login");
+        assertThat(controller.logout(context)).isEqualTo("redirect:/login");
 
         given(login.loginRequired()).willReturn(false);
-        assertThat(controller.logout(request)).isEqualTo("redirect:/");
-        verify(login, times(2)).logout(request);
+        assertThat(controller.logout(context)).isEqualTo("redirect:/");
+        verify(login, times(2)).logout(context);
     }
 
     @Test
     void aSuccessfulPasswordChangeClearsTheAddress() {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
-        assertThat(controller.changePassword("old", "new", "new", request, redirect)).isEqualTo("redirect:/setup");
+        assertThat(controller.changePassword("old", "new", "new", request, context, redirect)).isEqualTo("redirect:/setup");
 
-        verify(login).changePassword("old", "new", "new", request);
+        verify(login).changePassword("old", "new", "new", context);
         assertThat(flash(redirect))
                 .containsEntry("loginMessage", "Password changed. Other browsers need to log in again.");
         assertThat(limiter.blockedFor(ADDRESS)).isEmpty();
@@ -174,14 +176,14 @@ class LoginControllerTest {
     @Test
     void aWrongCurrentPasswordIsAGuessAndTheNextChangeWaits() {
         willThrow(new WrongPasswordException("The current password is wrong"))
-                .given(login).changePassword("guess", "new", "new", request);
+                .given(login).changePassword("guess", "new", "new", context);
         RedirectAttributesModelMap first = new RedirectAttributesModelMap();
 
-        controller.changePassword("guess", "new", "new", request, first);
+        controller.changePassword("guess", "new", "new", request, context, first);
 
         assertThat(flash(first)).containsEntry("loginError", "The current password is wrong");
         RedirectAttributesModelMap second = new RedirectAttributesModelMap();
-        assertThat(controller.changePassword("guess", "new", "new", request, second)).isEqualTo("redirect:/setup");
+        assertThat(controller.changePassword("guess", "new", "new", request, context, second)).isEqualTo("redirect:/setup");
         assertThat(flash(second)).containsEntry("loginError", "Too many attempts. Try again in 15 minutes.");
         verify(login, times(1)).changePassword(any(), any(), any(), any());
     }
@@ -189,13 +191,13 @@ class LoginControllerTest {
     @Test
     void aRejectedNewPasswordOrABusyVerifierIsNotAGuess() {
         willThrow(new PasswordRejectedException("The two passwords do not match"))
-                .given(login).changePassword("old", "new", "other", request);
-        willThrow(new LoginBusyException()).given(login).changePassword("old", "new", "new", request);
+                .given(login).changePassword("old", "new", "other", context);
+        willThrow(new LoginBusyException()).given(login).changePassword("old", "new", "new", context);
 
         RedirectAttributesModelMap rejected = new RedirectAttributesModelMap();
-        controller.changePassword("old", "new", "other", request, rejected);
+        controller.changePassword("old", "new", "other", request, context, rejected);
         RedirectAttributesModelMap busy = new RedirectAttributesModelMap();
-        controller.changePassword("old", "new", "new", request, busy);
+        controller.changePassword("old", "new", "new", request, context, busy);
 
         assertThat(flash(rejected)).containsEntry("loginError", "The two passwords do not match");
         assertThat(flash(busy))
@@ -207,10 +209,10 @@ class LoginControllerTest {
     void settingAPasswordReportsSuccessAndIsNotAGuess() {
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
-        assertThat(controller.setPassword("household password", "household password", request, redirect))
+        assertThat(controller.setPassword("household password", "household password", context, redirect))
                 .isEqualTo("redirect:/setup");
 
-        verify(login).setPassword("household password", "household password", request);
+        verify(login).setPassword("household password", "household password", context);
         assertThat(flash(redirect)).containsEntry("loginMessage",
                 "Password set. Every browser now needs it to open Home Control.");
         assertThat(limiter.blockedFor(ADDRESS)).isEmpty();
@@ -219,10 +221,10 @@ class LoginControllerTest {
     @Test
     void aRejectedNewPasswordIsShown() {
         willThrow(new PasswordRejectedException("The two passwords do not match"))
-                .given(login).setPassword("household password", "different", request);
+                .given(login).setPassword("household password", "different", context);
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
-        controller.setPassword("household password", "different", request, redirect);
+        controller.setPassword("household password", "different", context, redirect);
 
         assertThat(flash(redirect)).containsEntry("loginError", "The two passwords do not match");
     }
@@ -268,10 +270,10 @@ class LoginControllerTest {
 
     @Test
     void anUnexpectedFailureWhileChangingThePasswordIsNotAGuess() {
-        willThrow(new IllegalStateException("disk gone")).given(login).changePassword("old", "new", "new", request);
+        willThrow(new IllegalStateException("disk gone")).given(login).changePassword("old", "new", "new", context);
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
-        assertThatThrownBy(() -> controller.changePassword("old", "new", "new", request, redirect))
+        assertThatThrownBy(() -> controller.changePassword("old", "new", "new", request, context, redirect))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(limiter.blockedFor(ADDRESS)).isEmpty();
     }

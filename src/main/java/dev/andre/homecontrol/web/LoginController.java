@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.security.LoginBusyException;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRateLimiter;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
@@ -36,11 +37,11 @@ public class LoginController {
     }
 
     @GetMapping("/login")
-    public String page(@RequestParam(required = false) String next, HttpServletRequest request, Model model) {
+    public String page(@RequestParam(required = false) String next, LoginContext context, Model model) {
         if (!loginService.loginRequired()) {
             return HOME_REDIRECT;
         }
-        if (loginService.isAuthenticated(request)) {
+        if (context.loggedIn()) {
             return "redirect:" + safeNext(next);
         }
         model.addAttribute("next", safeNext(next));
@@ -49,7 +50,7 @@ public class LoginController {
 
     @PostMapping("/login")
     public String submit(@RequestParam(required = false) String password, @RequestParam(required = false) String next,
-                         HttpServletRequest request, HttpServletResponse response, Model model) {
+                         HttpServletRequest request, LoginContext context, HttpServletResponse response, Model model) {
         if (!loginService.loginRequired()) {
             return HOME_REDIRECT;
         }
@@ -64,7 +65,7 @@ public class LoginController {
         }
         boolean ok;
         try {
-            ok = loginService.authenticate(password, request);
+            ok = loginService.authenticate(password, context);
         } catch (LoginBusyException e) {
             limiter.release(address);
             response.setStatus(429);
@@ -84,16 +85,16 @@ public class LoginController {
     }
 
     @PostMapping("/logout")
-    public String logout(HttpServletRequest request) {
-        loginService.logout(request);
+    public String logout(LoginContext context) {
+        loginService.logout(context);
         return loginService.loginRequired() ? "redirect:/login" : HOME_REDIRECT;
     }
 
     @PostMapping("/setup/password")
     public String changePassword(@RequestParam(required = false) String current, @RequestParam(required = false) String password,
                                  @RequestParam(required = false) String confirmation, HttpServletRequest request,
-                                 RedirectAttributes redirect) {
-        guessing(request, redirect, () -> loginService.changePassword(current, password, confirmation, request),
+                                 LoginContext context, RedirectAttributes redirect) {
+        guessing(request, redirect, () -> loginService.changePassword(current, password, confirmation, context),
                 "Password changed. Other browsers need to log in again.");
         return SETUP_REDIRECT;
     }
@@ -101,10 +102,10 @@ public class LoginController {
     /** No guess is involved, so it is not rate-limited. Only possible while no login exists. */
     @PostMapping("/setup/password/set")
     public String setPassword(@RequestParam(required = false) String password,
-                              @RequestParam(required = false) String confirmation, HttpServletRequest request,
+                              @RequestParam(required = false) String confirmation, LoginContext context,
                               RedirectAttributes redirect) {
         try {
-            loginService.setPassword(password, confirmation, request);
+            loginService.setPassword(password, confirmation, context);
             redirect.addFlashAttribute(LOGIN_MESSAGE, "Password set. Every browser now needs it to open Home Control.");
         } catch (PasswordRejectedException e) {
             redirect.addFlashAttribute(LOGIN_ERROR, e.getMessage());

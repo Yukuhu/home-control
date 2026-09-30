@@ -7,6 +7,7 @@ import com.microsoft.playwright.options.BoundingBox;
 import com.microsoft.playwright.options.ScreenshotAnimations;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.sources.workflows.FakeWorkflowServer;
 import dev.andre.homecontrol.sources.workflows.WorkflowCodec;
 import dev.andre.homecontrol.sources.workflows.WorkflowStore;
@@ -45,7 +46,7 @@ class WorkflowE2eTest extends E2eApplicationTest {
     @AfterEach void clearWorkflowsAndTheLogin() {
         if (!workflows.all().isEmpty()) {
             var request = new MockHttpServletRequest();
-            org.assertj.core.api.Assertions.assertThat(login.authenticate(PASSWORD, request)).isTrue();
+            org.assertj.core.api.Assertions.assertThat(login.authenticate(PASSWORD, new RequestLoginContext(request, login))).isTrue();
             for (var definition : workflows.all()) workflows.remove(definition.id(), definition.revision(), request);
         }
         if (login.loginRequired()) {

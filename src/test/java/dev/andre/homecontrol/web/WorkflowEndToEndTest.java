@@ -5,6 +5,7 @@ import dev.andre.homecontrol.content.RailStatus;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.*;
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.sources.workflows.FakeWorkflowServer;
 import dev.andre.homecontrol.sources.workflows.WorkflowStore;
 import org.junit.jupiter.api.AfterEach;
@@ -108,7 +109,7 @@ class WorkflowEndToEndTest {
         try {
             if (!workflows.all().isEmpty()) {
                 var request = new MockHttpServletRequest();
-                assertThat(login.authenticate(PASSWORD, request)).isTrue();
+                assertThat(login.authenticate(PASSWORD, new RequestLoginContext(request, login))).isTrue();
                 for (var definition : workflows.all()) workflows.remove(definition.id(), definition.revision(), request);
             }
             if (login.loginRequired()) {
