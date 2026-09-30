@@ -8,7 +8,7 @@ import java.util.Objects;
 
 /**
  * An answer from a {@link GuardedHttpClient}: any status, its content type, its body (empty for a redirect it
- * followed past, or an error body nobody asked for), its headers by lower-case name, first value only, and the URI
+ * followed past, or for an answer other than 200 whose body nobody asked for), its headers by lower-case name, first value only, and the URI
  * that answered, which after a redirect is not the one requested.
  */
 public record OutboundResponse(int status, String contentType, byte[] body, Map<String, String> headers, URI uri) {

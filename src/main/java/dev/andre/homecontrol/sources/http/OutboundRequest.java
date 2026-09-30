@@ -15,7 +15,7 @@ import java.util.OptionalLong;
  * @param maxBytes    the body cap for this request, or 0 for the profile's
  * @param waitForSlot whether to wait for a free slot (until the deadline) rather than fail at once when all are busy
  * @param notAfter    a {@link System#nanoTime()} the whole exchange must end by, on top of the profile's deadline
- * @param errorBody   whether to read the body of an unsuccessful answer; otherwise it is dropped unread
+ * @param errorBody   whether to read the body of an answer other than 200; otherwise it is dropped unread
  */
 public record OutboundRequest(String method, URI uri, Map<String, String> headers, byte[] body, String contentType,
                               int maxBytes, boolean waitForSlot, OptionalLong notAfter,
@@ -62,7 +62,7 @@ public record OutboundRequest(String method, URI uri, Map<String, String> header
         return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, true, OptionalLong.of(nanoTime), errorBody);
     }
 
-    /** Reads the body of an unsuccessful answer too, for a source whose errors explain themselves there. */
+    /** Reads the body of an answer other than 200 too, for a source whose errors explain themselves there. */
     public OutboundRequest withErrorBody() {
         return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, waitForSlot, notAfter, true);
     }

@@ -489,4 +489,27 @@ class GuardedHttpClientTest {
                     .hasMessage("Home Control does not connect to metadata.test (address not allowed)");
         }
     }
+    @Test
+    void anAnswerOtherThan200IsNotReadUnlessAsked() throws Exception {
+        server.handle("GET", "/partial", exchange -> {
+            exchange.sendResponseHeaders(206, 0);
+            exchange.getResponseBody().write('x');
+            exchange.getResponseBody().flush();
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+            exchange.close();
+        });
+        try (var client = client(Redirects.NONE, Duration.ofSeconds(8), 2, true)) {
+            CompletableFuture<OutboundResponse> partial = CompletableFuture.supplyAsync(
+                    () -> client.send(OutboundRequest.get(at("source.test", "/partial"))));
+
+            // A caller that only accepts 200 rejects the status; the body that never ends is not waited for.
+            OutboundResponse answered = partial.get(3, TimeUnit.SECONDS);
+            assertThat(answered.status()).isEqualTo(206);
+            assertThat(answered.body()).isEmpty();
+        }
+    }
 }
