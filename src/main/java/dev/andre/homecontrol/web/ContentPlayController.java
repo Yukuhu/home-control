@@ -1,18 +1,15 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.PinOffers;
 import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.Route;
-import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.playback.PlayAttempt;
 import dev.andre.homecontrol.playback.PlaybackService;
 import org.springframework.beans.factory.ObjectProvider;
@@ -115,7 +112,7 @@ public class ContentPlayController {
 
     /**
      * The item, re-read from its source, for a device that exists. An unknown device, source or
-     * item ends the request as a 404 with a plain-text reason, through the handlers below.
+     * item ends the request as a 404 with a plain-text reason, through {@link ErrorAdvice} and the handler below.
      */
     private ContentItem requireItem(String id, String source, String item) {
         if (devices.device(id).isEmpty()) {
@@ -138,24 +135,10 @@ public class ContentPlayController {
         return text(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
-    @ExceptionHandler({DeviceNotFoundException.class, NoSuchContentException.class})
-    public ResponseEntity<String> notFound(RuntimeException e) {
+    /** The other exceptions reach {@link ErrorAdvice}. */
+    @ExceptionHandler(NoSuchContentException.class)
+    public ResponseEntity<String> noSuchContent(NoSuchContentException e) {
         return text(HttpStatus.NOT_FOUND, e.getMessage());
-    }
-
-    @ExceptionHandler(DeviceOfflineException.class)
-    public ResponseEntity<String> offline(DeviceOfflineException e) {
-        return text(HttpStatus.CONFLICT, e.getMessage());
-    }
-
-    @ExceptionHandler({UnsupportedActionException.class, UnroutableException.class})
-    public ResponseEntity<String> cannot(RuntimeException e) {
-        return text(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
-    }
-
-    @ExceptionHandler({ActionFailedException.class, ContentSourceException.class})
-    public ResponseEntity<String> failed(RuntimeException e) {
-        return text(HttpStatus.BAD_GATEWAY, e.getMessage());
     }
 
     private static ResponseEntity<String> text(HttpStatus status, String body) {

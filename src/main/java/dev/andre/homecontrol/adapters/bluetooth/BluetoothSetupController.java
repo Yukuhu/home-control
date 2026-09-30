@@ -3,12 +3,7 @@ package dev.andre.homecontrol.adapters.bluetooth;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.Device;
-import dev.andre.homecontrol.core.DeviceNotFoundException;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -104,10 +99,5 @@ public class BluetoothSetupController {
             flash.addFlashAttribute(ERROR, e.getMessage());
         }
         return REDIRECT;
-    }
-
-    @ExceptionHandler(DeviceNotFoundException.class)
-    public ResponseEntity<String> notFound(DeviceNotFoundException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).contentType(MediaType.TEXT_PLAIN).body(e.getMessage());
     }
 }

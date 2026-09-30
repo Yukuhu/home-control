@@ -1,22 +1,16 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.core.Action;
-import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.DeviceCommands;
-import dev.andre.homecontrol.core.DeviceNotFoundException;
-import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.RemoteKey;
-import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.playback.AppLinks;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.Route;
-import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.playback.PlaybackService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -146,26 +140,6 @@ public class DeviceController {
     private ResponseEntity<String> command(String id, Action action) {
         commands.execute(id, action);
         return ResponseEntity.noContent().build();
-    }
-
-    @ExceptionHandler(DeviceNotFoundException.class)
-    public ResponseEntity<String> notFound(DeviceNotFoundException e) {
-        return text(HttpStatus.NOT_FOUND, e.getMessage());
-    }
-
-    @ExceptionHandler(DeviceOfflineException.class)
-    public ResponseEntity<String> offline(DeviceOfflineException e) {
-        return text(HttpStatus.CONFLICT, e.getMessage());
-    }
-
-    @ExceptionHandler({UnsupportedActionException.class, UnroutableException.class})
-    public ResponseEntity<String> cannot(RuntimeException e) {
-        return text(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
-    }
-
-    @ExceptionHandler(ActionFailedException.class)
-    public ResponseEntity<String> failed(ActionFailedException e) {
-        return text(HttpStatus.BAD_GATEWAY, e.getMessage());
     }
 
     private static ResponseEntity<String> text(HttpStatus status, String body) {
