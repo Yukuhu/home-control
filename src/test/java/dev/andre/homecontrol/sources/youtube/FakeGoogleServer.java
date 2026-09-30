@@ -61,11 +61,16 @@ public final class FakeGoogleServer implements AutoCloseable {
     }
 
     public YouTubeProperties properties() {
+        return properties(true);
+    }
+
+    /** {@code allowLoopback} false is the production default, which refuses this fake. */
+    public YouTubeProperties properties(boolean allowLoopback) {
         URI base = base();
         return new YouTubeProperties(true, URI.create(base + "/oauth"), URI.create(base + "/youtube/v3"),
                 URI.create(base + "/lounge"), URI.create(base + "/thumbs"), Duration.ofSeconds(2),
                 Duration.ofSeconds(5), 10000, 20, 30, 30, 5,
-                Duration.ofHours(24), 20, Duration.ofMinutes(60), Duration.ofMinutes(15), Duration.ofHours(6));
+                Duration.ofHours(24), 20, Duration.ofMinutes(60), Duration.ofMinutes(15), Duration.ofHours(6), allowLoopback);
     }
 
     public static String fixture(String name) {

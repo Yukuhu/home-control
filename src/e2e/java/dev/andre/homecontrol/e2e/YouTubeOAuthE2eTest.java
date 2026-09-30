@@ -51,6 +51,7 @@ class YouTubeOAuthE2eTest extends E2eApplicationTest {
     static void google(DynamicPropertyRegistry registry) {
         registry.add("home-control.youtube.oauth-base-url", () -> GOOGLE.base() + "/oauth");
         registry.add("home-control.youtube.api-base-url", () -> GOOGLE.base() + "/youtube/v3");
+        registry.add("home-control.youtube.allow-loopback", () -> "true");
         registry.add("home-control.content.rails.scheduler-enabled", () -> "false");
     }
 

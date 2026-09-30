@@ -276,6 +276,6 @@ class SubscriptionsFeedTest {
         return new YouTubeProperties(p.enabled(), p.oauthBaseUrl(), p.apiBaseUrl(), p.loungeBaseUrl(), p.thumbnailBaseUrl(),
                 p.connectTimeout(), p.requestTimeout(), p.dailyQuotaUnits(), p.searchesPerDay(), p.railSize(),
                 channelsPerRefresh, p.videosPerChannel(), p.subscriptionsRefresh(), p.maxSubscriptionPages(),
-                p.refreshInterval(), p.minRefreshSpacing(), p.searchCacheTtl());
+                p.refreshInterval(), p.minRefreshSpacing(), p.searchCacheTtl(), true);
     }
 }

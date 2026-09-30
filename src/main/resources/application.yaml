@@ -213,6 +213,8 @@ home-control:
     api-base-url: https://www.googleapis.com/youtube/v3
     lounge-base-url: https://www.youtube.com/api/lounge
     thumbnail-base-url: https://i.ytimg.com
+    # Google's APIs are public: an answer that points at this machine is refused unless a local mirror is meant.
+    allow-loopback: false
     connect-timeout: 5s
     request-timeout: 15s
     # Your Cloud project's daily YouTube Data API quota (10000 unless Google raised it).

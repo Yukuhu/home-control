@@ -37,6 +37,7 @@ home-control:
     api-base-url: http://127.0.0.1:9
     lounge-base-url: http://127.0.0.1:9
     thumbnail-base-url: http://127.0.0.1:9
+    allow-loopback: true
   content:
     rails:
       scheduler-enabled: false
