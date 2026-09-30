@@ -2,7 +2,6 @@ package dev.andre.homecontrol.adapters.cast.protocol;
 
 import tools.jackson.databind.JsonNode;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,23 +17,23 @@ public record ReceiverStatus(double volumeLevel, boolean muted, boolean standBy,
     }
 
     public static ReceiverStatus parse(JsonNode status) {
-        List<ReceiverApp> applications = new ArrayList<>();
-        for (JsonNode app : status.path("applications")) {
-            List<String> namespaces = new ArrayList<>();
-            for (JsonNode namespace : app.path("namespaces")) {
-                namespaces.add(namespace.path("name").asString(""));
-            }
-            applications.add(new ReceiverApp(
-                    app.path("appId").asString(""),
-                    app.path("displayName").asString(""),
-                    app.path("sessionId").asString(""),
-                    app.path("transportId").asString(""),
-                    app.path("isIdleScreen").asBoolean(false),
-                    List.copyOf(namespaces)));
-        }
+        List<ReceiverApp> applications = status.path("applications").valueStream()
+                .map(ReceiverStatus::readApplication).toList();
         JsonNode volume = status.path("volume");
         return new ReceiverStatus(volume.path("level").asDouble(0.0), volume.path("muted").asBoolean(false),
-                status.path("isStandBy").asBoolean(false), List.copyOf(applications));
+                status.path("isStandBy").asBoolean(false), applications);
+    }
+
+    private static ReceiverApp readApplication(JsonNode app) {
+        List<String> namespaces = app.path("namespaces").valueStream()
+                .map(namespace -> namespace.path("name").asString("")).toList();
+        return new ReceiverApp(
+                app.path("appId").asString(""),
+                app.path("displayName").asString(""),
+                app.path("sessionId").asString(""),
+                app.path("transportId").asString(""),
+                app.path("isIdleScreen").asBoolean(false),
+                namespaces);
     }
 
     /** The app the user sees, ignoring the Backdrop idle screen. */

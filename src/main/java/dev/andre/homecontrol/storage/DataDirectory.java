@@ -8,6 +8,8 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /** The one place that knows the application's files under {@code /data}. */
+// This filesystem service retains identity semantics; a record would introduce value equality and expose its path in toString.
+@SuppressWarnings("java:S6206")
 public final class DataDirectory {
 
     public static final String KEYSTORE = "keystore.p12";

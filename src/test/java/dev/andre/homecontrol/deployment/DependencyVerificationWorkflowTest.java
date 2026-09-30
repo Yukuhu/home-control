@@ -26,7 +26,7 @@ class DependencyVerificationWorkflowTest {
         Map<String, Object> jobs = jobs();
         assertThat(needs(job(jobs, "ci-passed"))).contains("checksums");
         assertThat(needs(job(jobs, "pr-summary"))).contains("checksums");
-        assertThat(job(jobs, "checksums").get("continue-on-error")).isNotEqualTo(true);
+        assertThat(job(jobs, "checksums")).doesNotContainEntry("continue-on-error", true);
     }
 
     @Test
