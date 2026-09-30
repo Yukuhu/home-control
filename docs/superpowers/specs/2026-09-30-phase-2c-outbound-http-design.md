@@ -60,7 +60,9 @@ and with messages that name only the host.
 
 **`OutboundAddressPolicy`** decides where a source may connect.
 - `InetAddress[] addresses(String host)` resolves the host (through an injectable resolver, for tests) and returns
-  only approved addresses; if none is approved it throws `BLOCKED`. An IP literal is checked the same way.
+  its addresses when every one is approved; if any is refused it throws `BLOCKED`, as the workflow policy always did
+  (a mixed answer prevents any connection). An IP literal is checked the same way. (Amended during PR 2's review:
+  the first wording kept the approved addresses of a mixed answer.)
 - Always refused: any-local (`0.0.0.0`, `::`), link-local (`169.254.0.0/16`, which includes cloud metadata, and
   `fe80::/10`) and multicast. LAN (site-local and unique-local) addresses are allowed.
 - Loopback is allowed only when the policy was built with `allowLoopback`.

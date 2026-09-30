@@ -65,10 +65,10 @@ For the others it is off unless you turn it on, for example to reach a local mir
 
 | Source | Setting |
 | --- | --- |
-| TMDB | `home-control.tmdb.allow-loopback` |
-| TheSportsDB | `home-control.sports.thesportsdb.allow-loopback` |
-| YouTube and Google sign-in | `home-control.youtube.allow-loopback` |
-| Sports calendars | `home-control.sports.calendar.allow-loopback` |
+| TMDB | `HOME_CONTROL_TMDB_ALLOW_LOOPBACK` |
+| TheSportsDB | `HOME_CONTROL_SPORTS_THESPORTSDB_ALLOW_LOOPBACK` |
+| YouTube and Google sign-in | `HOME_CONTROL_YOUTUBE_ALLOW_LOOPBACK` |
+| Sports calendars | `HOME_CONTROL_SPORTS_CALENDAR_ALLOW_LOOPBACK` |
 | Workflows | `HOME_CONTROL_WORKFLOWS_ALLOW_LOOPBACK` |
 
 Redirects are not followed, except by calendars, which check every hop again, and by
