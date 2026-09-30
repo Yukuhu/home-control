@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,6 +60,37 @@ class EventStreamShutdownEndToEndTest {
             assertThat(closing).isLessThan(Duration.ofSeconds(10));
         } finally {
             // shutdownNow, not close: close() would wait for the stream if the application failed to end it.
+            http.shutdownNow();
+            app.close();
+            if (events != null) {
+                events.awaitEnd(Duration.ofSeconds(5));
+            }
+        }
+    }
+
+    /** Nothing to report, so the heartbeat is the stream's first write: it opens the response and keeps it open. */
+    @Test
+    void anIdleStreamGetsAKeepAliveCommentOnItsOwn() throws Exception {
+        String dataDir = Files.createTempDirectory("shield-sse-heartbeat").toString();
+        ConfigurableApplicationContext app = new SpringApplicationBuilder(HomeControlApplication.class)
+                .run("--server.port=0", "--home-control.data-dir=" + dataDir, "--home-control.events.heartbeat-interval=1s");
+        HttpClient http = HttpClient.newHttpClient();
+        EventStreamReader events = null;
+        try {
+            int port = app.getEnvironment().getRequiredProperty("local.server.port", Integer.class);
+            HttpResponse<Stream<String>> response = http.sendAsync(
+                    HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/events"))
+                            .header("Accept", "text/event-stream")
+                            .build(),
+                    HttpResponse.BodyHandlers.ofLines()).get(10, TimeUnit.SECONDS);
+            assertThat(response.statusCode()).isEqualTo(200);
+            EventStreamReader reader = new EventStreamReader(response);
+            events = reader;
+
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(reader.lines())
+                    .anySatisfy(line -> assertThat(line).startsWith(":").contains("keep-alive")));
+            assertThat(reader.lines()).noneMatch(line -> line.startsWith("data:"));
+        } finally {
             http.shutdownNow();
             app.close();
             if (events != null) {
