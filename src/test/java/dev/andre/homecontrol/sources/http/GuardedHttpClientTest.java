@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.awaitility.Awaitility.await;
 
 /**
  * The guarded client against a fake server on loopback. Host names resolve through the test's policy: source.test
@@ -278,27 +279,53 @@ class GuardedHttpClientTest {
         }
     }
 
+    /**
+     * A platform lookup ignores interruption, so it can answer after the caller gave up. The caller still hears at the
+     * deadline, and the late answer never opens a connection: nothing is accepted on the socket it names.
+     */
     @Test
-    void aHangingLookupEndsAtTheDeadline() {
-        CountDownLatch looking = new CountDownLatch(1);
-        var hanging = new OutboundAddressPolicy(true, host -> {
-            looking.countDown();
-            try {
-                release.await(10, TimeUnit.SECONDS);
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-            }
-            return new InetAddress[] {InetAddress.ofLiteral("127.0.0.1")};
-        });
-        server.respond("GET", "/ok", Response.of(200, "text/plain", "hello"));
-        try (var client = new GuardedHttpClient(profile(Redirects.NONE, Duration.ofMillis(300), 1), hanging,
-                failure -> new ContentSourceException(failure.kind(), failure.describe("the source")))) {
-            ContentSourceException hung = failureOf(() -> client.send(OutboundRequest.get(at("source.test", "/ok"))));
+    void aHangingLookupEndsAtTheDeadlineAndItsLateAnswerConnectsNowhere() throws Exception {
+        AtomicInteger accepted = new AtomicInteger();
+        try (var socket = new ServerSocket(0, 50, InetAddress.ofLiteral("127.0.0.1"))) {
+            Thread.ofVirtual().start(() -> {
+                while (!socket.isClosed()) {
+                    try (var connection = socket.accept()) {
+                        accepted.incrementAndGet();
+                    } catch (IOException _) {
+                        // closed at the end of the test
+                    }
+                }
+            });
+            CountDownLatch lookedUp = new CountDownLatch(1);
+            var deaf = new OutboundAddressPolicy(true, host -> {
+                lookedUp.countDown();
+                awaitIgnoringInterrupts(release);
+                return new InetAddress[] {InetAddress.ofLiteral("127.0.0.1")};
+            });
+            URI target = URI.create("http://source.test:" + socket.getLocalPort() + "/ok");
+            try (var client = new GuardedHttpClient(profile(Redirects.NONE, Duration.ofMillis(300), 1), deaf,
+                    failure -> new ContentSourceException(failure.kind(), failure.describe("the source")))) {
+                assertThat(failureOf(() -> client.send(OutboundRequest.get(target))))
+                        .hasMessageContaining(OutboundFailure.TIMED_OUT);
+                assertThat(lookedUp.await(5, TimeUnit.SECONDS)).isTrue();
 
-            assertThat(hung).hasMessageContaining(OutboundFailure.TIMED_OUT);
-            release.countDown();
+                release.countDown();
+                // One slot: this call starts only once the late worker has finished and freed it.
+                client.vet(OutboundRequest.get(target).endingBy(System.nanoTime() + Duration.ofSeconds(5).toNanos()));
+            }
+            await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2)).until(() -> accepted.get() == 0);
         }
-        assertThat(server.requests()).isEmpty();
+    }
+
+    private static void awaitIgnoringInterrupts(CountDownLatch latch) {
+        boolean waiting = true;
+        while (waiting) {
+            try {
+                waiting = !latch.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
+                // A platform resolver does not stop when its thread is interrupted; neither does this one.
+            }
+        }
     }
 
     @Test
