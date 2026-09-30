@@ -27,7 +27,8 @@ class OutboundAddressPolicyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"93.184.216.34", "192.168.1.20", "10.0.0.5", "172.16.3.4", "2001:db8::1", "fd00::5"})
+    @ValueSource(strings = {"93.184.216.34", "192.168.1.20", "10.0.0.5", "172.16.3.4", "100.64.1.1", "2001:db8::1",
+            "fd00::5", "fd12:3456::1"})
     void allowsTheInternetAndTheLan(String address) throws UnknownHostException {
         assertThat(resolvingTo(false, address).addresses("media.example")).hasSize(1);
     }

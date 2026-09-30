@@ -5,9 +5,9 @@ import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.content.SourcePreferencesService;
 import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarFetcher;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
-import dev.andre.homecontrol.sources.sports.calendar.CalendarUrlPolicy;
 import dev.andre.homecontrol.sources.sports.calendar.SportsCalendars;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
 import dev.andre.homecontrol.storage.DataDirectory;
@@ -43,13 +43,9 @@ public class SportsConfiguration {
     }
 
     @Bean
-    public CalendarUrlPolicy calendarUrlPolicy(SportsProperties properties) {
-        return new CalendarUrlPolicy(properties.calendar().allowLoopback());
-    }
-
-    @Bean
-    public CalendarFetcher calendarFetcher(SportsProperties properties, CalendarUrlPolicy policy) {
-        return new CalendarFetcher(properties.calendar(), policy);
+    public CalendarFetcher calendarFetcher(SportsProperties properties) {
+        return new CalendarFetcher(properties.calendar(),
+                new OutboundAddressPolicy(properties.calendar().allowLoopback()));
     }
 
     @Bean

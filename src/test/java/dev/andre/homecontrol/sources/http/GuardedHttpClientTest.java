@@ -452,4 +452,12 @@ class GuardedHttpClientTest {
             assertThat(client.send(OutboundRequest.get(at("source.test", "/explained"))).body()).isEmpty();
         }
     }
+    @Test
+    void aFailureOnARedirectNamesTheHostItWasGoingTo() {
+        server.respond("GET", "/metadata", Response.empty(302).withHeader("Location", "http://metadata.test/latest"));
+        try (var client = client(Redirects.CHECKED)) {
+            assertThat(failureOf(() -> client.send(OutboundRequest.get(at("source.test", "/metadata")))))
+                    .hasMessage("Home Control does not connect to metadata.test (address not allowed)");
+        }
+    }
 }
