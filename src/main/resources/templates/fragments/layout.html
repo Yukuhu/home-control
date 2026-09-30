@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<!--/* What every page shares. A page includes pageHead first in its own <head>, then adds its own scripts. */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <th:block th:fragment="pageHead(title, resizesContent)">
+        <meta charset="UTF-8">
+        <meta name="viewport" th:content="${resizesContent}
+                ? 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content'
+                : 'width=device-width, initial-scale=1, viewport-fit=cover'">
+        <meta name="theme-color" content="#101917">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-title" content="Home">
+        <link rel="manifest" href="/manifest.webmanifest">
+        <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+        <title th:text="${title}">Home Control</title>
+        <link rel="stylesheet" th:href="@{/app.css}">
+        <link rel="stylesheet" th:href="@{/themes/cyberpunk.css}">
+        <script th:src="@{/js/theme.js}"></script>
+    </th:block>
+</head>
+<body>
+
+<a th:fragment="brand" class="brand" th:href="@{/}" aria-label="Home Control home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg></span><span>Home<span class="brand-light">Control</span></span></a>
+
+<!--/* current: 'home' or 'setup'; the dashboard also shows its connection status. */-->
+<header th:fragment="appHeader(current)" class="app-header">
+    <a th:replace="~{fragments/layout :: brand}"></a>
+    <nav class="header-nav" aria-label="Main navigation">
+        <a th:href="@{/}" th:attr="aria-current=${current == 'home'} ? 'page' : null">Home</a>
+        <a th:href="@{/setup}" th:attr="aria-current=${current == 'setup'} ? 'page' : null">Setup</a>
+    </nav>
+    <output id="connection-status" class="connection-status" th:if="${current == 'home'}">Connecting…</output>
+    <button th:replace="~{fragments/theme-toggle :: toggle}"></button>
+</header>
+
+<!--/*
+    The first login password, asked for with the first account credentials; each form keeps its own intro and th:if.
+    idPrefix names the fields for a page whose error summary links to them (the workflow editor); null leaves them
+    without ids, so the setup page's several forms do not repeat one.
+*/-->
+<th:block th:fragment="firstPassword(idPrefix)">
+    <label>Home Control password (at least 10 characters)
+        <input type="password" name="loginPassword" minlength="10" maxlength="1024" autocomplete="new-password"
+               th:id="${idPrefix == null ? null : idPrefix + '-loginPassword'}" placeholder="New login password">
+    </label>
+    <label>Confirm Home Control password
+        <input type="password" name="loginPasswordConfirmation" minlength="10" maxlength="1024"
+               th:id="${idPrefix == null ? null : idPrefix + '-loginPasswordConfirmation'}"
+               autocomplete="new-password" placeholder="Repeat login password">
+    </label>
+</th:block>
+
+</body>
+</html>

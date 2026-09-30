@@ -1,33 +1,13 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-    <meta name="theme-color" content="#101917">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Home">
-    <link rel="manifest" href="/manifest.webmanifest">
-    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <title>Home Control</title>
-    <link rel="stylesheet" th:href="@{/app.css}">
-    <link rel="stylesheet" th:href="@{/themes/cyberpunk.css}">
-    <script th:src="@{/js/theme.js}"></script>
+    <th:block th:replace="~{fragments/layout :: pageHead('Home Control', true)}"></th:block>
     <script th:src="@{/vendor/htmx.min.js}" defer></script>
     <script type="module" th:src="@{/js/app.js}"></script>
 </head>
 <body class="dashboard" th:attr="data-device=${selected.id()}">
 <a class="skip-link" href="#content">Skip to content</a>
-<header class="app-header">
-    <a class="brand" href="/" aria-label="Home Control home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg></span><span>Home<span class="brand-light">Control</span></span></a>
-    <nav class="header-nav" aria-label="Main navigation">
-        <a href="/" aria-current="page">Home</a><a href="/setup">Setup</a>
-    </nav>
-    <output id="connection-status" class="connection-status">Connecting…</output>
-    <button th:replace="~{fragments/theme-toggle :: toggle}"></button>
-</header>
+<header th:replace="~{fragments/layout :: appHeader('home')}"></header>
 <main id="content">
     <div class="page-heading dashboard-heading">
         <div><p class="eyebrow">YOUR EVERYDAY, CONNECTED</p><h1>Make yourself at home.</h1>

@@ -129,7 +129,7 @@ class WorkflowE2eTest extends E2eApplicationTest {
             addValue(main, "A", "/id", false);
         }
         addValue(main, "C", "/auth/token", true);
-        label(page, "Home Control password (10–1024 characters)").fill(PASSWORD);
+        label(page, "Home Control password (at least 10 characters)").fill(PASSWORD);
         label(page, "Confirm Home Control password").fill(PASSWORD);
         button(page, "Save workflow").click();
         assertThat(page).hasURL(Pattern.compile(".*/setup/workflows/w-[0-9a-f]{12}$"));
@@ -375,7 +375,7 @@ class WorkflowE2eTest extends E2eApplicationTest {
             label(page, "Entry title pointer").fill("/title");
             addEntryField(page, "id", "/id", false);
             label(page, "New media URL template").fill(upstream.url("/media") + "/{path}?t={token}");
-            label(page, "Home Control password (10–1024 characters)").fill(PASSWORD);
+            label(page, "Home Control password (at least 10 characters)").fill(PASSWORD);
             label(page, "Confirm Home Control password").fill(PASSWORD);
             button(page, "Save workflow").click();
             assertThat(page).hasURL(Pattern.compile(".*/setup/workflows/w-[0-9a-f]{12}$"));

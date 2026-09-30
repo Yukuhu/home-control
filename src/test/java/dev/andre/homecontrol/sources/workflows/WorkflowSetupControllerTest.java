@@ -129,14 +129,27 @@ class WorkflowSetupControllerTest extends WebSliceTest {
         when(login.loginRequired()).thenReturn(false);
         mvc.perform(get("/setup/workflows/new")).andExpect(content().string(org.hamcrest.Matchers.containsString("loginPasswordConfirmation")));
         when(workflowStore.create(any(), any(), any(), any())).thenThrow(new PasswordRejectedException("The two passwords do not match"));
-        var request = post("/setup/workflows").param("name", "Draft").param("mode", "SINGLE").param("kind", "VIDEO")
+        assertSafeError(mvc.perform(firstSaveWithPasswords()).andExpect(status().isOk()).andReturn());
+    }
+
+    @Test void aFirstPasswordErrorLinksToThePasswordField() throws Exception {
+        when(login.loginRequired()).thenReturn(false);
+        when(workflowStore.create(any(), any(), any(), any())).thenThrow(new PasswordRejectedException("The two passwords do not match"));
+
+        String html = mvc.perform(firstSaveWithPasswords()).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("href=\"#workflow-loginPassword\"", "id=\"workflow-loginPassword\"",
+                "id=\"workflow-loginPasswordConfirmation\"");
+    }
+
+    private static MockHttpServletRequestBuilder firstSaveWithPasswords() {
+        return post("/setup/workflows").param("name", "Draft").param("mode", "SINGLE").param("kind", "VIDEO")
                 .param("title", "Draft title").param("calls[0].name", "main").param("calls[0].scope", "SHARED")
                 .param("calls[0].urlMode", "REPLACE").param("calls[0].url", "https://private-url/x")
                 .param("calls[0].variables[0].name", "A").param("calls[0].variables[0].pointer", "/id")
                 .param("templateMode", "REPLACE").param("template", "https://private-template/x/{A}")
                 .param("calls[0].headersMode", "REPLACE").param("mimeType", "video/mp4")
                 .param("loginPassword", "private-password").param("loginPasswordConfirmation", "private-confirmation");
-        assertSafeError(mvc.perform(request).andExpect(status().isOk()).andReturn());
     }
 
     @Test void optionalDisplaySourcesRoundTripAndNoClientDefinitionAppearsInModel() {

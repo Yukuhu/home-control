@@ -47,6 +47,15 @@ class SetupSectionsTest extends WebSliceTest {
         }
     }
 
+    /** Several of the setup page's forms ask for the first password at once, so their fields carry no id to repeat. */
+    @Test
+    void theFirstPasswordFieldsCarryNoId() throws Exception {
+        String page = page();
+
+        assertThat(Pattern.compile("name=\"loginPassword\"").matcher(page).results().count()).isGreaterThan(1);
+        assertThat(page).doesNotContain("-loginPassword\"", "-loginPasswordConfirmation\"");
+    }
+
     @Test
     void theAccountSectionStillKnowsWhetherALoginIsRequired() throws Exception {
         given(login.loginRequired()).willReturn(true);
