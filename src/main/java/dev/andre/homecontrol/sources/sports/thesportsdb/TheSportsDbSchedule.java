@@ -34,10 +34,10 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <p>No lock is held while a day downloads: {@link FeedFetches} runs one download per day at a time, and a pass that
  * finds one running waits for it. {@link #lock} guards only short steps: writing a download's outcome, publishing a
- * pass, {@link #forget} and {@link #clear}. Those two advance {@link #generation}, and a download that started under
- * an older generation drops its outcome, so neither a removal nor a new key is undone by a download already running.
- * Each download reads the key after the generation: a key change stores the key before it clears, so what an old key
- * fetched is never kept.
+ * pass, {@link #forget} and {@link #clear}. A download writes its outcome only if its league is still configured and
+ * no {@link #clear} advanced {@link #generation} since it started: a removal updates the settings before it forgets,
+ * and a key change stores the key before it clears, so neither is undone by a download already running. Each download
+ * reads the key after the generation, so what an old key fetched is never kept.
  */
 public class TheSportsDbSchedule implements SportsFeed {
 
@@ -45,6 +45,10 @@ public class TheSportsDbSchedule implements SportsFeed {
     private static final String LIMITED = "TheSportsDB is limiting requests; try again in a minute";
 
     private record Entry(List<SportsEvent> events, Instant fetchedAt) {
+    }
+
+    /** A day's last failed download: when, whether TheSportsDB was limiting requests, and under which key generation. */
+    private record Failure(Instant at, boolean rateLimited, long generation) {
     }
 
     private final TheSportsDbClient client;
@@ -56,7 +60,7 @@ public class TheSportsDbSchedule implements SportsFeed {
 
     private final Object lock = new Object();
     private final Map<String, Entry> cache = new ConcurrentHashMap<>();
-    private final Map<String, Instant> lastFailure = new ConcurrentHashMap<>();
+    private final Map<String, Failure> lastFailure = new ConcurrentHashMap<>();
     private final Map<String, String> errors = new ConcurrentHashMap<>();
     private final FeedFetches<String> fetches = new FeedFetches<>();
     private final AtomicLong generation = new AtomicLong();
@@ -155,10 +159,9 @@ public class TheSportsDbSchedule implements SportsFeed {
     }
 
     private FeedResult keyUnavailable(SportsSettings settings, TheSportsDbException e, long started) {
-        List<String> errorList = new ArrayList<>();
-        for (SportsSettings.CompetitionEntry competition : settings.competitions()) {
-            errorList.add(competition.name() + ": " + e.getMessage());
-        }
+        List<String> errorList = settings.competitions().stream()
+                .map(competition -> competition.name() + ": " + e.getMessage())
+                .toList();
         synchronized (lock) {
             // A key entered since this pass looked makes the error stale.
             if (generation.get() == started) {
@@ -190,12 +193,23 @@ public class TheSportsDbSchedule implements SportsFeed {
         boolean limited = limited(round);
         if (!failedRecently(cacheKey, round.now) && !limited) {
             fetches.run(cacheKey, () -> fetchIfStillDue(competition, date, cacheKey, round));
+            noteRateLimit(cacheKey, round);
         } else if (limited && entry == null) {
             synchronized (lock) {
                 if (generation.get() == round.limitedUnder) {
                     errors.put(competition.leagueId(), LIMITED);
                 }
             }
+        }
+    }
+
+    /** A rate limit met by this day's download, whichever pass ran it, holds back the rest of this pass too. */
+    private void noteRateLimit(String cacheKey, Round round) {
+        Failure failure = lastFailure.get(cacheKey);
+        if (failure != null && failure.rateLimited() && failure.generation() == generation.get()
+                && failure.at().plus(FeedFetches.RETRY_BACKOFF).isAfter(round.now)) {
+            round.rateLimited = true;
+            round.limitedUnder = failure.generation();
         }
     }
 
@@ -209,11 +223,16 @@ public class TheSportsDbSchedule implements SportsFeed {
     }
 
     private boolean failedRecently(String cacheKey, Instant now) {
-        Instant failedAt = lastFailure.get(cacheKey);
-        return failedAt != null && failedAt.plus(FeedFetches.RETRY_BACKOFF).isAfter(now);
+        Failure failure = lastFailure.get(cacheKey);
+        return failure != null && failure.at().plus(FeedFetches.RETRY_BACKOFF).isAfter(now);
     }
 
-    /** One download: checks again, downloads without a lock, and writes unless a forget or clear came between. */
+    /** Whether a download that started under {@code started} may write: its league kept, and no key change since. */
+    private boolean wanted(SportsSettings.CompetitionEntry competition, long started) {
+        return generation.get() == started && settingsService.current().competition(competition.leagueId()).isPresent();
+    }
+
+    /** One download: checks again, downloads without a lock, and writes the outcome if it is still wanted. */
     private void fetchIfStillDue(SportsSettings.CompetitionEntry competition, LocalDate date, String cacheKey,
                                  Round round) {
         long started = generation.get();
@@ -230,27 +249,22 @@ public class TheSportsDbSchedule implements SportsFeed {
                         .ifPresent(mapped::add);
             }
             synchronized (lock) {
-                if (generation.get() == started) {
+                if (wanted(competition, started)) {
                     cache.put(cacheKey, new Entry(mapped, round.now));
                     lastFailure.remove(cacheKey);
                     errors.remove(competition.leagueId());
                 }
             }
         } catch (TheSportsDbException e) {
-            boolean kept;
             synchronized (lock) {
-                kept = generation.get() == started;
-                if (kept) {
-                    lastFailure.put(cacheKey, round.now);
+                if (wanted(competition, started)) {
+                    lastFailure.put(cacheKey, new Failure(round.now,
+                            e.kind() == ContentSourceException.Kind.RATE_LIMITED, started));
                     errors.put(competition.leagueId(), e.getMessage());
                 }
             }
             log.warn("TheSportsDB fixtures for competition {} on {} failed ({})",
                     competition.leagueId(), date, e.kind());
-            if (kept && e.kind() == ContentSourceException.Kind.RATE_LIMITED) {
-                round.rateLimited = true;
-                round.limitedUnder = started;
-            }
         }
     }
 
@@ -322,7 +336,6 @@ public class TheSportsDbSchedule implements SportsFeed {
 
     public void forget(String leagueId) {
         synchronized (lock) {
-            generation.incrementAndGet();
             cache.keySet().removeIf(key -> leagueIdOf(key).equals(leagueId));
             lastFailure.keySet().removeIf(key -> leagueIdOf(key).equals(leagueId));
             errors.remove(leagueId);

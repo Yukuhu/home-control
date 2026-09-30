@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -44,8 +43,9 @@ import java.util.stream.Collectors;
  *
  * <p>No lock is held while a calendar downloads: {@link FeedFetches} runs one download per calendar at a time, and a
  * pass that finds one running waits for it. {@link #lock} guards only short steps: writing a download's outcome,
- * publishing a pass, and {@link #forget}. {@code forget} advances {@link #generation}, and a download that started
- * under an older generation drops its outcome, so a removal is never undone by a download that was already running.
+ * publishing a pass, and {@link #forget}. A download writes its outcome only if its calendar is still configured when
+ * it holds the lock; a removal updates the settings before it forgets, so it is never undone by a download that was
+ * already running, and other calendars' downloads are kept.
  */
 public class CalendarSchedule implements SportsFeed {
 
@@ -66,7 +66,6 @@ public class CalendarSchedule implements SportsFeed {
     private final Object lock = new Object();
     private final ConcurrentHashMap<String, Cached> cache = new ConcurrentHashMap<>();
     private final FeedFetches<String> fetches = new FeedFetches<>();
-    private final AtomicLong generation = new AtomicLong();
     /** Replaced under {@link #lock}, by a pass's publish step and by {@link #forget}; read without it. */
     private final AtomicReference<Map<String, SportsEvent>> byItemId = new AtomicReference<>(Map.of());
     /** Set when a pass ends, so a lookup that arrives during the first pass runs one too and joins its downloads. */
@@ -130,9 +129,8 @@ public class CalendarSchedule implements SportsFeed {
         return stale && cooledDown;
     }
 
-    /** One download: checks again, downloads without a lock, and writes the outcome unless a forget came between. */
+    /** One download: checks again, downloads without a lock, and writes the outcome if the calendar is still wanted. */
     private void refreshIfStillDue(SportsSettings.CalendarEntry entry, Instant now) {
-        long started = generation.get();
         if (settingsService.current().calendar(entry.id()).isEmpty()) {
             return;
         }
@@ -142,7 +140,7 @@ public class CalendarSchedule implements SportsFeed {
         }
         Cached next = refresh(entry, previous, now);
         synchronized (lock) {
-            if (generation.get() == started) {
+            if (settingsService.current().calendar(entry.id()).isPresent()) {
                 cache.put(entry.id(), next);
             }
         }
@@ -249,7 +247,6 @@ public class CalendarSchedule implements SportsFeed {
 
     public void forget(String calendarId) {
         synchronized (lock) {
-            generation.incrementAndGet();
             cache.remove(calendarId);
             String key = SportsSettings.calendarKey(calendarId);
             byItemId.updateAndGet(current -> {

@@ -177,6 +177,20 @@ class CalendarScheduleConcurrencyTest {
     }
 
     @Test
+    void removingOneCalendarKeepsAnotherOnesDownload() throws Exception {
+        server.holdFixture(WEEKLY_PATH, "recurring.ics", release);
+        Future<FeedResult> pass = passHeldAt(WEEKLY_PATH, 1);
+
+        settingsService.update(s -> s.withCalendars(List.of(s.calendars().get(1))));
+        schedule.forget(BUNDESLIGA);
+        release.countDown();
+
+        FeedResult result = pass.get(10, TimeUnit.SECONDS);
+        assertThat(result.succeeded()).isEqualTo(1);
+        assertThat(result.events()).anyMatch(e -> e.competitionKey().equals("calendar:" + WEEKLY));
+    }
+
+    @Test
     void aCalendarAddedDuringAPassIsPublishedFromItsFirstParse() throws Exception {
         server.holdFixture(WEEKLY_PATH, "recurring.ics", release);
         Future<FeedResult> pass = passHeldAt(WEEKLY_PATH, 1);
