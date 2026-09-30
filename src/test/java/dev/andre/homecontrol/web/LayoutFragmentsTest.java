@@ -43,6 +43,13 @@ class LayoutFragmentsTest {
         assertThat(Files.readString(TEMPLATES.resolve(page))).contains("fragments/layout :: pageHead(").contains("<title");
     }
 
+    /** Like every fragment file, the layout is bare fragments, not a page of its own that would need a title. */
+    @Test
+    void theLayoutIsNotAPage() throws IOException {
+        assertThat(Files.readString(TEMPLATES.resolve("fragments/layout.html")))
+                .doesNotContain("<!DOCTYPE").doesNotContain("<html").doesNotContain("<head>").doesNotContain("<body>");
+    }
+
     /** A placeholder that is replaced by a fragment is a th:block, never an empty link a checker takes for real. */
     @Test
     void noEmptyLinkStandsInForAFragment() throws IOException {
