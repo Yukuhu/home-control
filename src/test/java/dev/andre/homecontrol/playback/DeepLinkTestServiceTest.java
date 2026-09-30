@@ -173,6 +173,18 @@ class DeepLinkTestServiceTest {
     }
 
     @Test
+    void aDeviceForgottenBeforeItsCapabilitiesAreReadIsNotFoundNotUnsupported() {
+        when(devices.device("lg")).thenReturn(Optional.of(
+                new Device("lg", "LG TV", DeviceKind.WEBOS, "10.0.0.60", Map.of("webos", Map.of()), Instant.now())),
+                Optional.empty());
+        when(devices.capabilities("lg")).thenReturn(EnumSet.noneOf(Capability.class));
+
+        assertThatThrownBy(() -> service.run("lg"))
+                .isInstanceOf(DeviceNotFoundException.class).hasMessage("No device with id lg");
+        verify(commands, never()).execute(anyString(), any());
+    }
+
+    @Test
     void aDeviceForgottenBeforeTheLinkIsSentIsNotFoundAndReleasesTheDevice() {
         doThrow(new DeviceNotFoundException("No device with id lg")).when(commands).execute(eq("lg"), any());
 

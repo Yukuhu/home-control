@@ -54,6 +54,10 @@ public class DeepLinkTestService {
         this.properties = properties;
     }
 
+    private static DeviceNotFoundException notFound(String deviceId) {
+        return new DeviceNotFoundException("No device with id " + deviceId);
+    }
+
     @EventListener
     public void onStateChanged(DeviceStateChangedEvent event) {
         BlockingQueue<DeviceState> queue = watching.get(event.deviceId());
@@ -63,9 +67,10 @@ public class DeepLinkTestService {
     }
 
     public DeepLinkTestResult run(String deviceId) {
-        Device device = devices.device(deviceId)
-                .orElseThrow(() -> new DeviceNotFoundException("No device with id " + deviceId));
+        Device device = devices.device(deviceId).orElseThrow(() -> notFound(deviceId));
         if (!devices.capabilities(deviceId).contains(Capability.APP_LINK)) {
+            // A device forgotten since the lookup above has no capabilities either: that is an unknown device.
+            devices.device(deviceId).orElseThrow(() -> notFound(deviceId));
             throw new UnsupportedActionException(device.name() + " cannot open app links");
         }
         ForegroundAppReporting reporting = devices.foregroundAppReporting(deviceId);
