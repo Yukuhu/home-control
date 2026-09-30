@@ -8,7 +8,6 @@ import dev.andre.homecontrol.sources.jellyfin.JellyfinProperties;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarFetchException;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarFetcher;
-import dev.andre.homecontrol.sources.sports.calendar.CalendarUrlPolicy;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbClient;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbException;
 import dev.andre.homecontrol.sources.tmdb.TmdbClient;
@@ -118,11 +117,11 @@ class SlowBodyDeadlineTest {
         try (CalendarFetcher fetcher = new CalendarFetcher(
                 new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(1),
                 5 * 1024 * 1024, 3, true),
-                new CalendarUrlPolicy(true))) {
+                new OutboundAddressPolicy(true))) {
             assertThatThrownBy(() -> fetcher.fetch(calendar))
                     .isInstanceOf(CalendarFetchException.class)
                     .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
-                    .hasMessage("Could not reach 127.0.0.1");
+                    .hasMessage("Could not reach the calendar at 127.0.0.1 (request timed out)");
         }
         assertThat(server.bytesTrickled()).isGreaterThan(1);
     }

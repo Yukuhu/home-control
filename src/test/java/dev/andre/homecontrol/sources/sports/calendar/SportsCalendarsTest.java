@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.sports.calendar;
 
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.sources.sports.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import dev.andre.homecontrol.sources.sports.SportsSettings;
@@ -46,7 +47,7 @@ class SportsCalendarsTest {
     private LoginService login;
     private SportsSettingsService settingsService;
     private SportsProperties properties;
-    private CalendarUrlPolicy policy;
+    private OutboundAddressPolicy policy;
     private CalendarFetcher fetcher;
     private CalendarSchedule schedule;
     private SportsCalendars calendars;
@@ -85,7 +86,7 @@ class SportsCalendarsTest {
                 new SportsProperties.TheSportsDb(true, URI.create("http://127.0.0.1:9/api/v1/json"), "123",
                         Duration.ofHours(24), Duration.ofSeconds(1), Duration.ofSeconds(2), null));
 
-        policy = new CalendarUrlPolicy(true);
+        policy = new OutboundAddressPolicy(true);
         fetcher = new CalendarFetcher(properties.calendar(), policy);
         SportsTimeZones zones = mock(SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));

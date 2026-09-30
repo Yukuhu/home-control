@@ -141,15 +141,15 @@ public final class GuardedHttpClient implements AutoCloseable {
         } catch (InterruptedException _) {
             exchange.cancel();
             Thread.currentThread().interrupt();
-            throw failures.apply(unreachable(host, OutboundFailure.INTERRUPTED));
+            throw failures.apply(unreachable(exchange.host(), OutboundFailure.INTERRUPTED));
         } catch (TimeoutException _) {
             exchange.cancel();
-            throw failures.apply(unreachable(host, OutboundFailure.TIMED_OUT));
+            throw failures.apply(unreachable(exchange.host(), OutboundFailure.TIMED_OUT));
         } catch (ExecutionException e) {
             if (e.getCause() instanceof Failed failed) {
                 throw failures.apply(failed.failure);
             }
-            throw failures.apply(unreachable(host, OutboundFailure.FAILED));
+            throw failures.apply(unreachable(exchange.host(), OutboundFailure.FAILED));
         }
     }
 
@@ -173,7 +173,7 @@ public final class GuardedHttpClient implements AutoCloseable {
         T value = null;
         // Replaced by the outcome. Left as is only when an Error escapes to the thread's handler,
         // so the caller still hears at once that the request failed instead of waiting out its deadline.
-        Exception error = new Failed(unreachable(exchange.host, OutboundFailure.FAILED));
+        Exception error = new Failed(unreachable(exchange.host(), OutboundFailure.FAILED));
         exchange.worker = Thread.currentThread();
         current.set(exchange);
         try {
@@ -186,7 +186,7 @@ public final class GuardedHttpClient implements AutoCloseable {
         } catch (IOException e) {
             error = new Failed(failureOf(exchange, e));
         } catch (Exception _) {
-            error = new Failed(unreachable(exchange.host, exchange.expired() ? OutboundFailure.TIMED_OUT
+            error = new Failed(unreachable(exchange.host(), exchange.expired() ? OutboundFailure.TIMED_OUT
                     : OutboundFailure.FAILED));
         } finally {
             current.remove();
@@ -202,7 +202,7 @@ public final class GuardedHttpClient implements AutoCloseable {
     }
 
     private OutboundFailure failureOf(Exchange<?> exchange, IOException e) {
-        String host = exchange.host;
+        String host = exchange.host();
         if (closed.get()) {
             return unreachable(host, OutboundFailure.CLOSED);
         }
@@ -225,6 +225,7 @@ public final class GuardedHttpClient implements AutoCloseable {
         Exchange<?> exchange = current.get();
         URI uri = request.uri();
         for (int redirects = 0; ; redirects++) {
+            exchange.hop.set(host(uri));
             // HttpClient can connect to a literal without asking the DNS hook, so judge literals here as well.
             if (OutboundAddressPolicy.isLiteral(uri.getHost())) {
                 policy.addresses(uri.getHost());
@@ -257,7 +258,7 @@ public final class GuardedHttpClient implements AutoCloseable {
             throw new Failed(new OutboundFailure(Kind.BAD_RESPONSE, host(from), OutboundFailure.INVALID_REDIRECT, 0));
         }
         if (profile.redirects() == Redirects.SAME_ORIGIN && !sameOrigin(from, to)) {
-            throw new Failed(new OutboundFailure(Kind.BLOCKED, host(from), OutboundFailure.OTHER_ORIGIN, 0));
+            throw new Failed(new OutboundFailure(Kind.BLOCKED, host(to), OutboundFailure.OTHER_ORIGIN, 0));
         }
         return to;
     }
@@ -370,7 +371,8 @@ public final class GuardedHttpClient implements AutoCloseable {
     }
 
     private final class Exchange<T> {
-        private final String host;
+        // The host of the hop in flight, so a failure names the server that was being contacted.
+        private final AtomicReference<String> hop;
         private final long deadline;
         private final AtomicBoolean cancelled = new AtomicBoolean();
         private final AtomicReference<HttpUriRequestBase> active = new AtomicReference<>();
@@ -380,8 +382,12 @@ public final class GuardedHttpClient implements AutoCloseable {
         private volatile Thread worker;
 
         Exchange(String host, long deadline) {
-            this.host = host;
+            this.hop = new AtomicReference<>(host);
             this.deadline = deadline;
+        }
+
+        String host() {
+            return hop.get();
         }
 
         long remaining() {
@@ -394,10 +400,10 @@ public final class GuardedHttpClient implements AutoCloseable {
 
         void check() {
             if (closed.get()) {
-                throw new Failed(unreachable(host, OutboundFailure.CLOSED));
+                throw new Failed(unreachable(host(), OutboundFailure.CLOSED));
             }
             if (expired() || Thread.currentThread().isInterrupted()) {
-                throw new Failed(unreachable(host, OutboundFailure.TIMED_OUT));
+                throw new Failed(unreachable(host(), OutboundFailure.TIMED_OUT));
             }
         }
 
@@ -421,7 +427,7 @@ public final class GuardedHttpClient implements AutoCloseable {
         }
         exchanges.forEach(exchange -> {
             exchange.cancel();
-            exchange.result.completeExceptionally(new Failed(unreachable(exchange.host, OutboundFailure.CLOSED)));
+            exchange.result.completeExceptionally(new Failed(unreachable(exchange.host(), OutboundFailure.CLOSED)));
         });
         workers.shutdownNow();
         // Do not wait for platform DNS that can ignore interruption; those bounded workers keep their slots.

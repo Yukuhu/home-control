@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.sources.sports.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.SportsEvent;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
@@ -70,7 +71,7 @@ class CalendarScheduleTest {
                 new SportsProperties.TheSportsDb(true, URI.create("http://127.0.0.1:9/api/v1/json"), "123",
                         Duration.ofHours(24), Duration.ofSeconds(1), Duration.ofSeconds(2), null));
 
-        CalendarFetcher fetcher = new CalendarFetcher(properties.calendar(), new CalendarUrlPolicy(true));
+        CalendarFetcher fetcher = new CalendarFetcher(properties.calendar(), new OutboundAddressPolicy(true));
         schedule = new CalendarSchedule(settingsService, fetcher, secrets, properties, zones, clock);
     }
 

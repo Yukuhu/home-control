@@ -1,7 +1,10 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
+import dev.andre.homecontrol.testsupport.FakeHttpServer;
+import dev.andre.homecontrol.testsupport.Response;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +18,7 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 /** Transport failures and malformed redirects while fetching a calendar. */
 class CalendarFetcherFailureTest {
@@ -22,7 +26,7 @@ class CalendarFetcherFailureTest {
     private final SportsProperties.Calendar properties =
             new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
             2 * 1024 * 1024, 3, false);
-    private final CalendarUrlPolicy policy = new CalendarUrlPolicy(true);
+    private final OutboundAddressPolicy policy = new OutboundAddressPolicy(true);
     private FakeCalendarServer server;
 
     @AfterEach
@@ -43,7 +47,7 @@ class CalendarFetcherFailureTest {
             assertThatThrownBy(() -> fetcher.fetch(url))
                     .isInstanceOf(CalendarFetchException.class)
                     .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
-                    .hasMessage("127.0.0.1 answered HTTP 302");
+                    .hasMessage("The calendar at 127.0.0.1 sent a response Home Control cannot read (redirect has no destination)");
         }
     }
 
@@ -58,7 +62,7 @@ class CalendarFetcherFailureTest {
             assertThatThrownBy(() -> fetcher.fetch(url))
                     .isInstanceOf(CalendarFetchException.class)
                     .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
-                    .hasMessage("Could not reach 127.0.0.1");
+                    .hasMessage("Could not reach the calendar at 127.0.0.1 (request interrupted)");
             assertThat(Thread.interrupted()).as("the interrupt is kept (and cleared here)").isTrue();
         }
         assertThat(server.count("/cal.ics")).isZero();
@@ -85,8 +89,41 @@ class CalendarFetcherFailureTest {
                 assertThatThrownBy(() -> fetcher.fetch(url))
                         .isInstanceOf(CalendarFetchException.class)
                         .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
-                        .hasMessage("Could not reach 127.0.0.1")
-                        .hasCauseInstanceOf(IOException.class);
+                        .hasMessage("Could not reach the calendar at 127.0.0.1 (request failed)")
+                        .hasNoCause();
+            }
+        }
+    }
+
+    @Test
+    void noFailureRevealsTheSecretLink() throws IOException {
+        int closedPort;
+        try (var socket = new ServerSocket(0)) {
+            closedPort = socket.getLocalPort();
+        }
+        var small = new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofMillis(800),
+                1_024, 2, true);
+        OutboundAddressPolicy.Resolver named = host -> new InetAddress[] {InetAddress.ofLiteral("127.0.0.1")};
+        try (FakeHttpServer fake = FakeHttpServer.start();
+             CalendarFetcher fetcher = new CalendarFetcher(small, new OutboundAddressPolicy(true, named));
+             CalendarFetcher refusing = new CalendarFetcher(small, new OutboundAddressPolicy(false, named))) {
+            fake.respond("GET", "/secret-path/large.ics", Response.of(200, "text/calendar", "x".repeat(2_000)));
+            fake.respond("GET", "/secret-path/gzip.ics", Response.of(200, "text/calendar", "x").withHeader("Content-Encoding", "gzip"));
+            fake.respond("GET", "/secret-path/loop.ics", Response.empty(302).withHeader("Location", "/secret-path/loop.ics?token=secret-token"));
+            fake.trickle("GET", "/secret-path/slow.ics");
+            String base = "http://calendar.test:" + fake.url().getPort() + "/secret-path/";
+            String query = "?token=secret-token";
+            for (Runnable call : new Runnable[] {
+                    () -> fetcher.fetch(URI.create(base + "large.ics" + query)),
+                    () -> fetcher.fetch(URI.create(base + "gzip.ics" + query)),
+                    () -> fetcher.fetch(URI.create(base + "loop.ics" + query)),
+                    () -> fetcher.fetch(URI.create(base + "slow.ics" + query)),
+                    () -> fetcher.fetch(URI.create("http://calendar.test:" + closedPort + "/secret-path/cal.ics" + query)),
+                    () -> refusing.fetch(URI.create(base + "large.ics" + query))}) {
+                CalendarFetchException failure = catchThrowableOfType(CalendarFetchException.class, call::run);
+
+                assertThat(failure).hasNoCause();
+                assertThat(failure.getMessage()).doesNotContain("secret");
             }
         }
     }
