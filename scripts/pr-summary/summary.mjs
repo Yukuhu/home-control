@@ -14,6 +14,7 @@ const MAX_TRACE_LINES = 30;
 // GitHub API identifies it; `suite` names the JUnit results that belong to the job. A job that
 // runs several times is named "<job> on <architecture>" or "<job> (<language>)" there.
 export const CHECKS = [
+    { key: "checksums", job: "Verify dependency checksums", label: "Dependency checksums" },
     { key: "jar", job: "Build the jar", label: "Jar" },
     { key: "test", job: "Build and test", label: "Unit and integration tests", suite: "test" },
     { key: "e2e-chromium", job: "Browser tests (Chromium)", label: "Browser tests (Chromium)", suite: "e2e-chromium" },

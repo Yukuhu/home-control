@@ -57,11 +57,118 @@ jobs:
             echo "Only documentation changed: nothing is built or tested." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  checksums:
+    name: Verify dependency checksums
+    # Stop once, before every strict Gradle build, if an update needs reviewed hashes.
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      IS_DEPENDABOT: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+      DEPENDENCY_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Match the merge revision tested by the builds. Its two parents include
+          # the PR head, which is the baseline the downloadable patch must apply to.
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Isolate Dependabot's unreviewed downloads
+        if: env.IS_DEPENDABOT == 'true'
+        run: echo "GRADLE_USER_HOME=$RUNNER_TEMP/gradle-checksum-review" >> "$GITHUB_ENV"
+
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          cache-disabled: ${{ env.IS_DEPENDABOT == 'true' }}
+          cache-read-only: true
+
+      - name: Verify all dependency configurations without compiling
+        id: verification
+        shell: bash
+        run: |
+          if ./gradlew --no-daemon --dependency-verification strict verifyDependencyChecksums \
+              > "$RUNNER_TEMP/dependency-verification.log" 2>&1; then
+            cat "$RUNNER_TEMP/dependency-verification.log"
+            exit 0
+          fi
+          cat "$RUNNER_TEMP/dependency-verification.log"
+          if [[ "$IS_DEPENDABOT" == true ]] \
+              && grep -Fq 'Dependency verification failed' "$RUNNER_TEMP/dependency-verification.log"; then
+            echo "needs-review=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          exit 1
+
+      # Only a candidate: it cannot unblock builds or change the committed trust file.
+      - name: Generate candidate checksums
+        if: steps.verification.outputs.needs-review == 'true'
+        run: ./gradlew --no-daemon --write-verification-metadata sha256 verifyDependencyChecksums
+
+      - name: Prepare the review patch
+        id: patch
+        if: always() && steps.verification.outputs.needs-review == 'true'
+        shell: bash
+        run: |
+          # Preserve the committed XML style so the patch shows checksum changes.
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          path = Path('gradle/verification-metadata.xml')
+          committed = subprocess.check_output(['git', 'show', 'HEAD:gradle/verification-metadata.xml']).decode()
+          generated = path.read_text()
+          declaration = committed.splitlines()[0]
+          generated = declaration + '\n' + generated.split('\n', 1)[1]
+          generated = generated.replace(' />', '/>')
+          if ' />' in committed:
+              generated = generated.replace('/>', ' />')
+          path.write_text(generated)
+          PY
+          if git diff --quiet "$DEPENDENCY_HEAD" -- gradle/verification-metadata.xml; then
+            echo "No checksum patch was generated. Check the generation log." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/checksum-review"
+          git diff "$DEPENDENCY_HEAD" -- gradle/verification-metadata.xml > "$RUNNER_TEMP/checksum-review/verification-metadata.patch"
+          printf '%s\n' "$DEPENDENCY_HEAD" > "$RUNNER_TEMP/checksum-review/head-sha.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/checksum-review/tested-sha.txt"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          {
+            printf 'Dependency checksums need review for commit `%s`.\n\n' "$DEPENDENCY_HEAD"
+            echo 'Builds and browser tests have not started. Download the checksum artifact, compare every new hash with fresh official artifacts, and commit the reviewed patch to this PR.'
+            echo 'For protobuf updates, also add the other published protoc platform checksums.'
+            echo 'The patch applies to the PR head and includes reviewed metadata inherited from main when needed.'
+            echo 'See docs/dev/testing.md#dependabot-updates for the commands. The next push runs strict CI again.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload candidate checksums
+        if: always() && steps.patch.outputs.changed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dependency-checksums-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/checksum-review/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require reviewed checksums before starting builds
+        if: always() && steps.verification.outputs.needs-review == 'true'
+        run: |
+          echo "::error::Dependency checksums need review. See this job's summary and checksum artifact; commit the reviewed metadata to run the builds."
+          exit 1
+
   jar:
     name: Build the jar
     # The one jar of this run: the images that are tested and the images that are published are
     # all built from it. It carries its version, so the version is worked out here, first.
-    needs: changes
+    needs: [changes, checksums]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -179,7 +286,7 @@ jobs:
 
   test:
     name: Build and test
-    needs: changes
+    needs: [changes, checksums]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -238,7 +345,7 @@ jobs:
 
   image:
     name: Build the self-contained image
-    needs: changes
+    needs: [changes, checksums]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -330,7 +437,7 @@ jobs:
   # SonarCloud scan waits only for Chromium, the one browser that can say which JavaScript ran.
   e2e-chromium:
     name: Browser tests (Chromium)
-    needs: changes
+    needs: [changes, checksums]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -379,7 +486,7 @@ jobs:
 
   e2e-firefox:
     name: Browser tests (Firefox)
-    needs: changes
+    needs: [changes, checksums]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -392,7 +499,7 @@ jobs:
 
   e2e-webkit:
     name: Browser tests (WebKit)
-    needs: changes
+    needs: [changes, checksums]
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -532,7 +639,7 @@ jobs:
     # One comment per pull request, replaced on every run. Runs when earlier jobs failed, which
     # is when it matters, but not when the run was cancelled. Fork pull requests get a read-only
     # token, so they are left out.
-    needs: [changes, jar, test, e2e-chromium, e2e-firefox, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies, codeql]
+    needs: [changes, checksums, jar, test, e2e-chromium, e2e-firefox, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies, codeql]
     if: >-
       !cancelled()
       && github.event_name == 'pull_request'
@@ -818,6 +925,7 @@ jobs:
     if: always()
     needs:
       - changes
+      - checksums
       - jar
       - test
       - e2e-chromium

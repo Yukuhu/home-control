@@ -534,6 +534,7 @@ test("hostile test output cannot leave its code spans and blocks", async () => {
 
 const environment = {
     NEEDS_JSON: JSON.stringify({
+        checksums: { result: "success", outputs: {} },
         test: { result: "failure", outputs: {} }, "e2e-chromium": { result: "success", outputs: {} },
         "e2e-firefox": { result: "success", outputs: {} }, "e2e-webkit": { result: "success", outputs: {} },
         sonar: { result: "skipped", outputs: {} }, image: { result: "success", outputs: {} },
@@ -554,6 +555,20 @@ const environment = {
     RUN_STARTED_AT: "2026-09-27T08:59:06Z", SONAR_PROJECT_KEY: "Yukuhu_home-control",
 };
 
+test("a failed checksum gate is reported while downstream build jobs are skipped", () => {
+    const needs = Object.fromEntries(Object.keys(JSON.parse(environment.NEEDS_JSON))
+        .map((key) => [key, { result: "skipped", outputs: {} }]));
+    needs.checksums = { result: "failure", outputs: {} };
+    const env = { ...environment, NEEDS_JSON: JSON.stringify(needs), JOBS_JSON: JSON.stringify([
+        { name: "Verify dependency checksums", html_url: "https://example.test/job/checksums", conclusion: "failure" },
+    ]) };
+    const built = buildModel({ env, suites: {}, gate: null, now: 0 });
+    const comment = render(built);
+    assert.match(comment, /CI failed/);
+    assert.match(comment, /Dependency checksums.*❌.*https:\/\/example\.test\/job\/checksums/);
+    assert.match(comment, /Unit and integration tests.*⏭️ not run/);
+});
+
 test("the model is built from the needs context, the job list and the environment", () => {
     const suites = { test: suite({ failed: 1 }), "e2e-chromium": suite({ passed: 59 }),
         "e2e-firefox": suite({ passed: 57 }), "e2e-webkit": suite({ passed: 59 }) };
@@ -569,6 +584,7 @@ test("the model is built from the needs context, the job list and the environmen
     assert.equal(built.durationSeconds, 580);
     assert.equal(built.sonarUrl, SONAR_URL);
     assert.deepEqual(built.checks.map((check) => [check.key, check.result]), [
+        ["checksums", "success"],
         ["jar", "success"], ["test", "failure"], ["e2e-chromium", "success"], ["e2e-firefox", "success"],
         ["e2e-webkit", "success"], ["sonar", "skipped"], ["image", "success"],
         ["smoke", "success"], ["smoke-bluetooth", "success"], ["dependencies", "success"], ["codeql", "success"],

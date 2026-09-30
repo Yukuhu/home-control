@@ -9,6 +9,7 @@ What runs on every push and pull request, and how releases are made.
 | Job | What it does |
 | --- | --- |
 | Find out what changed | Decides with `scripts/code-changed.sh` whether a pull request changes anything besides documentation; if it does not, the jobs that build and test are left out. A push to `main` runs them all. |
+| Verify dependency checksums | Resolves all dependency configurations before the builds and browser tests. For an unreviewed Dependabot update, uploads a checksum review patch and blocks the builds until reviewed metadata is committed. |
 | Build the jar | Builds the one jar of the run and works out its version; every image that is tested or published is built from it. |
 | Build and test | Runs `./gradlew build` with the full test suite, checks that the frozen architecture violations are committed, and uploads the reports. |
 | Build the self-contained image | Checks that `Dockerfile` and `Dockerfile.dist` describe the same runtime, and builds `Dockerfile` without pushing it. |
@@ -25,10 +26,10 @@ What runs on every push and pull request, and how releases are made.
 | Release the Bluetooth image | After the release, publishes and attests the tested `-bluetooth` images, if they passed their smoke tests. |
 | CI passed | The one check `main` requires: it passes only if every job it needs passed or was left out on purpose. |
 
-`.github/workflows/dependency-checksums.yml` prepares a checksum review artifact for Dependabot's Gradle
-updates. It uses a fresh cache and read-only permissions, and runs a build with candidate checksums so a
-maintainer can inspect the update. A maintainer must review and commit the new checksums before ordinary
-CI can pass; this preparation job does not satisfy the required check. See
+The checksum gate in CI prepares a review artifact for Dependabot's Gradle updates. It uses a fresh cache
+and read-only permissions; candidate preparation resolves artifacts without running builds or tests. The
+jar, unit tests, source image and browser jobs wait for verification to pass. A maintainer must review and
+commit new checksums before those jobs start and `CI passed` can pass. See
 [Dependabot updates](testing.md#dependabot-updates) for the review and commit steps.
 
 ## CI quality gate
