@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.workflows;
 
+import dev.andre.homecontrol.sources.http.HttpUrls;
 import dev.andre.homecontrol.sources.http.VettedHttpClients;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.config.RequestConfig;
@@ -37,6 +38,8 @@ public final class WorkflowHttpClient implements AutoCloseable {
     private static final String CLIENT_CLOSED = "client is closed";
     private static final Set<String> DENIED_HEADERS = Set.of("host", "cookie", "connection", "content-length",
             "transfer-encoding", "te", "trailer", "upgrade", "keep-alive", "expect", "accept-encoding", "proxy");
+    static final HttpUrls.Rules CALL_URLS = new HttpUrls.Rules(true, false, true, false, 8_192);
+
     private final WorkflowProperties properties;
     private final WorkflowUrlPolicy policy;
     private final Semaphore permits;
@@ -90,7 +93,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
 
     private void checkMedia(URI uri, long deadline, boolean wait) {
         bounded(Stage.BUILD, deadline, wait, () -> {
-            URI checked = policy.parse(uri == null ? null : uri.toString());
+            URI checked = parse(uri == null ? null : uri.toString());
             current.get().check();
             policy.addresses(checked.getHost());
             current.get().check();
@@ -102,7 +105,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
         if (fetch == null || fetch.headers() == null || fetch.headers().size() > 16) {
             throw failure(Stage.FETCH, "invalid request settings");
         }
-        URI uri = policy.parse(fetch.url());
+        URI uri = parse(fetch.url());
         Operation<?> operation = current.get();
         for (int redirects = 0; ; redirects++) {
             operation.check();
@@ -121,7 +124,7 @@ public final class WorkflowHttpClient implements AutoCloseable {
     }
 
     private URI redirect(URI uri, String location) {
-        URI next = policy.parse(uri.resolve(location).toString());
+        URI next = parse(uri.resolve(location).toString());
         if (!policy.sameOrigin(uri, next)) {
             throw failure(Stage.FETCH, "redirect changes origin; configure the final source URL");
         }
@@ -163,6 +166,15 @@ public final class WorkflowHttpClient implements AutoCloseable {
         } finally {
             request.cancel();
             operation.active.compareAndSet(request, null);
+        }
+    }
+
+    /** A call URL by the workflow rules: http(s), no fragment, at most 8,192 characters. */
+    static URI parse(String value) {
+        try {
+            return HttpUrls.parse(value, CALL_URLS);
+        } catch (HttpUrls.InvalidUrlException _) {
+            throw failure(Stage.FETCH, "invalid HTTP URL");
         }
     }
 

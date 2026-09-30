@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.http.BoundedBody;
+import dev.andre.homecontrol.sources.http.HttpUrls;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -11,7 +12,6 @@ import tools.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
@@ -42,6 +42,7 @@ public class JellyfinClient {
     private static final Pattern SERVER_VERSION_PATTERN = Pattern.compile("^(\\d+)\\.(\\d+)");
     /** A generous cap on any Jellyfin JSON answer; a well-behaved server never comes close. */
     static final int MAX_JSON_BYTES = 2 * 1024 * 1024;
+    private static final HttpUrls.Rules SERVER_URLS = new HttpUrls.Rules(false, false, true, false, 0);
     /** A generous cap on one artwork image; a well-behaved server never comes close. */
     static final int MAX_IMAGE_BYTES = 10 * 1024 * 1024;
     /** Raster types only: an SVG served from our own origin could carry a script. */
@@ -72,15 +73,8 @@ public class JellyfinClient {
             trimmed = trimmed.substring(0, trimmed.length() - 1);
         }
         try {
-            URI uri = new URI(trimmed);
-            String scheme = uri.getScheme();
-            if (scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))
-                    || uri.getHost() == null || uri.getRawUserInfo() != null || uri.getRawQuery() != null
-                    || uri.getRawFragment() != null) {
-                throw new URISyntaxException(trimmed, "not a plain http(s) URL");
-            }
-            return uri;
-        } catch (URISyntaxException _) {
+            return HttpUrls.parse(trimmed, SERVER_URLS);
+        } catch (HttpUrls.InvalidUrlException _) {
             throw new JellyfinException(ContentSourceException.Kind.INVALID_INPUT,
                     "Enter the Jellyfin address as http://host:8096 (or https://…)");
         }

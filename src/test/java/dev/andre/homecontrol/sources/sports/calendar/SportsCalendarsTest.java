@@ -92,7 +92,7 @@ class SportsCalendarsTest {
         schedule = new CalendarSchedule(settingsService, fetcher, secrets, properties, zones,
                 Clock.fixed(Instant.parse("2026-09-19T14:00:00Z"), ZoneOffset.UTC));
 
-        calendars = new SportsCalendars(settingsService, policy, fetcher, schedule, secrets, login, properties,
+        calendars = new SportsCalendars(settingsService, fetcher, schedule, secrets, login, properties,
                 Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC), random);
     }
 
@@ -126,7 +126,7 @@ class SportsCalendarsTest {
     @Test
     void webcalLinksAreFetchedOverHttps() {
         int port = server.url("/x.ics").getPort();
-        URI parsed = policy.parse("webcal://127.0.0.1:" + port + "/x.ics");
+        URI parsed = CalendarLinks.parse("webcal://127.0.0.1:" + port + "/x.ics");
         assertThat(parsed.getScheme()).isEqualTo("https");
     }
 
@@ -187,7 +187,7 @@ class SportsCalendarsTest {
 
         SportsProperties limited = new SportsProperties(true, "", 30, 1, 10, Duration.ofMinutes(120),
                 properties.calendar(), properties.theSportsDb());
-        SportsCalendars limitedCalendars = new SportsCalendars(settingsService, policy, fetcher, schedule, secrets, login,
+        SportsCalendars limitedCalendars = new SportsCalendars(settingsService, fetcher, schedule, secrets, login,
                 limited, Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC), random);
         assertThatThrownBy(() -> limitedCalendars.add(
                 new SportsCalendars.AddCalendar(server.url("/other.ics").toString(), "", "household password", "household password"), http))

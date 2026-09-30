@@ -410,4 +410,10 @@ class WorkflowHttpClientTest {
             }
         }
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"file:///tmp/token", "ftp://host/a", "https://secret@host/a", "https://host/a#token", "//host/a", "http://host:0/a", "http://host:65536/a", "http://[fe80::1%25eth0]/"})
+    void rejectsUnsafeUriSyntax(String url) {
+        assertThatThrownBy(() -> WorkflowHttpClient.parse(url)).isInstanceOf(WorkflowException.class).hasMessageNotContaining("token");
+    }
 }

@@ -13,8 +13,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CalendarUrlPolicyTest {
 
-    private final CalendarUrlPolicy policy = new CalendarUrlPolicy(false);
-
     private static CalendarUrlPolicy.HostResolver literal(String... addresses) {
         return host -> {
             InetAddress[] resolved = new InetAddress[addresses.length];
@@ -23,28 +21,6 @@ class CalendarUrlPolicyTest {
             }
             return resolved;
         };
-    }
-
-    @Test
-    void acceptsHttpHttpsAndWebcal() {
-        assertThat(policy.parse("https://calendar.example.org/a.ics"))
-                .isEqualTo(URI.create("https://calendar.example.org/a.ics"));
-        assertThat(policy.parse("webcal://fixtur.es/de/team.ics?x=1"))
-                .isEqualTo(URI.create("https://fixtur.es/de/team.ics?x=1"));
-        assertThat(policy.parse("WEBCALS://Example.org/x")).isEqualTo(URI.create("https://Example.org/x"));
-        assertThat(policy.parse("http://192.168.1.20:5232/user/sport/"))
-                .isEqualTo(URI.create("http://192.168.1.20:5232/user/sport/"));
-    }
-
-    @Test
-    void rejectsBadLinks() {
-        assertThatThrownBy(() -> policy.parse(" ")).hasMessage("Enter a calendar link");
-        assertThatThrownBy(() -> policy.parse("a".repeat(2049))).hasMessage("That calendar link is too long");
-        assertThatThrownBy(() -> policy.parse("ftp://example.org/a.ics")).hasMessage("Use an http, https or webcal link");
-        assertThatThrownBy(() -> policy.parse("https://user:pw@example.org/a.ics"))
-                .hasMessage("Links with a user name or password are not supported; use the calendar's secret link instead");
-        assertThatThrownBy(() -> policy.parse("https:///a.ics")).hasMessage("That is not a valid link");
-        assertThatThrownBy(() -> policy.parse("not a url")).hasMessage("That is not a valid link");
     }
 
     @ParameterizedTest
