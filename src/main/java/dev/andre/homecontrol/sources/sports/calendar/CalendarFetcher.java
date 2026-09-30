@@ -135,7 +135,7 @@ public class CalendarFetcher implements AutoCloseable {
             throw new CalendarFetchException(Kind.BAD_RESPONSE, "The calendar link redirected too many times");
         }
         try {
-            return policy.parse(current.resolve(location.getValue()).toString());
+            return CalendarLinks.parse(current.resolve(location.getValue()).toString());
         } catch (IllegalArgumentException _) {
             throw new CalendarFetchException(Kind.BAD_RESPONSE,
                     host + " redirected to a link Home Control does not follow");

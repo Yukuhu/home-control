@@ -29,7 +29,6 @@ public class SportsCalendars {
     }
 
     private final SportsSettingsService settingsService;
-    private final CalendarUrlPolicy policy;
     private final CalendarFetcher fetcher;
     private final CalendarSchedule schedule;
     private final SecretStore secrets;
@@ -40,11 +39,10 @@ public class SportsCalendars {
 
     // Spring constructor injection of seven distinct collaborators plus the clock and id randomness tests pin.
     @SuppressWarnings("java:S107")
-    public SportsCalendars(SportsSettingsService settingsService, CalendarUrlPolicy policy, CalendarFetcher fetcher,
+    public SportsCalendars(SportsSettingsService settingsService, CalendarFetcher fetcher,
                            CalendarSchedule schedule, SecretStore secrets, LoginService login,
                            SportsProperties properties, Clock clock, SecureRandom random) {
         this.settingsService = settingsService;
-        this.policy = policy;
         this.fetcher = fetcher;
         this.schedule = schedule;
         this.secrets = secrets;
@@ -59,7 +57,7 @@ public class SportsCalendars {
     }
 
     public synchronized SportsSettings.CalendarEntry add(AddCalendar request, LoginContext context) {
-        URI uri = policy.parse(request.url());
+        URI uri = CalendarLinks.parse(request.url());
         String label = request.label() == null ? "" : request.label().strip();
         if (label.length() > 80) {
             throw new IllegalArgumentException("Keep the name under 80 characters");

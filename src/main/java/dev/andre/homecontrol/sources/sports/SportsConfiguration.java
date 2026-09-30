@@ -60,11 +60,11 @@ public class SportsConfiguration {
     }
 
     @Bean
-    public SportsCalendars sportsCalendars(SportsSettingsService settings, CalendarUrlPolicy policy,
+    public SportsCalendars sportsCalendars(SportsSettingsService settings,
                                            CalendarFetcher fetcher, CalendarSchedule schedule,
                                            SecretStore secretStore, LoginService loginService,
                                            SportsProperties properties) {
-        return new SportsCalendars(settings, policy, fetcher, schedule, secretStore, loginService, properties,
+        return new SportsCalendars(settings, fetcher, schedule, secretStore, loginService, properties,
                 Clock.systemUTC(), new SecureRandom());
     }
 

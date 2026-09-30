@@ -16,12 +16,6 @@ class WorkflowUrlPolicyTest {
     private final WorkflowUrlPolicy policy = new WorkflowUrlPolicy(false, InetAddress::getAllByName);
 
     @ParameterizedTest
-    @ValueSource(strings = {"file:///tmp/token", "ftp://host/a", "https://secret@host/a", "https://host/a#token", "//host/a", "http://host:0/a", "http://host:65536/a", "http://[fe80::1%25eth0]/"})
-    void rejectsUnsafeUriSyntax(String url) {
-        assertThatThrownBy(() -> policy.parse(url)).isInstanceOf(WorkflowException.class).hasMessageNotContaining("token");
-    }
-
-    @ParameterizedTest
     @ValueSource(strings = {"0.0.0.0", "127.0.0.1", "127.23.0.1", "169.254.1.1", "224.0.0.1", "::", "::1", "fe80::1", "ff02::1", "::ffff:127.0.0.1", "::ffff:169.254.1.1"})
     void rejectsForbiddenAddressesIncludingMappedIpv4(String address) {
         assertThatThrownBy(() -> policy.addresses(address)).isInstanceOf(UnknownHostException.class);

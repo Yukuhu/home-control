@@ -1,7 +1,7 @@
 package dev.andre.homecontrol.sources.workflows;
 
+import dev.andre.homecontrol.sources.http.HttpUrls;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +16,7 @@ public final class WorkflowTemplate {
     private static final String INVALID = "invalid ";
     private static final String PLACEHOLDER = " placeholder";
     private static final int MAX_URL = 8_192;
+    private static final HttpUrls.Rules TEMPLATE_URLS = new HttpUrls.Rules(true, false, false, false, 0);
     private final String template;
     private final List<Token> tokens;
     private final int pathStart;
@@ -151,15 +152,9 @@ public final class WorkflowTemplate {
 
     private URI validUri(String raw) {
         try {
-            URI uri = new URI(raw);
-            if (uri.getScheme() == null || !(uri.getScheme().equalsIgnoreCase("http") || uri.getScheme().equalsIgnoreCase("https"))
-                    || uri.getHost() == null || uri.getHost().isBlank() || uri.getRawUserInfo() != null
-                    || uri.getRawFragment() != null) fail(INVALID + label + " template");
-            for (String segment : uri.getPath().split("/", -1)) {
-                if (segment.equals(".") || segment.equals("..")) fail("dot path segment in " + label);
-            }
-            return uri;
-        } catch (URISyntaxException _) {
+            return HttpUrls.parse(raw, TEMPLATE_URLS);
+        } catch (HttpUrls.InvalidUrlException e) {
+            if (e.problem() == HttpUrls.Problem.DOT_SEGMENT) fail("dot path segment in " + label);
             throw new WorkflowException(stage, INVALID + label + " template");
         }
     }

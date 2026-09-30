@@ -2,7 +2,6 @@ package dev.andre.homecontrol.sources.workflows;
 
 import java.net.InetAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Objects;
@@ -20,20 +19,6 @@ public final class WorkflowUrlPolicy {
     public WorkflowUrlPolicy(boolean allowLoopback, HostResolver resolver) {
         this.allowLoopback = allowLoopback;
         this.resolver = Objects.requireNonNull(resolver);
-    }
-
-    public URI parse(String value) {
-        if (value == null || value.isBlank() || value.length() > 8_192) throw invalidUrl();
-        try {
-            URI uri = new URI(value);
-            if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-                    || uri.getHost() == null || uri.getHost().isBlank() || uri.getHost().contains("%")
-                    || uri.getRawUserInfo() != null || uri.getRawFragment() != null
-                    || uri.getPort() == 0 || uri.getPort() > 65_535) throw invalidUrl();
-            return uri;
-        } catch (URISyntaxException _) {
-            throw invalidUrl();
-        }
     }
 
     public InetAddress[] addresses(String host) throws UnknownHostException {
@@ -68,10 +53,6 @@ public final class WorkflowUrlPolicy {
     private static int port(URI uri) {
         if (uri.getPort() >= 0) return uri.getPort();
         return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
-    }
-
-    private static WorkflowException invalidUrl() {
-        return new WorkflowException(WorkflowException.Stage.FETCH, "invalid HTTP URL");
     }
 
     private static UnknownHostException invalidAddress() {
