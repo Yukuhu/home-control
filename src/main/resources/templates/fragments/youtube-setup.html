@@ -111,12 +111,7 @@
         <p class="hint" th:if="${youtube.hasClient()}">Leave empty to keep the saved secret</p>
         <th:block th:if="${youtube.needsLoginPassword()}">
             <p>Create a Home Control password to keep your connected accounts private. You will use it to log in from now on.</p>
-            <label>Home Control password (at least 10 characters)
-                <input type="password" name="loginPassword" minlength="10" autocomplete="new-password" placeholder="New login password">
-            </label>
-            <label>Confirm Home Control password
-                <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password" placeholder="Repeat login password">
-            </label>
+            <th:block th:replace="~{fragments/layout :: firstPassword(null)}"></th:block>
         </th:block>
         <button type="submit" class="primary" th:formaction="@{/setup/sources/youtube/browser/connect}"
                 th:disabled="${!youtube.browserSupported()}">Sign in with Google</button>

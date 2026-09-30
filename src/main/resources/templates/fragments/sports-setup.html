@@ -52,14 +52,7 @@
         <th:block th:if="${sports.needsLoginPassword()}">
             <p>A calendar link can contain a private token, so Home Control stores it as a secret and will
                 require this login password from now on.</p>
-            <label>Home Control password (at least 10 characters)
-                <input type="password" name="loginPassword" minlength="10" autocomplete="new-password"
-                   placeholder="New login password">
-            </label>
-            <label>Confirm Home Control password
-                <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password"
-                   placeholder="Repeat login password">
-            </label>
+            <th:block th:replace="~{fragments/layout :: firstPassword(null)}"></th:block>
         </th:block>
         <button type="submit" class="primary">Add calendar</button>
         <p class="hint">Links starting with webcal:// work too. Home Control only reads the calendar; it never
@@ -86,14 +79,7 @@
                 <input type="password" name="key" autocomplete="off">
             </label>
             <th:block th:if="${sports.needsLoginPassword()}">
-                <label>Home Control password (at least 10 characters)
-                <input type="password" name="loginPassword" minlength="10" autocomplete="new-password"
-                       placeholder="New login password">
-            </label>
-                <label>Confirm Home Control password
-                <input type="password" name="loginPasswordConfirmation" minlength="10" autocomplete="new-password"
-                       placeholder="Repeat login password">
-            </label>
+                <th:block th:replace="~{fragments/layout :: firstPassword(null)}"></th:block>
             </th:block>
             <button type="submit">Use my key</button>
         </form>

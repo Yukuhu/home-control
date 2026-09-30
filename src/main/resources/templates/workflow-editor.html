@@ -1,27 +1,13 @@
 <!doctype html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#101917">
-<title>Home Control · Workflow</title>
-<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
-<link rel="stylesheet" th:href="@{/app.css}">
-<link rel="stylesheet" th:href="@{/themes/cyberpunk.css}">
-<script th:src="@{/js/theme.js}"></script>
+    <th:block th:replace="~{fragments/layout :: pageHead('Home Control · Workflow', false)}"></th:block>
 <script type="module" th:src="@{/js/workflows.js}">
 </script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to workflow</a>
-<header class="app-header">
-    <a class="brand" th:href="@{/}" aria-label="Home Control home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg></span><span>Home<span class="brand-light">Control</span></span></a>
-    <nav class="header-nav" aria-label="Main navigation">
-        <a th:href="@{/}">Home</a>
-        <a th:href="@{/setup}" aria-current="page">Setup</a>
-    </nav>
-    <button th:replace="~{fragments/theme-toggle :: toggle}"></button>
-</header>
+<header th:replace="~{fragments/layout :: appHeader('setup')}"></header>
 <main id="main-content" class="setup workflow-editor">
 <div class="page-heading">
 <div>
@@ -293,14 +279,7 @@
 <fieldset th:if="${needsLoginPassword}">
 <legend>Protect your workflows</legend>
 <p>Create a Home Control password with your first saved workflow. You will use it to log in and protect saved addresses and credentials.</p>
-<div class="workflow-field">
-<label for="workflow-loginPassword">Home Control password (10–1024 characters)</label>
-<input id="workflow-loginPassword" name="loginPassword" type="password" maxlength="1024" autocomplete="off">
-</div>
-<div class="workflow-field">
-<label for="workflow-loginPasswordConfirmation">Confirm Home Control password</label>
-<input id="workflow-loginPasswordConfirmation" name="loginPasswordConfirmation" type="password" maxlength="1024" autocomplete="off">
-</div>
+<th:block th:replace="~{fragments/layout :: firstPassword('workflow')}"></th:block>
 </fieldset>
 <p class="hint">Saving never starts playback. A generated workflow may fetch JSON when its Dashboard row refreshes after Save; a single tile waits until Play. Saved credentials stay hidden; choose Keep to retain them.</p>
 <button type="submit" class="primary">Save workflow</button>
