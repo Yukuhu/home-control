@@ -92,16 +92,17 @@ final class AdapterSettingsStore implements DeviceSettings {
     /**
      * Stores a hand-entered MAC on every Wake-on-LAN adapter of the device and stops adapters from
      * replacing it; blank clears it so they learn it again. No reconnect: handles read the MAC from
-     * the registry when they wake the device. An invalid MAC throws {@link IllegalArgumentException}
-     * before anything is written.
+     * the registry when they wake the device. An unknown device throws {@link DeviceNotFoundException}, and an
+     * invalid MAC {@link IllegalArgumentException}, before anything is written.
      */
     @Override
     public void setWakeOnLanMac(String id, String mac) {
         boolean clear = mac == null || mac.isBlank();
-        String normalized = clear ? null : MacAddress.normalize(mac);
         synchronized (lock) {
+            // The device first: an unknown one is a 404 whatever was typed as its MAC.
             Device device = registry.findById(id)
                     .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
+            String normalized = clear ? null : MacAddress.normalize(mac);
             Device updated = device;
             for (String adapterId : device.adapters().keySet()) {
                 if (wakes(device, adapterId)) {
