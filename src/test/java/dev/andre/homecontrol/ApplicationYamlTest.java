@@ -40,6 +40,18 @@ class ApplicationYamlTest {
         assertThat(sources.getFirst().getProperty("home-control.bluetooth.enabled")).isEqualTo(false);
     }
 
+    /**
+     * At DEBUG, HttpClient 5 logs request lines, headers and bodies: TMDB's key in a query, TheSportsDB's in a path,
+     * bearer tokens and Google's form secrets. Turning the whole application to DEBUG must not turn those on.
+     */
+    @Test
+    void httpClientLogsNothingBelowInfoInTheProductionFile() throws IOException {
+        List<PropertySource<?>> sources = new YamlPropertySourceLoader()
+                .load("application.yaml", new ClassPathResource("application.yaml"));
+
+        assertThat(sources.getFirst().getProperty("logging.level.org.apache.hc")).isEqualTo("info");
+    }
+
     @Test
     void theTestOverridesWin() {
         runner.run(context -> {

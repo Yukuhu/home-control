@@ -19,6 +19,12 @@ spring:
         cachecontrol:
           no-cache: true
 
+logging:
+  level:
+    # At DEBUG, HttpClient 5 logs request lines, headers and bodies, which carry API keys, tokens and form secrets.
+    # Turning the whole application to DEBUG leaves it at INFO.
+    org.apache.hc: info
+
 home-control:
   data-dir: ./data
   discovery:
