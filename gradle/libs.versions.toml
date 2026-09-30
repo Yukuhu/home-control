@@ -22,7 +22,7 @@ test-retry = "1.6.6"
 jmdns = "3.6.3"
 bouncycastle = "1.86"
 bluez-dbus = "0.3.5"
-dbus-java = "5.2.1"
+dbus-java = "5.2.2"
 # scripts/e2e.sh and the CI browser cache read this version.
 playwright = "1.63.0"
 archunit = "1.5.1"
