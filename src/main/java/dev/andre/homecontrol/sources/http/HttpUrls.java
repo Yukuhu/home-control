@@ -63,13 +63,26 @@ public final class HttpUrls {
         if (rules.maxLength() > 0 && raw.length() > rules.maxLength()) {
             throw new InvalidUrlException(Problem.TOO_LONG);
         }
+        URI uri = withHttpScheme(raw, rules);
+        checkAuthority(uri);
+        checkRest(uri, rules);
+        return uri;
+    }
+
+    /** The link as http or https, a {@code webcal(s)} link read as https when the rules allow it. */
+    private static URI withHttpScheme(String raw, Rules rules) {
         URI uri = uri(raw);
         String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
         if (rules.webcal() && (scheme.equals("webcal") || scheme.equals("webcals"))) {
-            uri = uri("https" + raw.substring(uri.getScheme().length()));
-        } else if (!scheme.equals("http") && !scheme.equals("https")) {
+            return uri("https" + raw.substring(uri.getScheme().length()));
+        }
+        if (!scheme.equals("http") && !scheme.equals("https")) {
             throw new InvalidUrlException(Problem.SCHEME);
         }
+        return uri;
+    }
+
+    private static void checkAuthority(URI uri) {
         if (uri.getRawUserInfo() != null) {
             throw new InvalidUrlException(Problem.USER_INFO);
         }
@@ -79,6 +92,9 @@ public final class HttpUrls {
         if (uri.getPort() == 0 || uri.getPort() > 65_535) {
             throw new InvalidUrlException(Problem.PORT);
         }
+    }
+
+    private static void checkRest(URI uri, Rules rules) {
         if (!rules.allowQuery() && uri.getRawQuery() != null) {
             throw new InvalidUrlException(Problem.QUERY);
         }
@@ -88,7 +104,6 @@ public final class HttpUrls {
         if (!rules.allowDotSegments() && hasDotSegment(uri.getPath())) {
             throw new InvalidUrlException(Problem.DOT_SEGMENT);
         }
-        return uri;
     }
 
     private static URI uri(String raw) {

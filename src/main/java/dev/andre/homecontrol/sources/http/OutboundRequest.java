@@ -69,10 +69,12 @@ public record OutboundRequest(String method, URI uri, Map<String, String> header
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof OutboundRequest that && method.equals(that.method) && uri.equals(that.uri)
-                && headers.equals(that.headers) && Arrays.equals(body, that.body)
-                && Objects.equals(contentType, that.contentType) && maxBytes == that.maxBytes
-                && waitForSlot == that.waitForSlot && notAfter.equals(that.notAfter) && errorBody == that.errorBody;
+        return other instanceof OutboundRequest(var otherMethod, var otherUri, var otherHeaders, var otherBody,
+                var otherContentType, var otherMaxBytes, var otherWaitForSlot, var otherNotAfter, var otherErrorBody)
+                && method.equals(otherMethod) && uri.equals(otherUri) && headers.equals(otherHeaders)
+                && Arrays.equals(body, otherBody) && Objects.equals(contentType, otherContentType)
+                && maxBytes == otherMaxBytes && waitForSlot == otherWaitForSlot && notAfter.equals(otherNotAfter)
+                && errorBody == otherErrorBody;
     }
 
     @Override
