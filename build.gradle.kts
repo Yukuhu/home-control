@@ -184,3 +184,12 @@ val installPlaywrightBrowsers by tasks.registering(JavaExec::class) {
     mainClass = "com.microsoft.playwright.CLI"
     args(listOf("install", "--with-deps") + ((findProperty("e2eBrowsers") as String?) ?: "chromium,firefox,webkit").split(","))
 }
+
+// Resolve artifacts before CI fans out into builds and browser tests. Task inputs force
+// verification of every resolvable configuration without compiling or executing tests.
+tasks.register("verifyDependencyChecksums") {
+    description = "Verifies dependency checksums across all configurations without compiling."
+    group = "verification"
+    inputs.files(configurations.filter { it.isCanBeResolved })
+    doLast { logger.lifecycle("Dependency checksums verified.") }
+}

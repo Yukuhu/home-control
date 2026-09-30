@@ -102,11 +102,19 @@ Dependabot does not update Gradle verification metadata
 ([upstream request](https://github.com/dependabot/dependabot-core/issues/1996)). A dependency update therefore
 needs a maintainer to review and commit its new checksums before strict CI can pass.
 
-The `Review dependency checksums` workflow runs on Dependabot PRs that change the Gradle build or catalog.
-It checks out the PR's exact head commit, downloads into a fresh cache, generates candidate metadata and runs
-the build and test compilation. It uploads a patch and the head SHA as an artifact, including when tests fail
-after metadata generation. This job has a read-only token, saves no dependency cache, and does not commit or
-approve the checksums. Its result does not replace the required `CI passed` check.
+CI's `Verify dependency checksums` job resolves all dependency configurations before the jar, unit tests,
+source image and browser jobs start. It checks out the same merge revision those builds test. For Dependabot, it downloads
+into a fresh cache and, if verification fails, generates candidate metadata and uploads a patch and the head
+SHA as an artifact. It then reports that checksum review is required; the dependent builds stay skipped and
+`CI passed` stays blocked. There is one CI workflow, and candidate preparation does not run the test suite.
+
+This job has a read-only token, saves no dependency cache, and does not commit or approve the checksums.
+Other Gradle failures remain failures and do not trigger checksum generation. When the committed metadata
+passes verification, the usual builds and tests run with strict verification.
+
+The patch is based on the PR head, so it also works for branches opened before the checksum gate was added.
+It includes metadata already reviewed on `main` where necessary. `head-sha.txt` records the patch baseline;
+`tested-sha.txt` records the merge revision whose dependencies were resolved.
 
 To complete an update:
 
@@ -114,7 +122,8 @@ To complete an update:
    with `gh run download <run-id> --name dependency-checksums-<number>-<head-sha> --dir /tmp/checksum-review`.
 2. Confirm `git rev-parse HEAD` matches the artifact's `head-sha.txt`. If Dependabot rebased the PR, use the
    new run instead. Read `verification-metadata.patch` and compare every new checksum with fresh Maven
-   Central or Gradle Plugin Portal artifacts. Investigate any added checksum for an already trusted artifact.
+   Central or Gradle Plugin Portal artifacts, or confirm an inherited checksum is already reviewed on `main`.
+   Investigate any added checksum for an already trusted artifact.
 3. After review, run `git apply --check /tmp/checksum-review/verification-metadata.patch`, then
    `git apply /tmp/checksum-review/verification-metadata.patch`. For protobuf updates, add the other
    published `protoc` platform checksums as described above.
@@ -122,7 +131,7 @@ To complete an update:
    the commit to the dependency PR. The normal CI run now verifies it and must pass before merging.
 
 You can also generate the candidate locally with the command above. Never add the generation flag to the
-normal CI jobs or automatically commit this workflow's downloads: neither would verify newly fetched bytes
+build and test jobs or automatically commit the preparation job's downloads: neither would verify newly fetched bytes
 against a previously reviewed value.
 
 ## Fakes and fixtures
