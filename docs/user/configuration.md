@@ -21,6 +21,7 @@ Every setting, as a Spring property or an environment variable.
 | `home-control.tizen.client-name` | `Home Control` | Name shown in the Samsung Allow prompt |
 | `home-control.tizen.poll-interval` | `5s` | How often Samsung state is polled |
 | `home-control.wake-on-lan.broadcast-address` | `255.255.255.255` | Use the subnet broadcast on multi-homed hosts |
+| `home-control.events.heartbeat-interval` | `25s` | How often the dashboard's live updates send a keep-alive, so a reverse proxy does not close them |
 | `home-control.deep-link-test.youtube-url` | Big Buck Bunny on YouTube | Video the test button opens |
 | `home-control.deep-link-test.timeout` | `10s` | How long the test button watches for the app to change (the setup page says so) |
 | `HOME_CONTROL_SECRET` | unset | Passphrase that encrypts `secrets.json`; without it a random `secret.key` is created next to it on first use |

@@ -18,6 +18,7 @@ import dev.andre.homecontrol.discovery.MdnsBrowser;
 import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.playback.DeepLinkTestProperties;
+import dev.andre.homecontrol.web.EventStreamProperties;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,7 +28,7 @@ import org.springframework.context.annotation.Configuration;
 import java.util.List;
 
 @Configuration
-@EnableConfigurationProperties(DeepLinkTestProperties.class)
+@EnableConfigurationProperties({DeepLinkTestProperties.class, EventStreamProperties.class})
 public class HomeControlConfiguration {
 
     @Bean

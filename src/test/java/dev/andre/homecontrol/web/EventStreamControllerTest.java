@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-class StateControllerTest extends WebSliceTest {
+class EventStreamControllerTest extends WebSliceTest {
 
     @Autowired
     MockMvc mockMvc;
