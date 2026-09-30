@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
@@ -70,12 +71,12 @@ class TheSportsDbScheduleRetryTest {
 
     @Test
     void aFailedDayIsRetriedOnlyAfterTheBackoff() {
-        TheSportsDbSchedule.Result first = schedule.events();
+        FeedResult first = schedule.events();
         assertThat(server.count("eventsday.php")).isEqualTo(4);
         assertThat(first.errors()).containsExactly("German Bundesliga: TheSportsDB had a server error (HTTP 500)");
         assertThat(first.succeeded()).isEqualTo(1);
 
-        TheSportsDbSchedule.Result again = schedule.events();
+        FeedResult again = schedule.events();
         assertThat(server.count("eventsday.php")).isEqualTo(4);
         assertThat(again.errors()).isEqualTo(first.errors());
 
@@ -91,7 +92,7 @@ class TheSportsDbScheduleRetryTest {
         schedule.events();
         settingsService.update(s -> s.withCompetitions(List.of(BUNDESLIGA, PREMIER_LEAGUE)));
 
-        TheSportsDbSchedule.Result readded = schedule.events();
+        FeedResult readded = schedule.events();
 
         assertThat(server.count("eventsday.php")).isEqualTo(6);
         assertThat(readded.errors()).containsExactly("German Bundesliga: TheSportsDB had a server error (HTTP 500)");

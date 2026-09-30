@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
 import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
+import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
 import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
@@ -83,7 +84,7 @@ class CalendarScheduleTest {
 
     @Test
     void loadsEveryCalendarOnce() {
-        CalendarSchedule.Result result = schedule.events();
+        FeedResult result = schedule.events();
 
         assertThat(result.succeeded()).isEqualTo(2);
         assertThat(result.errors()).isEmpty();
@@ -111,7 +112,7 @@ class CalendarScheduleTest {
         clock.advance(Duration.ofHours(6));
         server.respond("/weekly.ics", 500, "text/plain", "");
 
-        CalendarSchedule.Result result = schedule.events();
+        FeedResult result = schedule.events();
         assertThat(result.events()).anyMatch(e -> e.title().contains("Darts Premier League"));
         assertThat(result.errors()).containsExactly("Weekly sport: 127.0.0.1 answered HTTP 500");
 
@@ -129,7 +130,7 @@ class CalendarScheduleTest {
     void aCalendarThatNeverLoadedIsAnError() {
         server.respond("/weekly.ics", 404, "text/plain", "");
 
-        CalendarSchedule.Result result = schedule.events();
+        FeedResult result = schedule.events();
 
         assertThat(result.succeeded()).isEqualTo(1);
         assertThat(result.errors()).containsExactly("Weekly sport: 127.0.0.1 has no calendar at that link");
@@ -139,7 +140,7 @@ class CalendarScheduleTest {
     void aMissingSecretIsExplained() {
         given(secrets.secret("sports.calendar.c-3f9a1c2b7d4e")).willReturn(Optional.empty());
 
-        CalendarSchedule.Result result = schedule.events();
+        FeedResult result = schedule.events();
 
         assertThat(result.errors()).contains(
                 "Bundesliga 2026/27: The link for Bundesliga 2026/27 is missing; remove the calendar and add it again");
@@ -150,7 +151,7 @@ class CalendarScheduleTest {
     void htmlIsNotACalendar() {
         server.respond("/weekly.ics", 200, "text/html", "<html></html>");
 
-        CalendarSchedule.Result result = schedule.events();
+        FeedResult result = schedule.events();
 
         assertThat(result.errors()).contains("Weekly sport: That link did not return a calendar (.ics)");
     }
@@ -185,7 +186,7 @@ class CalendarScheduleTest {
         schedule.events();
         settingsService.update(s -> s.withCalendars(List.of(s.calendars().get(1))));
 
-        CalendarSchedule.Result result = schedule.events();
+        FeedResult result = schedule.events();
         assertThat(result.events()).noneMatch(e -> e.competitionKey().equals("calendar:c-3f9a1c2b7d4e"));
     }
 

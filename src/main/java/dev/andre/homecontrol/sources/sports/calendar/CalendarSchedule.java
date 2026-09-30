@@ -1,8 +1,10 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
+import dev.andre.homecontrol.sources.sports.feed.SportsFeed;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
@@ -38,19 +40,12 @@ import java.util.stream.Collectors;
  * Every configured calendar, refetched on a schedule and expanded into a rolling window. Only fails a
  * calendar; a calendar keeps its last good parse across a transient failure.
  */
-public class CalendarSchedule {
+public class CalendarSchedule implements SportsFeed {
 
     private static final Logger log = LoggerFactory.getLogger(CalendarSchedule.class);
     private static final Duration RETRY_BACKOFF = Duration.ofMinutes(10);
     private static final Duration WINDOW_BEFORE = Duration.ofDays(1);
     private static final Duration WINDOW_AFTER = Duration.ofDays(8);
-
-    public record Result(List<SportsEvent> events, List<String> errors, int feeds, int succeeded) {
-        public Result {
-            events = List.copyOf(events);
-            errors = List.copyOf(errors);
-        }
-    }
 
     private record Cached(IcsCalendar calendar, Instant fetchedAt, Instant lastAttempt, String error) {
     }
@@ -77,11 +72,18 @@ public class CalendarSchedule {
         this.clock = clock;
     }
 
-    public boolean hasCalendars() {
+    @Override
+    public String itemPrefix() {
+        return "ics:";
+    }
+
+    @Override
+    public boolean configured() {
         return !settingsService.current().calendars().isEmpty();
     }
 
-    public synchronized Result events() {
+    @Override
+    public synchronized FeedResult events() {
         ranOnce = true;
         SportsSettings settings = settingsService.current();
         Instant now = clock.instant();
@@ -122,7 +124,7 @@ public class CalendarSchedule {
             }
         }
         byItemId.set(Map.copyOf(byId));
-        return new Result(events, errors, settings.calendars().size(), succeeded);
+        return new FeedResult(events, errors, settings.calendars().size(), succeeded);
     }
 
     private Cached refresh(SportsSettings.CalendarEntry entry, Cached previous, Instant now) {
@@ -152,6 +154,7 @@ public class CalendarSchedule {
         }
     }
 
+    @Override
     public Optional<SportsEvent> find(String itemId) {
         if (!ranOnce) {
             events();

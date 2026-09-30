@@ -9,6 +9,7 @@ import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarFetcher;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import dev.andre.homecontrol.sources.sports.calendar.SportsCalendars;
+import dev.andre.homecontrol.sources.sports.feed.SportsFeed;
 import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
@@ -24,6 +25,8 @@ import org.springframework.context.annotation.Configuration;
 
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
 
 /** The sports module. {@code home-control.sports.enabled=false} removes all of it. */
 @Configuration(proxyBeanMethods = false)
@@ -68,9 +71,13 @@ public class SportsConfiguration {
                 Clock.systemUTC(), new SecureRandom());
     }
 
+    /** Calendars first, then TheSportsDB when its module is on: the order of events and of the error shown. */
     @Bean
-    public SportsSchedule sportsSchedule(CalendarSchedule schedule, ObjectProvider<TheSportsDbSchedule> competitions) {
-        return new SportsSchedule(schedule, competitions.getIfAvailable());
+    public SportsSchedule sportsSchedule(CalendarSchedule calendars, ObjectProvider<TheSportsDbSchedule> competitions) {
+        List<SportsFeed> feeds = new ArrayList<>();
+        feeds.add(calendars);
+        competitions.ifAvailable(feeds::add);
+        return new SportsSchedule(feeds);
     }
 
     @Bean

@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
@@ -78,7 +79,7 @@ class TheSportsDbScheduleTest {
 
     @Test
     void fetchesEachCompetitionAndDateOnce() {
-        TheSportsDbSchedule.Result result = schedule.events();
+        FeedResult result = schedule.events();
 
         assertThat(server.count("eventsday.php")).isEqualTo(4);
         assertThat(result.events()).extracting(SportsEvent::itemId)
@@ -94,7 +95,7 @@ class TheSportsDbScheduleTest {
     void rateLimitingStopsTheRound() {
         server.respondJson("eventsday.php", java.util.Map.of("d", "2026-09-18", "l", "4331"), 429, "{}");
 
-        TheSportsDbSchedule.Result result = schedule.events();
+        FeedResult result = schedule.events();
 
         assertThat(server.count("eventsday.php")).isEqualTo(1);
         assertThat(result.errors()).containsExactlyInAnyOrder(
@@ -107,7 +108,7 @@ class TheSportsDbScheduleTest {
     void aMissingPersonalKeyIsAnErrorWithoutRequests() {
         settingsService.update(s -> s.withKeyKind(SportsSettings.KeyKind.PERSONAL));
 
-        TheSportsDbSchedule.Result result = schedule.events();
+        FeedResult result = schedule.events();
 
         assertThat(result.errors()).isNotEmpty().allMatch(e -> e.contains("Your TheSportsDB key is missing"));
         assertThat(server.count("eventsday.php")).isZero();
@@ -143,7 +144,7 @@ class TheSportsDbScheduleTest {
         schedule.events();
         settingsService.update(s -> s.withCompetitions(List.of(s.competitions().get(0))));
 
-        TheSportsDbSchedule.Result result = schedule.events();
+        FeedResult result = schedule.events();
         assertThat(result.events()).noneMatch(e -> e.itemId().startsWith("tsdb:26"));
     }
 }

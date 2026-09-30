@@ -1,56 +1,41 @@
 package dev.andre.homecontrol.sources.sports;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
-import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
+import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
-import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
+import dev.andre.homecontrol.sources.sports.feed.SportsFeed;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 /** Every configured feed as one list of events. Only fails when no feed has anything to show. */
 public class SportsSchedule {
 
-    private final CalendarSchedule calendars;
-    private final TheSportsDbSchedule competitions;
+    private final List<SportsFeed> feeds;
 
-    public SportsSchedule(CalendarSchedule calendars, TheSportsDbSchedule competitions) {
-        this.calendars = calendars;
-        this.competitions = competitions;
+    public SportsSchedule(List<SportsFeed> feeds) {
+        this.feeds = List.copyOf(feeds);
     }
 
     public boolean hasFeeds() {
-        return calendars.hasCalendars() || (competitions != null && competitions.hasCompetitions());
+        return feeds.stream().anyMatch(SportsFeed::configured);
     }
 
     public List<SportsEvent> events() {
-        CalendarSchedule.Result calendarResult = calendars.events();
-        TheSportsDbSchedule.Result competitionResult = competitions == null
-                ? new TheSportsDbSchedule.Result(List.of(), List.of(), 0, 0) : competitions.events();
-
-        List<SportsEvent> events = new ArrayList<>(calendarResult.events());
-        events.addAll(competitionResult.events());
-
-        List<String> errors = new ArrayList<>(calendarResult.errors());
-        errors.addAll(competitionResult.errors());
-
-        int feeds = calendarResult.feeds() + competitionResult.feeds();
-        int succeeded = calendarResult.succeeded() + competitionResult.succeeded();
-
-        if (feeds > 0 && succeeded == 0 && !errors.isEmpty()) {
-            throw new ContentSourceException(ContentSourceException.Kind.BAD_RESPONSE, errors.getFirst());
+        FeedResult all = FeedResult.NONE;
+        for (SportsFeed feed : feeds) {
+            all = all.plus(feed.events());
         }
-        return events;
+        if (all.allFailed()) {
+            throw new ContentSourceException(ContentSourceException.Kind.BAD_RESPONSE, all.errors().getFirst());
+        }
+        return all.events();
     }
 
     public Optional<SportsEvent> find(String itemId) {
-        if (itemId.startsWith("ics:")) {
-            return calendars.find(itemId);
-        }
-        if (itemId.startsWith("tsdb:")) {
-            return competitions == null ? Optional.empty() : competitions.find(itemId);
-        }
-        return Optional.empty();
+        return feeds.stream()
+                .filter(feed -> itemId.startsWith(feed.itemPrefix()))
+                .findFirst()
+                .flatMap(feed -> feed.find(itemId));
     }
 }
