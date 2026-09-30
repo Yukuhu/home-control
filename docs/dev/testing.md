@@ -144,7 +144,9 @@ against a previously reviewed value.
   (with a real `LoginService`, wrap a `MockHttpServletRequest` in `RequestLoginContext`).
   A fake of a web API (Jellyfin, TMDB, Google, TheSportsDB, calendars, workflows) is a thin wrapper over
   `FakeHttpServer` that keeps the service's own vocabulary; a fake of a socket protocol (UPnP, Tizen, Cast, Android
-  TV, mpv) stays protocol-specific.
+  TV, mpv) stays protocol-specific. A test that needs a request to stay open until it has checked something holds
+  the answer with `FakeHttpServer.hold` and a `CountDownLatch` (the calendar and TheSportsDB fakes wrap it); the
+  request is recorded on arrival, so the test can wait for it.
 - Recorded device and API responses live in `src/test/resources/fixtures/<device or source>/`, for example
   `fixtures/cast/` or `fixtures/jellyfin/`.
 - Waiting for something asynchronous uses Awaitility (`await().atMost(...)`), never `Thread.sleep`. A fake may
