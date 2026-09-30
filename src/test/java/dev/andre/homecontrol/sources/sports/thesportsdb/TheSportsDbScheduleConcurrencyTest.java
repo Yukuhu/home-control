@@ -153,6 +153,34 @@ class TheSportsDbScheduleConcurrencyTest {
         assertThat(first.get(10, TimeUnit.SECONDS).succeeded()).isEqualTo(2);
     }
 
+    @Test
+    void forgettingOneLeagueKeepsAnotherOnesDownload() throws Exception {
+        holdDay("2026-09-19", "4331", "eventsday-2026-09-19-4331.json");
+        Future<FeedResult> pass = passHeldAfter(2);
+
+        settingsService.update(s -> s.withCompetitions(List.of(s.competitions().get(0))));
+        schedule.forget("4328");
+        release.countDown();
+        pass.get(10, TimeUnit.SECONDS);
+
+        assertThat(schedule.find(BUNDESLIGA_ITEM)).isPresent();
+    }
+
+    @Test
+    void aRateLimitMetByAJoinedDownloadStopsBothPasses() throws Exception {
+        server.hold(EVENTS_DAY, Map.of("d", "2026-09-18", "l", "4331"), 429, "eventsday-empty.json", release);
+        Future<FeedResult> first = passHeldAfter(1);
+        Thread second = Thread.ofVirtual().start(schedule::events);
+        // Parked on the running download, not merely not started yet.
+        await().until(() -> second.getState() == Thread.State.WAITING);
+
+        release.countDown();
+        first.get(10, TimeUnit.SECONDS);
+
+        assertThat(second.join(Duration.ofSeconds(10))).isTrue();
+        assertThat(server.count(EVENTS_DAY)).isEqualTo(1);
+    }
+
     /** What SportsCompetitions.usePersonalKey does: the secret and the settings first, then the schedule. */
     private void switchToThePersonalKey() {
         given(secrets.secret(TheSportsDbKeys.SECRET)).willReturn(Optional.of(PERSONAL_KEY));

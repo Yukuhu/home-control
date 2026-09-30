@@ -83,7 +83,7 @@ class FeedFetchesTest {
     }
 
     @Test
-    void aFailingFetchReachesTheRunnerAndEveryWaiterAndFreesTheKey() throws Exception {
+    void aFailingFetchReachesTheRunnerAndEveryWaiterAndFreesTheKey() {
         Future<?> first = pool.submit(() -> fetches.run("calendar", () -> {
             heldFetch();
             throw new IllegalStateException("parser bug");
