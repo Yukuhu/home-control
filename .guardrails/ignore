@@ -1,0 +1,2 @@
+# Reviewed public SHA-256 artifact checksums trigger the hex entropy secret detector.
+/gradle/verification-metadata.xml
