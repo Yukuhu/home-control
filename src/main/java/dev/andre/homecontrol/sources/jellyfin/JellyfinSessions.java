@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import tools.jackson.databind.JsonNode;
 
 import java.net.InetAddress;
@@ -55,7 +56,7 @@ public class JellyfinSessions {
 
     public Optional<JellyfinSession> sessionFor(Device device) {
         JellyfinSettings settings = setup.settings().orElseThrow(() ->
-                new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
+                new JellyfinException(ContentSourceException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
         return match(device.name(), addressesOfHost.apply(device.host()), controllable(), settings.sessionLinks().get(device.id()));
     }
 
@@ -71,8 +72,8 @@ public class JellyfinSessions {
         try {
             client.post(connection(), "/Sessions/" + session + "/Playing", query, null);
         } catch (JellyfinException e) {
-            if (e.kind() == JellyfinException.Kind.NOT_FOUND) {
-                throw new JellyfinException(JellyfinException.Kind.NOT_FOUND, "The Jellyfin app on that device has closed its session");
+            if (e.kind() == ContentSourceException.Kind.NOT_FOUND) {
+                throw new JellyfinException(ContentSourceException.Kind.NOT_FOUND, "The Jellyfin app on that device has closed its session");
             }
             throw e;
         }
@@ -138,7 +139,7 @@ public class JellyfinSessions {
 
     private JellyfinConnection connection() {
         return setup.connection().orElseThrow(() ->
-                new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
+                new JellyfinException(ContentSourceException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
     }
 
     private static Instant instant(String value) {

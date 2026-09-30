@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -53,7 +54,7 @@ class CalendarUrlPolicyTest {
         var calendarUrl = URI.create("http://example.org/a.ics");
         assertThatThrownBy(() -> stubbed.checkAddress(calendarUrl))
                 .isInstanceOf(CalendarFetchException.class)
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BLOCKED)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BLOCKED)
                 .hasMessageContaining("example.org").hasMessageContaining("belongs to this machine");
     }
 
@@ -70,7 +71,7 @@ class CalendarUrlPolicyTest {
         var rebindingUrl = URI.create("http://rebind.example/a.ics");
         assertThatThrownBy(() -> stubbed.checkAddress(rebindingUrl))
                 .isInstanceOf(CalendarFetchException.class)
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BLOCKED);
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BLOCKED);
     }
 
     @Test
@@ -92,7 +93,7 @@ class CalendarUrlPolicyTest {
         var unresolvableUrl = URI.create("http://nowhere.invalid/a.ics");
         assertThatThrownBy(() -> stubbed.checkAddress(unresolvableUrl))
                 .isInstanceOf(CalendarFetchException.class)
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNREACHABLE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
                 .hasMessage("Could not find nowhere.invalid");
     }
 
@@ -104,6 +105,6 @@ class CalendarUrlPolicyTest {
         assertThat(lan.addresses("fd00::5")).containsExactly(InetAddress.ofLiteral("fd00::5"));
         assertThatThrownBy(() -> lan.addresses("[::1]"))
                 .isInstanceOf(CalendarFetchException.class)
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BLOCKED);
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BLOCKED);
     }
 }

@@ -51,7 +51,7 @@ public final class WorkflowContentSource implements ContentSource {
             }
             return new Rail(descriptor(definition), items, Instant.now());
         } catch (WorkflowException failure) {
-            throw new ContentSourceException(failure.getMessage());
+            throw new ContentSourceException(ContentSourceException.Kind.BAD_RESPONSE, failure.getMessage());
         }
     }
 

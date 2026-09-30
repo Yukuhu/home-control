@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
@@ -55,7 +56,7 @@ class TmdbSetupControllerTest extends WebSliceTest {
 
     @Test
     void failuresBecomeFlashErrors() throws Exception {
-        willThrow(new TmdbException(TmdbException.Kind.UNAUTHORIZED, "TMDB rejected the API key or read access token"))
+        willThrow(new TmdbException(ContentSourceException.Kind.UNAUTHORIZED, "TMDB rejected the API key or read access token"))
                 .given(tmdbSetup).connect(any(), any());
 
         mockMvc.perform(post("/setup/sources/tmdb").param("credential", "x"))

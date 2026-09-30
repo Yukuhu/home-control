@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
@@ -95,7 +96,7 @@ class YouTubeSetupServiceTest {
         assertThatThrownBy(() -> service.connect(request, httpRequest))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.INVALID_INPUT);
+                .isEqualTo(ContentSourceException.Kind.INVALID_INPUT);
         assertThatThrownBy(() -> service.connect(request, httpRequest))
                 .hasMessage("That does not look like an OAuth client ID (it ends in .apps.googleusercontent.com)");
     }
@@ -142,7 +143,7 @@ class YouTubeSetupServiceTest {
         assertThatThrownBy(() -> service.connect(noSecret, httpRequest))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.INVALID_INPUT);
+                .isEqualTo(ContentSourceException.Kind.INVALID_INPUT);
         assertThatThrownBy(() -> service.connect(noSecret, httpRequest)).hasMessage("Enter the client secret");
     }
 
@@ -206,7 +207,7 @@ class YouTubeSetupServiceTest {
     @Test
     void aFailedRevokeStillDisconnects() {
         given(secrets.secret(YouTubeSettings.REFRESH_TOKEN)).willReturn(Optional.of("rt"));
-        doThrow(new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Could not reach Google")).when(oauth).revoke("rt");
+        doThrow(new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Could not reach Google")).when(oauth).revoke("rt");
 
         service.disconnect();
 
@@ -353,11 +354,11 @@ class YouTubeSetupServiceTest {
         assertThatThrownBy(() -> service.setLounge("living", true))
                 .isInstanceOf(YouTubeException.class)
                 .hasMessage("Only Cast devices can use YouTube Cast")
-                .extracting(e -> ((YouTubeException) e).kind()).isEqualTo(YouTubeException.Kind.INVALID_INPUT);
+                .extracting(e -> ((YouTubeException) e).kind()).isEqualTo(ContentSourceException.Kind.INVALID_INPUT);
         assertThatThrownBy(() -> service.setLounge("gone", true))
                 .isInstanceOf(YouTubeException.class)
                 .hasMessage("No device with id gone")
-                .extracting(e -> ((YouTubeException) e).kind()).isEqualTo(YouTubeException.Kind.INVALID_INPUT);
+                .extracting(e -> ((YouTubeException) e).kind()).isEqualTo(ContentSourceException.Kind.INVALID_INPUT);
 
         service.save(service.settings().withLoungeDevice("gone", true));
         assertThat(service.setLounge("gone", false)).isEqualTo("gone");

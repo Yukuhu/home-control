@@ -172,7 +172,7 @@ class SportsRailTest {
 
     @Test
     void failuresSurfaceAsRailErrors() {
-        ContentSourceException failure = new ContentSourceException("Bundesliga 2026/27: calendar.example.org answered HTTP 500");
+        ContentSourceException failure = new ContentSourceException(ContentSourceException.Kind.BAD_RESPONSE, "Bundesliga 2026/27: calendar.example.org answered HTTP 500");
         given(schedule.events()).willThrow(failure);
 
         assertThatThrownBy(() -> source.rail("live-today")).isSameAs(failure);

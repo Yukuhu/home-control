@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -119,7 +120,7 @@ class QuotaLedgerTest {
         assertThatThrownBy(() -> ledger.charge(QuotaLedger.Call.PLAYLIST_ITEMS_LIST))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.QUOTA_EXHAUSTED);
+                .isEqualTo(ContentSourceException.Kind.QUOTA_EXHAUSTED);
         assertThatThrownBy(() -> ledger.charge(QuotaLedger.Call.PLAYLIST_ITEMS_LIST))
                 .hasMessage("YouTube's daily API quota is used up (3 of 3 units). Rails refresh again"
                         + " after midnight Pacific time (09:00 here).");
@@ -135,7 +136,7 @@ class QuotaLedgerTest {
         assertThatThrownBy(() -> ledger.charge(QuotaLedger.Call.SEARCH_LIST))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.SEARCH_LIMIT);
+                .isEqualTo(ContentSourceException.Kind.QUOTA_EXHAUSTED);
         assertThatThrownBy(() -> ledger.charge(QuotaLedger.Call.SEARCH_LIST))
                 .hasMessage("You have used today's 2 YouTube searches. More after midnight Pacific time (09:00 here).");
 
@@ -143,7 +144,7 @@ class QuotaLedgerTest {
         assertThatThrownBy(() -> tightBudget.charge(QuotaLedger.Call.SEARCH_LIST))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.QUOTA_EXHAUSTED);
+                .isEqualTo(ContentSourceException.Kind.QUOTA_EXHAUSTED);
     }
 
     @Test
@@ -157,7 +158,7 @@ class QuotaLedgerTest {
         assertThatThrownBy(() -> ledger.charge(QuotaLedger.Call.SUBSCRIPTIONS_LIST))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.QUOTA_EXHAUSTED);
+                .isEqualTo(ContentSourceException.Kind.QUOTA_EXHAUSTED);
     }
 
     @Test

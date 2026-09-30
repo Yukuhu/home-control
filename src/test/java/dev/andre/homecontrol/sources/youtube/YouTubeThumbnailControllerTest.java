@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,7 +59,7 @@ class YouTubeThumbnailControllerTest extends WebSliceTest {
         given(youTubeHttp.get(any(), any())).willReturn(new YouTubeHttp.Response(404, "text/plain", new byte[0]));
         mockMvc.perform(get("/sources/youtube/thumbnails/aqz-KE-bpKQ")).andExpect(status().isNotFound());
 
-        given(youTubeHttp.get(any(), any())).willThrow(new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Could not reach thumbs.test"));
+        given(youTubeHttp.get(any(), any())).willThrow(new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Could not reach thumbs.test"));
         mockMvc.perform(get("/sources/youtube/thumbnails/aqz-KE-bpKQ"))
                 .andExpect(status().isBadGateway())
                 .andExpect(content().string("Could not load the thumbnail"));

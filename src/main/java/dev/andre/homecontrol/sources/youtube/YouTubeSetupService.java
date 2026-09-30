@@ -3,6 +3,7 @@ package dev.andre.homecontrol.sources.youtube;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
@@ -120,16 +121,16 @@ public class YouTubeSetupService {
     private void saveClient(ConnectRequest request, LoginContext context) {
         String clientId = request.clientId() == null ? "" : request.clientId().strip();
         if (!CLIENT_ID_PATTERN.matcher(clientId).matches()) {
-            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT,
+            throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT,
                     "That does not look like an OAuth client ID (it ends in .apps.googleusercontent.com)");
         }
         String clientSecret = request.clientSecret() == null ? "" : request.clientSecret().strip();
         boolean hadSecret = secrets.secret(YouTubeSettings.CLIENT_SECRET).isPresent();
         if (clientSecret.isBlank() && !hadSecret) {
-            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Enter the client secret");
+            throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Enter the client secret");
         }
         if (clientSecret.length() > MAX_CLIENT_SECRET_LENGTH) {
-            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "That client secret is too long");
+            throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "That client secret is too long");
         }
         boolean clientIdChanged = !clientId.equals(secrets.secret(YouTubeSettings.CLIENT_ID).orElse(null));
         Map<String, String> values = new LinkedHashMap<>();
@@ -178,17 +179,17 @@ public class YouTubeSetupService {
     public void choosePlaylists(List<String> playlistIds) {
         List<String> ids = playlistIds == null ? List.of() : playlistIds;
         if (ids.size() > MAX_SELECTED_PLAYLISTS) {
-            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Choose at most " + MAX_SELECTED_PLAYLISTS + " playlists");
+            throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Choose at most " + MAX_SELECTED_PLAYLISTS + " playlists");
         }
         YouTubePlaylists p = playlists.getIfAvailable();
         Map<String, String> chosen = new LinkedHashMap<>();
         for (String id : ids) {
             if (id == null || !PLAYLIST_ID_PATTERN.matcher(id).matches()) {
-                throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Load your playlists again, then choose");
+                throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Load your playlists again, then choose");
             }
             Optional<YouTubePlaylists.PlaylistSummary> loaded = p == null ? Optional.empty() : p.loaded(id);
             if (loaded.isEmpty()) {
-                throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Load your playlists again, then choose");
+                throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Load your playlists again, then choose");
             }
             chosen.put(id, loaded.get().title());
         }
@@ -206,16 +207,16 @@ public class YouTubeSetupService {
      */
     public String setLounge(String deviceId, boolean enabled) {
         if (deviceId == null || deviceId.isBlank()) {
-            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Choose a device");
+            throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Choose a device");
         }
         DeviceQueries registered = devices.getIfAvailable();
         Optional<Device> device = registered == null ? Optional.empty() : registered.device(deviceId);
         if (enabled) {
             if (device.isEmpty()) {
-                throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "No device with id " + deviceId);
+                throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "No device with id " + deviceId);
             }
             if (!registered.capabilities(deviceId).contains(Capability.CAST_RECEIVER)) {
-                throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Only Cast devices can use YouTube Cast");
+                throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Only Cast devices can use YouTube Cast");
             }
         }
         save(settings().withLoungeDevice(deviceId, enabled));

@@ -2,7 +2,7 @@ package dev.andre.homecontrol.sources.sports.calendar;
 
 import dev.andre.homecontrol.sources.http.VettedHttpClients;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
-import dev.andre.homecontrol.sources.sports.calendar.CalendarFetchException.Kind;
+import dev.andre.homecontrol.core.content.ContentSourceException.Kind;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;

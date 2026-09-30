@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarFetchException;
@@ -75,7 +76,7 @@ class SportsSetupControllerTest extends WebSliceTest {
                 .andExpect(flash().attribute("sportsError", "Use an http, https or webcal link"))
                 .andExpect(flash().attribute("sportsForm", java.util.Map.of("label", "")));
 
-        willThrow(new CalendarFetchException(CalendarFetchException.Kind.NOT_FOUND, "calendar.example.org has no calendar at that link"))
+        willThrow(new CalendarFetchException(ContentSourceException.Kind.NOT_FOUND, "calendar.example.org has no calendar at that link"))
                 .given(sportsCalendars).add(any(), any());
         mockMvc.perform(post("/setup/sources/sports/calendars").param("url", url))
                 .andExpect(flash().attribute("sportsError", "calendar.example.org has no calendar at that link"));

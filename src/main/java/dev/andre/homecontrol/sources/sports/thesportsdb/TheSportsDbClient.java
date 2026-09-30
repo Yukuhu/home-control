@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.http.BoundedBody;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import tools.jackson.core.JacksonException;
@@ -50,7 +51,7 @@ public class TheSportsDbClient {
 
     public JsonNode get(String key, String endpoint, Map<String, String> query) {
         if (key == null || !KEY.matcher(key).matches()) {
-            throw new TheSportsDbException(TheSportsDbException.Kind.UNAUTHORIZED, "That does not look like a TheSportsDB API key");
+            throw new TheSportsDbException(ContentSourceException.Kind.UNAUTHORIZED, "That does not look like a TheSportsDB API key");
         }
         HttpRequest request = HttpRequest.newBuilder(uri(key, endpoint, query))
                 .GET()
@@ -65,37 +66,37 @@ public class TheSportsDbClient {
         } catch (IOException _) {
             // No cause attached: the request URI (which the JDK's IOException/timeout messages can
             // quote in full, e.g. via a wrapped ConnectException) embeds the API key in its path.
-            throw new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
+            throw new TheSportsDbException(ContentSourceException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
-            throw new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
+            throw new TheSportsDbException(ContentSourceException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
         }
         byte[] body = response.body();
         int status = response.statusCode();
         if (body.length > MAX_BODY_BYTES) {
-            throw new TheSportsDbException(TheSportsDbException.Kind.BAD_RESPONSE, "TheSportsDB answered with more data than expected");
+            throw new TheSportsDbException(ContentSourceException.Kind.BAD_RESPONSE, "TheSportsDB answered with more data than expected");
         }
         boolean mentionsApiKey = new String(body, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT).contains("api key");
         if (status == 401 || status == 403 || ((status == 400 || status == 404) && mentionsApiKey)) {
-            throw new TheSportsDbException(TheSportsDbException.Kind.UNAUTHORIZED, "TheSportsDB rejected the API key");
+            throw new TheSportsDbException(ContentSourceException.Kind.UNAUTHORIZED, "TheSportsDB rejected the API key");
         }
         if (status == 429) {
-            throw new TheSportsDbException(TheSportsDbException.Kind.RATE_LIMITED, "TheSportsDB is limiting requests; try again in a minute");
+            throw new TheSportsDbException(ContentSourceException.Kind.RATE_LIMITED, "TheSportsDB is limiting requests; try again in a minute");
         }
         if (status >= 500) {
-            throw new TheSportsDbException(TheSportsDbException.Kind.SERVER_ERROR, "TheSportsDB had a server error (HTTP " + status + ")");
+            throw new TheSportsDbException(ContentSourceException.Kind.SERVER_ERROR, "TheSportsDB had a server error (HTTP " + status + ")");
         }
         if (status < 200 || status >= 300) {
-            throw new TheSportsDbException(TheSportsDbException.Kind.BAD_RESPONSE, "TheSportsDB answered HTTP " + status);
+            throw new TheSportsDbException(ContentSourceException.Kind.BAD_RESPONSE, "TheSportsDB answered HTTP " + status);
         }
         JsonNode node;
         try {
             node = JSON.readTree(body);
         } catch (JacksonException _) {
-            throw new TheSportsDbException(TheSportsDbException.Kind.BAD_RESPONSE, "TheSportsDB answered with something that is not JSON");
+            throw new TheSportsDbException(ContentSourceException.Kind.BAD_RESPONSE, "TheSportsDB answered with something that is not JSON");
         }
         if (node == null || !node.isObject()) {
-            throw new TheSportsDbException(TheSportsDbException.Kind.BAD_RESPONSE, "TheSportsDB answered with something unexpected");
+            throw new TheSportsDbException(ContentSourceException.Kind.BAD_RESPONSE, "TheSportsDB answered with something unexpected");
         }
         return node;
     }

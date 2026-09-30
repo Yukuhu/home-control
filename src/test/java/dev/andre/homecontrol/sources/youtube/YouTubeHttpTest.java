@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -84,7 +85,7 @@ class YouTubeHttpTest {
         assertThatThrownBy(() -> http.get(unreachable, noHeaders))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.UNREACHABLE);
+                .isEqualTo(ContentSourceException.Kind.UNREACHABLE);
         assertThatThrownBy(() -> http.get(unreachable, noHeaders))
                 .hasMessage("Could not reach 127.0.0.1")
                 .satisfies(e -> assertThat(e.getMessage()).doesNotContain("secret"));
@@ -101,7 +102,7 @@ class YouTubeHttpTest {
         assertThatThrownBy(response::json)
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.BAD_RESPONSE);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
     }
 
     @Test
@@ -116,7 +117,7 @@ class YouTubeHttpTest {
         assertThatThrownBy(() -> http.get(oversized, noHeaders))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.BAD_RESPONSE);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
         assertThatThrownBy(() -> http.get(oversized, noHeaders))
                 .hasMessage("Google sent an oversized response");
     }

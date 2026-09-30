@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
@@ -97,7 +98,7 @@ public class SportsCompetitions {
         try {
             client.lookupLeague(key, "4328");
         } catch (TheSportsDbException e) {
-            if (e.kind() == TheSportsDbException.Kind.UNAUTHORIZED) {
+            if (e.kind() == ContentSourceException.Kind.UNAUTHORIZED) {
                 throw new IllegalArgumentException("TheSportsDB rejected that key");
             }
             throw e;

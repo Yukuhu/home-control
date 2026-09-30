@@ -282,7 +282,7 @@ class PinnedShortcutsTest {
 
     @Test
     void refusesWhenTheSourceLookupFails() {
-        given(tmdbSource.item("tv-500")).willThrow(new ContentSourceException("TMDB had a server error"));
+        given(tmdbSource.item("tv-500")).willThrow(new ContentSourceException(ContentSourceException.Kind.SERVER_ERROR, "TMDB had a server error"));
 
         assertThatThrownBy(() -> shortcuts.addUpgrade("https://example.org/x", "tmdb/tv-500"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("TMDB had a server error");

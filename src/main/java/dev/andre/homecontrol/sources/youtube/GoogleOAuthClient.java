@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
@@ -93,7 +94,7 @@ public class GoogleOAuthClient {
         String deviceCode = json.path("device_code").asString("");
         String userCode = json.path("user_code").asString("");
         if (deviceCode.isBlank() || userCode.isBlank()) {
-            throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "Google did not return a device code");
+            throw new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE, "Google did not return a device code");
         }
         String url = json.path("verification_url").asString("");
         return new DeviceCode(deviceCode, userCode,
@@ -121,18 +122,18 @@ public class GoogleOAuthClient {
                 GRANT_TYPE, "authorization_code"), Map.of());
         if (!response.ok()) {
             // Never echo Google error descriptions or codes: they may contain submitted credentials.
-            throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE,
+            throw new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE,
                     "Google could not complete sign-in. Check the Web application client and callback URL, then try again.");
         }
         JsonNode json = response.json();
         String scope = json.path(SCOPE_PARAMETER).asString("");
         if (!scope.isBlank() && java.util.Arrays.stream(scope.split("\\s+")).noneMatch(SCOPE::equals)) {
-            throw new YouTubeException(YouTubeException.Kind.UNAUTHORIZED,
+            throw new YouTubeException(ContentSourceException.Kind.UNAUTHORIZED,
                     "YouTube read-only access was not granted. Sign in again and allow access to YouTube.");
         }
         String refresh = json.path(REFRESH_TOKEN).asString("");
         if (refresh.isBlank()) {
-            throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE,
+            throw new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE,
                     "Google did not return offline access. Sign in again and accept the consent request.");
         }
         return new TokenPoll.Granted(accessToken(json), refresh);
@@ -176,7 +177,7 @@ public class GoogleOAuthClient {
             return accessToken(response.json());
         }
         if ("invalid_grant".equals(errorCode(response))) {
-            throw new YouTubeException(YouTubeException.Kind.REVOKED, "Google no longer accepts the saved YouTube"
+            throw new YouTubeException(ContentSourceException.Kind.REVOKED, "Google no longer accepts the saved YouTube"
                     + " authorization. It was revoked, or it expired after 7 days because the OAuth consent screen"
                     + " is still in “Testing”. Reconnect YouTube on the setup page.", "invalid_grant");
         }
@@ -190,7 +191,7 @@ public class GoogleOAuthClient {
     private AccessToken accessToken(JsonNode json) {
         String value = json.path("access_token").asString("");
         if (value.isBlank()) {
-            throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "Google did not return an access token");
+            throw new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE, "Google did not return an access token");
         }
         return new AccessToken(value, clock.instant().plusSeconds(json.path("expires_in").asLong(3600)));
     }
@@ -207,15 +208,15 @@ public class GoogleOAuthClient {
         String error = errorCode(response);
         if ("invalid_client".equals(error)) {
             String description = response.json().path("error_description").asString("").toLowerCase(Locale.ROOT);
-            return new YouTubeException(YouTubeException.Kind.UNAUTHORIZED, description.contains("client type")
+            return new YouTubeException(ContentSourceException.Kind.UNAUTHORIZED, description.contains("client type")
                     ? "Google says this OAuth client cannot use the device flow. Create a client of type"
                     + " “TVs and Limited Input devices”."
                     : "Google rejected the client ID or client secret.", error);
         }
         if (!error.isEmpty()) {
-            return new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "Google refused the request (" + error + ")", error);
+            return new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE, "Google refused the request (" + error + ")", error);
         }
-        return new YouTubeException(response.status() >= 500 ? YouTubeException.Kind.SERVER_ERROR
-                : YouTubeException.Kind.BAD_RESPONSE, "Google answered HTTP " + response.status());
+        return new YouTubeException(response.status() >= 500 ? ContentSourceException.Kind.SERVER_ERROR
+                : ContentSourceException.Kind.BAD_RESPONSE, "Google answered HTTP " + response.status());
     }
 }

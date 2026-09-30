@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
@@ -21,8 +22,8 @@ public class SubscriptionsFeed {
     private static final String MAX_RESULTS = "maxResults";
 
     private static final Logger log = LoggerFactory.getLogger(SubscriptionsFeed.class);
-    private static final Set<YouTubeException.Kind> FATAL = Set.of(YouTubeException.Kind.REVOKED,
-            YouTubeException.Kind.UNAUTHORIZED, YouTubeException.Kind.FORBIDDEN, YouTubeException.Kind.NOT_CONFIGURED);
+    private static final Set<ContentSourceException.Kind> FATAL = Set.of(ContentSourceException.Kind.REVOKED,
+            ContentSourceException.Kind.UNAUTHORIZED, ContentSourceException.Kind.FORBIDDEN, ContentSourceException.Kind.NOT_CONFIGURED);
 
     private record Polled(List<YouTubeVideo> videos, Instant at) {
     }
@@ -63,7 +64,7 @@ public class SubscriptionsFeed {
             }
             pollChannels(now);
         } catch (YouTubeException e) {
-            if (e.kind() != YouTubeException.Kind.QUOTA_EXHAUSTED || polled.isEmpty()) {
+            if (e.kind() != ContentSourceException.Kind.QUOTA_EXHAUSTED || polled.isEmpty()) {
                 firstRefreshFailure = e;
                 firstRefreshFailedAt = now;
                 throw e;
@@ -155,9 +156,9 @@ public class SubscriptionsFeed {
                 JsonNode response = api.get(QuotaLedger.Call.PLAYLIST_ITEMS_LIST, "playlistItems", query);
                 polled.put(channelId, new Polled(YouTubeVideoMapper.playlistItems(response), now));
             } catch (YouTubeException e) {
-                if (e.kind() == YouTubeException.Kind.NOT_FOUND) {
+                if (e.kind() == ContentSourceException.Kind.NOT_FOUND) {
                     polled.put(channelId, new Polled(List.of(), now));
-                } else if (e.kind() == YouTubeException.Kind.QUOTA_EXHAUSTED || FATAL.contains(e.kind())) {
+                } else if (e.kind() == ContentSourceException.Kind.QUOTA_EXHAUSTED || FATAL.contains(e.kind())) {
                     throw e;
                 } else {
                     log.debug("Skipping channel {} this time: {}", channelId, e.getMessage());

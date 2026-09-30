@@ -98,11 +98,11 @@ public class TmdbContentSource implements ContentSource {
             throw new IllegalArgumentException("TMDB has no rail '" + railId + "'");
         }
         TmdbCredential credential = setup.credential()
-                .orElseThrow(() -> new ContentSourceException(NOT_CONNECTED));
+                .orElseThrow(() -> new ContentSourceException(ContentSourceException.Kind.NOT_CONFIGURED, NOT_CONNECTED));
         SourcePreferences prefs = preferences.get();
         List<String> configuredProviders = prefs.providers();
         if (configuredProviders.isEmpty()) {
-            throw new ContentSourceException("Choose your streaming services in Setup to see what is trending on them");
+            throw new ContentSourceException(ContentSourceException.Kind.NOT_CONFIGURED, "Choose your streaming services in Setup to see what is trending on them");
         }
         List<JsonNode> candidates = collectTrendingCandidates(credential, prefs.locale());
         List<ContentItem> items = new ArrayList<>();
@@ -151,7 +151,7 @@ public class TmdbContentSource implements ContentSource {
     @Override
     public List<ContentItem> search(String query, int limit) {
         TmdbCredential credential = setup.credential()
-                .orElseThrow(() -> new ContentSourceException(NOT_CONNECTED));
+                .orElseThrow(() -> new ContentSourceException(ContentSourceException.Kind.NOT_CONFIGURED, NOT_CONNECTED));
         LinkedHashMap<String, String> params = new LinkedHashMap<>();
         params.put("query", query);
         params.put(LANGUAGE, preferences.get().locale());
@@ -176,7 +176,7 @@ public class TmdbContentSource implements ContentSource {
             return Optional.empty();
         }
         TmdbCredential credential = setup.credential()
-                .orElseThrow(() -> new ContentSourceException(NOT_CONNECTED));
+                .orElseThrow(() -> new ContentSourceException(ContentSourceException.Kind.NOT_CONFIGURED, NOT_CONNECTED));
         TmdbMediaRef mediaRef = ref.orElseThrow();
         SourcePreferences prefs = preferences.get();
         LinkedHashMap<String, String> params = new LinkedHashMap<>();
@@ -186,7 +186,7 @@ public class TmdbContentSource implements ContentSource {
         try {
             body = client.get(credential, mediaRef.path(), params);
         } catch (TmdbException e) {
-            if (e.kind() == TmdbException.Kind.NOT_FOUND) {
+            if (e.kind() == ContentSourceException.Kind.NOT_FOUND) {
                 return Optional.empty();
             }
             throw e;

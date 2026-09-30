@@ -171,7 +171,7 @@ class SearchServiceTest {
     @Test
     void aContentSourceExceptionKeepsItsMessage() {
         StubSource broken = new StubSource("broken", "Broken", (q, l) -> {
-            throw new ContentSourceException("Broken is unreachable");
+            throw new ContentSourceException(ContentSourceException.Kind.UNREACHABLE, "Broken is unreachable");
         });
         ContentSources sources = new ContentSources(List.of(broken));
         SearchService service = new SearchService(sources, new TestPreferences(), properties(Duration.ofMillis(300)), executor);
@@ -251,7 +251,7 @@ class SearchServiceTest {
         assertThat(outcome.failures()).isEmpty();
 
         StubSource broken = new StubSource("youtube2", "YouTube", (q, l) -> {
-            throw new ContentSourceException("You have used today's 20 YouTube searches. …");
+            throw new ContentSourceException(ContentSourceException.Kind.QUOTA_EXHAUSTED, "You have used today's 20 YouTube searches. …");
         }).onDemand();
         ContentSources brokenSources = new ContentSources(List.of(broken));
         SearchService brokenService = new SearchService(brokenSources, new TestPreferences(), properties(Duration.ofMillis(300)), executor);

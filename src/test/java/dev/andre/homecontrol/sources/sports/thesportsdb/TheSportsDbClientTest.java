@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,7 +86,7 @@ class TheSportsDbClientTest {
         server.respondJson("lookupleague.php", Map.of("id", "s" + status), status, "{}");
         assertThatThrownBy(() -> client.lookupLeague("123", "s" + status))
                 .isInstanceOf(TheSportsDbException.class)
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.valueOf(kind))
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.valueOf(kind))
                 .hasMessage(message);
     }
 
@@ -94,25 +95,25 @@ class TheSportsDbClientTest {
         server.respondJson("lookupleague.php", Map.of("id", "bad400"), 400, readInvalidKey());
         assertThatThrownBy(() -> client.lookupLeague("123", "bad400"))
                 .isInstanceOf(TheSportsDbException.class)
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.UNAUTHORIZED)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNAUTHORIZED)
                 .hasMessage("TheSportsDB rejected the API key");
 
         server.respondJson("lookupleague.php", Map.of("id", "e401"), 401, "{}");
         assertThatThrownBy(() -> client.lookupLeague("123", "e401"))
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.UNAUTHORIZED);
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNAUTHORIZED);
 
         server.respondJson("lookupleague.php", Map.of("id", "e404m"), 404, "{\"Message\":\"Invalid API key\"}");
         assertThatThrownBy(() -> client.lookupLeague("123", "e404m"))
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.UNAUTHORIZED);
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNAUTHORIZED);
 
         server.respondJson("lookupleague.php", Map.of("id", "e404"), 404, "{}");
         assertThatThrownBy(() -> client.lookupLeague("123", "e404"))
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.BAD_RESPONSE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
                 .hasMessage("TheSportsDB answered HTTP 404");
 
         server.respondJson("lookupleague.php", Map.of("id", "arr"), 200, "[]");
         assertThatThrownBy(() -> client.lookupLeague("123", "arr"))
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.BAD_RESPONSE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
                 .hasMessage("TheSportsDB answered with something unexpected");
 
         server.respondJson("lookupleague.php", Map.of("id", "html"), 200, "<html></html>");
@@ -132,7 +133,7 @@ class TheSportsDbClientTest {
     void wrongKeysNeverLeaveTheServer() {
         assertThatThrownBy(() -> client.lookupLeague("12 3/..", "4331"))
                 .isInstanceOf(TheSportsDbException.class)
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.UNAUTHORIZED)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNAUTHORIZED)
                 .hasMessage("That does not look like a TheSportsDB API key");
         assertThat(server.count("lookupleague.php")).isZero();
     }
@@ -142,14 +143,14 @@ class TheSportsDbClientTest {
         server.delay(Duration.ofSeconds(3));
         assertThatThrownBy(() -> client.lookupLeague("123", "4331"))
                 .isInstanceOf(TheSportsDbException.class)
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.UNREACHABLE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
                 .hasMessage("Could not reach TheSportsDB");
         server.delay(Duration.ZERO);
 
         String huge = "{\"leagues\":\"" + "x".repeat(2 * 1024 * 1024 + 10) + "\"}";
         server.respondJson("lookupleague.php", Map.of("id", "huge"), 200, huge);
         assertThatThrownBy(() -> client.lookupLeague("123", "huge"))
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.BAD_RESPONSE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
                 .hasMessage("TheSportsDB answered with more data than expected");
     }
 
@@ -171,7 +172,7 @@ class TheSportsDbClientTest {
     void doesNotFollowRedirects() {
         server.respondJson("lookupleague.php", Map.of("id", "redirect"), 302, "{}");
         assertThatThrownBy(() -> client.lookupLeague("123", "redirect"))
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.BAD_RESPONSE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
                 .hasMessage("TheSportsDB answered HTTP 302");
     }
 }

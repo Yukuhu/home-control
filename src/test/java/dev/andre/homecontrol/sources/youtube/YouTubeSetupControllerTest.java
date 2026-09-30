@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
@@ -54,7 +55,7 @@ class YouTubeSetupControllerTest extends WebSliceTest {
 
     @Test
     void aFailureKeepsOnlyTheClientId() throws Exception {
-        willThrow(new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Enter the client secret"))
+        willThrow(new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Enter the client secret"))
                 .given(youTubeSetup).connect(any(), any());
 
         FlashMap flashMap = mockMvc.perform(post("/setup/sources/youtube/connect")
@@ -105,7 +106,7 @@ class YouTubeSetupControllerTest extends WebSliceTest {
                 .andExpect(flash().attribute("youtubeMessage", "YouTube disconnected"));
         verify(youTubeSetup).disconnect();
 
-        willThrow(new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Could not reach Google")).given(youTubeSetup).authorize();
+        willThrow(new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Could not reach Google")).given(youTubeSetup).authorize();
         mockMvc.perform(post("/setup/sources/youtube/authorize"))
                 .andExpect(flash().attribute("youtubeError", "Could not reach Google"));
     }
@@ -149,7 +150,7 @@ class YouTubeSetupControllerTest extends WebSliceTest {
                 .andExpect(flash().attribute("youtubeMessage", "Watch Later shown"));
         verify(youTubeSetup).setWatchLater(true);
 
-        willThrow(new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Choose at most 20 playlists"))
+        willThrow(new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Choose at most 20 playlists"))
                 .given(youTubeSetup).choosePlaylists(any());
         mockMvc.perform(post("/setup/sources/youtube/playlists").param("playlist", "A"))
                 .andExpect(flash().attribute("youtubeError", "Choose at most 20 playlists"));
@@ -180,7 +181,7 @@ class YouTubeSetupControllerTest extends WebSliceTest {
         mockMvc.perform(post("/setup/sources/youtube/lounge").param("device", "kitchen").param("enabled", "false"))
                 .andExpect(flash().attribute("youtubeMessage", "YouTube Cast switched off for Kitchen"));
 
-        willThrow(new YouTubeException(YouTubeException.Kind.INVALID_INPUT, "Only Cast devices can use YouTube Cast"))
+        willThrow(new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Only Cast devices can use YouTube Cast"))
                 .given(youTubeSetup).setLounge("living", true);
         mockMvc.perform(post("/setup/sources/youtube/lounge").param("device", "living").param("enabled", "true"))
                 .andExpect(redirectedUrl("/setup#youtube"))

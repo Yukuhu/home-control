@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.storage.SecretStore;
 
 import java.time.Clock;
@@ -33,13 +34,13 @@ public class GoogleTokens {
         String clientSecret = secrets.secret(YouTubeSettings.CLIENT_SECRET).orElse(null);
         String refreshToken = secrets.secret(YouTubeSettings.REFRESH_TOKEN).orElse(null);
         if (clientId == null || clientSecret == null || refreshToken == null) {
-            throw new YouTubeException(YouTubeException.Kind.NOT_CONFIGURED, "YouTube is not connected");
+            throw new YouTubeException(ContentSourceException.Kind.NOT_CONFIGURED, "YouTube is not connected");
         }
         try {
             current = oauth.refresh(clientId, clientSecret, refreshToken);
             return current.value();
         } catch (YouTubeException e) {
-            if (e.kind() == YouTubeException.Kind.REVOKED) {
+            if (e.kind() == ContentSourceException.Kind.REVOKED) {
                 revoked = e;
             }
             throw e;

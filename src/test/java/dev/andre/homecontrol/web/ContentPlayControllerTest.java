@@ -127,7 +127,7 @@ class ContentPlayControllerTest extends WebSliceTest {
                 .andExpect(status().isBadGateway())
                 .andExpect(content().string("Jellyfin could not start playback on Shield"));
 
-        willThrow(new ContentSourceException("Jellyfin is unreachable")).given(jellyfin).item(ITEM_ID);
+        willThrow(new ContentSourceException(ContentSourceException.Kind.UNREACHABLE, "Jellyfin is unreachable")).given(jellyfin).item(ITEM_ID);
         mockMvc.perform(post("/devices/shield/play").param("source", "jellyfin").param("item", ITEM_ID))
                 .andExpect(status().isBadGateway())
                 .andExpect(content().string("Jellyfin is unreachable"));

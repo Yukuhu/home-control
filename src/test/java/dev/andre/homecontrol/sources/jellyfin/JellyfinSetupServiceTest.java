@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.Argon2PasswordHasher;
 import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
@@ -131,7 +132,7 @@ class JellyfinSetupServiceTest {
         assertThatThrownBy(() -> setup.connect(connectRequest, request))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.USER_NOT_FOUND);
+                .isEqualTo(ContentSourceException.Kind.UNAUTHORIZED);
         assertThatThrownBy(() -> setup.connect(connectRequest, request))
                 .hasMessage("No Jellyfin user named 'nobody'");
         assertThat(setup.settings()).isEmpty();

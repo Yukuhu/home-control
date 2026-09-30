@@ -105,7 +105,7 @@ public class FakeContentSource implements ContentSource {
             throw new IllegalArgumentException("No such rail " + railId);
         }
         if (flag.get()) {
-            throw new ContentSourceException("E2E source is down");
+            throw new ContentSourceException(ContentSourceException.Kind.UNREACHABLE, "E2E source is down");
         }
         return new Rail(new RailDescriptor("e2e", railId, "Flaky rail"), List.of(items.get("clip-2")), Instant.now());
     }

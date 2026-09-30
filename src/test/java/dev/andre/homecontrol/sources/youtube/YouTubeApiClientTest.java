@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,7 +81,7 @@ class YouTubeApiClientTest {
     @Test
     void revokedAuthorizationLeavesTheLedgerUnchanged() {
         GoogleTokens revoked = mock(GoogleTokens.class);
-        given(revoked.accessToken()).willThrow(new YouTubeException(YouTubeException.Kind.REVOKED,
+        given(revoked.accessToken()).willThrow(new YouTubeException(ContentSourceException.Kind.REVOKED,
                 "YouTube access was revoked; reconnect YouTube on the setup page"));
         YouTubeApiClient revokedClient = new YouTubeApiClient(new YouTubeHttp(fake.properties()),
                 URI.create(fake.base() + "/youtube/v3"), revoked, ledger);
@@ -88,7 +89,7 @@ class YouTubeApiClientTest {
         assertThatThrownBy(() -> revokedClient.get(QuotaLedger.Call.CHANNELS_LIST, "channels", Map.of()))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.REVOKED);
+                .isEqualTo(ContentSourceException.Kind.REVOKED);
         assertThat(ledger.usage().units()).isZero();
         assertThat(fake.requests("/youtube/v3/channels")).isEmpty();
     }
@@ -100,7 +101,7 @@ class YouTubeApiClientTest {
         assertThatThrownBy(() -> client.get(QuotaLedger.Call.CHANNELS_LIST, "channels", Map.of()))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.UNAUTHORIZED);
+                .isEqualTo(ContentSourceException.Kind.UNAUTHORIZED);
     }
 
     @Test
@@ -110,7 +111,7 @@ class YouTubeApiClientTest {
         assertThatThrownBy(() -> client.get(QuotaLedger.Call.CHANNELS_LIST, "channels", Map.of()))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.QUOTA_EXHAUSTED);
+                .isEqualTo(ContentSourceException.Kind.QUOTA_EXHAUSTED);
         assertThat(ledger.usage().exhausted()).isTrue();
     }
 
@@ -121,7 +122,7 @@ class YouTubeApiClientTest {
         assertThatThrownBy(() -> client.get(QuotaLedger.Call.CHANNELS_LIST, "channels", Map.of()))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.FORBIDDEN);
+                .isEqualTo(ContentSourceException.Kind.FORBIDDEN);
         assertThatThrownBy(() -> client.get(QuotaLedger.Call.CHANNELS_LIST, "channels", Map.of()))
                 .hasMessageContaining("not enabled in your Google Cloud project");
     }
@@ -133,7 +134,7 @@ class YouTubeApiClientTest {
         assertThatThrownBy(() -> client.get(QuotaLedger.Call.PLAYLIST_ITEMS_LIST, "playlistItems", Map.of()))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.NOT_FOUND);
+                .isEqualTo(ContentSourceException.Kind.NOT_FOUND);
         assertThatThrownBy(() -> client.get(QuotaLedger.Call.PLAYLIST_ITEMS_LIST, "playlistItems", Map.of()))
                 .extracting(e -> ((YouTubeException) e).reason())
                 .isEqualTo("playlistNotFound");
@@ -146,7 +147,7 @@ class YouTubeApiClientTest {
         assertThatThrownBy(() -> client.get(QuotaLedger.Call.CHANNELS_LIST, "channels", Map.of()))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.SERVER_ERROR);
+                .isEqualTo(ContentSourceException.Kind.SERVER_ERROR);
         assertThatThrownBy(() -> client.get(QuotaLedger.Call.CHANNELS_LIST, "channels", Map.of()))
                 .hasMessage("YouTube is having problems (HTTP 503)");
     }
@@ -160,7 +161,7 @@ class YouTubeApiClientTest {
         assertThatThrownBy(() -> noQuotaClient.get(QuotaLedger.Call.CHANNELS_LIST, "channels", Map.of()))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.QUOTA_EXHAUSTED);
+                .isEqualTo(ContentSourceException.Kind.QUOTA_EXHAUSTED);
         assertThat(fake.requests("/youtube/v3/channels")).isEmpty();
     }
 

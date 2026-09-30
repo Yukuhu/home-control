@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
@@ -54,7 +55,7 @@ public class JellyfinSetupService {
         URI deviceServer = request.deviceServerUrl() == null || request.deviceServerUrl().isBlank()
                 ? server : JellyfinClient.normalizeServerUrl(request.deviceServerUrl());
         if (request.userName() == null || request.userName().isBlank()) {
-            throw new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Enter the Jellyfin user name");
+            throw new JellyfinException(ContentSourceException.Kind.INVALID_INPUT, "Enter the Jellyfin user name");
         }
         Optional<JellyfinSettings> previous = settings();
         Optional<String> previousToken = secrets.secret(JellyfinSettings.TOKEN_SECRET);
@@ -66,7 +67,7 @@ public class JellyfinSetupService {
         String token = grant.token();
         JsonNode user = grant.user();
         if (token.isBlank() || user.path("Id").asString("").isBlank()) {
-            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin did not return a usable login");
+            throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin did not return a usable login");
         }
         String receiver = user.path("Configuration").path("CastReceiverId").asString("");
         JellyfinSettings next = new JellyfinSettings(server, deviceServer, info.path("Id").asString(""),
@@ -103,7 +104,7 @@ public class JellyfinSetupService {
             return new Grant(authenticated.path("AccessToken").asString(""), authenticated.path("User"));
         }
         if (request.apiKey() == null || request.apiKey().isBlank()) {
-            throw new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Enter the Jellyfin API key");
+            throw new JellyfinException(ContentSourceException.Kind.INVALID_INPUT, "Enter the Jellyfin API key");
         }
         String token = request.apiKey().strip();
         JsonNode user = findUser(client.get(new JellyfinConnection(server, token, deviceId, null), "/Users", Map.of()),
@@ -119,7 +120,7 @@ public class JellyfinSetupService {
     /** Pins a Jellyfin app (by its DeviceId) to one device; a blank device id unlinks it. */
     public void link(String jellyfinDeviceId, String deviceId) {
         JellyfinSettings settings = settings().orElseThrow(() ->
-                new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
+                new JellyfinException(ContentSourceException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
         for (Map.Entry<String, String> entry : settings.sessionLinks().entrySet()) {
             if (entry.getValue().equals(jellyfinDeviceId)) {
                 settings = settings.withSessionLink(entry.getKey(), null);
@@ -133,9 +134,9 @@ public class JellyfinSetupService {
 
     public String check() {
         JellyfinSettings settings = settings().orElseThrow(() ->
-                new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
+                new JellyfinException(ContentSourceException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
         JellyfinConnection connection = connection().orElseThrow(() ->
-                new JellyfinException(JellyfinException.Kind.UNAUTHORIZED, "The Jellyfin token is missing; reconnect Jellyfin"));
+                new JellyfinException(ContentSourceException.Kind.UNAUTHORIZED, "The Jellyfin token is missing; reconnect Jellyfin"));
         JsonNode info = client.publicInfo(settings.serverUrl());
         JsonNode user = client.get(connection, "/Users/" + JellyfinClient.id(settings.userId()), Map.of());
         return "Connected to " + info.path("ServerName").asString("Jellyfin") + " (Jellyfin "
@@ -157,7 +158,7 @@ public class JellyfinSetupService {
                 return user;
             }
         }
-        throw new JellyfinException(JellyfinException.Kind.USER_NOT_FOUND, "No Jellyfin user named '" + name + "'");
+        throw new JellyfinException(ContentSourceException.Kind.UNAUTHORIZED, "No Jellyfin user named '" + name + "'");
     }
 
     private void revokeQuietly(JellyfinConnection connection) {

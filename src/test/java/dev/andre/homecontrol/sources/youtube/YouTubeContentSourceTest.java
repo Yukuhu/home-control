@@ -127,7 +127,7 @@ class YouTubeContentSourceTest {
     @Test
     void feedFailuresAreContentSourceExceptions() {
         given(setup.connected()).willReturn(true);
-        given(feed.refresh()).willThrow(new YouTubeException(YouTubeException.Kind.QUOTA_EXHAUSTED, "no quota left"));
+        given(feed.refresh()).willThrow(new YouTubeException(ContentSourceException.Kind.QUOTA_EXHAUSTED, "no quota left"));
 
         assertThatThrownBy(() -> source.rail("subscriptions"))
                 .isInstanceOf(dev.andre.homecontrol.core.content.ContentSourceException.class)

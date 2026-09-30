@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,7 +99,7 @@ class JellyfinRouteExecutorTest {
 
     @Test
     void aClosedSessionOrUnreachableServerIsAFailedAction() {
-        willThrow(new JellyfinException(JellyfinException.Kind.NOT_FOUND, "The Jellyfin app on that device has closed its session"))
+        willThrow(new JellyfinException(ContentSourceException.Kind.NOT_FOUND, "The Jellyfin app on that device has closed its session"))
                 .given(sessions).playNow("s1", "item-1", 600L);
         DelegatedRoute route = new JellyfinRoute.Session("s1", "item-1", 600L, "Web");
 

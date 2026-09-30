@@ -103,14 +103,14 @@ public class YouTubePlaylists {
             if (watchLaterUnavailableAt != null && now.isBefore(watchLaterUnavailableAt.plus(properties.minRefreshSpacing()))) {
                 // Memoized: an empty or failed Watch Later result is honest and unlikely to change
                 // within the spacing window, so don't spend another call finding that out again.
-                throw new ContentSourceException(WATCH_LATER_UNAVAILABLE);
+                throw new ContentSourceException(ContentSourceException.Kind.NOT_FOUND, WATCH_LATER_UNAVAILABLE);
             }
         }
         List<YouTubeVideo> videos;
         try {
             videos = items(WATCH_LATER_ID);
         } catch (YouTubeException e) {
-            if (e.kind() == YouTubeException.Kind.NOT_FOUND) {
+            if (e.kind() == ContentSourceException.Kind.NOT_FOUND) {
                 return rethrowWatchLaterUnavailable(now);
             }
             throw e;
@@ -129,7 +129,7 @@ public class YouTubePlaylists {
 
     private synchronized List<YouTubeVideo> rethrowWatchLaterUnavailable(Instant now) {
         watchLaterUnavailableAt = now;
-        throw new ContentSourceException(WATCH_LATER_UNAVAILABLE);
+        throw new ContentSourceException(ContentSourceException.Kind.NOT_FOUND, WATCH_LATER_UNAVAILABLE);
     }
 
     public synchronized void clear() {

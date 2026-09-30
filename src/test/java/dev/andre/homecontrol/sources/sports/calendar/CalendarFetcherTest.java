@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,16 +88,16 @@ class CalendarFetcherTest {
         var unauthorizedUrl = server.url("/401");
         assertThatThrownBy(() -> fetcher.fetch(unauthorizedUrl))
                 .isInstanceOf(CalendarFetchException.class)
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNAUTHORIZED)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNAUTHORIZED)
                 .hasMessageContaining("refused access");
 
         server.respond("/404", 404, "text/plain", "");
         assertThatThrownBy(() -> fetcher.fetch(server.url("/404")))
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.NOT_FOUND);
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.NOT_FOUND);
 
         server.respond("/500", 500, "text/plain", "");
         assertThatThrownBy(() -> fetcher.fetch(server.url("/500")))
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BAD_RESPONSE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
                 .hasMessageContaining("answered HTTP 500");
     }
 
@@ -105,7 +106,7 @@ class CalendarFetcherTest {
     void mapsStatuses(int status, String kind) {
         server.respond("/s" + status, status, "text/plain", "");
         assertThatThrownBy(() -> fetcher.fetch(server.url("/s" + status)))
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.valueOf(kind));
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.valueOf(kind));
     }
 
     @Test
@@ -115,7 +116,7 @@ class CalendarFetcherTest {
         var tooLargeUrl = server.url("/too-large.ics");
         assertThatThrownBy(() -> fetcher.fetch(tooLargeUrl))
                 .isInstanceOf(CalendarFetchException.class)
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.TOO_LARGE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.TOO_LARGE)
                 .hasMessageContaining("2 MB");
     }
 
@@ -127,7 +128,7 @@ class CalendarFetcherTest {
         var slowUrl = server.url("/slow.ics");
         assertThatThrownBy(() -> fetcher.fetch(slowUrl))
                 .isInstanceOf(CalendarFetchException.class)
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNREACHABLE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
                 .hasMessageContaining("Could not reach 127.0.0.1");
     }
 
@@ -155,14 +156,14 @@ class CalendarFetcherTest {
         var metadataRedirectUrl = server.url("/hop");
         assertThatThrownBy(() -> blockedFetcher.fetch(metadataRedirectUrl))
                 .isInstanceOf(CalendarFetchException.class)
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BLOCKED)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BLOCKED)
                 .hasMessageContaining("metadata.test");
 
         server.redirect("/ftp", 302, "ftp://x/y");
         var ftpRedirectUrl = server.url("/ftp");
         assertThatThrownBy(() -> blockedFetcher.fetch(ftpRedirectUrl))
                 .isInstanceOf(CalendarFetchException.class)
-                .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BAD_RESPONSE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
                 .hasMessage("127.0.0.1 redirected to a link Home Control does not follow");
     }
 
@@ -188,7 +189,7 @@ class CalendarFetcherTest {
             URI url = unresolvable("/cal.ics");
             assertThatThrownBy(() -> rebound.fetch(url))
                     .isInstanceOf(CalendarFetchException.class)
-                    .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BLOCKED);
+                    .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BLOCKED);
         }
         assertThat(server.count("/cal.ics")).isZero();
     }

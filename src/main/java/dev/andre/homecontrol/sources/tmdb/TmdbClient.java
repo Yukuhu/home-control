@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.http.BoundedBody;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -53,39 +54,39 @@ public class TmdbClient {
             response = http.send(request.build(),
                     BoundedBody.handler(MAX_BODY_BYTES, properties.requestTimeout()));
         } catch (IOException e) {
-            throw new TmdbException(TmdbException.Kind.UNREACHABLE, unreachable(), e);
+            throw new TmdbException(ContentSourceException.Kind.UNREACHABLE, unreachable(), e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new TmdbException(TmdbException.Kind.UNREACHABLE, unreachable(), e);
+            throw new TmdbException(ContentSourceException.Kind.UNREACHABLE, unreachable(), e);
         }
         byte[] body = response.body();
         int status = response.statusCode();
         if (status == 401 || status == 403) {
-            throw new TmdbException(TmdbException.Kind.UNAUTHORIZED, "TMDB rejected the API key or read access token");
+            throw new TmdbException(ContentSourceException.Kind.UNAUTHORIZED, "TMDB rejected the API key or read access token");
         }
         if (status == 404) {
-            throw new TmdbException(TmdbException.Kind.NOT_FOUND, "TMDB does not know this title");
+            throw new TmdbException(ContentSourceException.Kind.NOT_FOUND, "TMDB does not know this title");
         }
         if (status == 429) {
-            throw new TmdbException(TmdbException.Kind.RATE_LIMITED, "TMDB is limiting requests; try again in a moment");
+            throw new TmdbException(ContentSourceException.Kind.RATE_LIMITED, "TMDB is limiting requests; try again in a moment");
         }
         if (status >= 500) {
-            throw new TmdbException(TmdbException.Kind.SERVER_ERROR, "TMDB had a server error (HTTP " + status + ")");
+            throw new TmdbException(ContentSourceException.Kind.SERVER_ERROR, "TMDB had a server error (HTTP " + status + ")");
         }
         if (status < 200 || status >= 300) {
-            throw new TmdbException(TmdbException.Kind.BAD_RESPONSE, "TMDB answered HTTP " + status);
+            throw new TmdbException(ContentSourceException.Kind.BAD_RESPONSE, "TMDB answered HTTP " + status);
         }
         if (body.length > MAX_BODY_BYTES) {
-            throw new TmdbException(TmdbException.Kind.BAD_RESPONSE, "TMDB answered with more data than expected");
+            throw new TmdbException(ContentSourceException.Kind.BAD_RESPONSE, "TMDB answered with more data than expected");
         }
         JsonNode node;
         try {
             node = JSON.readTree(body);
         } catch (JacksonException _) {
-            throw new TmdbException(TmdbException.Kind.BAD_RESPONSE, "TMDB answered with something that is not JSON");
+            throw new TmdbException(ContentSourceException.Kind.BAD_RESPONSE, "TMDB answered with something that is not JSON");
         }
         if (node == null || !node.isObject()) {
-            throw new TmdbException(TmdbException.Kind.BAD_RESPONSE, "TMDB answered with something unexpected");
+            throw new TmdbException(ContentSourceException.Kind.BAD_RESPONSE, "TMDB answered with something unexpected");
         }
         return node;
     }

@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.Argon2PasswordHasher;
 import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
@@ -100,7 +101,7 @@ class TmdbSetupServiceTest {
         assertThatThrownBy(() -> setup.connect(rejectedToken, request))
                 .isInstanceOf(TmdbException.class)
                 .extracting(e -> ((TmdbException) e).kind())
-                .isEqualTo(TmdbException.Kind.UNAUTHORIZED);
+                .isEqualTo(ContentSourceException.Kind.UNAUTHORIZED);
 
         assertThat(secretStore.hasSecrets()).isFalse();
         assertThat(setup.settings()).isEmpty();
@@ -116,7 +117,7 @@ class TmdbSetupServiceTest {
                 .isInstanceOf(TmdbException.class)
                 .hasMessage("Paste the API Read Access Token or the API key from your TMDB account settings")
                 .extracting(e -> ((TmdbException) e).kind())
-                .isEqualTo(TmdbException.Kind.INVALID_INPUT);
+                .isEqualTo(ContentSourceException.Kind.INVALID_INPUT);
 
         assertThat(fake.requests()).isEmpty();
     }
@@ -157,7 +158,7 @@ class TmdbSetupServiceTest {
                 .isInstanceOf(TmdbException.class)
                 .hasMessage("TMDB is not connected")
                 .extracting(e -> ((TmdbException) e).kind())
-                .isEqualTo(TmdbException.Kind.INVALID_INPUT);
+                .isEqualTo(ContentSourceException.Kind.INVALID_INPUT);
     }
 
     @Test

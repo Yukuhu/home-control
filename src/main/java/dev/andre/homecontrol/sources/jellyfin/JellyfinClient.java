@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.http.BoundedBody;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -80,7 +81,7 @@ public class JellyfinClient {
             }
             return uri;
         } catch (URISyntaxException _) {
-            throw new JellyfinException(JellyfinException.Kind.INVALID_INPUT,
+            throw new JellyfinException(ContentSourceException.Kind.INVALID_INPUT,
                     "Enter the Jellyfin address as http://host:8096 (or https://…)");
         }
     }
@@ -98,7 +99,7 @@ public class JellyfinClient {
         try {
             info = send(serverUrl, request(serverUrl, "/System/Info/Public", Map.of(), null, null).GET());
         } catch (JellyfinException e) {
-            if (e.kind() == JellyfinException.Kind.NOT_FOUND || e.kind() == JellyfinException.Kind.BAD_RESPONSE) {
+            if (e.kind() == ContentSourceException.Kind.NOT_FOUND || e.kind() == ContentSourceException.Kind.BAD_RESPONSE) {
                 throw notJellyfin(serverUrl);
             }
             throw e;
@@ -111,7 +112,7 @@ public class JellyfinClient {
         Matcher matcher = SERVER_VERSION_PATTERN.matcher(serverVersion);
         if (!matcher.find() || Integer.parseInt(matcher.group(1)) < 10
                 || (Integer.parseInt(matcher.group(1)) == 10 && Integer.parseInt(matcher.group(2)) < 9)) {
-            throw new JellyfinException(JellyfinException.Kind.UNSUPPORTED_VERSION,
+            throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE,
                     "Jellyfin " + serverVersion + " is too old; Home Control needs Jellyfin 10.9 or newer");
         }
         return info;
@@ -126,8 +127,8 @@ public class JellyfinClient {
                     .header(CONTENT_TYPE, APPLICATION_JSON)
                     .POST(HttpRequest.BodyPublishers.ofByteArray(mapper.writeValueAsBytes(body))));
         } catch (JellyfinException e) {
-            if (e.kind() == JellyfinException.Kind.UNAUTHORIZED) {
-                throw new JellyfinException(JellyfinException.Kind.UNAUTHORIZED, "Jellyfin rejected the user name or password");
+            if (e.kind() == ContentSourceException.Kind.UNAUTHORIZED) {
+                throw new JellyfinException(ContentSourceException.Kind.UNAUTHORIZED, "Jellyfin rejected the user name or password");
             }
             throw e;
         }
@@ -203,11 +204,11 @@ public class JellyfinClient {
         String bareType = contentType.split(";", 2)[0].strip().toLowerCase(Locale.ROOT);
         if (response.statusCode() != 200 || !ALLOWED_IMAGE_TYPES.contains(bareType)
                 || contentLengthExceeds(response, MAX_IMAGE_BYTES)) {
-            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent no image");
+            throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent no image");
         }
         byte[] bytes = response.body();
         if (bytes.length > MAX_IMAGE_BYTES) {
-            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized image");
+            throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized image");
         }
         return Optional.of(new Image(contentType, bytes));
     }
@@ -237,7 +238,7 @@ public class JellyfinClient {
         // misbehaving or hostile server can't make us buffer an unbounded amount of it into heap.
         byte[] bytes = response.body();
         if (contentLengthExceeds(response, MAX_JSON_BYTES) || bytes.length > MAX_JSON_BYTES) {
-            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized response");
+            throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an oversized response");
         }
         return bytes.length == 0 ? MissingNode.getInstance() : parse(serverUrl, bytes);
     }
@@ -264,18 +265,18 @@ public class JellyfinClient {
     /** Redirects, rejected credentials, unknown paths and every other 4xx/5xx answer end the call. */
     private static void requireSuccess(URI serverUrl, int status) {
         if (status >= 300 && status < 400) {
-            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE,
+            throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE,
                     "Jellyfin at " + serverUrl + " redirected elsewhere; enter the final server address");
         }
         if (status == 401 || status == 403) {
-            throw new JellyfinException(JellyfinException.Kind.UNAUTHORIZED,
+            throw new JellyfinException(ContentSourceException.Kind.UNAUTHORIZED,
                     "Jellyfin rejected the stored credentials; reconnect Jellyfin on the setup page");
         }
         if (status == 404) {
-            throw new JellyfinException(JellyfinException.Kind.NOT_FOUND, "Jellyfin at " + serverUrl + " does not know that");
+            throw new JellyfinException(ContentSourceException.Kind.NOT_FOUND, "Jellyfin at " + serverUrl + " does not know that");
         }
         if (status >= 400) {
-            throw new JellyfinException(JellyfinException.Kind.SERVER_ERROR, "Jellyfin at " + serverUrl + " answered HTTP " + status);
+            throw new JellyfinException(ContentSourceException.Kind.SERVER_ERROR, "Jellyfin at " + serverUrl + " answered HTTP " + status);
         }
     }
 
@@ -283,7 +284,7 @@ public class JellyfinClient {
         try {
             return mapper.readTree(bytes);
         } catch (JacksonException _) {
-            throw new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an unreadable answer");
+            throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin at " + serverUrl + " sent an unreadable answer");
         }
     }
 
@@ -293,12 +294,12 @@ public class JellyfinClient {
     }
 
     private static JellyfinException unreachable(URI serverUrl, String reason) {
-        return new JellyfinException(JellyfinException.Kind.UNREACHABLE, "Could not reach Jellyfin at " + serverUrl
+        return new JellyfinException(ContentSourceException.Kind.UNREACHABLE, "Could not reach Jellyfin at " + serverUrl
                 + " (" + reason + "). Check the address and that Home Control can reach it.");
     }
 
     private static JellyfinException notJellyfin(URI serverUrl) {
-        return new JellyfinException(JellyfinException.Kind.NOT_JELLYFIN, serverUrl + " answered, but it is not a Jellyfin server");
+        return new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, serverUrl + " answered, but it is not a Jellyfin server");
     }
 
     private static String encode(String value) {

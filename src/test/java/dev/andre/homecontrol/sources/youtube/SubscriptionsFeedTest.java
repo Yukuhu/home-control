@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -216,19 +217,19 @@ class SubscriptionsFeedTest {
         assertThatThrownBy(feed::refresh)
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.QUOTA_EXHAUSTED);
+                .isEqualTo(ContentSourceException.Kind.QUOTA_EXHAUSTED);
     }
 
     @Test
     void revokedAuthorizationFails() {
-        given(tokens.accessToken()).willThrow(new YouTubeException(YouTubeException.Kind.REVOKED, "revoked"));
+        given(tokens.accessToken()).willThrow(new YouTubeException(ContentSourceException.Kind.REVOKED, "revoked"));
         YouTubeApiClient client = api();
         SubscriptionsFeed feed = feed(client);
 
         assertThatThrownBy(feed::refresh)
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.REVOKED);
+                .isEqualTo(ContentSourceException.Kind.REVOKED);
     }
 
     @Test
@@ -240,7 +241,7 @@ class SubscriptionsFeedTest {
         assertThatThrownBy(feed::refresh)
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.FORBIDDEN);
+                .isEqualTo(ContentSourceException.Kind.FORBIDDEN);
     }
 
     @Test
@@ -256,7 +257,7 @@ class SubscriptionsFeedTest {
         assertThatThrownBy(feed::refresh)
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.FORBIDDEN);
+                .isEqualTo(ContentSourceException.Kind.FORBIDDEN);
         assertThat(fake.requests("/youtube/v3/subscriptions")).hasSize(requestsAfterFirstFailure);
 
         // Past the window: it is asked again, and can now succeed.

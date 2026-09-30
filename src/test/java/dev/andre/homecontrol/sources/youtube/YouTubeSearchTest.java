@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -126,7 +127,7 @@ class YouTubeSearchTest {
         assertThatThrownBy(() -> search.search("three", 5))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.SEARCH_LIMIT);
+                .isEqualTo(ContentSourceException.Kind.QUOTA_EXHAUSTED);
         assertThat(fake.requests("/youtube/v3/search")).hasSize(2);
     }
 
