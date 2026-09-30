@@ -110,6 +110,9 @@ document.body.addEventListener("htmx:responseError", (event) => {
 });
 document.body.addEventListener("htmx:sendError", () => toast("Cannot reach the server"));
 
+// The search box searches as you type; Enter must not submit the form and reload the page.
+document.querySelector("form.search")?.addEventListener("submit", (event) => event.preventDefault());
+
 // Keyboard control for desktop use, always aimed at the selected device.
 const KEYS = {
     ArrowUp: "DPAD_UP", ArrowDown: "DPAD_DOWN", ArrowLeft: "DPAD_LEFT",

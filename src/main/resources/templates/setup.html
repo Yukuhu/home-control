@@ -3,6 +3,7 @@
 <head>
     <th:block th:replace="~{fragments/layout :: pageHead('Home Control · Setup', false)}"></th:block>
     <script th:src="@{/vendor/htmx.min.js}" defer></script>
+    <script type="module" th:src="@{/js/setup.js}"></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to setup</a>
@@ -153,10 +154,8 @@
                     <button type="submit" class="danger">Forget</button>
                 </form>
                 <th:block th:if="${deepLinkTestable.contains(device.id())}">
-                    <button type="button" hx-swap="innerHTML" hx-target="next .deep-link-output"
-                            th:attr="hx-post=@{/setup/devices/{id}/deep-link-test(id=${device.id()})}"
-                            hx-on::response-error="this.nextElementSibling.textContent = event.detail.xhr.responseText || 'The test could not run'"
-                            hx-on::send-error="this.nextElementSibling.textContent = 'Cannot reach the server'">Test deep link</button>
+                    <button type="button" class="deep-link-test" hx-swap="innerHTML" hx-target="next .deep-link-output"
+                            th:attr="hx-post=@{/setup/devices/{id}/deep-link-test(id=${device.id()})}">Test deep link</button>
                     <div class="deep-link-output" aria-live="polite"></div>
                     <p class="hint" th:text="|Opens a YouTube test video on the device and reports what the device told us. Takes up to ${deepLinkTestSeconds} seconds; the device must be on.|">Opens a YouTube test video on the device and reports what the device told us.
                         Takes up to 10 seconds; the device must be on.</p>
@@ -286,7 +285,6 @@
     </section>
     </div>
     </div>
-    <script type="module">import { initPwa } from "/js/pwa.js"; initPwa();</script>
 </main>
 </body>
 </html>

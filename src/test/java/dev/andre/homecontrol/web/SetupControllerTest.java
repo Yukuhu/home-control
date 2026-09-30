@@ -203,7 +203,8 @@ class SetupControllerTest extends WebSliceTest {
                 .andExpect(content().string(containsString("hx-target=\"next .deep-link-output\"")))
                 .andExpect(content().string(containsString("htmx.min.js")))
                 .andExpect(content().string(containsString("<div class=\"deep-link-output\"")))
-                .andExpect(content().string(containsString("hx-on::response-error")))
+                .andExpect(content().string(containsString("class=\"deep-link-test\"")))
+                .andExpect(content().string(containsString("/js/setup.js")))
                 .andExpect(content().string(containsString("Takes up to 10 seconds")))
                 .andExpect(content().string(not(containsString("/setup/devices/speaker/deep-link-test"))));
     }
