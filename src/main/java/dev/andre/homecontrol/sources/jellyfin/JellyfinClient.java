@@ -109,7 +109,7 @@ public class JellyfinClient implements AutoCloseable {
             throw e;
         }
         String product = info.path("ProductName").asString("Jellyfin Server");
-        if (!info.isObject() || info.path("Id").asString("").isBlank() || !product.contains("Jellyfin")) {
+        if (!info.isObject() || info.path("Id").asString("").isBlank() || !product.contains(NAME)) {
             throw notJellyfin(serverUrl);
         }
         String serverVersion = info.path("Version").asString("");
