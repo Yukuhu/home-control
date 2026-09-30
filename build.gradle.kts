@@ -102,6 +102,7 @@ tasks.named<Test>("test") {
     // inputs, a change to one of them alone runs the tests again instead of reusing a result.
     inputs.files(
         ".github/workflows/ci.yml",
+        ".github/workflows/dependency-checksums.yml",
         ".github/actions/smoke-image/action.yml",
         "Dockerfile",
         "Dockerfile.dist",
