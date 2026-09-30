@@ -46,7 +46,8 @@ public record SportsProperties(@DefaultValue("true") boolean enabled,
                               Duration connectTimeout,
                               @DefaultValue("15s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 1)
                               Duration requestTimeout,
-                              Map<String, Duration> sportDurations) {
+                              Map<String, Duration> sportDurations,
+                              @DefaultValue("false") boolean allowLoopback) {
 
         public static final Map<String, Duration> DEFAULT_DURATIONS = Map.of(
                 "soccer", Duration.ofMinutes(120), "basketball", Duration.ofMinutes(150),

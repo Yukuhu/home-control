@@ -40,7 +40,7 @@ class TmdbImagesTest {
     private TmdbProperties properties(URI imageBaseUrl) {
         return new TmdbProperties(true, fake.apiBase(), imageBaseUrl, Duration.ofSeconds(1), Duration.ofSeconds(1),
                 20, 40,
-                Duration.ofHours(24), Duration.ofHours(24), null);
+                Duration.ofHours(24), Duration.ofHours(24), null, true);
     }
 
     @Test

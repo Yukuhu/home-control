@@ -1,18 +1,19 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
 import dev.andre.homecontrol.core.content.ContentSourceException;
-import dev.andre.homecontrol.sources.http.BoundedBody;
+import dev.andre.homecontrol.sources.http.GuardedHttpClient;
+import dev.andre.homecontrol.sources.http.HttpUrls;
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
+import dev.andre.homecontrol.sources.http.OutboundRequest;
+import dev.andre.homecontrol.sources.http.OutboundResponse;
+import dev.andre.homecontrol.sources.http.Statuses;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -28,70 +29,50 @@ import java.util.regex.Pattern;
  * The only class that speaks HTTP to TheSportsDB. Never follows redirects, caps bodies, and never
  * puts the URL or the key into a message: the key is part of the path in every request.
  */
-public class TheSportsDbClient {
+public class TheSportsDbClient implements AutoCloseable {
 
     static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
+    /** Schedule refreshes and the setup page share these. */
+    private static final int MAX_CONCURRENT = 8;
+    private static final HttpUrls.Rules API_URLS = new HttpUrls.Rules(true, false, true, false, 0);
     private static final Pattern KEY = Pattern.compile("^[A-Za-z0-9]{1,64}$");
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final SportsProperties.TheSportsDb properties;
-    private final HttpClient http;
+    private final GuardedHttpClient http;
 
     public TheSportsDbClient(SportsProperties.TheSportsDb properties) {
-        this(properties, HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .connectTimeout(properties.connectTimeout())
-                .build());
-    }
-
-    public TheSportsDbClient(SportsProperties.TheSportsDb properties, HttpClient http) {
         this.properties = properties;
-        this.http = http;
+        this.http = new GuardedHttpClient(new GuardedHttpClient.Profile("TheSportsDB",
+                GuardedHttpClient.Redirects.NONE, 0, MAX_BODY_BYTES, properties.connectTimeout(),
+                properties.requestTimeout(), MAX_CONCURRENT, API_URLS),
+                new OutboundAddressPolicy(properties.allowLoopback()),
+                failure -> new TheSportsDbException(failure.kind(), failure.describe("TheSportsDB")));
     }
 
     public JsonNode get(String key, String endpoint, Map<String, String> query) {
         if (key == null || !KEY.matcher(key).matches()) {
             throw new TheSportsDbException(ContentSourceException.Kind.UNAUTHORIZED, "That does not look like a TheSportsDB API key");
         }
-        HttpRequest request = HttpRequest.newBuilder(uri(key, endpoint, query))
-                .GET()
-                .timeout(properties.requestTimeout())
-                .header("Accept", "application/json")
-                .header("User-Agent", "HomeControl")
-                .build();
-        HttpResponse<byte[]> response;
-        try {
-            response = http.send(request,
-                    BoundedBody.handler(MAX_BODY_BYTES, properties.requestTimeout()));
-        } catch (IOException _) {
-            // No cause attached: the request URI (which the JDK's IOException/timeout messages can
-            // quote in full, e.g. via a wrapped ConnectException) embeds the API key in its path.
-            throw new TheSportsDbException(ContentSourceException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
-        } catch (InterruptedException _) {
-            Thread.currentThread().interrupt();
-            throw new TheSportsDbException(ContentSourceException.Kind.UNREACHABLE, "Could not reach TheSportsDB");
-        }
-        byte[] body = response.body();
-        int status = response.statusCode();
-        if (body.length > MAX_BODY_BYTES) {
-            throw new TheSportsDbException(ContentSourceException.Kind.BAD_RESPONSE, "TheSportsDB answered with more data than expected");
-        }
-        boolean mentionsApiKey = new String(body, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT).contains("api key");
+        // The error body is read: TheSportsDB says "api key" in it when it refuses the key with a 400 or 404.
+        OutboundResponse response = http.send(OutboundRequest.get(uri(key, endpoint, query))
+                .header("Accept", "application/json").header("User-Agent", "HomeControl").withErrorBody());
+        int status = response.status();
+        boolean mentionsApiKey = new String(response.body(), StandardCharsets.UTF_8).toLowerCase(Locale.ROOT).contains("api key");
         if (status == 401 || status == 403 || ((status == 400 || status == 404) && mentionsApiKey)) {
             throw new TheSportsDbException(ContentSourceException.Kind.UNAUTHORIZED, "TheSportsDB rejected the API key");
         }
-        if (status == 429) {
-            throw new TheSportsDbException(ContentSourceException.Kind.RATE_LIMITED, "TheSportsDB is limiting requests; try again in a minute");
-        }
-        if (status >= 500) {
-            throw new TheSportsDbException(ContentSourceException.Kind.SERVER_ERROR, "TheSportsDB had a server error (HTTP " + status + ")");
-        }
-        if (status < 200 || status >= 300) {
-            throw new TheSportsDbException(ContentSourceException.Kind.BAD_RESPONSE, "TheSportsDB answered HTTP " + status);
+        if (status != 200) {
+            ContentSourceException.Kind kind = Statuses.kindOf(status);
+            throw new TheSportsDbException(kind, switch (kind) {
+                case RATE_LIMITED -> "TheSportsDB is limiting requests; try again in a minute";
+                case SERVER_ERROR -> "TheSportsDB had a server error (HTTP " + status + ")";
+                default -> "TheSportsDB answered HTTP " + status;
+            });
         }
         JsonNode node;
         try {
-            node = JSON.readTree(body);
+            node = JSON.readTree(response.body());
         } catch (JacksonException _) {
             throw new TheSportsDbException(ContentSourceException.Kind.BAD_RESPONSE, "TheSportsDB answered with something that is not JSON");
         }
@@ -99,6 +80,11 @@ public class TheSportsDbClient {
             throw new TheSportsDbException(ContentSourceException.Kind.BAD_RESPONSE, "TheSportsDB answered with something unexpected");
         }
         return node;
+    }
+
+    @Override
+    public void close() {
+        http.close();
     }
 
     public Optional<League> lookupLeague(String key, String leagueId) {

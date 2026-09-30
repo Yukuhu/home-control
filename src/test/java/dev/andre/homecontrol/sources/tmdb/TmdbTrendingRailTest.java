@@ -64,7 +64,7 @@ class TmdbTrendingRailTest {
     private TmdbProperties properties(int railSize, int trendingCandidates) {
         return new TmdbProperties(true, fake.apiBase(), null, Duration.ofSeconds(1), Duration.ofSeconds(2), railSize,
                 trendingCandidates,
-                Duration.ofHours(24), Duration.ofHours(24), null);
+                Duration.ofHours(24), Duration.ofHours(24), null, true);
     }
 
     private TmdbContentSource source(TmdbProperties properties) {

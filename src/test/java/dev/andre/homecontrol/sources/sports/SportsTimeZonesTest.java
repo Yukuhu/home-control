@@ -20,7 +20,7 @@ class SportsTimeZonesTest {
                 new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(5), Duration.ofSeconds(15),
                 5242880, 3, false),
                 new SportsProperties.TheSportsDb(true, URI.create("http://127.0.0.1:9/api/v1/json"), "123",
-                        Duration.ofHours(24), Duration.ofSeconds(1), Duration.ofSeconds(2), null));
+                        Duration.ofHours(24), Duration.ofSeconds(1), Duration.ofSeconds(2), null, true));
     }
 
     @Test

@@ -30,7 +30,7 @@ class TmdbClientBaseUrlTest {
     void trailingSlashesOnTheBaseUrlAreDropped() {
         TmdbProperties properties = new TmdbProperties(true, URI.create(fake.apiBase() + "//"), null,
                 Duration.ofSeconds(1), Duration.ofSeconds(1), 20, 40,
-                Duration.ofHours(24), Duration.ofHours(24), null);
+                Duration.ofHours(24), Duration.ofHours(24), null, true);
 
         new TmdbClient(properties).get(TmdbCredential.parse(FakeTmdbServer.READ_TOKEN), "/authentication", Map.of());
 

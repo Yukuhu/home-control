@@ -52,7 +52,7 @@ class TmdbSetupServiceTest {
         fake = new FakeTmdbServer().withStandardResponses();
         TmdbProperties properties = new TmdbProperties(true, fake.apiBase(), null, Duration.ofSeconds(1),
                 Duration.ofSeconds(2), 20, 40,
-                Duration.ofHours(24), Duration.ofHours(24), null);
+                Duration.ofHours(24), Duration.ofHours(24), null, true);
         client = new TmdbClient(properties);
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         setup = new TmdbSetupService(client, sources, secretStore, loginService, clock);

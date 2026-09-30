@@ -9,8 +9,4 @@ public class TmdbException extends ContentSourceException {
         super(kind, message);
     }
 
-    public TmdbException(Kind kind, String message, Throwable cause) {
-        super(kind, message, cause);
-    }
-
 }

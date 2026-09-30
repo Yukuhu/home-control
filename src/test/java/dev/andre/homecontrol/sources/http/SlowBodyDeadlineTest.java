@@ -56,7 +56,7 @@ class SlowBodyDeadlineTest {
     void tmdb() {
         TmdbClient client = new TmdbClient(new TmdbProperties(true, server.url("/3"), null, Duration.ofSeconds(1),
                 Duration.ofSeconds(1), 20, 40,
-                Duration.ofHours(24), Duration.ofHours(24), null));
+                Duration.ofHours(24), Duration.ofHours(24), null, true));
         TmdbCredential key = TmdbCredential.parse("0123456789abcdef0123456789abcdef");
 
         assertThatThrownBy(() -> client.get(key, "/trending/movie/week", Map.of()))
@@ -69,13 +69,13 @@ class SlowBodyDeadlineTest {
     void theSportsDb() {
         TheSportsDbClient client = new TheSportsDbClient(new SportsProperties.TheSportsDb(true,
                 server.url("/api/v1/json"), "123", Duration.ofHours(24), Duration.ofSeconds(1),
-                Duration.ofSeconds(1), null));
+                Duration.ofSeconds(1), null, true));
         Map<String, String> league = Map.of("id", "4331");
 
         assertThatThrownBy(() -> client.get("123", "eventsnextleague.php", league))
                 .isInstanceOf(TheSportsDbException.class)
                 .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
-                .hasMessage("Could not reach TheSportsDB");
+                .hasMessage("Could not reach TheSportsDB at 127.0.0.1 (request timed out)");
         assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
 

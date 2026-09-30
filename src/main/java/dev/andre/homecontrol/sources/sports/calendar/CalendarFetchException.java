@@ -9,8 +9,4 @@ public class CalendarFetchException extends ContentSourceException {
         super(kind, message);
     }
 
-    public CalendarFetchException(Kind kind, String message, Throwable cause) {
-        super(kind, message, cause);
-    }
-
 }

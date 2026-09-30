@@ -9,8 +9,4 @@ public class TheSportsDbException extends ContentSourceException {
         super(kind, message);
     }
 
-    public TheSportsDbException(Kind kind, String message, Throwable cause) {
-        super(kind, message, cause);
-    }
-
 }

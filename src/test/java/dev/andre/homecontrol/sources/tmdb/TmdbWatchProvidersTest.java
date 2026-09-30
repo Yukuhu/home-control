@@ -31,7 +31,7 @@ class TmdbWatchProvidersTest {
         fake = new FakeTmdbServer().withStandardResponses();
         properties = new TmdbProperties(true, fake.apiBase(), null, Duration.ofSeconds(1), Duration.ofSeconds(1), 20,
                 40,
-                Duration.ofHours(24), Duration.ofHours(24), null);
+                Duration.ofHours(24), Duration.ofHours(24), null, true);
         client = new TmdbClient(properties);
         clock = MutableClock.at(Instant.parse("2026-09-16T10:00:00Z"));
         providers = new TmdbWatchProviders(client, properties, clock);
