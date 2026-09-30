@@ -15,6 +15,9 @@ import dev.andre.homecontrol.sources.tmdb.TmdbClient;
 import dev.andre.homecontrol.sources.tmdb.TmdbCredential;
 import dev.andre.homecontrol.sources.tmdb.TmdbException;
 import dev.andre.homecontrol.sources.tmdb.TmdbProperties;
+import dev.andre.homecontrol.sources.workflows.WorkflowException;
+import dev.andre.homecontrol.sources.workflows.WorkflowHttpClient;
+import dev.andre.homecontrol.sources.workflows.WorkflowProperties;
 import dev.andre.homecontrol.sources.youtube.YouTubeException;
 import dev.andre.homecontrol.sources.youtube.YouTubeHttp;
 import dev.andre.homecontrol.sources.youtube.YouTubeProperties;
@@ -25,8 +28,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -118,6 +123,21 @@ class SlowBodyDeadlineTest {
                     .isInstanceOf(CalendarFetchException.class)
                     .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
                     .hasMessage("Could not reach 127.0.0.1");
+        }
+        assertThat(server.bytesTrickled()).isGreaterThan(1);
+    }
+
+    @Test
+    void workflows() {
+        URI data = server.url("/data.json");
+        try (WorkflowHttpClient client = new WorkflowHttpClient(
+                new WorkflowProperties(true, true, Duration.ofSeconds(1), Duration.ofSeconds(1), 4, 2_097_152, 3),
+                new OutboundAddressPolicy(true, host -> new InetAddress[] {InetAddress.ofLiteral("127.0.0.1")}))) {
+            var request = new WorkflowHttpClient.Request(data.toString(), List.of());
+            assertThatThrownBy(() -> client.fetch(request))
+                    .isInstanceOf(WorkflowException.class)
+                    .hasFieldOrPropertyWithValue("stage", WorkflowException.Stage.FETCH)
+                    .hasFieldOrPropertyWithValue("detail", "request timed out");
         }
         assertThat(server.bytesTrickled()).isGreaterThan(1);
     }

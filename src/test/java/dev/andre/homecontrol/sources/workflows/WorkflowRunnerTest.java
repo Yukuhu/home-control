@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.workflows;
 
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import org.junit.jupiter.api.Test;
 import java.net.InetAddress;
 import java.net.URI;
@@ -86,7 +87,7 @@ class WorkflowRunnerTest {
                     draft.tile(), new WorkflowDraft.Cast(server.url("/media").toString() + "?id={A}&token={C}", "audio/aac"));
             var definition = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, WorkflowIntegrationFixture.ID, 1, draft);
             var properties = new WorkflowProperties(true, true, Duration.ofSeconds(5), Duration.ofSeconds(15), 4, 2097152, 3);
-            try (var client = new WorkflowHttpClient(properties, new WorkflowUrlPolicy(true, InetAddress::getAllByName))) {
+            try (var client = new WorkflowHttpClient(properties, new OutboundAddressPolicy(true, InetAddress::getAllByName))) {
                 var media = new WorkflowRunner(client, PROPERTIES).resolve(definition, "single");
                 assertThat(media.url().getPath()).isEqualTo("/media");
                 assertThat(media.mimeType()).isEqualTo("audio/aac");
@@ -99,7 +100,7 @@ class WorkflowRunnerTest {
     /** Every host resolves to 127.0.0.1: the fake server is reachable and media.example passes the address check. */
     private static WorkflowHttpClient loopbackClient() {
         return new WorkflowHttpClient(PROPERTIES,
-                new WorkflowUrlPolicy(true, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}));
+                new OutboundAddressPolicy(true, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}));
     }
 
     private static WorkflowDefinition chain(FakeWorkflowServer server) {

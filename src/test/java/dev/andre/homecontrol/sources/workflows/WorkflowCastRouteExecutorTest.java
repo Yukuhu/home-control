@@ -3,6 +3,7 @@ package dev.andre.homecontrol.sources.workflows;
 import dev.andre.homecontrol.content.RailPreferences;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.core.*;
 import dev.andre.homecontrol.core.playback.*;
 import dev.andre.homecontrol.playback.*;
@@ -70,7 +71,7 @@ class WorkflowCastRouteExecutorTest {
             var generated = new WorkflowIntegrationFixture(draft);
             var properties = new WorkflowProperties(true, true, java.time.Duration.ofSeconds(5),
                     java.time.Duration.ofSeconds(15), 4, 2097152, 3);
-            try (var http = new WorkflowHttpClient(properties, new WorkflowUrlPolicy(true, java.net.InetAddress::getAllByName))) {
+            try (var http = new WorkflowHttpClient(properties, new OutboundAddressPolicy(true, java.net.InetAddress::getAllByName))) {
                 var realRunner = new WorkflowRunner(http, properties);
                 var source = new WorkflowContentSource(generated.store, realRunner,
                         new WorkflowCatalogs(generated.store), preferences);

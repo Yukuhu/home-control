@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.workflows;
 
 import com.sun.net.httpserver.HttpExchange;
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -24,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class WorkflowCallsTest {
     private static WorkflowHttpClient client() {
         return new WorkflowHttpClient(new WorkflowProperties(true, true, Duration.ofSeconds(1), Duration.ofSeconds(5), 8, 2_097_152, 3),
-                new WorkflowUrlPolicy(true, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}));
+                new OutboundAddressPolicy(true, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}));
     }
 
     private static Call call(String name, String url, Variable... variables) {

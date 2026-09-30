@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 /**
@@ -402,5 +401,55 @@ class GuardedHttpClientTest {
             client.vet(OutboundRequest.get(at("source.test", "/media.mp4")));
         }
         assertThat(server.requests()).isEmpty();
+    }
+
+    @Test
+    void anOriginIsItsSchemeHostAndPortWithDefaultsFilledIn() {
+        assertThat(GuardedHttpClient.sameOrigin(URI.create("HTTP://Example.COM/a"), URI.create("http://example.com:80/b"))).isTrue();
+        assertThat(GuardedHttpClient.sameOrigin(URI.create("https://host/a"), URI.create("https://host:443/b"))).isTrue();
+        assertThat(GuardedHttpClient.sameOrigin(URI.create("https://host/a"), URI.create("http://host:443/a"))).isFalse();
+        assertThat(GuardedHttpClient.sameOrigin(URI.create("http://host/a"), URI.create("http://host:81/a"))).isFalse();
+    }
+
+    @Test
+    void anErrorOnTheWorkerFailsTheCallerAtOnceAndFreesItsSlot() {
+        var broken = new OutboundAddressPolicy(true, host -> {
+            throw new AssertionError("resolver bug");
+        });
+        // Far longer than the test could wait: a caller left waiting for its deadline would hang here.
+        try (var client = new GuardedHttpClient(profile(Redirects.NONE, Duration.ofSeconds(60), 1), broken,
+                failure -> new ContentSourceException(failure.kind(), failure.describe("the source")))) {
+            // More calls than slots: each failed worker must have given its slot back.
+            for (int call = 0; call < 3; call++) {
+                assertThat(failureOf(() -> client.vet(OutboundRequest.get(URI.create("http://fixture.invalid/media")))))
+                        .hasMessageContaining(OutboundFailure.FAILED);
+            }
+        }
+    }
+
+    @Test
+    void anErrorBodyIsReadOnlyWhenAskedFor() throws Exception {
+        server.respond("GET", "/explained", Response.of(500, "text/plain", "quota exceeded"));
+        server.handle("GET", "/stalled", exchange -> {
+            exchange.sendResponseHeaders(403, 0);
+            exchange.getResponseBody().write('x');
+            exchange.getResponseBody().flush();
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+            exchange.close();
+        });
+        try (var client = client(Redirects.NONE, Duration.ofSeconds(8), 2, true)) {
+            OutboundResponse explained = client.send(OutboundRequest.get(at("source.test", "/explained")).withErrorBody());
+            CompletableFuture<OutboundResponse> stalled = CompletableFuture.supplyAsync(
+                    () -> client.send(OutboundRequest.get(at("source.test", "/stalled"))));
+
+            assertThat(explained.body()).asString().isEqualTo("quota exceeded");
+            // The stalled body is dropped unread: the answer comes long before the 8-second deadline.
+            assertThat(stalled.get(3, TimeUnit.SECONDS).status()).isEqualTo(403);
+            assertThat(client.send(OutboundRequest.get(at("source.test", "/explained"))).body()).isEmpty();
+        }
     }
 }

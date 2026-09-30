@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.security.LoginRequiredException;
+import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.testsupport.FakeLoginContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -163,6 +164,6 @@ class WorkflowTestServiceTest {
 
     private static WorkflowHttpClient client() {
         return new WorkflowHttpClient(PROPERTIES,
-                new WorkflowUrlPolicy(true, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}));
+                new OutboundAddressPolicy(true, host -> new InetAddress[]{InetAddress.ofLiteral("127.0.0.1")}));
     }
 }
