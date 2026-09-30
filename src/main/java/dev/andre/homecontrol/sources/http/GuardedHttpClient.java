@@ -42,7 +42,9 @@ import java.util.function.Function;
  * The one way a content source reaches the network. It connects only to addresses its {@link OutboundAddressPolicy}
  * approved, looked up once, so a host cannot pass the check at one address and be reached at another. One deadline
  * covers waiting for a slot, DNS, connecting, every redirect and the whole body; each exchange runs on a worker that
- * is cancelled at the deadline. Bodies are capped (Content-Length first) and never decompressed. Failures reach the
+ * is cancelled at the deadline. A caller with a deadline of its own ({@link OutboundRequest#endingBy}, a workflow
+ * run) may wait for a slot until then; once admitted, its exchange ends within the profile's deadline or its own,
+ * whichever comes first. Bodies are capped (Content-Length first) and never decompressed. Failures reach the
  * source's factory as an {@link OutboundFailure}, which names only the host and carries no cause.
  */
 public final class GuardedHttpClient implements AutoCloseable {
