@@ -19,13 +19,21 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
-/** Fans device state changes out to every open browser tab. */
+/**
+ * The server-sent event stream every open browser tab follows: device state ({@code state}), a rail's new content
+ * ({@code rail}) and the list of rails ({@code rails}), plus a comment line as a heartbeat, so a reverse proxy does not
+ * close a stream that is quiet for a while.
+ */
 @Component
-public class DeviceStateBroadcaster {
+public class EventStream {
 
-    private static final Logger log = LoggerFactory.getLogger(DeviceStateBroadcaster.class);
+    private static final Logger log = LoggerFactory.getLogger(EventStream.class);
 
     private static final long NO_TIMEOUT = 0L;
 
@@ -37,13 +45,27 @@ public class DeviceStateBroadcaster {
      * The fan-out's own thread. {@code publishEvent} is synchronous, so without this the
      * loop below would run on the publishing {@code AndroidTvSession}'s single scheduler
      * thread, and one wedged browser blocking in {@code send} would stall that device's
-     * reconnects. Single-threaded, so events still reach each tab in the order published.
+     * reconnects. Single-threaded, so events and heartbeats still reach each tab in the order published. A plain
+     * executor, not a scheduled one: that would wrap each task in a future and swallow an Error in a send.
      */
-    private final ExecutorService fanOut = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "home-control-sse-broadcast");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private final ExecutorService fanOut = Executors.newSingleThreadExecutor(daemon("home-control-sse-broadcast"));
+    /** Only keeps time: each tick queues a heartbeat on {@link #fanOut}, which sends it in order with the events. */
+    private final ScheduledExecutorService ticks = Executors.newSingleThreadScheduledExecutor(daemon("home-control-sse-heartbeat"));
+    private final ScheduledFuture<?> heartbeat;
+
+    public EventStream(EventStreamProperties properties) {
+        long interval = properties.heartbeatInterval().toMillis();
+        heartbeat = ticks.scheduleWithFixedDelay(() -> enqueue(this::sendHeartbeat), interval, interval,
+                TimeUnit.MILLISECONDS);
+    }
+
+    private static ThreadFactory daemon(String name) {
+        return runnable -> {
+            Thread thread = new Thread(runnable, name);
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
 
     /** @param stillAllowed false once this subscriber's browser logged out or lost its login */
     public SseEmitter subscribe(BooleanSupplier stillAllowed) {
@@ -128,6 +150,7 @@ public class DeviceStateBroadcaster {
      */
     @EventListener(ContextClosedEvent.class)
     public void onContextClosed() {
+        heartbeat.cancel(false);
         for (SseEmitter emitter : List.copyOf(emitters)) {
             drop(emitter);
             completeQuietly(emitter);
@@ -175,6 +198,11 @@ public class DeviceStateBroadcaster {
         emitter.send(SseEmitter.event().name("state").data(event));
     }
 
+    /** A comment line: browsers ignore it, proxies see traffic, and a closed tab shows up as a failed send. */
+    void sendHeartbeat(SseEmitter emitter) throws IOException {
+        emitter.send(SseEmitter.event().comment("keep-alive"));
+    }
+
     /** Named non-device events; package-private so a test can observe them. */
     void sendNamed(SseEmitter emitter, String name, Object data) throws IOException {
         emitter.send(SseEmitter.event().name(name).data(data));
@@ -199,6 +227,7 @@ public class DeviceStateBroadcaster {
 
     @PreDestroy
     void shutdown() {
+        ticks.shutdownNow();
         fanOut.shutdownNow();
     }
 }

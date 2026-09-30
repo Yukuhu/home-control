@@ -8,6 +8,8 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.content.RailDescriptor;
+import java.io.IOException;
+import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -23,9 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.awaitility.Awaitility.await;
 
-class DeviceStateBroadcasterTest {
+class EventStreamTest {
 
-    private final DeviceStateBroadcaster broadcaster = new DeviceStateBroadcaster();
+    private final EventStream broadcaster = new EventStream(new EventStreamProperties(Duration.ofSeconds(25)));
 
     @AfterEach
     void shutdown() {
@@ -63,7 +65,7 @@ class DeviceStateBroadcasterTest {
     @Test
     void forwardsTheDeviceIdWithTheState() {
         List<DeviceStateChangedEvent> sent = new CopyOnWriteArrayList<>();
-        DeviceStateBroadcaster recording = new DeviceStateBroadcaster() {
+        EventStream recording = new EventStream(new EventStreamProperties(Duration.ofSeconds(25))) {
             @Override
             void sendData(SseEmitter emitter, DeviceStateChangedEvent event) {
                 sent.add(event);
@@ -115,7 +117,7 @@ class DeviceStateBroadcasterTest {
         record Sent(String name, Object data) {
         }
         List<Sent> sent = new CopyOnWriteArrayList<>();
-        DeviceStateBroadcaster recording = new DeviceStateBroadcaster() {
+        EventStream recording = new EventStream(new EventStreamProperties(Duration.ofSeconds(25))) {
             @Override
             void sendNamed(SseEmitter emitter, String name, Object data) {
                 sent.add(new Sent(name, data));
@@ -167,6 +169,71 @@ class DeviceStateBroadcasterTest {
         @Override
         public void send(SseEventBuilder builder) {
             sends.incrementAndGet();
+        }
+    }
+
+    @Test
+    void aHeartbeatReachesEveryOpenStreamWithoutAnyEvent() {
+        List<SseEmitter> beats = new CopyOnWriteArrayList<>();
+        EventStream stream = new EventStream(new EventStreamProperties(Duration.ofMillis(50))) {
+            @Override
+            void sendHeartbeat(SseEmitter emitter) {
+                beats.add(emitter);
+            }
+        };
+        try {
+            SseEmitter first = stream.subscribe(() -> true);
+            SseEmitter second = stream.subscribe(() -> true);
+
+            await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> assertThat(beats).contains(first, second));
+        } finally {
+            stream.shutdown();
+        }
+    }
+
+    @Test
+    void aStreamWhoseHeartbeatFailsIsDropped() {
+        AtomicInteger beats = new AtomicInteger();
+        EventStream stream = new EventStream(new EventStreamProperties(Duration.ofMillis(50))) {
+            @Override
+            void sendHeartbeat(SseEmitter emitter) throws IOException {
+                beats.incrementAndGet();
+                throw new IOException("the tab is gone");
+            }
+        };
+        try {
+            stream.subscribe(() -> true);
+
+            await().atMost(Duration.ofSeconds(2)).until(() -> beats.get() >= 1);
+            int afterFirst = beats.get();
+            await().pollDelay(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2))
+                    .untilAsserted(() -> assertThat(beats.get()).isEqualTo(afterFirst));
+        } finally {
+            stream.shutdown();
+        }
+    }
+
+    @Test
+    void theHeartbeatStopsWhenTheApplicationCloses() {
+        AtomicInteger beats = new AtomicInteger();
+        EventStream stream = new EventStream(new EventStreamProperties(Duration.ofMillis(50))) {
+            @Override
+            void sendHeartbeat(SseEmitter emitter) {
+                beats.incrementAndGet();
+            }
+        };
+        try {
+            stream.subscribe(() -> true);
+            await().atMost(Duration.ofSeconds(2)).until(() -> beats.get() >= 1);
+
+            stream.onContextClosed();
+            stream.subscribe(() -> true);
+            int afterClose = beats.get();
+
+            await().pollDelay(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2))
+                    .untilAsserted(() -> assertThat(beats.get()).isEqualTo(afterClose));
+        } finally {
+            stream.shutdown();
         }
     }
 }

@@ -5,9 +5,8 @@ import dev.andre.homecontrol.content.RailSnapshot;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,31 +15,31 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.function.BooleanSupplier;
 
+/** {@code GET /events}: opens a browser tab's {@link EventStream}, starting with a snapshot of every device and rail. */
 @RestController
-public class StateController {
+public class EventStreamController {
 
-    private final DeviceStateBroadcaster broadcaster;
+    private final EventStream stream;
     private final DeviceQueries devices;
     private final RailCache rails;
-    private final LoginService login;
 
-    public StateController(DeviceStateBroadcaster broadcaster, DeviceQueries devices, RailCache rails,
-                           ObjectProvider<LoginService> login) {
-        this.broadcaster = broadcaster;
+    public EventStreamController(EventStream stream, DeviceQueries devices, RailCache rails,
+                                 ObjectProvider<LoginService> login) {
+        this.stream = stream;
         this.devices = devices;
         this.rails = rails;
-        this.login = login.getIfAvailable();
-        if (this.login != null) {
+        LoginService service = login.getIfAvailable();
+        if (service != null) {
             // A logout, a password change or a first login ends the streams that may no longer see state.
-            this.login.onChange(broadcaster::revalidate);
+            service.onChange(stream::revalidate);
         }
     }
 
     @GetMapping(path = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter events(HttpServletRequest request) throws IOException {
-        SseEmitter emitter = broadcaster.subscribe(stillAllowed(request));
+    public SseEmitter events(LoginContext login) throws IOException {
+        // Bound to the session, not the request: the stream outlives the request that opened it.
+        SseEmitter emitter = stream.subscribe(login.whileLoggedIn());
         try {
             // One snapshot per device so a new tab paints every chip before anything changes.
             for (Map.Entry<String, DeviceState> entry : devices.states().entrySet()) {
@@ -54,18 +53,9 @@ public class StateController {
         } catch (IOException e) {
             // The emitter never reached Spring, so its onCompletion/onTimeout/onError
             // will never fire; undo the subscribe ourselves or it leaks forever.
-            broadcaster.unsubscribe(emitter);
+            stream.unsubscribe(emitter);
             throw e;
         }
         return emitter;
-    }
-
-    /** Bound to the session, not the request: the stream outlives the request that opened it. */
-    private BooleanSupplier stillAllowed(HttpServletRequest request) {
-        if (login == null) {
-            return () -> true;
-        }
-        HttpSession session = request.getSession(false);
-        return () -> login.isAuthenticated(session);
     }
 }

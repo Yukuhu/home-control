@@ -110,6 +110,9 @@ home-control:
     load-timeout: 15s
     command-timeout: 3s
     host-check-cache-ttl: 30s
+  events:
+    # A comment line on every open event stream this often, so a reverse proxy does not close a quiet one.
+    heartbeat-interval: 25s
   deep-link-test:
     # Blender Foundation's "Big Buck Bunny": long-lived and region-free.
     youtube-url: https://www.youtube.com/watch?v=aqz-KE-bpKQ

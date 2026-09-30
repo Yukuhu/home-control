@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -16,9 +17,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 /** Subscribers whose send or completion fails, and a send that fails with an Error. */
-class DeviceStateBroadcasterFailuresTest {
+class EventStreamFailuresTest {
 
-    private final DeviceStateBroadcaster broadcaster = new DeviceStateBroadcaster();
+    private final EventStream broadcaster = new EventStream(new EventStreamProperties(Duration.ofSeconds(25)));
 
     @AfterEach
     void shutdown() {

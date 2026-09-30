@@ -40,7 +40,7 @@ import dev.andre.homecontrol.sources.youtube.YouTubeHttp;
 import dev.andre.homecontrol.sources.youtube.YouTubeProperties;
 import dev.andre.homecontrol.sources.youtube.YouTubeSettings;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupService;
-import dev.andre.homecontrol.web.DeviceStateBroadcaster;
+import dev.andre.homecontrol.web.EventStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -127,7 +127,7 @@ public abstract class WebSliceTest {
     @MockitoBean
     protected DeepLinkTestService deepLinkTests;
     @MockitoBean
-    protected DeviceStateBroadcaster broadcaster;
+    protected EventStream broadcaster;
     @MockitoBean
     protected SourcePreferencesService sourcePreferences;
     @MockitoBean
