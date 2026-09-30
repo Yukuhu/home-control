@@ -2,8 +2,10 @@ package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.core.content.ContentChangedEvent;
 import dev.andre.homecontrol.security.Argon2PasswordHasher;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.storage.SecretKeySource;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +41,7 @@ class WorkflowStoreTest {
     SecretStore secrets;
     LoginService login;
     WorkflowStore workflows;
-    MockHttpServletRequest request;
+    LoginContext request;
     List<Object> events;
 
     @BeforeEach void setUp() {
@@ -47,7 +49,7 @@ class WorkflowStoreTest {
         secrets = new SecretStore(dir.resolve("secrets.json"),
                 new SecretKeySource(null, dir.resolve("secret.key"), random), random);
         login = new LoginService(secrets, new Argon2PasswordHasher(random), random);
-        request = new MockHttpServletRequest();
+        request = new RequestLoginContext(new MockHttpServletRequest(), login);
         events = new ArrayList<>();
         workflows = new WorkflowStore(secrets, login, new WorkflowCodec(), events::add, random);
     }
@@ -67,7 +69,7 @@ class WorkflowStoreTest {
         WorkflowDefinition saved = first();
         assertThat(saved.id()).matches("w-[0-9a-f]{12}");
         assertThat(saved.revision()).isEqualTo(1);
-        assertThat(login.isAuthenticated(request)).isTrue();
+        assertThat(request.loggedIn()).isTrue();
         assertThat(workflows.all()).containsExactly(saved);
         assertThat(events).containsExactly(new ContentChangedEvent("workflows"));
         String file = Files.readString(dir.resolve("secrets.json"));
@@ -80,7 +82,7 @@ class WorkflowStoreTest {
         String id = saved.id();
         long revision = saved.revision();
         WorkflowDraft edit = draft();
-        var anonymous = new MockHttpServletRequest();
+        var anonymous = new RequestLoginContext(new MockHttpServletRequest(), login);
         assertThatThrownBy(() -> workflows.update(id, revision, edit, anonymous))
                 .isInstanceOf(LoginRequiredException.class);
         assertThatThrownBy(() -> workflows.setEnabled(id, revision, false, anonymous))
@@ -146,7 +148,7 @@ class WorkflowStoreTest {
         workflows = new WorkflowStore(secrets, login, new WorkflowCodec(), events::add, new SecureRandom());
         assertThat(workflows.problems()).containsKey("damaged-record");
         WorkflowDraft replacement = draft();
-        var anonymous = new MockHttpServletRequest();
+        var anonymous = new RequestLoginContext(new MockHttpServletRequest(), login);
         assertThatThrownBy(() -> workflows.create(replacement, null, null, anonymous))
                 .isInstanceOf(LoginRequiredException.class);
         assertThatThrownBy(() -> workflows.removeInvalid("damaged-record", anonymous))

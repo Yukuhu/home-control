@@ -18,6 +18,7 @@ import dev.andre.homecontrol.sources.youtube.QuotaLedger;
 import dev.andre.homecontrol.sources.youtube.YouTubeVideo;
 import dev.andre.homecontrol.core.content.SourcePreferences;
 import dev.andre.homecontrol.device.Devices;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.junit.jupiter.api.Test;
@@ -73,7 +74,7 @@ class FullAppResetTest extends FullAppTest {
     void resetBringsTheApplicationBackToAFreshInstall() throws Exception {
         enrollment.adopt(new Device("reset-probe", "Probe", DeviceKind.ANDROID_TV, "127.0.0.1",
                 Map.of("androidtv", Map.of()), Instant.now()));
-        login.storeSecrets(Map.of("jellyfin.token", "0123456789abcdef"), PASSWORD, PASSWORD, new MockHttpServletRequest());
+        login.storeSecrets(Map.of("jellyfin.token", "0123456789abcdef"), PASSWORD, PASSWORD, new RequestLoginContext(new MockHttpServletRequest(), login));
         for (int i = 0; i < 5; i++) {
             limiter.failed("127.0.0.1");
         }

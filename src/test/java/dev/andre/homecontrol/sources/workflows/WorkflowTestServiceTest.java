@@ -1,10 +1,9 @@
 package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.security.LoginRequiredException;
-import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.testsupport.FakeLoginContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockHttpServletRequest;
 import java.net.InetAddress;
 import java.time.Duration;
 import java.util.Optional;
@@ -17,25 +16,22 @@ class WorkflowTestServiceTest {
     private static final WorkflowProperties PROPERTIES =
             new WorkflowProperties(true, true, Duration.ofSeconds(5), Duration.ofSeconds(10), 8, 2097152, 3);
     final WorkflowStore store = mock(WorkflowStore.class);
-    final LoginService login = mock(LoginService.class);
-    final MockHttpServletRequest request = new MockHttpServletRequest();
+    final FakeLoginContext request = FakeLoginContext.loggedInBrowser();
     final String id = "w-0123456789ab";
     WorkflowDefinition saved;
 
     @BeforeEach void setup() {
         when(store.find(id)).thenAnswer(call -> Optional.of(saved));
-        when(login.isAuthenticated(request)).thenReturn(true);
     }
 
     @Test void authenticationAndRevisionAreCheckedBeforeAnyFetch() throws Exception {
         try (var server = new FakeWorkflowServer(); var http = client()) {
             var runner = mock(WorkflowRunner.class);
-            var service = new WorkflowTestService(store, login, runner, http);
+            var service = new WorkflowTestService(store, runner, http);
             saved = definition(7, WorkflowFixtures.chain(server.url("/")));
-            when(login.isAuthenticated(request)).thenReturn(false);
-            assertThatThrownBy(() -> service.test(id, 7, request)).isInstanceOf(LoginRequiredException.class);
+            assertThatThrownBy(() -> service.test(id, 7, FakeLoginContext.loggedOutBrowser()))
+                    .isInstanceOf(LoginRequiredException.class);
             verifyNoInteractions(store, runner);
-            when(login.isAuthenticated(request)).thenReturn(true);
             assertThatThrownBy(() -> service.test(id, 6, request)).isInstanceOf(WorkflowException.class);
             verifyNoInteractions(runner);
             assertThat(server.count("/list")).isZero();
@@ -122,7 +118,7 @@ class WorkflowTestServiceTest {
         var runner = mock(WorkflowRunner.class);
         when(runner.refreshRun()).thenThrow(new IllegalStateException("upstream-secret", new IllegalArgumentException("cause-secret")));
         saved = definition(7, WorkflowFixtures.chain(java.net.URI.create("https://api.example/")));
-        var result = new WorkflowTestService(store, login, runner, mock(WorkflowHttpClient.class)).test(id, 7, request);
+        var result = new WorkflowTestService(store, runner, mock(WorkflowHttpClient.class)).test(id, 7, request);
         assertThat(result.stages()).last().satisfies(stage -> {
             assertThat(stage.name()).isEqualTo("Refresh");
             assertThat(stage.success()).isFalse();
@@ -140,7 +136,7 @@ class WorkflowTestServiceTest {
                     real.fetch(call.getArgument(0), call.getArgument(1)));
             doThrow(new RuntimeException("private-marker")).when(http).checkMedia(any(), anyLong());
             var stored = save(WorkflowFixtures.chain(server.url("/")));
-            var result = new WorkflowTestService(store, login, new WorkflowRunner(http, PROPERTIES), http)
+            var result = new WorkflowTestService(store, new WorkflowRunner(http, PROPERTIES), http)
                     .test(stored.id(), stored.revision(), request);
             assertThat(result.samples()).isEmpty();
             assertThat(result.stages()).last().satisfies(stage -> {
@@ -161,7 +157,7 @@ class WorkflowTestServiceTest {
     }
 
     private WorkflowTestService service(WorkflowHttpClient http) {
-        return new WorkflowTestService(store, login, new WorkflowRunner(http, PROPERTIES), http);
+        return new WorkflowTestService(store, new WorkflowRunner(http, PROPERTIES), http);
     }
 
     private static WorkflowHttpClient client() {

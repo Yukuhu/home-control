@@ -46,12 +46,12 @@ public class YouTubeSetupAdvice {
 
     @ModelAttribute("youtubeCallbackUrl")
     public String callbackUrl(HttpServletRequest request) {
-        return YouTubeOAuthCallback.uri(request).toString();
+        return YouTubeSetupController.callback(request).toString();
     }
 
     @ModelAttribute("youtubeBrowserSupported")
     public boolean browserSupported(HttpServletRequest request) {
-        return YouTubeOAuthCallback.supported(YouTubeOAuthCallback.uri(request));
+        return YouTubeOAuthCallback.supported(YouTubeSetupController.callback(request));
     }
 
     private final ObjectProvider<YouTubeSetupService> setup;

@@ -204,7 +204,7 @@ class YouTubeBrowserAuthorizationTest {
         request.addHeader("X-Forwarded-Port", "443");
         var result = new AtomicReference<URI>();
         new ForwardedHeaderFilter().doFilter(request, new MockHttpServletResponse(),
-                (req, res) -> result.set(YouTubeOAuthCallback.uri((jakarta.servlet.http.HttpServletRequest) req)));
+                (req, res) -> result.set(YouTubeSetupController.callback((jakarta.servlet.http.HttpServletRequest) req)));
         assertThat(result.get()).isEqualTo(callback);
         assertThat(YouTubeOAuthCallback.supported(result.get())).isTrue();
     }

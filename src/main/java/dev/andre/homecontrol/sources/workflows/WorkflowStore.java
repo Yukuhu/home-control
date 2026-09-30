@@ -1,10 +1,9 @@
 package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.core.content.ContentChangedEvent;
-import dev.andre.homecontrol.security.LoginRequiredException;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.SecretStore;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.security.SecureRandom;
@@ -80,19 +79,19 @@ public final class WorkflowStore {
     }
 
     public WorkflowDefinition create(WorkflowDraft draft, String password, String confirmation,
-                                     HttpServletRequest request) {
+                                     LoginContext context) {
         WorkflowDefinition created;
         writes.lock();
         try {
             Snapshot current = snapshot;
-            if (login.loginRequired()) requireLogin(request);
+            context.requireLogin();
             if (current.keys.size() >= MAX_WORKFLOWS) {
                 throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "workflow limit reached");
             }
             String id = newId(current.keys);
             created = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, 1, draft);
             String encoded = codec.encode(created);
-            login.storeSecrets(Map.of(secretName(id), encoded), password, confirmation, request);
+            login.storeSecrets(Map.of(secretName(id), encoded), password, confirmation, context);
             snapshot = current.withCreated(created);
         } finally {
             writes.unlock();
@@ -102,7 +101,7 @@ public final class WorkflowStore {
     }
 
     public WorkflowDefinition update(String id, long expectedRevision, WorkflowDraft draft,
-                                     HttpServletRequest request) {
+                                     LoginContext context) {
         String key = secretName(id);
         WorkflowDefinition updated;
         ReentrantLock stripe = stripe(id);
@@ -110,12 +109,12 @@ public final class WorkflowStore {
         try {
             writes.lock();
             try {
-                requireLogin(request);
+                context.requireLogin();
                 Snapshot current = snapshot;
                 WorkflowDefinition previous = currentDefinition(current, id, expectedRevision);
                 updated = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, nextRevision(previous.revision()), draft);
                 String encoded = codec.encode(updated);
-                login.storeSecrets(Map.of(key, encoded), null, null, request);
+                login.storeSecrets(Map.of(key, encoded), null, null, context);
                 snapshot = current.withUpdated(updated);
             } finally {
                 writes.unlock();
@@ -127,21 +126,21 @@ public final class WorkflowStore {
         return updated;
     }
 
-    public void setEnabled(String id, long expectedRevision, boolean enabled, HttpServletRequest request) {
+    public void setEnabled(String id, long expectedRevision, boolean enabled, LoginContext context) {
         String key = secretName(id);
         ReentrantLock stripe = stripe(id);
         stripe.lock();
         try {
             writes.lock();
             try {
-                requireLogin(request);
+                context.requireLogin();
                 Snapshot current = snapshot;
                 WorkflowDefinition previous = currentDefinition(current, id, expectedRevision);
                 WorkflowDraft draft = previous.draft();
                 WorkflowDraft changedDraft = draft.withEnabled(enabled);
                 WorkflowDefinition updated = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, id, nextRevision(previous.revision()), changedDraft);
                 String encoded = codec.encode(updated);
-                login.storeSecrets(Map.of(key, encoded), null, null, request);
+                login.storeSecrets(Map.of(key, encoded), null, null, context);
                 snapshot = current.withUpdated(updated);
             } finally {
                 writes.unlock();
@@ -152,14 +151,14 @@ public final class WorkflowStore {
         changed();
     }
 
-    public void remove(String id, long expectedRevision, HttpServletRequest request) {
+    public void remove(String id, long expectedRevision, LoginContext context) {
         String key = secretName(id);
         ReentrantLock stripe = stripe(id);
         stripe.lock();
         try {
             writes.lock();
             try {
-                requireLogin(request);
+                context.requireLogin();
                 Snapshot current = snapshot;
                 currentDefinition(current, id, expectedRevision);
                 login.removeSecrets(List.of(key));
@@ -174,14 +173,14 @@ public final class WorkflowStore {
     }
 
     /** Removes only a key displayed by problems(), without interpreting its damaged value. */
-    public void removeInvalid(String id, HttpServletRequest request) {
+    public void removeInvalid(String id, LoginContext context) {
         if (id == null) throw new IllegalArgumentException("Unknown workflow");
         ReentrantLock stripe = stripe(id);
         stripe.lock();
         try {
             writes.lock();
             try {
-                requireLogin(request);
+                context.requireLogin();
                 Snapshot current = snapshot;
                 String key = current.invalidKeys.get(id);
                 if (key == null) throw new IllegalArgumentException("Unknown workflow");
@@ -253,10 +252,6 @@ public final class WorkflowStore {
             if (!keys.contains(secretName(id.toString()))) return id.toString();
         }
         throw new WorkflowException(WorkflowException.Stage.WORKFLOW, "could not allocate workflow ID");
-    }
-
-    private void requireLogin(HttpServletRequest request) {
-        if (!login.isAuthenticated(request)) throw new LoginRequiredException();
     }
 
     private ReentrantLock stripe(String id) {

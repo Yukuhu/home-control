@@ -3,11 +3,11 @@ package dev.andre.homecontrol.sources.sports;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.sources.sports.calendar.SportsCalendars;
 import dev.andre.homecontrol.storage.StorageException;
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
@@ -46,10 +46,10 @@ public class SportsSetupController {
     public String add(@RequestParam(required = false) String url, @RequestParam(required = false) String label,
                       @RequestParam(required = false) String loginPassword,
                       @RequestParam(required = false) String loginPasswordConfirmation,
-                      HttpServletRequest request, RedirectAttributes redirect) {
+                      LoginContext context, RedirectAttributes redirect) {
         try {
             SportsSettings.CalendarEntry entry = calendars.add(
-                    new SportsCalendars.AddCalendar(url, label, loginPassword, loginPasswordConfirmation), request);
+                    new SportsCalendars.AddCalendar(url, label, loginPassword, loginPasswordConfirmation), context);
             redirect.addFlashAttribute(MESSAGE, "Added " + entry.label());
         } catch (LoginRequiredException _) {
             failedAdd(redirect, label, "Log in again to change sources");

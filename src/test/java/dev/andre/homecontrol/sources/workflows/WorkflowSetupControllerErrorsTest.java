@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.testsupport.FakeLoginContext;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,7 +59,8 @@ class WorkflowSetupControllerErrorsTest {
     @SuppressWarnings("unchecked")
     private List<WorkflowSetupController.ErrorView> save(WorkflowForm form, DirectFieldBindingResult binding) {
         var model = new ExtendedModelMap();
-        String view = controller.create(form, binding, new MockHttpServletRequest(), new MockHttpServletResponse(), model);
+        String view = controller.create(form, binding, new MockHttpServletRequest(), FakeLoginContext.loggedInBrowser(),
+                new MockHttpServletResponse(), model);
         assertThat(view).isEqualTo("workflow-editor");
         return (List<WorkflowSetupController.ErrorView>) model.getAttribute("errors");
     }

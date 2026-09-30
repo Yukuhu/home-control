@@ -2,9 +2,7 @@ package dev.andre.homecontrol.sources.workflows;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
-import dev.andre.homecontrol.security.LoginRequiredException;
-import dev.andre.homecontrol.security.LoginService;
-import jakarta.servlet.http.HttpServletRequest;
+import dev.andre.homecontrol.security.LoginContext;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,16 +25,15 @@ public final class WorkflowTestService {
     private static final String ARTWORK = "Some artwork was omitted because it is not a public HTTPS image address without credentials.";
     private static final int SAMPLES = 5;
     private final WorkflowStore store;
-    private final LoginService login;
     private final WorkflowRunner runner;
     private final WorkflowHttpClient http;
 
-    public WorkflowTestService(WorkflowStore store, LoginService login, WorkflowRunner runner, WorkflowHttpClient http) {
-        this.store = store; this.login = login; this.runner = runner; this.http = http;
+    public WorkflowTestService(WorkflowStore store, WorkflowRunner runner, WorkflowHttpClient http) {
+        this.store = store; this.runner = runner; this.http = http;
     }
 
-    public Result test(String id, long revision, HttpServletRequest request) {
-        authenticate(request);
+    public Result test(String id, long revision, LoginContext browser) {
+        browser.requireLogin();
         WorkflowDefinition saved = current(id, revision);
         var draft = saved.draft();
         List<StageView> stages = new ArrayList<>();
@@ -73,7 +70,7 @@ public final class WorkflowTestService {
             stages.add(new StageView(name, false, message));
             samples.clear();
         }
-        authenticate(request);
+        browser.requireLogin();
         current(id, revision); // An explicit Test may run while disabled, but never return an obsolete revision.
         return new Result(stages, total, samples, warnings);
     }
@@ -83,9 +80,6 @@ public final class WorkflowTestService {
                 .map(name -> name + " = " + (plan.sensitive(name) ? "\u2022\u2022\u2022" : values.get(name).text())).toList();
     }
 
-    private void authenticate(HttpServletRequest request) {
-        if (!login.isAuthenticated(request)) throw new LoginRequiredException();
-    }
     private WorkflowDefinition current(String id, long revision) {
         var saved = store.find(id).orElseThrow(WorkflowTestService::changed);
         if (saved.revision() != revision) throw changed();

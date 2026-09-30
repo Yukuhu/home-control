@@ -3,12 +3,12 @@ package dev.andre.homecontrol.sources.sports.thesportsdb;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.content.ContentSourceException;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.sources.sports.SportsSettings;
 import dev.andre.homecontrol.sources.sports.SportsSettingsService;
 import dev.andre.homecontrol.storage.StorageException;
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
@@ -96,9 +96,9 @@ public class TheSportsDbSetupController {
     @PostMapping("/setup/sources/sports/thesportsdb/key")
     public String key(@RequestParam(required = false) String key, @RequestParam(required = false) String loginPassword,
                       @RequestParam(required = false) String loginPasswordConfirmation,
-                      HttpServletRequest request, RedirectAttributes redirect) {
+                      LoginContext context, RedirectAttributes redirect) {
         try {
-            competitions.usePersonalKey(new SportsCompetitions.PersonalKey(key, loginPassword, loginPasswordConfirmation), request);
+            competitions.usePersonalKey(new SportsCompetitions.PersonalKey(key, loginPassword, loginPasswordConfirmation), context);
             redirect.addFlashAttribute(MESSAGE, "Using your TheSportsDB key");
         } catch (LoginRequiredException _) {
             redirect.addFlashAttribute(ERROR, "Log in again to change sources");

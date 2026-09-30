@@ -1,9 +1,9 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
-import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.Clock;
 import java.util.List;
@@ -52,7 +52,7 @@ public class TmdbSetupService {
         });
     }
 
-    public TmdbSettings connect(ConnectRequest request, HttpServletRequest http) {
+    public TmdbSettings connect(ConnectRequest request, LoginContext context) {
         TmdbCredential credential;
         try {
             credential = TmdbCredential.parse(request.credential());
@@ -61,7 +61,7 @@ public class TmdbSetupService {
         }
         validate(credential);
         login.storeSecrets(Map.of(TmdbSettings.CREDENTIAL_SECRET, credential.value()),
-                request.loginPassword(), request.loginPasswordConfirmation(), http);
+                request.loginPassword(), request.loginPasswordConfirmation(), context);
         TmdbSettings settings = new TmdbSettings(credential.kind(), clock.instant());
         sources.put(TmdbSettings.SOURCE_ID, settings);
         return settings;

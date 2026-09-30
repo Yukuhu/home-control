@@ -3,10 +3,10 @@ package dev.andre.homecontrol.sources.youtube;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -89,34 +89,35 @@ public class YouTubeSetupService {
         return tokens.revoked();
     }
 
-    public YouTubeAuthorizationService.Status connect(ConnectRequest request, HttpServletRequest http) {
+    public YouTubeAuthorizationService.Status connect(ConnectRequest request, LoginContext context) {
         synchronized (authorization) {
-            saveClient(request, http);
+            saveClient(request, context);
             return authorization.start();
         }
     }
 
-    public URI connectBrowser(ConnectRequest request, HttpServletRequest http) {
-        YouTubeOAuthCallback.requireSupported(YouTubeOAuthCallback.uri(http));
+    /** {@code callback} is this server's sign-in callback as the browser reaches it. */
+    public URI connectBrowser(ConnectRequest request, URI callback, LoginContext context) {
+        YouTubeOAuthCallback.requireSupported(callback);
         synchronized (authorization) {
-            saveClient(request, http);
-            return authorizeBrowser(http);
+            saveClient(request, context);
+            return authorizeBrowser(callback, context);
         }
     }
 
-    public URI authorizeBrowser(HttpServletRequest http) {
-        URI callback = YouTubeOAuthCallback.uri(http);
+    /** The sign-in is bound to this browser session, so only the browser that started it can complete it. */
+    public URI authorizeBrowser(URI callback, LoginContext context) {
         YouTubeOAuthCallback.requireSupported(callback);
-        return authorization.startBrowser(callback, http.getSession().getId());
+        return authorization.startBrowser(callback, context.sessionKey());
     }
 
-    public YouTubeAuthorizationService.Status completeBrowser(HttpServletRequest http, String state, String code, String error) {
-        var session = http.getSession(false);
-        authorization.completeBrowser(session == null ? null : session.getId(), state, code, error);
+    /** A browser without a session gets a fresh key, which matches no sign-in it started, and is refused. */
+    public YouTubeAuthorizationService.Status completeBrowser(LoginContext context, String state, String code, String error) {
+        authorization.completeBrowser(context.sessionKey(), state, code, error);
         return authorization.status();
     }
 
-    private void saveClient(ConnectRequest request, HttpServletRequest http) {
+    private void saveClient(ConnectRequest request, LoginContext context) {
         String clientId = request.clientId() == null ? "" : request.clientId().strip();
         if (!CLIENT_ID_PATTERN.matcher(clientId).matches()) {
             throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT,
@@ -136,7 +137,7 @@ public class YouTubeSetupService {
         if (!clientSecret.isBlank()) {
             values.put(YouTubeSettings.CLIENT_SECRET, clientSecret);
         }
-        login.storeSecrets(values, request.loginPassword(), request.loginPasswordConfirmation(), http);
+        login.storeSecrets(values, request.loginPassword(), request.loginPasswordConfirmation(), context);
         authorization.cancel();
         if (clientIdChanged && secrets.secret(YouTubeSettings.REFRESH_TOKEN).isPresent()
                 && secrets.names().size() > 1) {

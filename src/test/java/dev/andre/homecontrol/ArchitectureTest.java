@@ -99,10 +99,10 @@ class ArchitectureTest {
             .because("the web layer sees the domain model only"));
 
     @ArchTest
-    static final ArchRule servletTypesStayAtTheWebEdge = freeze(noClasses()
+    static final ArchRule servletTypesStayAtTheWebEdge = noClasses()
             .that().resideOutsideOfPackages("dev.andre.homecontrol.web..", "dev.andre.homecontrol.security..")
             .and().areNotMetaAnnotatedWith(Controller.class)
             .and().areNotMetaAnnotatedWith(ControllerAdvice.class)
             .should().dependOnClassesThat().resideInAPackage("jakarta.servlet..")
-            .because("services and stores take values, not requests"));
+            .because("services and stores take values, not requests");
 }

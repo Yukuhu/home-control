@@ -5,7 +5,7 @@ import dev.andre.homecontrol.sources.sports.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import dev.andre.homecontrol.sources.sports.SportsSettings;
 import dev.andre.homecontrol.sources.sports.SportsSettingsService;
-import jakarta.servlet.http.HttpServletRequest;
+import dev.andre.homecontrol.testsupport.FakeLoginContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +37,7 @@ class SportsCompetitionsTest {
     private LoginService login;
     private TheSportsDbSchedule schedule;
     private SportsCompetitions competitions;
-    private HttpServletRequest http;
+    private FakeLoginContext http;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -49,7 +49,7 @@ class SportsCompetitionsTest {
 
         login = mock(LoginService.class);
         given(login.loginRequired()).willReturn(false);
-        http = mock(HttpServletRequest.class);
+        http = FakeLoginContext.loggedInBrowser();
 
         SportsProperties properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
                 new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
@@ -137,7 +137,7 @@ class SportsCompetitionsTest {
     void storesAPersonalKeyAfterVerifyingIt() {
         competitions.usePersonalKey(new SportsCompetitions.PersonalKey(" 9876543210 ", "household password", "household password"), http);
 
-        verify(login).checkNewPassword("household password", "household password");
+        verify(login).permitSecrets(http, "household password", "household password");
         verify(login).storeSecrets(java.util.Map.of(TheSportsDbKeys.SECRET, "9876543210"),
                 "household password", "household password", http);
         assertThat(settingsService.current().keyKind()).isEqualTo(SportsSettings.KeyKind.PERSONAL);

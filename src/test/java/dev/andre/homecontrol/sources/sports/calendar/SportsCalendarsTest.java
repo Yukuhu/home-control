@@ -8,7 +8,7 @@ import dev.andre.homecontrol.sources.sports.SportsSettings;
 import dev.andre.homecontrol.sources.sports.SportsSettingsService;
 import dev.andre.homecontrol.sources.sports.SportsTimeZones;
 import dev.andre.homecontrol.storage.SecretStore;
-import jakarta.servlet.http.HttpServletRequest;
+import dev.andre.homecontrol.testsupport.FakeLoginContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +51,7 @@ class SportsCalendarsTest {
     private CalendarFetcher fetcher;
     private CalendarSchedule schedule;
     private SportsCalendars calendars;
-    private HttpServletRequest http;
+    private FakeLoginContext http;
     private SecureRandom random;
 
     private static SecureRandom incrementingRandom() {
@@ -73,7 +73,7 @@ class SportsCalendarsTest {
         secrets = mock(SecretStore.class);
         login = mock(LoginService.class);
         given(login.loginRequired()).willReturn(false);
-        http = mock(HttpServletRequest.class);
+        http = FakeLoginContext.loggedInBrowser();
         random = incrementingRandom();
 
         JsonFileSportsStore store = new JsonFileSportsStore(dir.resolve("sports.json"));
@@ -108,12 +108,12 @@ class SportsCalendarsTest {
         doAnswer(invocation -> {
             assertThat(server.count("/private/token-abc123/bl.ics")).isZero();
             return null;
-        }).when(login).checkNewPassword("household password", "household password");
+        }).when(login).permitSecrets(http, "household password", "household password");
 
         SportsSettings.CalendarEntry entry = calendars.add(
                 new SportsCalendars.AddCalendar(url, "", "household password", "household password"), http);
 
-        verify(login).checkNewPassword("household password", "household password");
+        verify(login).permitSecrets(http, "household password", "household password");
         verify(login).storeSecrets(java.util.Map.of("sports.calendar." + entry.id(), url),
                 "household password", "household password", http);
         assertThat(entry.id()).matches("c-[0-9a-f]{12}");
@@ -168,7 +168,7 @@ class SportsCalendarsTest {
         assertThatThrownBy(() -> calendars.add(missingCalendar, http))
                 .isInstanceOf(CalendarFetchException.class).hasMessage("127.0.0.1 has no calendar at that link");
 
-        doThrow(new PasswordRejectedException("no")).when(login).checkNewPassword(any(), any());
+        doThrow(new PasswordRejectedException("no")).when(login).permitSecrets(any(), any(), any());
         var mismatchedPasswords = new SportsCalendars.AddCalendar(
                 server.url("/private/token-abc123/bl.ics").toString(), "", "x", "y");
         assertThatThrownBy(() -> calendars.add(mismatchedPasswords, http))
@@ -202,7 +202,7 @@ class SportsCalendarsTest {
 
         calendars.add(new SportsCalendars.AddCalendar(url, "", null, null), http);
 
-        verify(login, times(0)).checkNewPassword(any(), any());
+        verify(login).permitSecrets(http, null, null);
         verify(login).storeSecrets(any(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq(http));
     }
 

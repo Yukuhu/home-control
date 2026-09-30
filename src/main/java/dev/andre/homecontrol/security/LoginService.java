@@ -125,12 +125,6 @@ public class LoginService {
         changed();
     }
 
-    /** For the sources until they take a {@link LoginContext}. */
-    public void storeSecrets(Map<String, String> secrets, String newPassword, String confirmation,
-                             HttpServletRequest request) {
-        storeSecrets(secrets, newPassword, confirmation, new RequestLoginContext(request, this));
-    }
-
     /**
      * Before work that ends in {@link #storeSecrets}: this browser is logged in, or, while no password is set, the new
      * one is acceptable. Throws what {@code storeSecrets} would, before anything is fetched or stored.

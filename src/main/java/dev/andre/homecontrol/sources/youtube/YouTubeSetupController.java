@@ -2,10 +2,12 @@ package dev.andre.homecontrol.sources.youtube;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.net.URI;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +17,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /** YouTube setup, including the browser OAuth redirect and callback. */
 @Controller
@@ -36,11 +39,12 @@ public class YouTubeSetupController {
                                  @RequestParam(required = false) String clientSecret,
                                  @RequestParam(required = false) String loginPassword,
                                  @RequestParam(required = false) String loginPasswordConfirmation,
-                                 HttpServletRequest request, HttpServletResponse response, RedirectAttributes redirect) {
+                                 HttpServletRequest request, LoginContext context, HttpServletResponse response,
+                                 RedirectAttributes redirect) {
         privateResponse(response);
         try {
             return "redirect:" + setup.connectBrowser(new YouTubeSetupService.ConnectRequest(
-                    clientId, clientSecret, loginPassword, loginPasswordConfirmation), request);
+                    clientId, clientSecret, loginPassword, loginPasswordConfirmation), callback(request), context);
         } catch (YouTubeException | PasswordRejectedException | LoginRequiredException e) {
             redirect.addFlashAttribute(ERROR, e.getMessage());
             redirect.addFlashAttribute("youtubeForm", Map.of("clientId", clientId == null ? "" : clientId));
@@ -49,10 +53,11 @@ public class YouTubeSetupController {
     }
 
     @PostMapping("/setup/sources/youtube/browser/authorize")
-    public String authorizeBrowser(HttpServletRequest request, HttpServletResponse response, RedirectAttributes redirect) {
+    public String authorizeBrowser(HttpServletRequest request, LoginContext context, HttpServletResponse response,
+                                   RedirectAttributes redirect) {
         privateResponse(response);
         try {
-            return "redirect:" + setup.authorizeBrowser(request);
+            return "redirect:" + setup.authorizeBrowser(callback(request), context);
         } catch (YouTubeException e) {
             redirect.addFlashAttribute(ERROR, e.getMessage());
             return REDIRECT;
@@ -62,23 +67,28 @@ public class YouTubeSetupController {
     @GetMapping(YouTubeOAuthCallback.PATH)
     public String callback(@RequestParam(required = false) String state, @RequestParam(required = false) String code,
                            @RequestParam(required = false) String error, HttpServletRequest request,
-                           HttpServletResponse response, RedirectAttributes redirect) {
+                           LoginContext context, HttpServletResponse response, RedirectAttributes redirect) {
         privateResponse(response);
-        completeCallback(state, code, error, request, redirect);
+        completeCallback(state, code, error, request, context, redirect);
         return REDIRECT;
     }
 
     private void completeCallback(String state, String code, String error, HttpServletRequest request,
-                                  RedirectAttributes redirect) {
+                                  LoginContext context, RedirectAttributes redirect) {
         // Spring also maps HEAD to GET. Only a real callback navigation may consume a grant.
         if (!"GET".equals(request.getMethod())) return;
         try {
-            var status = setup.completeBrowser(request, state, code, error);
+            var status = setup.completeBrowser(context, state, code, error);
             redirect.addFlashAttribute(status.state() == YouTubeAuthorizationService.State.CONNECTED
                     ? MESSAGE : ERROR, status.message());
         } catch (YouTubeException e) {
             redirect.addFlashAttribute(ERROR, e.getMessage());
         }
+    }
+
+    /** This server's sign-in callback as the browser that sent the request reaches it. */
+    static URI callback(HttpServletRequest request) {
+        return YouTubeOAuthCallback.uri(ServletUriComponentsBuilder.fromContextPath(request).build().toUri());
     }
 
     private static void privateResponse(HttpServletResponse response) {
@@ -90,11 +100,11 @@ public class YouTubeSetupController {
     public String connect(@RequestParam(required = false) String clientId, @RequestParam(required = false) String clientSecret,
                           @RequestParam(required = false) String loginPassword,
                           @RequestParam(required = false) String loginPasswordConfirmation,
-                          HttpServletRequest request, RedirectAttributes redirect) {
+                          LoginContext context, RedirectAttributes redirect) {
         YouTubeSetupService.ConnectRequest connectRequest =
                 new YouTubeSetupService.ConnectRequest(clientId, clientSecret, loginPassword, loginPasswordConfirmation);
         try {
-            setup.connect(connectRequest, request);
+            setup.connect(connectRequest, context);
             redirect.addFlashAttribute(MESSAGE, "Enter the code on your phone");
         } catch (YouTubeException | PasswordRejectedException | LoginRequiredException e) {
             redirect.addFlashAttribute(ERROR, e.getMessage());

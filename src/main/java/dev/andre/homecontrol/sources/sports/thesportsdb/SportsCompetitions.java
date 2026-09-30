@@ -1,10 +1,10 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import dev.andre.homecontrol.sources.sports.SportsSettings;
 import dev.andre.homecontrol.sources.sports.SportsSettingsService;
-import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -88,14 +88,12 @@ public class SportsCompetitions {
         return client.searchLeagues(keys.current(), strippedCountry, strippedSport);
     }
 
-    public synchronized void usePersonalKey(PersonalKey request, HttpServletRequest http) {
+    public synchronized void usePersonalKey(PersonalKey request, LoginContext context) {
         String key = request.key() == null ? "" : request.key().strip();
         if (!KEY.matcher(key).matches()) {
             throw new IllegalArgumentException("That does not look like a TheSportsDB API key");
         }
-        if (!login.loginRequired()) {
-            login.checkNewPassword(request.loginPassword(), request.loginPasswordConfirmation());
-        }
+        login.permitSecrets(context, request.loginPassword(), request.loginPasswordConfirmation());
         try {
             client.lookupLeague(key, "4328");
         } catch (TheSportsDbException e) {
@@ -105,7 +103,7 @@ public class SportsCompetitions {
             throw e;
         }
         login.storeSecrets(Map.of(TheSportsDbKeys.SECRET, key), request.loginPassword(),
-                request.loginPasswordConfirmation(), http);
+                request.loginPasswordConfirmation(), context);
         settingsService.update(s -> s.withKeyKind(SportsSettings.KeyKind.PERSONAL));
         schedule.clear();
     }
