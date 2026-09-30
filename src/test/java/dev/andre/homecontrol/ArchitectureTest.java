@@ -18,6 +18,7 @@ import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.nam
 import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static com.tngtech.archunit.library.freeze.FreezingArchRule.freeze;
 
@@ -67,6 +68,30 @@ class ArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage("java.net.http..", "org.apache.hc..")
             .because("the guarded client pins addresses, bounds bodies and time, and keeps URLs out of errors; "
                     + "see ADR 0005");
+
+    @ArchTest
+    static final ArchRule sportsFeedsSitBelowTheSource = layeredArchitecture()
+            .consideringOnlyDependenciesInAnyPackage("dev.andre.homecontrol.sources.sports..")
+            .layer("Source").definedBy("dev.andre.homecontrol.sources.sports")
+            .layer("Calendars").definedBy("dev.andre.homecontrol.sources.sports.calendar..")
+            .layer("Competitions").definedBy("dev.andre.homecontrol.sources.sports.thesportsdb..")
+            .layer("Shared").definedBy("dev.andre.homecontrol.sources.sports.feed..",
+                    "dev.andre.homecontrol.sources.sports.settings..")
+            .layer("Ics").definedBy("dev.andre.homecontrol.sources.sports.ics..")
+            .whereLayer("Source").mayNotBeAccessedByAnyLayer()
+            .whereLayer("Calendars").mayOnlyBeAccessedByLayers("Source")
+            .whereLayer("Competitions").mayOnlyBeAccessedByLayers("Source")
+            .whereLayer("Shared").mayOnlyBeAccessedByLayers("Source", "Calendars", "Competitions")
+            .whereLayer("Ics").mayOnlyBeAccessedByLayers("Calendars")
+            .because("the feeds build on the shared sports types and the source builds on the feeds; an edge back "
+                    + "up would tie them into a cycle again");
+
+    @ArchTest
+    static final ArchRule icsIsALibrary = classes()
+            .that().resideInAPackage("dev.andre.homecontrol.sources.sports.ics..")
+            .should().onlyDependOnClassesThat().resideInAnyPackage("java..", "dev.andre.homecontrol.sources.sports.ics..")
+            .because("the calendar parser is a library: it takes text and returns values, and knows nothing of "
+                    + "Spring or the app");
 
     @ArchTest
     static final ArchRule onlyTheConfigurationBuildsAJsonMapper = noClasses()
