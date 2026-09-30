@@ -5,8 +5,10 @@ import dev.andre.homecontrol.adapters.androidtv.CertificateStore;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceQueries;
+import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.sources.tmdb.FakeTmdbServer;
 import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.testsupport.RailHtml;
 import dev.andre.homecontrol.testsupport.SharedFakes;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -71,6 +73,9 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
 
     @Autowired
     CertificateStore certificates;
+
+    @Autowired
+    ContentSources sources;
 
     /** Shared across both @Order methods so the second reuses the first's logged-in session. */
     private static final HttpClient browser = HttpClient.newBuilder().cookieHandler(new CookieManager()).build();
@@ -145,7 +150,7 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
                 assertThat(TMDB.last("GET", "/3/authentication").header("authorization")).isEqualTo("Bearer " + FakeTmdbServer.READ_TOKEN);
                 HttpResponse<String> setupAfterConnect = send(browser, page("/setup"));
                 assertThat(setupAfterConnect.body()).contains("Connected (read access token)").contains("This product uses the TMDB API");
-                assertThat(send(stranger, get("/sources")).statusCode()).isEqualTo(401);
+                assertThat(send(stranger, get("/rails")).statusCode()).isEqualTo(401);
 
                 // 4. Language, region and the household's streaming services.
                 assertThat(send(browser, postPairs("/setup/sources/preferences/locale", List.of(
@@ -154,11 +159,11 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
                         .isEqualTo(302);
 
                 // 5. Refresh the trending rail; poll until it is READY (D1's rail cache).
-                assertThat(send(browser, post("/sources/tmdb/rails/trending/refresh", Map.of())).statusCode()).isEqualTo(202);
+                assertThat(send(browser, post("/rails/tmdb/trending/refresh", Map.of())).statusCode()).isEqualTo(200);
                 HttpResponse<String>[] railHolder = new HttpResponse[1];
                 await().atMost(Duration.ofSeconds(10)).until(() -> {
-                    railHolder[0] = send(browser, getJson("/sources/tmdb/rails/trending"));
-                    return railHolder[0].statusCode() == 200 && "READY".equals(json(railHolder[0]).path("status").asString(""));
+                    railHolder[0] = send(browser, get("/rails/tmdb/trending"));
+                    return "READY".equals(RailHtml.status(railHolder[0].body()));
                 });
                 String railBody = railHolder[0].body();
                 assertThat(railBody).contains("Stranger Things").contains("On Netflix · 2016")
@@ -202,16 +207,13 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
                         "title", "The Boys"))).statusCode()).isEqualTo(302);
                 HttpResponse<String>[] pinnedHolder = new HttpResponse[1];
                 await().atMost(Duration.ofSeconds(10)).until(() -> {
-                    pinnedHolder[0] = send(browser, getJson("/sources/pinned/rails/pinned"));
-                    return pinnedHolder[0].statusCode() == 200 && "READY".equals(json(pinnedHolder[0]).path("status").asString(""))
-                            && json(pinnedHolder[0]).toString().contains("Stranger Things") && json(pinnedHolder[0]).toString().contains("The Boys");
+                    pinnedHolder[0] = send(browser, get("/rails/pinned/pinned"));
+                    return "READY".equals(RailHtml.status(pinnedHolder[0].body()))
+                            && pinnedHolder[0].body().contains("Stranger Things") && pinnedHolder[0].body().contains("The Boys");
                 });
-                String primePinId = null;
-                for (JsonNode item : json(pinnedHolder[0]).path("items")) {
-                    if ("The Boys".equals(item.path("title").asString(""))) {
-                        primePinId = item.path("id").asString("");
-                    }
-                }
+                String primePinId = RailHtml.tiles(pinnedHolder[0].body()).stream()
+                        .filter(tile -> "The Boys".equals(tile.get("data-title"))).map(tile -> tile.get("data-item"))
+                        .findFirst().orElse(null);
                 assertThat(primePinId).isNotBlank();
 
                 // 11. Playing the pinned Prime Video item opens its title directly.
@@ -228,7 +230,7 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
                 assertThat(shieldRemote.nextAppLink()).isEqualTo("https://www.amazon.de/gp/video/detail/B0B8TJ4WQS");
 
                 // 13. Unified search reaches TMDB with the configured language.
-                HttpResponse<String> search = send(browser, getJson("/search?q=matrix"));
+                HttpResponse<String> search = send(browser, get("/search/results?q=matrix"));
                 assertThat(search.body()).contains("Matrix").contains("tmdb");
                 assertThat(TMDB.last("GET", "/3/search/multi").query()).containsEntry("language", "de-DE");
 
@@ -251,15 +253,8 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
 
                 // 16. Disconnect: the login stays, and the pinned rail (no secret) still answers.
                 assertThat(send(browser, post("/setup/sources/tmdb/disconnect", Map.of())).statusCode()).isEqualTo(302);
-                JsonNode sourcesAfterDisconnect = json(send(browser, getJson("/sources")));
-                boolean tmdbUnavailable = false;
-                for (JsonNode source : sourcesAfterDisconnect) {
-                    if ("tmdb".equals(source.path("id").asString(""))) {
-                        tmdbUnavailable = !source.path("available").asBoolean(true);
-                    }
-                }
-                assertThat(tmdbUnavailable).isTrue();
-                assertThat(send(browser, getJson("/sources/pinned/rails/pinned")).statusCode()).isEqualTo(200);
+                assertThat(sources.find("tmdb").orElseThrow().available()).isFalse();
+                assertThat(send(browser, get("/rails/pinned/pinned")).statusCode()).isEqualTo(200);
                 assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(302);
             } finally {
                 enrollment.forget("shield-e2e");
@@ -279,13 +274,6 @@ class StreamingLaunchersEndToEndTest extends FullAppTest {
         assertThat(lastAuth.query()).containsEntry("api_key", FakeTmdbServer.API_KEY);
         assertThat(lastAuth.header("authorization")).isNull();
 
-        JsonNode sources = json(send(browser, getJson("/sources")));
-        boolean tmdbAvailable = false;
-        for (JsonNode source : sources) {
-            if ("tmdb".equals(source.path("id").asString(""))) {
-                tmdbAvailable = source.path("available").asBoolean(false);
-            }
-        }
-        assertThat(tmdbAvailable).isTrue();
+        assertThat(sources.find("tmdb").orElseThrow().available()).isTrue();
     }
 }

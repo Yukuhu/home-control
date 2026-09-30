@@ -108,7 +108,7 @@ class SpeakerJellyfinEndToEndTest extends FullAppTest {
                 await().atMost(Duration.ofSeconds(10)).until(() -> devices.state(ID).status() == DeviceStatus.CONNECTED);
 
                 // The rail cache answers while it loads in the background: poll until the rail is there.
-                await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(send(browser, get("/sources/jellyfin/rails/music-recent")).body())
+                await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(send(browser, get("/rails/jellyfin/music-recent")).body())
                         .contains("Bunny Song").contains("The Rabbits"));
                 assertThat(send(browser, get("/devices/" + ID + "/route?source=jellyfin&item=" + TRACK)).body())
                         .isEqualTo("Stream directly to this device (DLNA/UPnP)");

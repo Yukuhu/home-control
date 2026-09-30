@@ -41,7 +41,7 @@ class CrossOriginEndToEndTest extends FullAppTest {
     @ParameterizedTest
     @ValueSource(strings = {"/devices/nope/key/HOME", "/devices;x/nope/key/HOME", "/devices/nope;x/key/HOME",
             "/%64evices/nope/key/HOME", "/devices/%6eope/key/HOME", "/setup/sources/youtube/lounge",
-            "/search/results/youtube", "/search?source=youtube&q=bunny"})
+            "/search/results/youtube", "/rails/youtube/subscriptions/refresh"})
     void aCrossSiteRequestIsRefusedWhateverThePathLooksLike(String path) throws Exception {
         assertThat(post(path, "Sec-Fetch-Site", "cross-site", "Origin", "http://evil.example")).isEqualTo(403);
         assertThat(post(path, "Origin", "http://evil.example")).isEqualTo(403);

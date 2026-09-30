@@ -11,6 +11,7 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.sources.jellyfin.FakeJellyfinServer;
 import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.testsupport.RailHtml;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -123,7 +124,7 @@ class JellyfinEndToEndTest extends FullAppTest {
                 assertThat(send(browser, page("/setup")).body()).contains("Connected to nas");
 
                 // From now on everything is gated for other clients, images and SSE included.
-                assertThat(send(stranger, get("/sources")).statusCode()).isEqualTo(401);
+                assertThat(send(stranger, get("/rails")).statusCode()).isEqualTo(401);
                 assertThat(send(stranger, get("/events")).statusCode()).isEqualTo(401);
                 assertThat(send(stranger, get("/sources/jellyfin/images/" + EPISODE + "/Primary?tag=1a2b3c4d5e6f")).statusCode()).isEqualTo(401);
                 assertThat(send(stranger, page("/setup")).statusCode()).isEqualTo(302);
@@ -132,15 +133,15 @@ class JellyfinEndToEndTest extends FullAppTest {
                 // the first request while it loads in the background, so poll until it is READY.
                 HttpResponse<String>[] railHolder = new HttpResponse[1];
                 await().atMost(Duration.ofSeconds(5)).until(() -> {
-                    railHolder[0] = send(browser, get("/sources/jellyfin/rails/resume"));
-                    return railHolder[0].statusCode() == 200;
+                    railHolder[0] = send(browser, get("/rails/jellyfin/resume"));
+                    return "READY".equals(RailHtml.status(railHolder[0].body()));
                 });
                 HttpResponse<String> rail = railHolder[0];
                 assertThat(rail.statusCode()).isEqualTo(200);
                 assertThat(rail.body()).contains("Northern Lights").contains("/sources/jellyfin/images/" + EPISODE + "/Primary?tag=1a2b3c4d5e6f");
                 assertThat(send(browser, get("/sources/jellyfin/images/" + EPISODE + "/Primary?tag=1a2b3c4d5e6f")).statusCode()).isEqualTo(200);
                 assertThat(jellyfin.last("GET", "/Items/" + EPISODE + "/Images/Primary").header("authorization")).isNull();
-                HttpResponse<String> search = send(browser, get("/search?q=bunny"));
+                HttpResponse<String> search = send(browser, get("/search/results?q=bunny"));
                 assertThat(search.body()).contains("Big Buck Bunny").contains("Meadow Tales").contains("Bunny Song");
 
                 // Rung 1: the Shield's Jellyfin app is linked on the setup page, then commanded.
