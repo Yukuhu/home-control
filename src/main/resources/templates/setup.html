@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <th:block th:replace="~{fragments/layout :: pageHead('Home Control · Setup', false)}"></th:block>
+    <th:block th:replace="~{fragments/layout :: pageHead(false)}"></th:block>
+    <title>Home Control · Setup</title>
     <script th:src="@{/vendor/htmx.min.js}" defer></script>
     <script type="module" th:src="@{/js/setup.js}"></script>
 </head>

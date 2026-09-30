@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnModule(Module.JELLYFIN)
-public class JellyfinSetupSection implements SetupSection {
+public class JellyfinSetupSection extends SetupSection {
 
     private static final String PASSWORD = "password";
 
@@ -42,35 +42,11 @@ public class JellyfinSetupSection implements SetupSection {
 
     public JellyfinSetupSection(ObjectProvider<JellyfinSetupService> setup, ObjectProvider<LoginService> login,
                                ObjectProvider<JellyfinSessions> sessions, ObjectProvider<DeviceQueries> devices) {
+        super("jellyfin", "Jellyfin", Group.CONTENT_SOURCES, 10);
         this.setup = setup;
         this.login = login;
         this.sessions = sessions;
         this.devices = devices;
-    }
-
-    @Override
-    public String id() {
-        return "jellyfin";
-    }
-
-    @Override
-    public String title() {
-        return "Jellyfin";
-    }
-
-    @Override
-    public String fragment() {
-        return "fragments/jellyfin-setup";
-    }
-
-    @Override
-    public Group group() {
-        return Group.CONTENT_SOURCES;
-    }
-
-    @Override
-    public int order() {
-        return 10;
     }
 
     @Override

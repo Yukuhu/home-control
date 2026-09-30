@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <th:block th:replace="~{fragments/layout :: pageHead('Home Control · Log in', false)}"></th:block>
+    <th:block th:replace="~{fragments/layout :: pageHead(false)}"></th:block>
+    <title>Home Control · Log in</title>
 </head>
 <body class="auth-page">
 <main class="auth-card">
-    <a th:replace="~{fragments/layout :: brand}"></a>
+    <th:block th:replace="~{fragments/layout :: brand}"></th:block>
     <p class="eyebrow">YOUR HOME IS WAITING</p>
     <h1>Welcome back.</h1>
     <p>Your devices, your favorites, all in one place. Enter your password to come on in.</p>
