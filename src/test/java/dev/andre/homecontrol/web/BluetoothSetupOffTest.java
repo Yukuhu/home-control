@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** With the module off, {@code BluetoothSetupController} and {@code BluetoothSetupAdvice} are not wired up at all. */
+/** With the module off, {@code BluetoothSetupController} and {@code BluetoothSetupSection} are not wired up at all. */
 class BluetoothSetupOffTest extends ModulesOffTest {
 
     @Test

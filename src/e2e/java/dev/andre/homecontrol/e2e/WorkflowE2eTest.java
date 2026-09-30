@@ -203,7 +203,8 @@ class WorkflowE2eTest extends E2eApplicationTest {
             feed(upstream, TOKEN, false);
             Page page = session.page();
             page.navigate("/setup");
-            Locator workflowsLink = page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName("Workflows"));
+            Locator workflowsLink = page.getByRole(AriaRole.NAVIGATION, new Page.GetByRoleOptions().setName("Setup sections"))
+                    .getByRole(AriaRole.LINK, new Locator.GetByRoleOptions().setName("Workflows"));
             assertThat(workflowsLink).isVisible();
             workflowsLink.click();
             assertThat(page).hasURL(Pattern.compile(".*/setup#workflows$"));

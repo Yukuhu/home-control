@@ -21,7 +21,7 @@ class TmdbModuleEnabledTest extends FullAppTest {
     void theModuleIsWiredUpByDefault() {
         assertThat(context.getBeanNamesForType(TmdbContentSource.class)).isNotEmpty();
         assertThat(context.getBeanNamesForType(TmdbSetupController.class)).isNotEmpty();
-        assertThat(context.getBeanNamesForType(TmdbSetupAdvice.class)).isNotEmpty();
+        assertThat(context.getBeanNamesForType(TmdbSetupSection.class)).isNotEmpty();
         assertThat(sources.find("tmdb")).isPresent();
     }
 }

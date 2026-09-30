@@ -22,7 +22,7 @@ class TmdbModuleSwitchTest extends ModulesOffTest {
     void theModuleCanBeSwitchedOff() throws Exception {
         assertThat(context.getBeanNamesForType(TmdbContentSource.class)).isEmpty();
         assertThat(context.getBeanNamesForType(TmdbSetupController.class)).isEmpty();
-        assertThat(context.getBeanNamesForType(TmdbSetupAdvice.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(TmdbSetupSection.class)).isEmpty();
         assertThat(sources.find("tmdb")).isEmpty();
 
         mockMvc.perform(get("/setup"))

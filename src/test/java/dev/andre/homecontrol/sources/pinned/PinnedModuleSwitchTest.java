@@ -20,6 +20,7 @@ class PinnedModuleSwitchTest extends ModulesOffTest {
         assertThat(context.getBeanNamesForType(PinnedShortcuts.class)).isEmpty();
         assertThat(context.getBeanNamesForType(PinnedContentSource.class)).isEmpty();
         assertThat(context.getBeanNamesForType(PinnedSetupController.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(PinnedSetupSection.class)).isEmpty();
 
         mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())

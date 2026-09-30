@@ -2,25 +2,25 @@ package dev.andre.homecontrol.sources.sports;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.config.SetupSection;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import dev.andre.homecontrol.sources.sports.calendar.FeedStatus;
 import dev.andre.homecontrol.sources.sports.thesportsdb.TheSportsDbSchedule;
-import dev.andre.homecontrol.web.SetupController;
+import java.net.URI;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ModelAttribute;
 
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.stereotype.Component;
 
 /** What the setup page shows about the sports source: time zone, calendar and TheSportsDB status. */
-@ControllerAdvice(assignableTypes = SetupController.class)
+@Component
 @ConditionalOnModule(Module.SPORTS)
-public class SportsSetupAdvice {
+public class SportsSetupSection implements SetupSection {
 
     public record CalendarView(String id, String label, String host, String status, String provider) {
     }
@@ -43,7 +43,7 @@ public class SportsSetupAdvice {
     private final ObjectProvider<SportsProperties> propertiesProvider;
     private final ObjectProvider<TheSportsDbSchedule> theSportsDbScheduleProvider;
 
-    public SportsSetupAdvice(ObjectProvider<SportsSettingsService> settingsProvider,
+    public SportsSetupSection(ObjectProvider<SportsSettingsService> settingsProvider,
                              ObjectProvider<SportsTimeZones> zonesProvider,
                              ObjectProvider<CalendarSchedule> scheduleProvider,
                              ObjectProvider<LoginService> loginProvider,
@@ -57,8 +57,33 @@ public class SportsSetupAdvice {
         this.theSportsDbScheduleProvider = theSportsDbScheduleProvider;
     }
 
-    @ModelAttribute("sports")
-    public View sports() {
+    @Override
+    public String id() {
+        return "sports";
+    }
+
+    @Override
+    public String title() {
+        return "Sports";
+    }
+
+    @Override
+    public String fragment() {
+        return "fragments/sports-setup";
+    }
+
+    @Override
+    public Group group() {
+        return Group.CONTENT_SOURCES;
+    }
+
+    @Override
+    public int order() {
+        return 60;
+    }
+
+    @Override
+    public View view(URI baseUrl) {
         SportsSettingsService settings = settingsProvider.getIfAvailable();
         SportsTimeZones zones = zonesProvider.getIfAvailable();
         CalendarSchedule schedule = scheduleProvider.getIfAvailable();

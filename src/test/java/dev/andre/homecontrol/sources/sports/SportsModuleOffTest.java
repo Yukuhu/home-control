@@ -20,6 +20,7 @@ class SportsModuleOffTest extends ModulesOffTest {
         assertThat(context.getBeanNamesForType(SportsContentSource.class)).isEmpty();
         assertThat(context.getBeanNamesForType(dev.andre.homecontrol.sources.sports.calendar.SportsCalendars.class)).isEmpty();
         assertThat(context.getBeanNamesForType(SportsSetupController.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(SportsSetupSection.class)).isEmpty();
 
         mockMvc.perform(get("/setup"))
                 .andExpect(status().isOk())

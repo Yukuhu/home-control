@@ -97,8 +97,8 @@
     <h3 th:text="${youtube.connected()} ? 'Reconnect' : 'Connect'">Connect</h3>
     <p>Connect one YouTube account for the household. Sign in again to choose a different account.</p>
     <p class="hint">Browser sign-in uses a Web application OAuth client. Register this exact Authorized redirect URI:</p>
-    <p><code th:text="${youtubeCallbackUrl}">http://localhost:8080/setup/sources/youtube/callback</code></p>
-    <p class="hint" th:unless="${youtubeBrowserSupported}">Google requires an HTTPS domain or localhost for browser
+    <p><code th:text="${youtube.callbackUrl()}">http://localhost:8080/setup/sources/youtube/callback</code></p>
+    <p class="hint" th:unless="${youtube.browserSupported()}">Google requires an HTTPS domain or localhost for browser
         sign-in. At this LAN address, use a device code with a TVs and Limited Input devices client.</p>
     <form method="post" th:action="@{/setup/sources/youtube/connect}">
         <label>OAuth client ID
@@ -119,12 +119,12 @@
             </label>
         </th:block>
         <button type="submit" class="primary" th:formaction="@{/setup/sources/youtube/browser/connect}"
-                th:disabled="${!youtubeBrowserSupported}">Sign in with Google</button>
+                th:disabled="${!youtube.browserSupported()}">Sign in with Google</button>
         <button type="submit">Use a device code</button>
     </form>
 
     <form method="post" th:action="@{/setup/sources/youtube/browser/authorize}"
-          th:if="${youtube.hasClient() and youtubeBrowserSupported}">
+          th:if="${youtube.hasClient() and youtube.browserSupported()}">
         <button type="submit">Sign in with saved Web client</button>
     </form>
     <form method="post" th:action="@{/setup/sources/youtube/authorize}"

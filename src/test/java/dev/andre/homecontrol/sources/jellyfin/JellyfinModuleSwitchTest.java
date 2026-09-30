@@ -20,7 +20,7 @@ class JellyfinModuleSwitchTest extends ModulesOffTest {
         assertThat(context.getBeanNamesForType(JellyfinClient.class)).isEmpty();
         assertThat(context.getBeanNamesForType(JellyfinSetupService.class)).isEmpty();
         assertThat(context.getBeanNamesForType(JellyfinSetupController.class)).isEmpty();
-        assertThat(context.getBeanNamesForType(JellyfinSetupAdvice.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(JellyfinSetupSection.class)).isEmpty();
         assertThat(context.getBeansOfType(RouteStrategy.class).values()).noneMatch(JellyfinSessionStrategy.class::isInstance);
 
         mockMvc.perform(get("/setup"))

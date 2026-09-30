@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.config.SetupSection;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.CodePairing;
 import dev.andre.homecontrol.core.CodePairingOutcome;
@@ -11,6 +12,7 @@ import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.PromptPairing;
 import dev.andre.homecontrol.core.PromptPairingResult;
 import dev.andre.homecontrol.playback.DeepLinkTestProperties;
+import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,12 +28,17 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @Controller
 public class SetupController {
@@ -47,21 +54,27 @@ public class SetupController {
     private final List<PromptPairing> promptPairings;
 
     private final Duration deepLinkTestTimeout;
+    private final ObjectProvider<SetupSection> sections;
+    private final ObjectProvider<LoginService> login;
 
     /**
      * {@code codePairings}: Android TV's, absent when that module is switched off.
      * {@code promptPairings}: one per enabled smart-TV module; empty when none is.
      * {@code deepLinkTest}: its timeout is shown next to the "Test deep link" button.
+     * {@code sections}: one per enabled module that has something to set up.
      */
     public SetupController(ObjectProvider<CodePairing> codePairings, DeviceQueries devices,
                            DeviceEnrollment enrollment, DeviceSettings deviceSettings,
-                           List<PromptPairing> promptPairings, DeepLinkTestProperties deepLinkTest) {
+                           List<PromptPairing> promptPairings, DeepLinkTestProperties deepLinkTest,
+                           ObjectProvider<SetupSection> sections, ObjectProvider<LoginService> login) {
         this.codePairings = codePairings;
         this.devices = devices;
         this.enrollment = enrollment;
         this.deviceSettings = deviceSettings;
         this.promptPairings = List.copyOf(promptPairings);
         this.deepLinkTestTimeout = deepLinkTest.timeout();
+        this.sections = sections;
+        this.login = login;
     }
 
     @GetMapping("/setup")
@@ -184,6 +197,25 @@ public class SetupController {
                 .filter(id -> devices.capabilities(id).contains(Capability.APP_LINK))
                 .collect(Collectors.toSet()));
         model.addAttribute("deepLinkTestSeconds", Math.max(1, (deepLinkTestTimeout.toMillis() + 999) / 1000));
+        populateSections(model);
+        LoginService loginService = login.getIfAvailable();
+        model.addAttribute("loginRequired", loginService != null && loginService.loginRequired());
+        model.addAttribute("connectedAccounts", loginService == null ? List.of() : loginService.connectedAccounts());
+    }
+
+    /** Each module's section under its id, and the sections by group in their order; one with nothing to show is left out. */
+    private void populateSections(Model model) {
+        URI baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUri();
+        Map<SetupSection.Group, List<SetupSection>> shown = new EnumMap<>(SetupSection.Group.class);
+        sections.orderedStream().sorted(Comparator.comparingInt(SetupSection::order)).forEach(section -> {
+            Object view = section.view(baseUrl);
+            if (view != null) {
+                model.addAttribute(section.id(), view);
+                shown.computeIfAbsent(section.group(), group -> new ArrayList<>()).add(section);
+            }
+        });
+        model.addAttribute("deviceSections", shown.getOrDefault(SetupSection.Group.DEVICES, List.of()));
+        model.addAttribute("sourceSections", shown.getOrDefault(SetupSection.Group.CONTENT_SOURCES, List.of()));
     }
 
     @PostMapping("/setup/forget")

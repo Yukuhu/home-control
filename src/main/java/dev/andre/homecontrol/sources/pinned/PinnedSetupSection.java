@@ -2,16 +2,16 @@ package dev.andre.homecontrol.sources.pinned;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
-import dev.andre.homecontrol.web.SetupController;
+import dev.andre.homecontrol.config.SetupSection;
+import java.net.URI;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ModelAttribute;
 
 import java.util.List;
+import org.springframework.stereotype.Component;
 
-@ControllerAdvice(assignableTypes = SetupController.class)
+@Component
 @ConditionalOnModule(Module.PINNED)
-public class PinnedSetupAdvice {
+public class PinnedSetupSection implements SetupSection {
 
     public record PinView(String id, String title, String subtitle, String url, boolean first, boolean last) {
     }
@@ -23,13 +23,38 @@ public class PinnedSetupAdvice {
     private final ObjectProvider<PinnedShortcuts> shortcuts;
     private final ObjectProvider<PinnedProperties> properties;
 
-    public PinnedSetupAdvice(ObjectProvider<PinnedShortcuts> shortcuts, ObjectProvider<PinnedProperties> properties) {
+    public PinnedSetupSection(ObjectProvider<PinnedShortcuts> shortcuts, ObjectProvider<PinnedProperties> properties) {
         this.shortcuts = shortcuts;
         this.properties = properties;
     }
 
-    @ModelAttribute("pinned")
-    public View pinned() {
+    @Override
+    public String id() {
+        return "pinned";
+    }
+
+    @Override
+    public String title() {
+        return "Pinned links";
+    }
+
+    @Override
+    public String fragment() {
+        return "fragments/pinned-setup";
+    }
+
+    @Override
+    public Group group() {
+        return Group.CONTENT_SOURCES;
+    }
+
+    @Override
+    public int order() {
+        return 40;
+    }
+
+    @Override
+    public View view(URI baseUrl) {
         PinnedShortcuts service = shortcuts.getIfAvailable();
         PinnedProperties props = properties.getIfAvailable();
         if (service == null || props == null) {

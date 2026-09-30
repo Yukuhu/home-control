@@ -2,22 +2,22 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
+import dev.andre.homecontrol.config.SetupSection;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.security.LoginService;
-import dev.andre.homecontrol.web.SetupController;
+import java.net.URI;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ModelAttribute;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.stereotype.Component;
 
-@ControllerAdvice(assignableTypes = SetupController.class)
+@Component
 @ConditionalOnModule(Module.JELLYFIN)
-public class JellyfinSetupAdvice {
+public class JellyfinSetupSection implements SetupSection {
 
     private static final String PASSWORD = "password";
 
@@ -40,7 +40,7 @@ public class JellyfinSetupAdvice {
     private final ObjectProvider<JellyfinSessions> sessions;
     private final ObjectProvider<DeviceQueries> devices;
 
-    public JellyfinSetupAdvice(ObjectProvider<JellyfinSetupService> setup, ObjectProvider<LoginService> login,
+    public JellyfinSetupSection(ObjectProvider<JellyfinSetupService> setup, ObjectProvider<LoginService> login,
                                ObjectProvider<JellyfinSessions> sessions, ObjectProvider<DeviceQueries> devices) {
         this.setup = setup;
         this.login = login;
@@ -48,8 +48,33 @@ public class JellyfinSetupAdvice {
         this.devices = devices;
     }
 
-    @ModelAttribute("jellyfin")
-    public View jellyfin() {
+    @Override
+    public String id() {
+        return "jellyfin";
+    }
+
+    @Override
+    public String title() {
+        return "Jellyfin";
+    }
+
+    @Override
+    public String fragment() {
+        return "fragments/jellyfin-setup";
+    }
+
+    @Override
+    public Group group() {
+        return Group.CONTENT_SOURCES;
+    }
+
+    @Override
+    public int order() {
+        return 10;
+    }
+
+    @Override
+    public View view(URI baseUrl) {
         JellyfinSetupService service = setup.getIfAvailable();
         LoginService loginService = login.getIfAvailable();
         boolean needsPassword = loginService == null || !loginService.loginRequired();
