@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.DeviceAdapter;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
@@ -329,9 +330,9 @@ final class Enrollment implements DeviceEnrollment {
         Device merged;
         synchronized (lock) {
             Device target = registry.findById(targetId)
-                    .orElseThrow(() -> new IllegalArgumentException(NO_DEVICE_PREFIX + targetId));
+                    .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + targetId));
             Device source = registry.findById(sourceId)
-                    .orElseThrow(() -> new IllegalArgumentException(NO_DEVICE_PREFIX + sourceId));
+                    .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + sourceId));
             merged = target;
             for (Map.Entry<String, Map<String, String>> entry : source.adapters().entrySet()) {
                 String adapterId = entry.getKey();
@@ -367,7 +368,7 @@ final class Enrollment implements DeviceEnrollment {
         Device split;
         synchronized (lock) {
             Device device = registry.findById(id)
-                    .orElseThrow(() -> new IllegalArgumentException(NO_DEVICE_PREFIX + id));
+                    .orElseThrow(() -> new DeviceNotFoundException(NO_DEVICE_PREFIX + id));
             if (!device.hasAdapter(adapterId)) {
                 throw new IllegalArgumentException(device.name() + " has no " + adapterId + " connection");
             }

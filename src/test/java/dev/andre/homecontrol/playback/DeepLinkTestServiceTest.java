@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
@@ -64,6 +65,14 @@ class DeepLinkTestServiceTest {
             Thread.ofVirtual().start(() -> service.onStateChanged(new DeviceStateChangedEvent(deviceId, state)));
             return null;
         }).when(commands).execute(eq("lg"), any());
+    }
+
+    @Test
+    void anUnknownDeviceIsNotFound() {
+        when(devices.device("ghost")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.run("ghost"))
+                .isInstanceOf(DeviceNotFoundException.class).hasMessage("No device with id ghost");
     }
 
     @Test
@@ -184,13 +193,6 @@ class DeepLinkTestServiceTest {
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessageContaining("cannot open app links");
         verify(commands, never()).execute(anyString(), any());
-    }
-
-    @Test
-    void anUnknownDeviceIsOffline() {
-        when(devices.device("ghost")).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.run("ghost")).isInstanceOf(DeviceOfflineException.class);
     }
 
     @Test

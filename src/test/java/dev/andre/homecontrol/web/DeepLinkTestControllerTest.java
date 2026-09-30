@@ -2,6 +2,7 @@ package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.playback.DeepLinkTestResult;
@@ -40,21 +41,22 @@ class DeepLinkTestControllerTest extends WebSliceTest {
 
     @Test
     void anUnknownDeviceIsNotFound() throws Exception {
-        given(devices.device("ghost")).willReturn(Optional.empty());
+        given(deepLinkTests.run("ghost")).willThrow(new DeviceNotFoundException("No device with id ghost"));
 
-        mockMvc.perform(post("/setup/devices/ghost/deep-link-test")).andExpect(status().isNotFound());
+        mockMvc.perform(post("/setup/devices/ghost/deep-link-test"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
+                .andExpect(content().string("No device with id ghost"));
     }
 
     @Test
-    void aDeviceThatVanishedDuringTheTestIsAFailedFragment() throws Exception {
-        given(devices.device("lg")).willReturn(Optional.of(
-                new Device("lg", "LG TV", DeviceKind.WEBOS, "10.0.0.60", Map.of("webos", Map.of()), Instant.now())));
-        given(deepLinkTests.run("lg")).willThrow(new DeviceOfflineException("No device with id lg"));
+    void anOfflineDeviceIsAFailedResultNotAnError() throws Exception {
+        given(deepLinkTests.run("lg")).willThrow(new DeviceOfflineException("LG TV is offline"));
 
         mockMvc.perform(post("/setup/devices/lg/deep-link-test"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
-                .andExpect(content().string("<p class=\"deep-link-result failed\">No device with id lg</p>"));
+                .andExpect(content().string("<p class=\"deep-link-result failed\">LG TV is offline</p>"));
     }
 
     @Test

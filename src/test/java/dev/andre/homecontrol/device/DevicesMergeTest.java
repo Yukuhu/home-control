@@ -5,6 +5,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceNotFoundException;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStateChangedEvent;
@@ -170,6 +171,19 @@ class DevicesMergeTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("other way round");
         assertThat(registry.findAll()).hasSize(2);
         assertThatThrownBy(() -> enrollment.merge("10-0-0-5", "10-0-0-5")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void anUnknownDeviceCannotBeMergedOrSplit() {
+        registry.save(shield());
+
+        DeviceEnrollment enrollment = devices.enrollment();
+        assertThatThrownBy(() -> enrollment.merge("ghost", "10-0-0-5"))
+                .isInstanceOf(DeviceNotFoundException.class).hasMessage("No device with id ghost");
+        assertThatThrownBy(() -> enrollment.merge("10-0-0-5", "ghost"))
+                .isInstanceOf(DeviceNotFoundException.class).hasMessage("No device with id ghost");
+        assertThatThrownBy(() -> enrollment.split("ghost", "cast"))
+                .isInstanceOf(DeviceNotFoundException.class).hasMessage("No device with id ghost");
     }
 
     @Test

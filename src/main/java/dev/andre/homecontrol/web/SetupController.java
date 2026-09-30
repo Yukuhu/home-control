@@ -150,9 +150,7 @@ public class SetupController {
     /** A hand-entered Wake-on-LAN MAC address; blank clears it so the TV's own report is learned again. */
     @PostMapping("/setup/devices/{id}/mac")
     public String wakeOnLanMac(@PathVariable String id, @RequestParam(required = false) String mac, Model model) {
-        if (devices.device(id).isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No device with id " + id);
-        }
+        // An unknown device is a DeviceNotFoundException from the settings, a 404 through ErrorAdvice.
         return refusable(model, () -> deviceSettings.setWakeOnLanMac(id, mac));
     }
 

@@ -64,7 +64,7 @@ public class DeepLinkTestService {
 
     public DeepLinkTestResult run(String deviceId) {
         Device device = devices.device(deviceId)
-                .orElseThrow(() -> new DeviceOfflineException("No device with id " + deviceId));
+                .orElseThrow(() -> new DeviceNotFoundException("No device with id " + deviceId));
         if (!devices.capabilities(deviceId).contains(Capability.APP_LINK)) {
             throw new UnsupportedActionException(device.name() + " cannot open app links");
         }
