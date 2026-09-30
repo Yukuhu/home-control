@@ -5,11 +5,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -154,6 +160,121 @@ class MpvPlayerTest {
                 .isInstanceOf(MpvException.class).hasMessage("the stream could not be loaded (loading failed)");
         assertThat(player.active()).isFalse();
         await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> assertThat(launcher.alive()).isZero());
+    }
+
+    @Test
+    void anAcknowledgedLoadThatNeverFinishesStopsThePlayer() {
+        launcher.beforeServing = FakeMpv::holdFileLoaded;
+        player = new MpvPlayer(launcher, MpvPlayer.socketFor(dir, "load-timeout"), Duration.ofSeconds(2),
+                Duration.ofMillis(200), Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> player.play(URI.create("http://nas/a.mp3"), "pulse/x", 40, false))
+                .isInstanceOf(IOException.class).hasMessageContaining("the stream did not start");
+
+        assertStoppedAfterFailedPlay();
+    }
+
+    @Test
+    void aRefusedLoadCommandStopsThePlayer() {
+        launcher.beforeServing = fake -> fake.rejectLoadCommands("invalid parameter");
+
+        assertThatThrownBy(() -> player.play(URI.create("http://nas/a.mp3"), "pulse/x", 40, false))
+                .isInstanceOf(MpvException.class).hasMessageContaining("mpv refused loadfile");
+
+        assertStoppedAfterFailedPlay();
+    }
+
+    @Test
+    void anUnansweredLoadCommandStopsThePlayer() {
+        launcher.beforeServing = FakeMpv::dropLoadReply;
+        player = new MpvPlayer(launcher, MpvPlayer.socketFor(dir, "command-timeout"), Duration.ofSeconds(2),
+                Duration.ofSeconds(2), Duration.ofMillis(200));
+
+        assertThatThrownBy(() -> player.play(URI.create("http://nas/a.mp3"), "pulse/x", 40, false))
+                .isInstanceOf(IOException.class).hasMessageContaining("mpv did not answer loadfile");
+
+        assertStoppedAfterFailedPlay();
+    }
+
+    @Test
+    void interruptingAnUnfinishedLoadStopsThePlayerAndPreservesTheInterrupt() throws Exception {
+        launcher.beforeServing = FakeMpv::holdFileLoaded;
+        player = new MpvPlayer(launcher, MpvPlayer.socketFor(dir, "interrupted-load"), Duration.ofSeconds(2),
+                Duration.ofSeconds(30), Duration.ofSeconds(1));
+        record InterruptedPlay(Exception failure, boolean interrupted) { }
+        CompletableFuture<InterruptedPlay> result = new CompletableFuture<>();
+        Thread playback = Thread.ofVirtual().start(() -> {
+            try {
+                player.play(URI.create("http://nas/a.mp3"), "pulse/x", 40, false);
+                result.complete(new InterruptedPlay(null, Thread.currentThread().isInterrupted()));
+            } catch (Exception failure) {
+                result.complete(new InterruptedPlay(failure, Thread.currentThread().isInterrupted()));
+            }
+        });
+        try {
+            // Interrupt the file-loaded wait, after the loadfile command has been acknowledged.
+            await().atMost(Duration.ofSeconds(3)).until(() -> playback.getState() == Thread.State.TIMED_WAITING
+                    && Arrays.stream(playback.getStackTrace()).anyMatch(frame -> frame.getClassName().equals(MpvPlayer.class.getName()))
+                    && Arrays.stream(playback.getStackTrace()).noneMatch(frame -> frame.getClassName().equals(MpvIpc.class.getName())));
+
+            playback.interrupt();
+            InterruptedPlay interrupted = result.get(3, TimeUnit.SECONDS);
+
+            assertThat(interrupted.failure()).isInstanceOf(InterruptedIOException.class)
+                    .hasMessage("interrupted while starting playback");
+            assertThat(interrupted.interrupted()).isTrue();
+            assertStoppedAfterFailedPlay();
+        } finally {
+            playback.interrupt();
+            playback.join(Duration.ofSeconds(3));
+        }
+    }
+
+    @Test
+    void radioMetadataFallsBackToTheIcyTitleWhenTheTitleIsBlank() throws Exception {
+        launcher.beforeServing = fake -> fake.metadata(Map.of("title", "   ", "ICY-TITLE", "  Radio Song  "));
+
+        player.play(URI.create("http://nas/radio"), "pulse/x", 40, false);
+
+        assertThat(player.status().orElseThrow().metadataTitle()).isEqualTo("Radio Song");
+    }
+
+    @Test
+    void theTrackTitleTakesPrecedenceOverTheIcyTitle() throws Exception {
+        launcher.beforeServing = fake -> fake.metadata(Map.of("TITLE", "  Track Song  ", "icy-title", "Radio Song"));
+
+        player.play(URI.create("http://nas/radio"), "pulse/x", 40, false);
+
+        assertThat(player.status().orElseThrow().metadataTitle()).isEqualTo("Track Song");
+    }
+
+    @Test
+    void startupFailureIncludesMpvDiagnosticsWithoutStreamCredentials() throws Exception {
+        Path binary = FakeMpvScript.create(dir.resolve("bin"), Map.of("FAKE_MPV_EXIT_AT_START",
+                "2:Failed to open http://user:password@nas/a.mp3?ApiKey=private-token"));
+        try (ProcessMpvLauncher processLauncher = new ProcessMpvLauncher(binary.toString());
+             MpvPlayer failing = new MpvPlayer(processLauncher, MpvPlayer.socketFor(dir, "diagnostics"),
+                     Duration.ofSeconds(15), Duration.ofSeconds(2), Duration.ofSeconds(1))) {
+
+            assertThatThrownBy(() -> failing.play(URI.create("http://nas/a.mp3?ApiKey=private-token"), "pulse/x", 40, false))
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining("mpv exited before opening its control socket")
+                    .hasMessageContaining("Failed to open http://…@nas/a.mp3?…")
+                    .hasMessageNotContaining("private-token")
+                    .hasMessageNotContaining("password");
+            assertThat(failing.active()).isFalse();
+            assertThat(failing.status()).isEmpty();
+        }
+    }
+
+    private void assertStoppedAfterFailedPlay() {
+        assertThat(player.active()).isFalse();
+        assertThat(player.status()).isEmpty();
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            assertThat(launcher.latest().hasQuit()).isTrue();
+            assertThat(launcher.alive()).isZero();
+        });
+        assertThatThrownBy(() -> player.pause(true)).isInstanceOf(IOException.class).hasMessage("nothing is playing");
     }
 
     @Test

@@ -82,6 +82,10 @@ public final class FakeMpv implements AutoCloseable {
     private boolean muted;
     private boolean everLoaded;
     private boolean closing;
+    private boolean holdFileLoaded;
+    private boolean dropLoadReply;
+    private String loadCommandError;
+    private Map<String, String> metadata;
 
     private FakeMpv(ServerSocketChannel server, Path socket, Options options, double volume, Consumer<String> log) {
         this.server = server;
@@ -125,6 +129,24 @@ public final class FakeMpv implements AutoCloseable {
     /** The next {@code count} {@code get_property} requests get no reply at all, like a busy/slow poll. */
     public void dropNextGetProperty(int count) {
         dropNextGetProperty.set(count);
+    }
+
+    /** Accepts loadfile, but leaves the file loading until the client gives up. */
+    public synchronized void holdFileLoaded() {
+        holdFileLoaded = true;
+    }
+
+    /** A busy player that never acknowledges loadfile. */
+    public synchronized void dropLoadReply() {
+        dropLoadReply = true;
+    }
+
+    public synchronized void rejectLoadCommands(String error) {
+        loadCommandError = error;
+    }
+
+    public synchronized void metadata(Map<String, String> values) {
+        metadata = Map.copyOf(values);
     }
 
     public boolean hasQuit() {
@@ -254,8 +276,17 @@ public final class FakeMpv implements AutoCloseable {
                 case "get_property" -> getProperty(command.size() > 1 ? command.get(1) : "", response);
                 case "set_property" -> setProperty(command.size() > 1 ? command.get(1) : "", request.path("command").path(2), response);
                 case "loadfile" -> {
-                    response.put("error", "success");
-                    quitAfter = load(command.size() > 1 ? command.get(1) : "", events);
+                    if (dropLoadReply) {
+                        return;
+                    }
+                    if (loadCommandError != null) {
+                        response.put("error", loadCommandError);
+                    } else {
+                        response.put("error", "success");
+                        if (!holdFileLoaded) {
+                            quitAfter = load(command.size() > 1 ? command.get(1) : "", events);
+                        }
+                    }
                 }
                 case "stop" -> {
                     response.put("error", "success");
@@ -309,9 +340,11 @@ public final class FakeMpv implements AutoCloseable {
                     response.put("error", "property unavailable");
                     return;
                 }
-                ObjectNode metadata = response.putObject("data");
-                if (options.metadataTitle() != null) {
-                    metadata.put("title", options.metadataTitle());
+                ObjectNode data = response.putObject("data");
+                if (metadata != null) {
+                    metadata.forEach(data::put);
+                } else if (options.metadataTitle() != null) {
+                    data.put("title", options.metadataTitle());
                 }
             }
             default -> {
