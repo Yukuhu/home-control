@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
 import dev.andre.homecontrol.sources.sports.feed.FeedResult;
+import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
 import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
@@ -31,6 +32,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static dev.andre.homecontrol.sources.sports.thesportsdb.FakeTheSportsDbServer.FREE_KEY;
+import static dev.andre.homecontrol.sources.sports.thesportsdb.FakeTheSportsDbServer.PERSONAL_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.BDDMockito.given;
@@ -50,6 +53,7 @@ class TheSportsDbScheduleConcurrencyTest {
     private final ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();
     private FakeTheSportsDbServer server;
     private SportsSettingsService settingsService;
+    private SecretStore secrets;
     private TheSportsDbSchedule schedule;
 
     @BeforeEach
@@ -71,7 +75,8 @@ class TheSportsDbScheduleConcurrencyTest {
                         Duration.ofSeconds(1), Duration.ofSeconds(30), null, true));
         MutableClock clock = MutableClock.at(Instant.parse("2026-09-19T14:00:00Z"));
         TheSportsDbClient client = new TheSportsDbClient(properties.theSportsDb());
-        TheSportsDbKeys keys = new TheSportsDbKeys(settingsService, mock(SecretStore.class), properties);
+        secrets = mock(SecretStore.class);
+        TheSportsDbKeys keys = new TheSportsDbKeys(settingsService, secrets, properties);
         schedule = new TheSportsDbSchedule(client, keys, settingsService, properties, zones, clock);
     }
 
@@ -148,19 +153,77 @@ class TheSportsDbScheduleConcurrencyTest {
         assertThat(first.get(10, TimeUnit.SECONDS).succeeded()).isEqualTo(2);
     }
 
+    /** What SportsCompetitions.usePersonalKey does: the secret and the settings first, then the schedule. */
+    private void switchToThePersonalKey() {
+        given(secrets.secret(TheSportsDbKeys.SECRET)).willReturn(Optional.of(PERSONAL_KEY));
+        settingsService.update(s -> s.withKeyKind(SportsSettings.KeyKind.PERSONAL));
+        schedule.clear();
+    }
+
+    private List<String> keysSent() {
+        return server.requests(EVENTS_DAY).stream().map(FakeTheSportsDbServer.Recorded::key).toList();
+    }
+
     @Test
-    void aClearDuringAFetchDropsThatDay() throws Exception {
+    void aKeyChangeDuringAPassKeepsOnlyWhatTheNewKeyFetched() throws Exception {
         holdDay("2026-09-19", "4331", "eventsday-2026-09-19-4331.json");
         Future<FeedResult> pass = passHeldAfter(2);
 
-        schedule.clear();   // what a key change does
+        switchToThePersonalKey();
         release.countDown();
         pass.get(10, TimeUnit.SECONDS);
 
         assertThat(schedule.find(BUNDESLIGA_ITEM)).isEmpty();
         assertThat(schedule.status("4331").orElseThrow().events()).isZero();
+        assertThat(keysSent()).containsExactly(FREE_KEY, FREE_KEY, PERSONAL_KEY, PERSONAL_KEY);
         schedule.events();
-        assertThat(server.count(EVENTS_DAY)).isEqualTo(6);
+        assertThat(keysSent()).containsExactly(FREE_KEY, FREE_KEY, PERSONAL_KEY, PERSONAL_KEY, PERSONAL_KEY, PERSONAL_KEY);
+    }
+
+    @Test
+    void aRateLimitOnTheReplacedKeyDoesNotHoldBackTheNewOne() throws Exception {
+        server.hold(EVENTS_DAY, Map.of("d", "2026-09-18", "l", "4331"), 429, "eventsday-empty.json", release);
+        Future<FeedResult> pass = passHeldAfter(1);
+
+        switchToThePersonalKey();
+        release.countDown();
+        FeedResult result = pass.get(10, TimeUnit.SECONDS);
+
+        assertThat(result.errors()).isEmpty();
+        assertThat(keysSent()).containsExactly(FREE_KEY, PERSONAL_KEY, PERSONAL_KEY, PERSONAL_KEY);
+    }
+
+    @Test
+    void aMissingKeyFoundBeforeAKeyChangeLeavesNoError() throws Exception {
+        settingsService.update(s -> s.withKeyKind(SportsSettings.KeyKind.PERSONAL));
+        CountDownLatch asked = new CountDownLatch(1);
+        CountDownLatch answer = new CountDownLatch(1);
+        given(secrets.secret(TheSportsDbKeys.SECRET)).willAnswer(invocation -> {
+            asked.countDown();
+            answer.await();
+            return Optional.empty();
+        });
+        Future<FeedResult> pass = pool.submit(schedule::events);
+        assertThat(asked.await(10, TimeUnit.SECONDS)).isTrue();
+
+        schedule.clear();   // the key was entered again while the pass still thought it missing
+        answer.countDown();
+        pass.get(10, TimeUnit.SECONDS);
+
+        assertThat(schedule.status("4331").orElseThrow().error()).isNull();
+    }
+
+    @Test
+    void aStatusDuringTheFirstPassDoesNotWaitForIt() throws Exception {
+        holdDay("2026-09-19", "4331", "eventsday-2026-09-19-4331.json");
+        Future<FeedResult> pass = passHeldAfter(2);
+
+        Optional<FeedStatus> status = pool.submit(() -> schedule.status("4328")).get(5, TimeUnit.SECONDS);
+
+        assertThat(status).hasValueSatisfying(s -> assertThat(s.fetchedAt()).isNull());
+        assertThat(pass).isNotDone();
+        release.countDown();
+        pass.get(10, TimeUnit.SECONDS);
     }
 
     @Test
