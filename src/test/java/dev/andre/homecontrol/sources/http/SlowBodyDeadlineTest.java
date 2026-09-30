@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.http;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinClient;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinConnection;
 import dev.andre.homecontrol.sources.jellyfin.JellyfinException;
@@ -56,7 +57,7 @@ class SlowBodyDeadlineTest {
 
         assertThatThrownBy(() -> client.get(key, "/trending/movie/week", Map.of()))
                 .isInstanceOf(TmdbException.class)
-                .hasFieldOrPropertyWithValue("kind", TmdbException.Kind.UNREACHABLE);
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE);
         assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
 
@@ -69,7 +70,7 @@ class SlowBodyDeadlineTest {
 
         assertThatThrownBy(() -> client.get("123", "eventsnextleague.php", league))
                 .isInstanceOf(TheSportsDbException.class)
-                .hasFieldOrPropertyWithValue("kind", TheSportsDbException.Kind.UNREACHABLE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
                 .hasMessage("Could not reach TheSportsDB");
         assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
@@ -83,11 +84,11 @@ class SlowBodyDeadlineTest {
 
         assertThatThrownBy(() -> client.get(connection, "/Items", Map.of()))
                 .isInstanceOf(JellyfinException.class)
-                .hasFieldOrPropertyWithValue("kind", JellyfinException.Kind.UNREACHABLE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
                 .hasMessageContaining("(no answer in time)");
         assertThatThrownBy(() -> client.image(serverUrl, "abc", "Primary", null, 480))
                 .isInstanceOf(JellyfinException.class)
-                .hasFieldOrPropertyWithValue("kind", JellyfinException.Kind.UNREACHABLE);
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE);
         assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
 
@@ -101,7 +102,7 @@ class SlowBodyDeadlineTest {
 
         assertThatThrownBy(() -> http.get(subscriptions, Map.of()))
                 .isInstanceOf(YouTubeException.class)
-                .hasFieldOrPropertyWithValue("kind", YouTubeException.Kind.UNREACHABLE)
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
                 .hasMessage("Could not reach 127.0.0.1");
         assertThat(server.bytesTrickled()).isGreaterThan(1);
     }
@@ -115,7 +116,7 @@ class SlowBodyDeadlineTest {
                 new CalendarUrlPolicy(true))) {
             assertThatThrownBy(() -> fetcher.fetch(calendar))
                     .isInstanceOf(CalendarFetchException.class)
-                    .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNREACHABLE)
+                    .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
                     .hasMessage("Could not reach 127.0.0.1");
         }
         assertThat(server.bytesTrickled()).isGreaterThan(1);

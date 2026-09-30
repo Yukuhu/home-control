@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,7 +60,7 @@ class YouTubeForbiddenAndParsingTest {
                 {"error":{"errors":[{"reason":"dailyLimitExceeded"}]}}
                 """);
 
-        assertThat(failure.kind()).isEqualTo(YouTubeException.Kind.QUOTA_EXHAUSTED);
+        assertThat(failure.kind()).isEqualTo(ContentSourceException.Kind.QUOTA_EXHAUSTED);
         assertThat(ledger.usage().exhausted()).isTrue();
     }
 
@@ -75,7 +76,7 @@ class YouTubeForbiddenAndParsingTest {
     void everyOtherRefusalIsForbiddenWithItsExplanation(String body, String message, String reason) {
         YouTubeException failure = forbiddenWith(body);
 
-        assertThat(failure.kind()).isEqualTo(YouTubeException.Kind.FORBIDDEN);
+        assertThat(failure.kind()).isEqualTo(ContentSourceException.Kind.FORBIDDEN);
         assertThat(failure).hasMessageContaining(message);
         assertThat(failure.reason()).isEqualTo(reason);
         assertThat(ledger.usage().exhausted()).isFalse();

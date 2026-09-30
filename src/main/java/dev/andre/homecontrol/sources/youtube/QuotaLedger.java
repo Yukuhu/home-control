@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.storage.StorageException;
 import dev.andre.homecontrol.storage.VersionedJsonFile;
 import org.slf4j.Logger;
@@ -93,7 +94,7 @@ public class QuotaLedger {
     public synchronized void charge(Call call) {
         roll();
         if (call == Call.SEARCH_LIST && searches >= searchesPerDay) {
-            throw new YouTubeException(YouTubeException.Kind.SEARCH_LIMIT, "You have used today's " + searchesPerDay
+            throw new YouTubeException(ContentSourceException.Kind.QUOTA_EXHAUSTED, "You have used today's " + searchesPerDay
                     + " YouTube searches. More " + resetPhrase(resetsAt()) + ".");
         }
         if (units + call.units() > dailyUnits) {
@@ -132,7 +133,7 @@ public class QuotaLedger {
     }
 
     YouTubeException exhaustedException() {
-        return new YouTubeException(YouTubeException.Kind.QUOTA_EXHAUSTED, "YouTube's daily API quota is used up ("
+        return new YouTubeException(ContentSourceException.Kind.QUOTA_EXHAUSTED, "YouTube's daily API quota is used up ("
                 + Math.min(units, dailyUnits) + " of " + dailyUnits + " units). Rails refresh again "
                 + resetPhrase(resetsAt()) + ".", "quotaExceeded");
     }

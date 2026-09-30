@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import dev.andre.homecontrol.testsupport.MutableClock;
@@ -234,7 +235,7 @@ class YouTubeAuthorizationServiceTest {
         assertThatThrownBy(() -> authorization.start())
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.NOT_CONFIGURED);
+                .isEqualTo(ContentSourceException.Kind.NOT_CONFIGURED);
         assertThatThrownBy(() -> authorization.start()).hasMessage("Save the OAuth client ID and secret first");
     }
 

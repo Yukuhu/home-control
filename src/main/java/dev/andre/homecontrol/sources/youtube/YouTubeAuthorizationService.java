@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.slf4j.Logger;
@@ -77,7 +78,7 @@ public class YouTubeAuthorizationService implements AutoCloseable {
     public synchronized Status start() {
         String clientId = secrets.secret(YouTubeSettings.CLIENT_ID).orElse(null);
         if (clientId == null || secrets.secret(YouTubeSettings.CLIENT_SECRET).isEmpty()) {
-            throw new YouTubeException(YouTubeException.Kind.NOT_CONFIGURED, "Save the OAuth client ID and secret first");
+            throw new YouTubeException(ContentSourceException.Kind.NOT_CONFIGURED, "Save the OAuth client ID and secret first");
         }
         GoogleOAuthClient.DeviceCode code = oauth.requestDeviceCode(clientId);
         synchronized (this) {
@@ -100,7 +101,7 @@ public class YouTubeAuthorizationService implements AutoCloseable {
     public synchronized URI startBrowser(URI redirectUri, String sessionId) {
         String clientId = secrets.secret(YouTubeSettings.CLIENT_ID).orElse(null);
         if (clientId == null || secrets.secret(YouTubeSettings.CLIENT_SECRET).isEmpty()) {
-            throw new YouTubeException(YouTubeException.Kind.NOT_CONFIGURED, "Save the OAuth client ID and secret first");
+            throw new YouTubeException(ContentSourceException.Kind.NOT_CONFIGURED, "Save the OAuth client ID and secret first");
         }
         String state = randomToken();
         String verifier = randomToken();
@@ -120,7 +121,7 @@ public class YouTubeAuthorizationService implements AutoCloseable {
         BrowserRequest request = browser;
         if (request == null || sessionId == null || !request.sessionId().equals(sessionId) || state == null
                 || !MessageDigest.isEqual(request.state().getBytes(StandardCharsets.UTF_8), state.getBytes(StandardCharsets.UTF_8))) {
-            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT,
+            throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT,
                     "This sign-in request is no longer valid. Start again from Setup in the same browser.");
         }
         browser = null; // single use, including failed exchanges and denied consent
@@ -181,7 +182,7 @@ public class YouTubeAuthorizationService implements AutoCloseable {
                 if (pending != code) {
                     return pending != null;
                 }
-                if (e.kind() == YouTubeException.Kind.UNREACHABLE || e.kind() == YouTubeException.Kind.SERVER_ERROR) {
+                if (e.kind() == ContentSourceException.Kind.UNREACHABLE || e.kind() == ContentSourceException.Kind.SERVER_ERROR) {
                     nextPollAt = clock.instant().plus(interval);
                     status = new Status(State.PENDING, code.userCode(), code.verificationUrl(), code.expiresAt(),
                             "Could not reach Google; still trying");

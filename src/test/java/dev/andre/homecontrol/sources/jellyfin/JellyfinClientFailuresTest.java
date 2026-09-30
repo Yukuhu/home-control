@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -39,10 +40,10 @@ class JellyfinClientFailuresTest {
 
         assertThatThrownBy(() -> client.get(connection(fake.url()), "/forbidden", Map.of()))
                 .isInstanceOfSatisfying(JellyfinException.class,
-                        e -> assertThat(e.kind()).isEqualTo(JellyfinException.Kind.UNAUTHORIZED));
+                        e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.UNAUTHORIZED));
         assertThatThrownBy(() -> client.get(connection(fake.url()), "/garbled", Map.of()))
                 .isInstanceOfSatisfying(JellyfinException.class,
-                        e -> assertThat(e.kind()).isEqualTo(JellyfinException.Kind.BAD_RESPONSE))
+                        e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.BAD_RESPONSE))
                 .hasMessage("Jellyfin at " + fake.url() + " sent an unreadable answer");
     }
 
@@ -53,7 +54,7 @@ class JellyfinClientFailuresTest {
 
             assertThatThrownBy(() -> client.get(connection(server), "/x", Map.of()))
                     .isInstanceOfSatisfying(JellyfinException.class,
-                            e -> assertThat(e.kind()).isEqualTo(JellyfinException.Kind.UNREACHABLE))
+                            e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.UNREACHABLE))
                     .hasMessageContaining("(no answer in time)");
         }
     }
@@ -74,7 +75,7 @@ class JellyfinClientFailuresTest {
 
             assertThatThrownBy(() -> client.image(server, "abc", "Primary", null, 480))
                     .isInstanceOfSatisfying(JellyfinException.class,
-                            e -> assertThat(e.kind()).isEqualTo(JellyfinException.Kind.UNREACHABLE))
+                            e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.UNREACHABLE))
                     .hasMessageStartingWith("Could not reach Jellyfin at " + server + " (");
         }
     }
@@ -87,7 +88,7 @@ class JellyfinClientFailuresTest {
             try {
                 assertThatThrownBy(() -> client.publicInfo(server))
                         .isInstanceOfSatisfying(JellyfinException.class,
-                                e -> assertThat(e.kind()).isEqualTo(JellyfinException.Kind.UNREACHABLE))
+                                e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.UNREACHABLE))
                         .hasMessageContaining("(interrupted)");
                 assertThat(Thread.currentThread().isInterrupted()).isTrue();
             } finally {

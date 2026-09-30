@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,7 +93,7 @@ class TmdbClientTest {
                 .isInstanceOf(TmdbException.class)
                 .hasMessage(message)
                 .extracting(e -> ((TmdbException) e).kind())
-                .isEqualTo(TmdbException.Kind.valueOf(kind));
+                .isEqualTo(ContentSourceException.Kind.valueOf(kind));
     }
 
     @Test
@@ -148,7 +149,7 @@ class TmdbClientTest {
         assertThatThrownBy(() -> client.get(bearer, "/authentication", Map.of()))
                 .isInstanceOf(TmdbException.class)
                 .hasMessage("Could not reach TMDB at 127.0.0.1")
-                .extracting(e -> ((TmdbException) e).kind()).isEqualTo(TmdbException.Kind.UNREACHABLE);
+                .extracting(e -> ((TmdbException) e).kind()).isEqualTo(ContentSourceException.Kind.UNREACHABLE);
     }
 
     @ParameterizedTest
@@ -213,7 +214,7 @@ class TmdbClientTest {
 
     @Test
     void aTmdbExceptionIsAContentSourceException() {
-        assertThat(new TmdbException(TmdbException.Kind.INVALID_INPUT, "x"))
+        assertThat(new TmdbException(ContentSourceException.Kind.INVALID_INPUT, "x"))
                 .isInstanceOf(dev.andre.homecontrol.core.content.ContentSourceException.class);
     }
 }

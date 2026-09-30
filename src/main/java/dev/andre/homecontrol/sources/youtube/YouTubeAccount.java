@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
@@ -27,7 +28,7 @@ public class YouTubeAccount {
         String id = item.path("id").asString("");
         String title = item.path("snippet").path("title").asString("");
         if (id.isBlank() || title.isBlank()) {
-            throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "YouTube did not return your channel");
+            throw new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE, "YouTube did not return your channel");
         }
         YouTubeSettings current = setup.settings();
         Instant connectedAt = current.connectedAt() != null ? current.connectedAt() : Instant.now();

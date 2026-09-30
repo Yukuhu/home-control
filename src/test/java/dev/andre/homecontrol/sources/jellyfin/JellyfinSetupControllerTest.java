@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.Capability;
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,7 +83,7 @@ class JellyfinSetupControllerTest extends WebSliceTest {
 
     @Test
     void aFailureKeepsTheNonSecretFieldsButNeverThePasswordOrKey() throws Exception {
-        willThrow(new JellyfinException(JellyfinException.Kind.UNAUTHORIZED, "Jellyfin rejected the user name or password"))
+        willThrow(new JellyfinException(ContentSourceException.Kind.UNAUTHORIZED, "Jellyfin rejected the user name or password"))
                 .given(jellyfinSetup).connect(any(), any());
 
         FlashMap flashMap = mockMvc.perform(post("/setup/sources/jellyfin")
@@ -118,7 +119,7 @@ class JellyfinSetupControllerTest extends WebSliceTest {
                 .andExpect(redirectedUrl("/setup"))
                 .andExpect(flash().attribute("jellyfinMessage", "Connected to nas as andre"));
 
-        willThrow(new JellyfinException(JellyfinException.Kind.UNREACHABLE, "Could not reach Jellyfin"))
+        willThrow(new JellyfinException(ContentSourceException.Kind.UNREACHABLE, "Could not reach Jellyfin"))
                 .given(jellyfinSetup).check();
 
         mockMvc.perform(post("/setup/sources/jellyfin/test"))

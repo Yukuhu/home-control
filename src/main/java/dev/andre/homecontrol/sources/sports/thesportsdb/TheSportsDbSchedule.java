@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.sports.SportsEvent;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import dev.andre.homecontrol.sources.sports.SportsSettings;
@@ -187,7 +188,7 @@ public class TheSportsDbSchedule {
             errors.put(competition.leagueId(), e.getMessage());
             log.warn("TheSportsDB fixtures for competition {} on {} failed ({})",
                     competition.leagueId(), date, e.kind());
-            if (e.kind() == TheSportsDbException.Kind.RATE_LIMITED) {
+            if (e.kind() == ContentSourceException.Kind.RATE_LIMITED) {
                 round.rateLimited = true;
             }
         }

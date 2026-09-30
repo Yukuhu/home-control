@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -60,7 +61,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.publicInfo(notJellyfinUrl))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.NOT_JELLYFIN);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
         assertThatThrownBy(() -> client.publicInfo(fake.url()))
                 .hasMessage(fake.url() + " answered, but it is not a Jellyfin server");
         fake.close();
@@ -71,7 +72,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.publicInfo(htmlPageUrl))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.NOT_JELLYFIN);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
         fake.close();
 
         fake = new FakeJellyfinServer();
@@ -79,7 +80,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.publicInfo(silentServerUrl))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.NOT_JELLYFIN);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
     }
 
     @Test
@@ -90,7 +91,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.publicInfo(oldServerUrl))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.UNSUPPORTED_VERSION);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
         assertThatThrownBy(() -> client.publicInfo(fake.url()))
                 .hasMessageContaining("10.8.13")
                 .hasMessageContaining("10.9");
@@ -119,7 +120,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.authenticateByName(serverUrl, "dev-1", "andre", "wrong"))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.UNAUTHORIZED);
+                .isEqualTo(ContentSourceException.Kind.UNAUTHORIZED);
         assertThatThrownBy(() -> client.authenticateByName(fake.url(), "dev-1", "andre", "wrong"))
                 .hasMessage("Jellyfin rejected the user name or password");
     }
@@ -137,19 +138,19 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.get(connection, "/a", Map.of()))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.UNAUTHORIZED);
+                .isEqualTo(ContentSourceException.Kind.UNAUTHORIZED);
         assertThatThrownBy(() -> client.get(connection, "/b", Map.of()))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.NOT_FOUND);
+                .isEqualTo(ContentSourceException.Kind.NOT_FOUND);
         assertThatThrownBy(() -> client.get(connection, "/c", Map.of()))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.SERVER_ERROR);
+                .isEqualTo(ContentSourceException.Kind.SERVER_ERROR);
         assertThatThrownBy(() -> client.get(connection, "/d", Map.of()))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
         assertThat(fake.requests("GET", "/d")).hasSize(1);
 
         JsonNode node = client.get(connection, "/e", Map.of());
@@ -167,7 +168,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.get(connection, "/x", Map.of()))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.UNREACHABLE);
+                .isEqualTo(ContentSourceException.Kind.UNREACHABLE);
         assertThatThrownBy(() -> client.get(connection, "/x", Map.of()))
                 .hasMessageStartingWith("Could not reach Jellyfin at http://127.0.0.1:")
                 .satisfies(e -> assertThat(e.getMessage()).doesNotContain("secret-token-xyz"));
@@ -183,7 +184,7 @@ class JellyfinClientTest {
             assertThatThrownBy(() -> JellyfinClient.normalizeServerUrl(invalid))
                     .isInstanceOf(JellyfinException.class)
                     .extracting(e -> ((JellyfinException) e).kind())
-                    .isEqualTo(JellyfinException.Kind.INVALID_INPUT);
+                    .isEqualTo(ContentSourceException.Kind.INVALID_INPUT);
         }
     }
 
@@ -196,7 +197,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.get(connection, "/big", Map.of()))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
         assertThatThrownBy(() -> client.get(connection, "/big", Map.of()))
                 .hasMessage("Jellyfin at " + fake.url() + " sent an oversized response");
     }
@@ -226,7 +227,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.image(htmlImageServerUrl, itemId, "Primary", null, 480))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
         fake.close();
 
         // A raster-only allowlist: an SVG served from our own origin could carry a script.
@@ -236,7 +237,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.image(svgImageServerUrl, itemId, "Primary", null, 480))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
         fake.close();
 
         fake = new FakeJellyfinServer().respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 200,
@@ -245,7 +246,7 @@ class JellyfinClientTest {
         assertThatThrownBy(() -> client.image(oversizedImageServerUrl, itemId, "Primary", null, 480))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.BAD_RESPONSE);
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
     }
 
     @Test

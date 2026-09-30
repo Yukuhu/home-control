@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ class CalendarFetcherFailureTest {
 
             assertThatThrownBy(() -> fetcher.fetch(url))
                     .isInstanceOf(CalendarFetchException.class)
-                    .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.BAD_RESPONSE)
+                    .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
                     .hasMessage("127.0.0.1 answered HTTP 302");
         }
     }
@@ -56,7 +57,7 @@ class CalendarFetcherFailureTest {
 
             assertThatThrownBy(() -> fetcher.fetch(url))
                     .isInstanceOf(CalendarFetchException.class)
-                    .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNREACHABLE)
+                    .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
                     .hasMessage("Could not reach 127.0.0.1");
             assertThat(Thread.interrupted()).as("the interrupt is kept (and cleared here)").isTrue();
         }
@@ -83,7 +84,7 @@ class CalendarFetcherFailureTest {
             try (CalendarFetcher fetcher = new CalendarFetcher(properties, policy)) {
                 assertThatThrownBy(() -> fetcher.fetch(url))
                         .isInstanceOf(CalendarFetchException.class)
-                        .hasFieldOrPropertyWithValue("kind", CalendarFetchException.Kind.UNREACHABLE)
+                        .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNREACHABLE)
                         .hasMessage("Could not reach 127.0.0.1")
                         .hasCauseInstanceOf(IOException.class);
             }

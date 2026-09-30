@@ -38,7 +38,7 @@ public class SportsSchedule {
         int succeeded = calendarResult.succeeded() + competitionResult.succeeded();
 
         if (feeds > 0 && succeeded == 0 && !errors.isEmpty()) {
-            throw new ContentSourceException(errors.getFirst());
+            throw new ContentSourceException(ContentSourceException.Kind.BAD_RESPONSE, errors.getFirst());
         }
         return events;
     }

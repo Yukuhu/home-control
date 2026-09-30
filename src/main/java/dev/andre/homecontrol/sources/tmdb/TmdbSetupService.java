@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.tmdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
@@ -57,7 +58,7 @@ public class TmdbSetupService {
         try {
             credential = TmdbCredential.parse(request.credential());
         } catch (IllegalArgumentException e) {
-            throw new TmdbException(TmdbException.Kind.INVALID_INPUT, e.getMessage());
+            throw new TmdbException(ContentSourceException.Kind.INVALID_INPUT, e.getMessage());
         }
         validate(credential);
         login.storeSecrets(Map.of(TmdbSettings.CREDENTIAL_SECRET, credential.value()),
@@ -69,7 +70,7 @@ public class TmdbSetupService {
 
     public String check() {
         TmdbCredential credential = credential().orElseThrow(() ->
-                new TmdbException(TmdbException.Kind.INVALID_INPUT, "TMDB is not connected"));
+                new TmdbException(ContentSourceException.Kind.INVALID_INPUT, "TMDB is not connected"));
         validate(credential);
         return "TMDB accepted the " + credential.describe();
     }
@@ -82,7 +83,7 @@ public class TmdbSetupService {
     private void validate(TmdbCredential credential) {
         var response = client.get(credential, "/authentication", Map.of());
         if (!response.path("success").asBoolean(false)) {
-            throw new TmdbException(TmdbException.Kind.UNAUTHORIZED, "TMDB rejected the API key or read access token");
+            throw new TmdbException(ContentSourceException.Kind.UNAUTHORIZED, "TMDB rejected the API key or read access token");
         }
     }
 }

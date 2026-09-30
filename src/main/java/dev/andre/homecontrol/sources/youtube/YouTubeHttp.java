@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.http.BoundedBody;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -59,7 +60,7 @@ public class YouTubeHttp {
             try {
                 return MAPPER.readTree(body);
             } catch (JacksonException _) {
-                throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "Google sent an answer that is not JSON");
+                throw new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE, "Google sent an answer that is not JSON");
             }
         }
     }
@@ -95,14 +96,14 @@ public class YouTubeHttp {
         try {
             response = http.send(builder.build(), BoundedBody.handler(MAX_RESPONSE_BYTES, requestTimeout));
         } catch (IOException _) {
-            throw new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Could not reach " + uri.getHost());
+            throw new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Could not reach " + uri.getHost());
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
-            throw new YouTubeException(YouTubeException.Kind.UNREACHABLE, "Interrupted while calling " + uri.getHost());
+            throw new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Interrupted while calling " + uri.getHost());
         }
         byte[] bytes = response.body();
         if (contentLengthExceeds(response, MAX_RESPONSE_BYTES) || bytes.length > MAX_RESPONSE_BYTES) {
-            throw new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "Google sent an oversized response");
+            throw new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE, "Google sent an oversized response");
         }
         return new Response(response.statusCode(), response.headers().firstValue("Content-Type").orElse(""), bytes);
     }

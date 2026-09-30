@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -82,13 +83,13 @@ class GoogleTokensTest {
         assertThatThrownBy(() -> tokens.accessToken())
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.NOT_CONFIGURED);
+                .isEqualTo(ContentSourceException.Kind.NOT_CONFIGURED);
         assertThatThrownBy(() -> tokens.accessToken()).hasMessage("YouTube is not connected");
     }
 
     @Test
     void aRevokedGrantIsRememberedUntilReset() {
-        YouTubeException revoked = new YouTubeException(YouTubeException.Kind.REVOKED, "Google no longer accepts...");
+        YouTubeException revoked = new YouTubeException(ContentSourceException.Kind.REVOKED, "Google no longer accepts...");
         given(oauth.refresh("cid", "csecret", "rt")).willThrow(revoked);
 
         assertThatThrownBy(() -> tokens.accessToken()).isSameAs(revoked);

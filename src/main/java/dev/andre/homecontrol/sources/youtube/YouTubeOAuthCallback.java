@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.youtube;
 
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import java.net.URI;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -28,7 +29,7 @@ final class YouTubeOAuthCallback {
 
     static void requireSupported(URI uri) {
         if (!supported(uri)) {
-            throw new YouTubeException(YouTubeException.Kind.INVALID_INPUT,
+            throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT,
                     "Google browser sign-in needs an HTTPS domain or localhost. Open Home Control there,"
                             + " or use a device code with a TVs and Limited Input devices client on your LAN.");
         }

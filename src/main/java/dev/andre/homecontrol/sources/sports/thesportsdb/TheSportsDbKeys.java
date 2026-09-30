@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.sources.sports.SportsProperties;
 import dev.andre.homecontrol.sources.sports.SportsSettings;
 import dev.andre.homecontrol.sources.sports.SportsSettingsService;
@@ -25,6 +26,6 @@ public class TheSportsDbKeys {
             return properties.theSportsDb().freeKey();
         }
         return secrets.secret(SECRET).orElseThrow(() -> new TheSportsDbException(
-                TheSportsDbException.Kind.UNAUTHORIZED, "Your TheSportsDB key is missing; enter it again or use the free key"));
+                ContentSourceException.Kind.UNAUTHORIZED, "Your TheSportsDB key is missing; enter it again or use the free key"));
     }
 }

@@ -112,8 +112,8 @@ public class YouTubeContentSource implements ContentSource {
         try {
             videos = playlists.items(playlistId);
         } catch (YouTubeException e) {
-            if (e.kind() == YouTubeException.Kind.NOT_FOUND) {
-                throw new ContentSourceException("The playlist “" + title
+            if (e.kind() == ContentSourceException.Kind.NOT_FOUND) {
+                throw new ContentSourceException(ContentSourceException.Kind.NOT_FOUND, "The playlist “" + title
                         + "” no longer exists or is private to another account; choose it again on the setup page");
             }
             throw e;
@@ -140,7 +140,7 @@ public class YouTubeContentSource implements ContentSource {
             video.ifPresent(v -> known.remember(List.of(v)));
             return video.map(YouTubeVideo::toItem);
         } catch (YouTubeException e) {
-            if (e.kind() == YouTubeException.Kind.NOT_FOUND) {
+            if (e.kind() == ContentSourceException.Kind.NOT_FOUND) {
                 return Optional.empty();
             }
             throw e;

@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.content.ContentSource;
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.playback.ContentItem;
@@ -90,7 +91,7 @@ public class JellyfinContentSource implements ContentSource {
         try {
             return JellyfinItemMapper.toItem(client.get(connection, "/Items/" + id, Map.of(USER_ID, connection.userId())));
         } catch (JellyfinException e) {
-            if (e.kind() == JellyfinException.Kind.NOT_FOUND) {
+            if (e.kind() == ContentSourceException.Kind.NOT_FOUND) {
                 return Optional.empty();
             }
             throw e;
@@ -125,7 +126,7 @@ public class JellyfinContentSource implements ContentSource {
 
     JellyfinConnection connection() {
         return setup.connection().orElseThrow(() ->
-                new JellyfinException(JellyfinException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
+                new JellyfinException(ContentSourceException.Kind.INVALID_INPUT, "Jellyfin is not connected"));
     }
 
     Map<String, String> listQuery(JellyfinConnection connection, String... extra) {

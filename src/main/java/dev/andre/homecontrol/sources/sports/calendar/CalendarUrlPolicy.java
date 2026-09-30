@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -76,12 +77,12 @@ public class CalendarUrlPolicy {
         try {
             addresses = resolver.resolve(lookup);
         } catch (UnknownHostException _) {
-            throw new CalendarFetchException(CalendarFetchException.Kind.UNREACHABLE, "Could not find " + host);
+            throw new CalendarFetchException(ContentSourceException.Kind.UNREACHABLE, "Could not find " + host);
         }
         for (InetAddress address : addresses) {
             if (address.isAnyLocalAddress() || address.isLinkLocalAddress() || address.isMulticastAddress()
                     || (address.isLoopbackAddress() && !allowLoopback)) {
-                throw new CalendarFetchException(CalendarFetchException.Kind.BLOCKED, "Home Control does not load calendars from "
+                throw new CalendarFetchException(ContentSourceException.Kind.BLOCKED, "Home Control does not load calendars from "
                         + host + ": that address belongs to this machine or its network link");
             }
         }

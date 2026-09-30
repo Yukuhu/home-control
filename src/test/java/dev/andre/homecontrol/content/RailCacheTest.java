@@ -211,7 +211,7 @@ class RailCacheTest {
     void aFailureKeepsTheLastItemsAndIsRetriedWithBackoff() {
         cache.snapshots();
         executor.runAll();
-        source.failure = new ContentSourceException("Could not reach Stub (connection refused)");
+        source.failure = new ContentSourceException(ContentSourceException.Kind.UNREACHABLE, "Could not reach Stub (connection refused)");
         clock.advance(Duration.ofMinutes(10));
         cache.tick();
         executor.runAll();
@@ -239,7 +239,7 @@ class RailCacheTest {
 
     @Test
     void aManualRetryIgnoresBackoffAndRecovers() {
-        source.failure = new ContentSourceException("Stub is down");
+        source.failure = new ContentSourceException(ContentSourceException.Kind.UNREACHABLE, "Stub is down");
         cache.snapshots();
         executor.runAll();
         assertThat(a().status()).isEqualTo(RailStatus.FAILED);

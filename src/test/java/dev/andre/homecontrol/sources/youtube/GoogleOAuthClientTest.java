@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -137,7 +138,7 @@ class GoogleOAuthClientTest {
         assertThatThrownBy(() -> client.requestDeviceCode("cid"))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.UNAUTHORIZED);
+                .isEqualTo(ContentSourceException.Kind.UNAUTHORIZED);
         assertThatThrownBy(() -> client.requestDeviceCode("cid"))
                 .hasMessageContaining("TVs and Limited Input devices");
     }
@@ -162,7 +163,7 @@ class GoogleOAuthClientTest {
         assertThatThrownBy(() -> client.refresh("cid", "csecret", "rt"))
                 .isInstanceOf(YouTubeException.class)
                 .extracting(e -> ((YouTubeException) e).kind())
-                .isEqualTo(YouTubeException.Kind.REVOKED);
+                .isEqualTo(ContentSourceException.Kind.REVOKED);
         assertThatThrownBy(() -> client.refresh("cid", "csecret", "rt"))
                 .hasMessageContaining("Testing")
                 .hasMessageContaining("Reconnect YouTube");

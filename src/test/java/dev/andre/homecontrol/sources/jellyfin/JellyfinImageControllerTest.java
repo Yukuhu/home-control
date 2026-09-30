@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.testsupport.WebSliceTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,7 +94,7 @@ class JellyfinImageControllerTest extends WebSliceTest {
         mockMvc.perform(get("/sources/jellyfin/images/" + ITEM_ID + "/Primary")).andExpect(status().isNotFound());
 
         given(jellyfinClient.image(eq(SERVER_URL), eq(ITEM_ID), eq("Primary"), isNull(), eq(480)))
-                .willThrow(new JellyfinException(JellyfinException.Kind.BAD_RESPONSE, "Jellyfin sent no image"));
+                .willThrow(new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE, "Jellyfin sent no image"));
         mockMvc.perform(get("/sources/jellyfin/images/" + ITEM_ID + "/Primary")).andExpect(status().isBadGateway());
     }
 }

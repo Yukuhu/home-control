@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.sources.sports.SportsSettings;
@@ -156,13 +157,13 @@ class TheSportsDbSetupControllerTest extends WebSliceTest {
     void refusedKeysSearchesAndRemovalsSayWhy() throws Exception {
         doThrow(new LoginRequiredException())
                 .doThrow(new PasswordRejectedException("The two passwords do not match"))
-                .doThrow(new TheSportsDbException(TheSportsDbException.Kind.UNAUTHORIZED, "TheSportsDB did not accept that key"))
+                .doThrow(new TheSportsDbException(ContentSourceException.Kind.UNAUTHORIZED, "TheSportsDB did not accept that key"))
                 .when(sportsCompetitions).usePersonalKey(any(), any());
-        doThrow(new TheSportsDbException(TheSportsDbException.Kind.UNREACHABLE, "TheSportsDB is unreachable"))
+        doThrow(new TheSportsDbException(ContentSourceException.Kind.UNREACHABLE, "TheSportsDB is unreachable"))
                 .when(sportsCompetitions).search("Germany", "Soccer");
         doThrow(new IllegalArgumentException("Choose a country or a sport")).when(sportsCompetitions).search(null, null);
         doThrow(new IllegalArgumentException("Competition 999 is not added")).when(sportsCompetitions).remove("999");
-        doThrow(new TheSportsDbException(TheSportsDbException.Kind.RATE_LIMITED, "TheSportsDB is busy; try again later"))
+        doThrow(new TheSportsDbException(ContentSourceException.Kind.RATE_LIMITED, "TheSportsDB is busy; try again later"))
                 .when(sportsCompetitions).add("4331");
 
         for (String expected : List.of("Log in again to change sources", "The two passwords do not match",

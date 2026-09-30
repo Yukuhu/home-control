@@ -2,6 +2,7 @@ package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -180,7 +181,7 @@ class JellyfinSessionsTest {
         assertThatThrownBy(() -> sessions.playNow("1d2c3b4a59687f6e5d4c3b2a19081726", ITEM_ID, 0))
                 .isInstanceOf(JellyfinException.class)
                 .extracting(e -> ((JellyfinException) e).kind())
-                .isEqualTo(JellyfinException.Kind.NOT_FOUND);
+                .isEqualTo(ContentSourceException.Kind.NOT_FOUND);
         assertThatThrownBy(() -> sessions.playNow("1d2c3b4a59687f6e5d4c3b2a19081726", ITEM_ID, 0))
                 .hasMessage("The Jellyfin app on that device has closed its session");
     }

@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -198,7 +199,7 @@ public class LoungeClient {
         try {
             return http.postForm(uri, form, Map.of());
         } catch (YouTubeException e) {
-            throw new LoungeException(step, e.kind() == YouTubeException.Kind.UNREACHABLE
+            throw new LoungeException(step, e.kind() == ContentSourceException.Kind.UNREACHABLE
                     ? "could not reach YouTube" : "YouTube sent an answer that could not be used");
         }
     }

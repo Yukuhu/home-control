@@ -34,7 +34,7 @@ class ErrorAdviceTest {
             "unsupported", () -> new UnsupportedActionException("Shield cannot switch inputs"),
             "unroutable", () -> new UnroutableException("Shield: this device cannot open app links"),
             "failed", () -> new ActionFailedException("Shield refused the key"),
-            "source", () -> new ContentSourceException("Jellyfin did not answer"),
+            "source", () -> new ContentSourceException(ContentSourceException.Kind.UNREACHABLE, "Jellyfin did not answer"),
             "login", LoginRequiredException::new);
 
     @RestController

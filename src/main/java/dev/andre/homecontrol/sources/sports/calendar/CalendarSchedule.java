@@ -147,7 +147,7 @@ public class CalendarSchedule {
         try {
             return IcsParser.parse(text);
         } catch (IcsFormatException e) {
-            throw new CalendarFetchException(CalendarFetchException.Kind.NOT_A_CALENDAR, e.getMessage());
+            throw new CalendarFetchException(ContentSourceException.Kind.BAD_RESPONSE, e.getMessage());
         }
     }
 

@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.youtube;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.MissingNode;
 
@@ -28,7 +29,7 @@ public class YouTubeApiClient {
             tokens.invalidate();
             response = chargedSend(call, uri);
             if (response.status() == 401) {
-                throw new YouTubeException(YouTubeException.Kind.UNAUTHORIZED,
+                throw new YouTubeException(ContentSourceException.Kind.UNAUTHORIZED,
                         "Google rejected the YouTube authorization; reconnect YouTube on the setup page", "authError");
             }
         }
@@ -58,13 +59,13 @@ public class YouTubeApiClient {
             return forbidden(error, reason);
         }
         if (status == 404) {
-            return new YouTubeException(YouTubeException.Kind.NOT_FOUND,
+            return new YouTubeException(ContentSourceException.Kind.NOT_FOUND,
                     "YouTube could not find it (" + (reason.isBlank() ? "HTTP 404" : reason) + ")", reason);
         }
         if (status >= 500) {
-            return new YouTubeException(YouTubeException.Kind.SERVER_ERROR, "YouTube is having problems (HTTP " + status + ")");
+            return new YouTubeException(ContentSourceException.Kind.SERVER_ERROR, "YouTube is having problems (HTTP " + status + ")");
         }
-        return new YouTubeException(YouTubeException.Kind.BAD_RESPONSE, "YouTube answered HTTP " + status, reason);
+        return new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE, "YouTube answered HTTP " + status, reason);
     }
 
     /** A 403: the day's quota is spent, the API is off in the Cloud project, the grant is too narrow, or else a plain refusal. */
@@ -76,14 +77,14 @@ public class YouTubeApiClient {
         String message = error.path("message").asString("");
         if (reason.equals("accessNotConfigured") || ("PERMISSION_DENIED".equals(error.path("status").asString(""))
                 && (message.contains("has not been used") || message.contains("is disabled")))) {
-            return new YouTubeException(YouTubeException.Kind.FORBIDDEN, "The YouTube Data API v3 is not enabled"
+            return new YouTubeException(ContentSourceException.Kind.FORBIDDEN, "The YouTube Data API v3 is not enabled"
                     + " in your Google Cloud project. Enable it, wait a few minutes and try again.", reason);
         }
         if (reason.equals("insufficientPermissions")) {
-            return new YouTubeException(YouTubeException.Kind.FORBIDDEN,
+            return new YouTubeException(ContentSourceException.Kind.FORBIDDEN,
                     "The saved authorization does not include read access to YouTube; reconnect YouTube.", reason);
         }
-        return new YouTubeException(YouTubeException.Kind.FORBIDDEN,
+        return new YouTubeException(ContentSourceException.Kind.FORBIDDEN,
                 "YouTube refused the request (" + (reason.isBlank() ? "HTTP 403" : reason) + ")", reason);
     }
 
