@@ -105,7 +105,7 @@ The roadmap's measures, updated by each workstream that moves them.
 
 | Measure | Baseline (2026-09-27) | Now |
 | --- | --- | --- |
-| Frozen ArchUnit violations | 89 | 75 |
+| Frozen ArchUnit violations | 89 | 44 |
 | Largest class | 813 lines (`DeviceManager`) | 526 lines (`CastSession`) |
 | Summed test-class time | 495 s (one JVM) | 320 s (one JVM), 569 s (four JVMs) |
 | `test` task wall time | not measured | 3 min 27 s (four JVMs, 4 CPUs) |
