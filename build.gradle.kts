@@ -64,24 +64,30 @@ allprojects {
     }
 
     // Resolve artifacts before CI fans out into builds and browser tests. Task inputs force
-    // verification of every resolvable configuration without compiling or executing tests.
+    // verification of every resolvable configuration without compiling or executing tests. The
+    // build's own projects are left out of the files: their jars would need compiling first.
     tasks.register("verifyDependencyChecksums") {
         description = "Verifies dependency checksums across all configurations without compiling."
         group = "verification"
-        inputs.files(configurations.filter { it.isCanBeResolved })
+        inputs.files(configurations.filter { it.isCanBeResolved }.map { configuration ->
+            configuration.incoming.artifactView {
+                componentFilter { it !is ProjectComponentIdentifier }
+            }.files
+        })
         doLast { logger.lifecycle("Dependency checksums verified.") }
     }
 }
 
 // What only the modules need: Spring Boot's plugin gives the app's compiler -parameters, which the modules get the
 // same way here. `test --tests` runs its filter in every project: a module without a match passes, and the app's
-// `test` still fails when nothing matches, so a filter that matches no test anywhere fails the build.
+// `test` still fails when nothing matches, so a filter that matches no test anywhere fails the build. A module's
+// test task asked for by its path, such as `:core:test --tests …`, fails when nothing matches, as the app's does.
 subprojects {
     tasks.withType<JavaCompile>().configureEach {
         options.compilerArgs.add("-parameters")
     }
     tasks.withType<Test>().configureEach {
-        filter.isFailOnNoMatchingTests = false
+        filter.isFailOnNoMatchingTests = gradle.startParameter.taskNames.any { it == path || ":$it" == path }
     }
 }
 

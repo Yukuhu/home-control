@@ -69,7 +69,7 @@ off Spring Framework 7's pausing, because `RailCache` cannot restart after a pau
 - One class of the app: `scripts/gradle.sh test --tests 'dev.andre.homecontrol.web.ErrorAdviceTest'`. One class of
   `core`: `scripts/gradle.sh :core:test --tests 'dev.andre.homecontrol.core.ActionTest'`. `test --tests` runs its
   filter in every module: a module without a match passes, and the app's `test` fails when nothing matches, so a
-  filter that matches no test anywhere fails the build.
+  filter that matches no test anywhere fails the build. `:core:test --tests` fails when nothing in `core` matches.
 - A failure's details: `grep -A20 '<failure' build/test-results/test/*.xml core/build/test-results/test/*.xml`.
 - The unit tests run in up to four JVMs at once, and Gradle reuses the results of tasks whose inputs did not change,
   so a test that passed and was not touched is not run again.
