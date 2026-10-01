@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.upnp;
 
+import dev.andre.homecontrol.adapters.support.SessionRegistry;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
 import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
@@ -16,8 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /** UPnP/DLNA media renderers (spec §4.1): TVs, AV receivers, Wi-Fi speakers. Pairing-free. */
@@ -28,15 +27,14 @@ public class UpnpAdapter implements DeviceAdapter, AdapterDiscovery {
     private final UpnpProperties properties;
     private final UpnpDiscovery discovery;
     private final HttpClient http;
-    private final Map<String, UpnpSession> sessions = new ConcurrentHashMap<>();
+    private final SessionRegistry<UpnpSession> sessions = new SessionRegistry<>();
 
     public UpnpAdapter(UpnpProperties properties, UpnpDiscovery discovery) {
         this.properties = properties;
         this.discovery = discovery;
         this.http = SoapClient.httpClient(properties.connectTimeout());
         // A renderer that announces itself is back: skip the backoff.
-        discovery.onAlive(udn -> sessions.values().stream()
-                .filter(session -> udn != null && udn.equalsIgnoreCase(session.udn()))
+        discovery.onAlive(udn -> sessions.matching(session -> udn != null && udn.equalsIgnoreCase(session.udn()))
                 .forEach(UpnpSession::reconnectNow));
     }
 
@@ -57,12 +55,9 @@ public class UpnpAdapter implements DeviceAdapter, AdapterDiscovery {
 
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
-        AtomicReference<UpnpSession> self = new AtomicReference<>();
         // Only announcements from the registered address may point the session at a (new) description port.
-        UpnpSession session = new UpnpSession(device, properties, http, udn -> discovery.location(udn, device.host()), onChange,
-                () -> sessions.remove(device.id(), self.get()));
-        self.set(session);
-        sessions.put(device.id(), session);
+        UpnpSession session = sessions.open(device.id(), onClose -> new UpnpSession(device, properties, http,
+                udn -> discovery.location(udn, device.host()), onChange, onClose));
         session.start();
         return session;
     }

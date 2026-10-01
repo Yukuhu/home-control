@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.webos;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.adapters.support.PairingKeys;
+import dev.andre.homecontrol.adapters.support.SessionRegistry;
 import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
@@ -23,11 +24,8 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -46,7 +44,7 @@ public class WebOsAdapter implements DeviceAdapter, AdapterDiscovery {
     private final DeviceSecrets secrets;
     private final PairingKeys keys;
     private final HttpClient http;
-    private final Map<String, WebOsSession> sessions = new ConcurrentHashMap<>();
+    private final SessionRegistry<WebOsSession> sessions = new SessionRegistry<>();
 
     public WebOsAdapter(WebOsProperties properties, SsdpDiscovery ssdp, DeviceRegistry registry, WakeOnLan wakeOnLan,
                         DeviceSecrets secrets) {
@@ -59,8 +57,8 @@ public class WebOsAdapter implements DeviceAdapter, AdapterDiscovery {
         this.http = InsecureTls.httpClient(properties.connectTimeout());
         // A TV that just woke announces itself: reconnect now instead of waiting out the backoff.
         // Plain string comparison: SSDP listeners must not block on DNS.
-        ssdp.addListener(SEARCH_TARGET, service -> sessions.values().stream()
-                .filter(session -> session.host().equalsIgnoreCase(service.address()))
+        ssdp.addListener(SEARCH_TARGET, service -> sessions
+                .matching(session -> session.host().equalsIgnoreCase(service.address()))
                 .forEach(WebOsSession::reconnectNow));
     }
 
@@ -94,11 +92,8 @@ public class WebOsAdapter implements DeviceAdapter, AdapterDiscovery {
 
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange, LearnedSettings learned) {
-        AtomicReference<WebOsSession> self = new AtomicReference<>();
-        WebOsSession session = new WebOsSession(device, properties, WebOsTimings.from(properties), http, registry, learned,
-                secrets, wakeOnLan, onChange, () -> sessions.remove(device.id(), self.get()));
-        self.set(session);
-        sessions.put(device.id(), session);
+        WebOsSession session = sessions.open(device.id(), onClose -> new WebOsSession(device, properties,
+                WebOsTimings.from(properties), http, registry, learned, secrets, wakeOnLan, onChange, onClose));
         session.start();
         return session;
     }

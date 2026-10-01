@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.sonos;
 
+import dev.andre.homecontrol.adapters.support.SessionRegistry;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
 import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
@@ -16,8 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /** Sonos rooms (spec §4.1): media renderers with grouping. Pairing-free. */
@@ -28,15 +27,14 @@ public class SonosAdapter implements DeviceAdapter, AdapterDiscovery {
     private final SonosProperties properties;
     private final SonosDiscovery discovery;
     private final HttpClient http;
-    private final Map<String, SonosSession> sessions = new ConcurrentHashMap<>();
+    private final SessionRegistry<SonosSession> sessions = new SessionRegistry<>();
 
     public SonosAdapter(SonosProperties properties, SonosDiscovery discovery) {
         this.properties = properties;
         this.discovery = discovery;
         this.http = SoapClient.httpClient(properties.connectTimeout());
         // A player that announces itself is back: skip the backoff.
-        discovery.onAlive(uuid -> sessions.values().stream()
-                .filter(session -> uuid != null && uuid.equals(session.uuid()))
+        discovery.onAlive(uuid -> sessions.matching(session -> uuid != null && uuid.equals(session.uuid()))
                 .forEach(SonosSession::reconnectNow));
     }
 
@@ -57,11 +55,8 @@ public class SonosAdapter implements DeviceAdapter, AdapterDiscovery {
 
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
-        AtomicReference<SonosSession> self = new AtomicReference<>();
-        SonosSession session = new SonosSession(device, properties, http, onChange,
-                () -> sessions.remove(device.id(), self.get()));
-        self.set(session);
-        sessions.put(device.id(), session);
+        SonosSession session = sessions.open(device.id(),
+                onClose -> new SonosSession(device, properties, http, onChange, onClose));
         session.start();
         return session;
     }
