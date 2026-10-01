@@ -102,7 +102,7 @@ class AndroidTvAdapterTest {
 
                 handle.execute(new Action.PressKey(RemoteKey.DPAD_UP));
 
-                assertThat(remote.nextKeyPress()).isEqualTo(RemoteKey.DPAD_UP.code());
+                assertThat(remote.nextKeyPress()).isEqualTo(19);
             }
         }
     }

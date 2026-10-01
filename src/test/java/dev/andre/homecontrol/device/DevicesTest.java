@@ -131,7 +131,7 @@ class DevicesTest {
 
                 devices.commands().execute("bedroom", new Action.PressKey(RemoteKey.HOME));
 
-                assertThat(bedroom.nextKeyPress()).isEqualTo(RemoteKey.HOME.code());
+                assertThat(bedroom.nextKeyPress()).isEqualTo(3);
                 assertThat(living.nextKeyPress()).isNull();
             }
         }
@@ -156,7 +156,7 @@ class DevicesTest {
                 await().until(() -> devices.queries().state("127-0-0-1").status() == DeviceStatus.CONNECTED);
                 devices.commands().execute("127-0-0-1", new Action.PressKey(RemoteKey.HOME));
 
-                assertThat(remote.nextKeyPress()).isEqualTo(RemoteKey.HOME.code());
+                assertThat(remote.nextKeyPress()).isEqualTo(3);
             }
         }
     }

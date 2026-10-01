@@ -3,8 +3,6 @@ package dev.andre.homecontrol.adapters.androidtv.protocol;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteDirection;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteMessage;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteStart;
-import dev.andre.homecontrol.core.KeyPress;
-import dev.andre.homecontrol.core.RemoteKey;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +11,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteError;
 import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteAppLinkLaunchRequest;
+import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteKeyCode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -181,7 +180,7 @@ class RemoteConnectionTest {
                 connection.sendAppLink("https://www.youtube.com/");
                 assertThat(device.nextAppLink()).isEqualTo("https://www.youtube.com/");
             } else {
-                connection.sendKey(RemoteKey.DPAD_DOWN);
+                connection.sendKey(RemoteKeyCode.KEYCODE_DPAD_DOWN, RemoteDirection.SHORT);
                 assertThat(device.nextKeyPress()).isEqualTo(20);
             }
         });
@@ -234,15 +233,15 @@ class RemoteConnectionTest {
 
     @Test
     void sendsKeyPressesWithTheVerifiedKeyCode() throws Exception {
-        connection.sendKey(RemoteKey.DPAD_UP);
+        connection.sendKey(RemoteKeyCode.KEYCODE_DPAD_UP, RemoteDirection.SHORT);
 
         assertThat(device.nextKeyPress()).isEqualTo(19);
     }
 
     @Test
     void sendsLongPressDirections() throws Exception {
-        connection.sendKey(RemoteKey.DPAD_CENTER, KeyPress.START_LONG);
-        connection.sendKey(RemoteKey.DPAD_CENTER, KeyPress.END_LONG);
+        connection.sendKey(RemoteKeyCode.KEYCODE_DPAD_CENTER, RemoteDirection.START_LONG);
+        connection.sendKey(RemoteKeyCode.KEYCODE_DPAD_CENTER, RemoteDirection.END_LONG);
 
         await().until(() -> device.receivedKeyPresses().size() >= 2);
         assertThat(device.receivedKeyPresses()).containsExactly(
