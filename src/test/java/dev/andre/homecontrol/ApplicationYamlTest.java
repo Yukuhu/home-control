@@ -52,6 +52,15 @@ class ApplicationYamlTest {
         assertThat(sources.getFirst().getProperty("logging.level.org.apache.hc")).isEqualTo("info");
     }
 
+    /** A request that waits on a slow device or service holds a virtual thread, not one of Tomcat's platform threads. */
+    @Test
+    void requestsRunOnVirtualThreadsInTheProductionFile() throws IOException {
+        List<PropertySource<?>> sources = new YamlPropertySourceLoader()
+                .load("application.yaml", new ClassPathResource("application.yaml"));
+
+        assertThat(sources.getFirst().getProperty("spring.threads.virtual.enabled")).isEqualTo(true);
+    }
+
     @Test
     void theTestOverridesWin() {
         runner.run(context -> {

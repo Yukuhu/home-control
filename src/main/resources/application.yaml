@@ -12,6 +12,11 @@ server:
         secure: ${HOME_CONTROL_SECURE_COOKIE:false}
 
 spring:
+  threads:
+    # Request threads are virtual: a request waiting on a slow device holds no platform thread. Argon2 hashing stays
+    # capped at two at a time (LoginService), so a burst of logins cannot multiply it.
+    virtual:
+      enabled: true
   web:
     resources:
       cache:
