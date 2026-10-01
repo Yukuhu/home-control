@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.tizen;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.adapters.support.PairingKeys;
+import dev.andre.homecontrol.adapters.support.SessionRegistry;
 import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
@@ -20,10 +21,7 @@ import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import java.net.http.HttpClient;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -42,7 +40,7 @@ public class TizenAdapter implements DeviceAdapter, AdapterDiscovery {
     private final DeviceSecrets secrets;
     private final PairingKeys keys;
     private final HttpClient http;
-    private final Map<String, TizenSession> sessions = new ConcurrentHashMap<>();
+    private final SessionRegistry<TizenSession> sessions = new SessionRegistry<>();
 
     public TizenAdapter(TizenProperties properties, SsdpDiscovery ssdp, DeviceRegistry registry, WakeOnLan wakeOnLan,
                         DeviceSecrets secrets) {
@@ -55,8 +53,8 @@ public class TizenAdapter implements DeviceAdapter, AdapterDiscovery {
         this.http = InsecureTls.httpClient(properties.connectTimeout());
         // A TV that just woke announces itself: poll now instead of at the next interval.
         // Plain string comparison: SSDP listeners must not block on DNS.
-        ssdp.addListener(SEARCH_TARGET, service -> sessions.values().stream()
-                .filter(session -> session.host().equalsIgnoreCase(service.address()))
+        ssdp.addListener(SEARCH_TARGET, service -> sessions
+                .matching(session -> session.host().equalsIgnoreCase(service.address()))
                 .forEach(TizenSession::pollNow));
     }
 
@@ -89,11 +87,8 @@ public class TizenAdapter implements DeviceAdapter, AdapterDiscovery {
 
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange, LearnedSettings learned) {
-        AtomicReference<TizenSession> self = new AtomicReference<>();
-        TizenSession session = new TizenSession(device, properties, TizenTimings.from(properties), http, registry,
-                learned, secrets, wakeOnLan, onChange, () -> sessions.remove(device.id(), self.get()));
-        self.set(session);
-        sessions.put(device.id(), session);
+        TizenSession session = sessions.open(device.id(), onClose -> new TizenSession(device, properties,
+                TizenTimings.from(properties), http, registry, learned, secrets, wakeOnLan, onChange, onClose));
         session.start();
         return session;
     }
