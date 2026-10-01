@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.adapters.net;
 
+import dev.andre.homecontrol.core.Hosts;
+
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -14,9 +16,13 @@ public final class DeviceUris {
      * {@code scheme://host:port} followed by {@code pathAndQuery}, which must already be encoded and is kept as given.
      * A host that no URL can carry makes the device unreachable, as a {@link MalformedURLException}: an underscore
      * or a numeric last label is a name the setup page accepts. A host that would change the URL is refused the same
-     * way, and nothing is sent: {@code 127.0.0.1/admin?} would reach a page of this machine, not a television.
+     * way, and nothing is sent: {@code 127.0.0.1/admin?} would reach a page of this machine, not a television. The
+     * host must first pass {@link Hosts#isValid}, the check the setup page applies to every address it stores.
      */
     public static URI of(String scheme, String host, int port, String pathAndQuery) throws MalformedURLException {
+        if (!Hosts.isValid(host)) {
+            throw notAHost(host, null);
+        }
         URI base;
         try {
             base = new URI(scheme, null, host, port, null, null, null);

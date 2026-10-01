@@ -25,7 +25,7 @@ class RendererResolverTest {
     }
 
     @AfterEach
-    void stop() throws Exception {
+    void stop() {
         renderer.close();
     }
 
