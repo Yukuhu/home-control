@@ -617,4 +617,46 @@ class CastSessionTest {
 
         assertThatThrownBy(() -> session.query(MDX_STATUS)).isInstanceOf(DeviceOfflineException.class);
     }
+
+    @Test
+    void aStatusThatChangesNothingIsNotPublishedAgain() throws Exception {
+        start(receiver.port());
+        awaitStatus();
+        int published = seen.all().size();
+
+        receiver.pushReceiverStatus();
+        receiver.setVolume(0.8, false);
+        receiver.pushReceiverStatus();
+
+        await().until(() -> session.state().volumeLevel() == 80);
+        assertThat(seen.all()).hasSize(published + 1);
+    }
+
+    @Test
+    void aCommandAfterCloseIsOfflineAndClosingTwiceIsQuiet() {
+        start(receiver.port());
+        awaitStatus();
+
+        session.close();
+        session.close();
+
+        var volume = new Action.SetVolume(30);
+        assertThatThrownBy(() -> session.execute(volume))
+                .isInstanceOf(DeviceOfflineException.class)
+                .hasMessage("Living Room TV is not connected");
+    }
+
+    @Test
+    void aStateListenerThatThrowsDoesNotStopReconnecting() throws Exception {
+        session = new CastSession(device(receiver.port()), TIMINGS, state -> {
+            seen.accept(state);
+            throw new IllegalStateException("a subscriber failed");
+        });
+        session.start();
+        awaitStatus();
+
+        receiver.dropConnection();
+
+        await().until(() -> receiver.connections() == 2 && session.state().connected());
+    }
 }
