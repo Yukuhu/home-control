@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -448,5 +449,36 @@ class LoginServiceTest {
         assertThatThrownBy(() -> login.permitSecrets(first, "short", "short")).isInstanceOf(PasswordRejectedException.class);
         assertThatCode(() -> login.permitSecrets(first, PASSWORD, PASSWORD)).doesNotThrowAnyException();
         assertThat(login.loginRequired()).isFalse();
+    }
+
+    /** Argon2 is CPU-bound for a while: on a virtual request thread it would pin one of the few carriers. */
+    @Test
+    void passwordsAreHashedOnTheHashingThreadsNotTheCallers() throws Exception {
+        Argon2PasswordHasher hasher = mock(Argon2PasswordHasher.class);
+        List<Thread> hashedOn = new CopyOnWriteArrayList<>();
+        given(hasher.hash(anyString())).willAnswer(call -> {
+            hashedOn.add(Thread.currentThread());
+            return "hash of " + call.getArgument(0);
+        });
+        given(hasher.matches(anyString(), anyString())).willAnswer(call -> {
+            hashedOn.add(Thread.currentThread());
+            return true;
+        });
+        ExecutorService hashing = Executors.newSingleThreadExecutor(Thread.ofPlatform().name("test-hash").factory());
+        try (ExecutorService requests = Executors.newVirtualThreadPerTaskExecutor()) {
+            LoginService service = new LoginService(store, hasher, new SecureRandom(), hashing);
+            requests.submit(() -> {
+                service.storeSecrets(Map.of("jellyfin.token", "t"), PASSWORD, PASSWORD,
+                        context(service, new MockHttpServletRequest()));
+                return service.authenticate(PASSWORD, context(service, new MockHttpServletRequest()));
+            }).get(10, SECONDS);
+        } finally {
+            hashing.shutdownNow();
+        }
+
+        assertThat(hashedOn).hasSizeGreaterThanOrEqualTo(2).allSatisfy(thread -> {
+            assertThat(thread.isVirtual()).isFalse();
+            assertThat(thread.getName()).isEqualTo("test-hash");
+        });
     }
 }

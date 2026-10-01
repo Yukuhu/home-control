@@ -13,8 +13,8 @@ server:
 
 spring:
   threads:
-    # Request threads are virtual: a request waiting on a slow device holds no platform thread. Argon2 hashing stays
-    # capped at two at a time (LoginService), so a burst of logins cannot multiply it.
+    # Request threads are virtual: a request waiting on a slow device holds no platform thread. Argon2 hashing runs
+    # on two platform threads of its own (LoginService), so a login never holds one of the few carrier threads.
     virtual:
       enabled: true
   web:
