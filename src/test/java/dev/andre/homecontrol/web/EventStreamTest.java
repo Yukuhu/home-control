@@ -18,6 +18,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -214,12 +216,18 @@ class EventStreamTest {
     }
 
     @Test
-    void theHeartbeatStopsWhenTheApplicationCloses() {
+    void theHeartbeatStopsWhenTheApplicationCloses() throws InterruptedException {
         AtomicInteger beats = new AtomicInteger();
+        CountDownLatch drained = new CountDownLatch(1);
         EventStream stream = new EventStream(new EventStreamProperties(Duration.ofMillis(50))) {
             @Override
             void sendHeartbeat(SseEmitter emitter) {
                 beats.incrementAndGet();
+            }
+
+            @Override
+            void sendNamed(SseEmitter emitter, String name, Object data) {
+                drained.countDown();
             }
         };
         try {
@@ -228,6 +236,10 @@ class EventStreamTest {
 
             stream.onContextClosed();
             stream.subscribe(() -> true);
+            // Heartbeats queued before the close may still go out; the fan-out sends in order, so once this event
+            // arrives they have, and every heartbeat counted after it would come from a tick after the close.
+            stream.onRailsChanged(new RailsChangedEvent(List.of()));
+            assertThat(drained.await(2, TimeUnit.SECONDS)).isTrue();
             int afterClose = beats.get();
 
             await().pollDelay(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2))
