@@ -218,11 +218,15 @@ class EventStreamTest {
     @Test
     void theHeartbeatStopsWhenTheApplicationCloses() throws InterruptedException {
         AtomicInteger beats = new AtomicInteger();
+        CountDownLatch slowTab = new CountDownLatch(1);
         CountDownLatch drained = new CountDownLatch(1);
         EventStream stream = new EventStream(new EventStreamProperties(Duration.ofMillis(50))) {
             @Override
             void sendHeartbeat(SseEmitter emitter) {
-                beats.incrementAndGet();
+                // The first heartbeat meets a slow tab, so the ticks that follow queue theirs behind it.
+                if (beats.incrementAndGet() == 1) {
+                    awaitQuietly(slowTab);
+                }
             }
 
             @Override
@@ -232,20 +236,28 @@ class EventStreamTest {
         };
         try {
             stream.subscribe(() -> true);
-            await().atMost(Duration.ofSeconds(2)).until(() -> beats.get() >= 1);
+            await().atMost(Duration.ofSeconds(2)).until(() -> beats.get() == 1);
+            await().during(Duration.ofMillis(250)).atMost(Duration.ofSeconds(2)).until(() -> beats.get() == 1);
 
             stream.onContextClosed();
             stream.subscribe(() -> true);
-            // Heartbeats queued before the close may still go out; the fan-out sends in order, so once this event
-            // arrives they have, and every heartbeat counted after it would come from a tick after the close.
             stream.onRailsChanged(new RailsChangedEvent(List.of()));
+            slowTab.countDown();
+            // The fan-out sends in order: once this event arrives, every heartbeat queued before it has had its turn.
             assertThat(drained.await(2, TimeUnit.SECONDS)).isTrue();
-            int afterClose = beats.get();
 
-            await().pollDelay(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2))
-                    .untilAsserted(() -> assertThat(beats.get()).isEqualTo(afterClose));
+            assertThat(beats).hasValue(1);
+            await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2)).until(() -> beats.get() == 1);
         } finally {
             stream.shutdown();
+        }
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
         }
     }
 }
