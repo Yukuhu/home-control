@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.upnp;
 
+import dev.andre.homecontrol.adapters.support.DeviceCalls;
 import dev.andre.homecontrol.adapters.support.ReconnectingPoller;
 import dev.andre.homecontrol.adapters.upnp.protocol.DidlLite;
 import dev.andre.homecontrol.adapters.upnp.protocol.PlayedItem;
@@ -15,7 +16,6 @@ import dev.andre.homecontrol.adapters.upnp.protocol.VolumeRange;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
-import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.discovery.ssdp.DeviceDescription;
@@ -56,6 +56,8 @@ public class UpnpSession implements DeviceHandle {
     // Immutable record replaced wholesale by the poll loop (and cleared by close()); command threads only read it.
     @SuppressWarnings("java:S3077")
     private volatile Endpoints endpoints;
+    /** After close() nothing reopens the session, not even a connect that finishes late. */
+    private volatile boolean closed;
 
     public UpnpSession(Device device, UpnpProperties properties, HttpClient http,
                        Function<String, Optional<URI>> locator, Consumer<DeviceState> onChange, Runnable onClosed) {
@@ -99,8 +101,8 @@ public class UpnpSession implements DeviceHandle {
     @Override
     public void execute(Action action) {
         Endpoints current = endpoints;
-        if (current == null) { // resolved endpoints exist only while connected
-            throw new DeviceOfflineException(device.name() + " is not connected");
+        if (closed || current == null) { // resolved endpoints exist only while connected
+            throw DeviceCalls.notConnected(device.name());
         }
         String av = current.avTransport().serviceType();
         try {
@@ -140,6 +142,8 @@ public class UpnpSession implements DeviceHandle {
 
     @Override
     public void close() {
+        closed = true;
+        publisher.close();
         poller.close();
         endpoints = null;
         onClosed.run();

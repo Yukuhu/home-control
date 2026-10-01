@@ -4,6 +4,7 @@ import dev.andre.homecontrol.adapters.sonos.protocol.SonosActions;
 import dev.andre.homecontrol.adapters.sonos.protocol.SonosEndpoints;
 import dev.andre.homecontrol.adapters.sonos.protocol.SonosUris;
 import dev.andre.homecontrol.adapters.sonos.protocol.ZoneGroupState;
+import dev.andre.homecontrol.adapters.support.DeviceCalls;
 import dev.andre.homecontrol.adapters.support.ReconnectingPoller;
 import dev.andre.homecontrol.adapters.upnp.protocol.PlayedItem;
 import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
@@ -20,7 +21,6 @@ import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
-import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.GroupListing;
 import dev.andre.homecontrol.core.GroupMember;
@@ -76,6 +76,8 @@ public class SonosSession implements DeviceHandle, GroupListing {
     private volatile ProtocolInfo sink = ProtocolInfo.UNKNOWN;
     /** True from a completed connect until a disconnect or close; commands and topology need it. */
     private volatile boolean live;
+    /** After close() nothing reopens the session, not even a connect that finishes late. */
+    private volatile boolean closed;
 
     public SonosSession(Device device, SonosProperties properties, HttpClient http,
                         Consumer<DeviceState> onChange, Runnable onClosed) {
@@ -119,7 +121,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
     @Override
     public Optional<SpeakerTopology> speakerTopology() {
         ZoneGroupState current = topology;
-        if (current == null || !live) {
+        if (current == null || closed || !live) {
             return Optional.empty();
         }
         List<SpeakerGroup> groups = current.groups().stream()
@@ -134,8 +136,8 @@ public class SonosSession implements DeviceHandle, GroupListing {
 
     @Override
     public void execute(Action action) {
-        if (!live) {
-            throw new DeviceOfflineException(device.name() + " is not connected");
+        if (closed || !live) {
+            throw DeviceCalls.notConnected(device.name());
         }
         try {
             switch (action) {
@@ -247,7 +249,9 @@ public class SonosSession implements DeviceHandle, GroupListing {
 
     @Override
     public void close() {
+        closed = true;
         live = false;
+        publisher.close();
         poller.close();
         onClosed.run();
     }
