@@ -266,7 +266,7 @@ class CastSessionTest {
         var staleStop = new Action.Stop();
         assertThatThrownBy(() -> session.execute(staleStop))
                 .isInstanceOf(ActionFailedException.class)
-                .hasMessage("Living Room TV refused to stop Default Media Receiver (INVALID_REQUEST: INVALID_SESSION_ID)");
+                .hasMessage("Living Room TV refused to stop Default Media Receiver: INVALID_REQUEST: INVALID_SESSION_ID");
     }
 
     @Test
@@ -306,7 +306,7 @@ class CastSessionTest {
         var staleStop = new Action.Stop();
         assertThatThrownBy(() -> session.execute(staleStop))
                 .isInstanceOf(ActionFailedException.class)
-                .hasMessage("Living Room TV refused to stop CC1AD845 (INVALID_REQUEST: INVALID_SESSION_ID)");
+                .hasMessage("Living Room TV refused to stop CC1AD845: INVALID_REQUEST: INVALID_SESSION_ID");
     }
 
     private static Action.CastLoad bunny() {
@@ -530,7 +530,7 @@ class CastSessionTest {
         var rejectedPlayback = playNow();
         assertThatThrownBy(() -> session.execute(rejectedPlayback))
                 .isInstanceOf(ActionFailedException.class)
-                .hasMessageContaining("refused to play it (Missing one or more required params");
+                .hasMessageContaining("refused to start playback: Missing one or more required params");
     }
 
     @Test
@@ -597,7 +597,7 @@ class CastSessionTest {
 
         assertThatThrownBy(() -> session.query(MDX_STATUS))
                 .isInstanceOf(ActionFailedException.class)
-                .hasMessageContaining("refused the request (nope)");
+                .hasMessageContaining("refused to answer mdxSessionStatus: nope");
     }
 
     @Test
