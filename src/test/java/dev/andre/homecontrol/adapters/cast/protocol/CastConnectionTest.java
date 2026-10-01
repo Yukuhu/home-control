@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.cast.protocol;
 
+import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,7 +86,7 @@ class CastConnectionTest {
         receiver.ignore("GET_STATUS");
 
         assertThatThrownBy(() -> connection.request(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus(), Duration.ofMillis(500)))
-                .isInstanceOf(CastTimeoutException.class);
+                .isInstanceOf(DeviceTimeoutException.class);
     }
 
     @Test
@@ -113,7 +114,7 @@ class CastConnectionTest {
 
         await().until(() -> !disconnects.isEmpty());
         assertThat(disconnects).singleElement().isIn(CastDisconnectCause.CLOSED, CastDisconnectCause.ERROR);
-        assertThat(pending.get(5, TimeUnit.SECONDS)).isInstanceOf(IOException.class).isNotInstanceOf(CastTimeoutException.class);
+        assertThat(pending.get(5, TimeUnit.SECONDS)).isInstanceOf(IOException.class).isNotInstanceOf(DeviceTimeoutException.class);
         assertThatThrownBy(() -> connection.send(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus()))
                 .isInstanceOf(IOException.class);
     }

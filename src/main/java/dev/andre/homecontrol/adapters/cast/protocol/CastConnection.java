@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.cast.protocol;
 
 import dev.andre.homecontrol.adapters.cast.protocol.channel.CastMessage;
+import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
@@ -143,7 +144,7 @@ public final class CastConnection implements AutoCloseable {
             try {
                 return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
             } catch (TimeoutException _) {
-                throw new CastTimeoutException("The Cast receiver did not answer within " + timeout.toMillis() + " ms");
+                throw new DeviceTimeoutException("The Cast receiver did not answer within " + timeout.toMillis() + " ms");
             } catch (ExecutionException e) {
                 throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause());
             } catch (InterruptedException _) {

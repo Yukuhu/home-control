@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
+import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -92,7 +93,7 @@ public final class RendererCommands {
             return call.call();
         } catch (SoapFault fault) {
             throw new RendererFaultException(deviceName + " refused to " + what + " (" + fault.getMessage() + ")", fault.errorCode());
-        } catch (SoapTimeoutException _) {
+        } catch (DeviceTimeoutException _) {
             throw new ActionFailedException(deviceName + " did not answer in time when asked to " + what);
         } catch (IOException _) {
             throw new DeviceOfflineException(deviceName + " could not be reached to " + what);

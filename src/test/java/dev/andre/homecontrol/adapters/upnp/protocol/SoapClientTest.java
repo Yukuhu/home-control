@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
 import com.sun.net.httpserver.HttpServer;
+import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -146,7 +147,7 @@ class SoapClientTest {
     void aSilentDeviceIsATimeout() {
         delayMillis = 2000;
 
-        assertThatThrownBy(() -> client.call(control(), UpnpActions.play(AV))).isInstanceOf(SoapTimeoutException.class);
+        assertThatThrownBy(() -> client.call(control(), UpnpActions.play(AV))).isInstanceOf(DeviceTimeoutException.class);
     }
 
     @Test
@@ -154,7 +155,7 @@ class SoapClientTest {
         status = 404;
         assertThatThrownBy(() -> client.call(control(), UpnpActions.play(AV)))
                 .isInstanceOf(IOException.class)
-                .isNotInstanceOf(SoapTimeoutException.class);
+                .isNotInstanceOf(DeviceTimeoutException.class);
 
         int closedPort;
         try (ServerSocket socket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
@@ -182,7 +183,7 @@ class SoapClientTest {
 
         assertThatThrownBy(() -> client.call(control(), UpnpActions.getVolume(RC)))
                 .isInstanceOf(IOException.class)
-                .isNotInstanceOf(SoapTimeoutException.class)
+                .isNotInstanceOf(DeviceTimeoutException.class)
                 .hasMessageContaining("cap");
     }
 
