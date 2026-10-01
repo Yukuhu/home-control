@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.tizen;
 
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
+import dev.andre.homecontrol.adapters.support.PlayPauseToggle;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
@@ -28,7 +29,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -65,7 +65,7 @@ public class TizenSession implements DeviceHandle {
     private final Consumer<DeviceState> onChange;
     private final Runnable onClose;
     private final ScheduledExecutorService scheduler;
-    private final AtomicBoolean nextPlayPauseIsPlay = new AtomicBoolean();
+    private final PlayPauseToggle playPause = new PlayPauseToggle();
 
     /** Set by the scheduler thread; taken out (and closed) by whoever drops it, which close() does from any thread. */
     private final AtomicReference<TizenRemoteConnection> connection = new AtomicReference<>();
@@ -159,7 +159,7 @@ public class TizenSession implements DeviceHandle {
         }
         switch (key) {
             case POWER -> togglePower();
-            case PLAY_PAUSE -> sendKey(nextPlayPauseIsPlay.getAndSet(!nextPlayPauseIsPlay.get()) ? "KEY_PLAY" : "KEY_PAUSE");
+            case PLAY_PAUSE -> sendKey(playPause.playNext() ? "KEY_PLAY" : "KEY_PAUSE");
             default -> sendKey(TizenKeys.code(key).orElseThrow(() ->
                     new UnsupportedActionException(device.name() + " has no " + key + " key")));
         }

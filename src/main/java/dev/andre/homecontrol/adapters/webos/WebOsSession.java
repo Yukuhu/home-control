@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.webos;
 import dev.andre.homecontrol.adapters.net.Backoff;
 import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
+import dev.andre.homecontrol.adapters.support.PlayPauseToggle;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
@@ -35,7 +36,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -69,7 +69,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
     private final Consumer<DeviceState> onChange;
     private final Runnable onClose;
     private final ScheduledExecutorService scheduler;
-    private final AtomicBoolean nextPlayPauseIsPlay = new AtomicBoolean();
+    private final PlayPauseToggle playPause = new PlayPauseToggle();
 
     /** Set by the scheduler thread; taken out (and closed) by whoever drops it, which close() does from any thread. */
     private final AtomicReference<SsapConnection> connection = new AtomicReference<>();
@@ -202,7 +202,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
             case VOLUME_UP -> call(SsapUris.VOLUME_UP, SsapMessages.empty(), "raise the volume");
             case VOLUME_DOWN -> call(SsapUris.VOLUME_DOWN, SsapMessages.empty(), "lower the volume");
             case VOLUME_MUTE -> call(SsapUris.SET_MUTE, SsapMessages.empty().put("mute", !state.muted()), "mute");
-            case PLAY_PAUSE -> button(nextPlayPauseIsPlay.getAndSet(!nextPlayPauseIsPlay.get()) ? "PLAY" : "PAUSE");
+            case PLAY_PAUSE -> button(playPause.playNext() ? "PLAY" : "PAUSE");
             default -> button(WebOsKeys.button(key).orElseThrow(() ->
                     new UnsupportedActionException(device.name() + " has no " + key + " button")));
         }
