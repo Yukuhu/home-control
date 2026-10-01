@@ -4,11 +4,11 @@ import dev.andre.homecontrol.adapters.sonos.protocol.SonosActions;
 import dev.andre.homecontrol.adapters.sonos.protocol.SonosEndpoints;
 import dev.andre.homecontrol.adapters.sonos.protocol.SonosUris;
 import dev.andre.homecontrol.adapters.sonos.protocol.ZoneGroupState;
+import dev.andre.homecontrol.adapters.support.ReconnectingPoller;
 import dev.andre.homecontrol.adapters.upnp.protocol.NowPlayings;
 import dev.andre.homecontrol.adapters.upnp.protocol.PlayedItem;
 import dev.andre.homecontrol.adapters.upnp.protocol.PositionInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
-import dev.andre.homecontrol.adapters.upnp.protocol.ReconnectingPoller;
 import dev.andre.homecontrol.adapters.upnp.protocol.RendererCommands;
 import dev.andre.homecontrol.adapters.upnp.protocol.RendererFaultException;
 import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
@@ -301,19 +301,23 @@ public class SonosSession implements DeviceHandle, GroupListing {
         }
 
         @Override
-        public void connect() throws IOException, SoapFault {
-            readTopology();
+        public void connect() throws IOException {
             try {
-                sink = commands.sink(own(SonosEndpoints.CONNECTION_MANAGER_PATH, SonosEndpoints.CONNECTION_MANAGER));
-            } catch (SoapFault _) {
-                sink = ProtocolInfo.UNKNOWN;
+                readTopology();
+                try {
+                    sink = commands.sink(own(SonosEndpoints.CONNECTION_MANAGER_PATH, SonosEndpoints.CONNECTION_MANAGER));
+                } catch (SoapFault _) {
+                    sink = ProtocolInfo.UNKNOWN;
+                }
+                readState();
+            } catch (SoapFault fault) {
+                throw new IOException(device.id() + " refused to report its state: " + fault.getMessage());
             }
-            readState();
             live = true;
         }
 
         @Override
-        public void poll() throws IOException, SoapFault {
+        public void poll() throws IOException {
             if (Duration.between(topologyReadAt, clock.instant()).compareTo(timings.topologyInterval()) >= 0) {
                 try {
                     readTopology();
@@ -321,7 +325,11 @@ public class SonosSession implements DeviceHandle, GroupListing {
                     log.debug("{}: topology unavailable: {}", device.id(), fault.getMessage());
                 }
             }
-            readState();
+            try {
+                readState();
+            } catch (SoapFault fault) {
+                log.debug("{}: poll failed: {}", device.id(), fault.getMessage());
+            }
         }
 
         @Override

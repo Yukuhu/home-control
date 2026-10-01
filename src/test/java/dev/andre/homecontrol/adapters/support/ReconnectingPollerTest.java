@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.upnp.protocol;
+package dev.andre.homecontrol.adapters.support;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +28,6 @@ class ReconnectingPollerTest {
         final List<Exception> disconnects = new CopyOnWriteArrayList<>();
         final AtomicInteger connectFailures = new AtomicInteger();
         final AtomicInteger pollIoFailures = new AtomicInteger();
-        volatile SoapFault everyPollFailure;
         volatile RuntimeException everyPollBug;
         volatile Duration pollDelay = Duration.ofMillis(50);
 
@@ -41,13 +40,10 @@ class ReconnectingPollerTest {
         }
 
         @Override
-        public void poll() throws IOException, SoapFault {
+        public void poll() throws IOException {
             polls.add(System.nanoTime());
             if (pollIoFailures.getAndUpdate(n -> Math.max(0, n - 1)) > 0) {
                 throw new IOException("gone");
-            }
-            if (everyPollFailure != null) {
-                throw everyPollFailure;
             }
             if (everyPollBug != null) {
                 throw everyPollBug;
@@ -116,18 +112,6 @@ class ReconnectingPollerTest {
             assertThat(link.connects).hasSize(2);
             assertThat(link.polls).hasSizeGreaterThanOrEqualTo(3);
         });
-    }
-
-    @Test
-    void otherPollFailuresKeepPolling() {
-        ScriptedLink link = new ScriptedLink();
-        link.everyPollFailure = new SoapFault(501, "Action Failed");
-        poller(link);
-
-        await().atMost(Duration.ofSeconds(1)).untilAsserted(() -> assertThat(link.polls).hasSizeGreaterThanOrEqualTo(2));
-        int seen = link.polls.size();
-        await().atMost(Duration.ofSeconds(1)).untilAsserted(() -> assertThat(link.polls).hasSizeGreaterThan(seen));
-        assertThat(link.disconnects).isEmpty();
     }
 
     @Test

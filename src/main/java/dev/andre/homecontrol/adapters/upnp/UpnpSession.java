@@ -1,11 +1,11 @@
 package dev.andre.homecontrol.adapters.upnp;
 
+import dev.andre.homecontrol.adapters.support.ReconnectingPoller;
 import dev.andre.homecontrol.adapters.upnp.protocol.DidlLite;
 import dev.andre.homecontrol.adapters.upnp.protocol.NowPlayings;
 import dev.andre.homecontrol.adapters.upnp.protocol.PlayedItem;
 import dev.andre.homecontrol.adapters.upnp.protocol.PositionInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
-import dev.andre.homecontrol.adapters.upnp.protocol.ReconnectingPoller;
 import dev.andre.homecontrol.adapters.upnp.protocol.RendererCommands;
 import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
@@ -280,22 +280,29 @@ public class UpnpSession implements DeviceHandle {
         }
 
         @Override
-        public void connect() throws IOException, SoapFault {
+        public void connect() throws IOException {
             Endpoints resolved = resolve();
             endpoints = resolved;
             try {
                 readState(resolved);
-            } catch (IOException | SoapFault | RuntimeException e) {
+            } catch (SoapFault fault) {
+                endpoints = null;
+                throw new IOException(device.id() + " refused to report its state: " + fault.getMessage());
+            } catch (IOException | RuntimeException e) {
                 endpoints = null;
                 throw e;
             }
         }
 
         @Override
-        public void poll() throws IOException, SoapFault {
+        public void poll() throws IOException {
             Endpoints current = endpoints;
             if (current != null) {
-                readState(current);
+                try {
+                    readState(current);
+                } catch (SoapFault fault) {
+                    log.debug("{}: poll failed: {}", device.id(), fault.getMessage());
+                }
             }
         }
 
