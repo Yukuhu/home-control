@@ -39,8 +39,10 @@ class AndroidTvKeysTest {
 
     @Test
     void everyKeySendsTheAndroidKeyCodeItAlwaysSent() {
-        assertThat(SENT).containsOnlyKeys(RemoteKey.values());
-        SENT.forEach((key, code) -> assertThat(AndroidTvKeys.code(key).getNumber()).as(key.name()).isEqualTo(code));
+        // A key missing from SENT has no expected code, so it fails here until the table names it.
+        for (RemoteKey key : RemoteKey.values()) {
+            assertThat(AndroidTvKeys.code(key).getNumber()).as(key.name()).isEqualTo(SENT.get(key));
+        }
     }
 
     @Test
