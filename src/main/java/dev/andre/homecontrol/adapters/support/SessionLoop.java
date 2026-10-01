@@ -78,7 +78,9 @@ public final class SessionLoop implements AutoCloseable {
         executor.shutdownNow();
     }
 
-    @SuppressWarnings("java:S1181") // an Error is logged and rethrown: it still ends the task
+    // An Error is logged where it happens, or the executor would keep it unseen in a future, and rethrown, so it
+    // still ends the task.
+    @SuppressWarnings({"java:S1181", "java:S2139"})
     private Runnable logged(Runnable task) {
         return () -> {
             try {

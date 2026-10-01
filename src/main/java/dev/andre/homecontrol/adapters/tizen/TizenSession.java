@@ -170,8 +170,8 @@ public class TizenSession implements DeviceHandle {
         switch (TizenLaunches.forUri(uri, current.installedApps())) {
             case TizenLaunch.Dial(var app, var body) ->
                     DeviceCalls.run(device.name(), "start " + app, () -> dial.launch(device.host(), app, body));
-            case TizenLaunch.App app ->
-                    DeviceCalls.run(device.name(), "open " + app.name(), () -> current.launchApp(app.appId(), app.actionType()));
+            case TizenLaunch.App(var appId, var name, var actionType) ->
+                    DeviceCalls.run(device.name(), "open " + name, () -> current.launchApp(appId, actionType));
             case TizenLaunch.Unsupported(var reason) -> throw new UnsupportedActionException(
                     device.name() + ": " + reason);
         }

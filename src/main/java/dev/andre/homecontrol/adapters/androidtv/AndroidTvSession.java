@@ -231,18 +231,6 @@ public class AndroidTvSession implements DeviceHandle {
         consecutiveUnpaired = 0;
     }
 
-    private void handlePower(boolean on) {
-        if (!on) {
-            playback.poweredOff();
-        }
-        publisher.update(state -> state.withPower(on).withNowPlaying(playback.current(Instant.now())));
-    }
-
-    private void handleCurrentApp(String appPackage) {
-        playback.appChanged(appPackage);
-        publisher.update(state -> state.withCurrentApp(appPackage).withNowPlaying(playback.current(Instant.now())));
-    }
-
     private void handleLaunched(LaunchedMedia media) {
         playback.launched(media, publisher.current().currentApp(), Instant.now());
         refreshPlayback();
@@ -256,24 +244,6 @@ public class AndroidTvSession implements DeviceHandle {
                 deadline -> playbackExpiry.schedule(this::refreshPlayback,
                         Duration.ofMillis(Math.max(0, Duration.between(now, deadline).toMillis()) + 1)),
                 playbackExpiry::cancel);
-    }
-
-    private void handleDisconnect(Attempt attempt, DisconnectCause cause) {
-        if (attempt.own == null || !connection.takeIf(attempt.own)) {
-            return; // a connection that is no longer the current one
-        }
-        if (cause == DisconnectCause.UNPAIRED) {
-            if (ambiguousUnpaired()) {
-                reconnector.lost();
-            } else {
-                reconnector.stop();
-            }
-            return;
-        }
-        log.info("Lost the connection to {} ({}); reconnecting", device.id(), cause);
-        forgetAmbiguousVerdicts();
-        publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED));
-        reconnector.lost();
     }
 
     @Override
@@ -301,6 +271,36 @@ public class AndroidTvSession implements DeviceHandle {
             });
         }
 
+        private void handlePower(boolean on) {
+            if (!on) {
+                playback.poweredOff();
+            }
+            publisher.update(state -> state.withPower(on).withNowPlaying(playback.current(Instant.now())));
+        }
+
+        private void handleCurrentApp(String appPackage) {
+            playback.appChanged(appPackage);
+            publisher.update(state -> state.withCurrentApp(appPackage).withNowPlaying(playback.current(Instant.now())));
+        }
+
+        private void handleDisconnect(DisconnectCause cause) {
+            if (own == null || !connection.takeIf(own)) {
+                return; // a connection that is no longer the current one
+            }
+            if (cause == DisconnectCause.UNPAIRED) {
+                if (ambiguousUnpaired()) {
+                    reconnector.lost();
+                } else {
+                    reconnector.stop();
+                }
+                return;
+            }
+            log.info("Lost the connection to {} ({}); reconnecting", device.id(), cause);
+            forgetAmbiguousVerdicts();
+            publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED));
+            reconnector.lost();
+        }
+
         @Override
         public void onReady() {
             onLoop(AndroidTvSession.this::handleReady);
@@ -323,7 +323,7 @@ public class AndroidTvSession implements DeviceHandle {
 
         @Override
         public void onDisconnected(DisconnectCause cause) {
-            loop.execute(() -> handleDisconnect(this, cause));
+            loop.execute(() -> handleDisconnect(cause));
         }
     }
 }
