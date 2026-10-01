@@ -11,7 +11,9 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.adapters.androidtv.protocol.FakeRemoteServer;
 import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
+import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteListener;
 import dev.andre.homecontrol.core.RemoteKey;
+import dev.andre.homecontrol.testsupport.RecordingStateListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -72,18 +75,30 @@ class AndroidTvSessionTest {
     @Test
     void staysConnectingAfterTlsUntilTheRemoteHandshakeCompletes() throws Exception {
         FakeRemoteServer.ConnectionGate gate = fakeDevice.pauseNextRemoteHandshake();
-        session.start();
-        gate.awaitEntered();
+        ClientCertificate credential = ClientCertificate.generate("shield-remote");
+        AtomicReference<RemoteListener> attempt = new AtomicReference<>();
+        Device device = AndroidTvSettings.device("shield-gated", "Test Shield", "127.0.0.1", fakeDevice.port(),
+                null, Instant.now());
 
-        // This queued callback runs after connect() returns, proving TLS is complete.
-        session.onPower(true);
-        await().until(() -> session.state().powerOn());
-        assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTING);
-        assertThatThrownBy(() -> session.sendKey(RemoteKey.DPAD_UP))
-                .isInstanceOf(DeviceOfflineException.class);
+        try (AndroidTvSession gated = new AndroidTvSession(device, credential, TIMINGS, state -> {
+        }, listener -> {
+            attempt.set(listener);
+            return RemoteConnection.connect("127.0.0.1", fakeDevice.port(), credential, 10_000, listener);
+        })) {
+            gated.start();
+            gate.awaitEntered();
+            await().until(() -> attempt.get() != null);
 
-        gate.release();
-        await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+            // The callback reaches the loop after connect() returned, so TLS is complete.
+            attempt.get().onPower(true);
+            await().until(() -> gated.state().powerOn());
+            assertThat(gated.state().status()).isEqualTo(DeviceStatus.CONNECTING);
+            assertThatThrownBy(() -> gated.sendKey(RemoteKey.DPAD_UP))
+                    .isInstanceOf(DeviceOfflineException.class);
+
+            gate.release();
+            await().until(() -> gated.state().status() == DeviceStatus.CONNECTED);
+        }
     }
 
     @Test
@@ -182,7 +197,8 @@ class AndroidTvSessionTest {
     @Test
     void refusesCommandsWhileDisconnected() {
         assertThatThrownBy(() -> session.sendKey(RemoteKey.DPAD_UP))
-                .isInstanceOf(DeviceOfflineException.class);
+                .isInstanceOf(DeviceOfflineException.class)
+                .hasMessage("Test Shield is not connected");
     }
 
     @Test
@@ -315,13 +331,10 @@ class AndroidTvSessionTest {
         Device device = AndroidTvSettings.device("shield-listener-error", "Test Shield", "127.0.0.1",
                 fakeDevice.port(), null, Instant.now());
         CountDownLatch connecting = new CountDownLatch(1);
-        CountDownLatch nextCallback = new CountDownLatch(1);
 
         try (AndroidTvSession failing = new AndroidTvSession(device,
                 ClientCertificate.generate("shield-remote"), TIMINGS, state -> {
-                    if (state.powerOn()) {
-                        nextCallback.countDown();
-                    } else if (state.status() == DeviceStatus.CONNECTING) {
+                    if (state.status() == DeviceStatus.CONNECTING) {
                         connecting.countDown();
                         throw new LinkageError("a subscriber cannot load its dependency");
                     }
@@ -329,12 +342,9 @@ class AndroidTvSessionTest {
             failing.start();
             assertThat(connecting.await(5, TimeUnit.SECONDS)).isTrue();
 
-            // This callback runs after the connect task, so the assertion does not race
-            // the task continuing into a network connection after the listener failed.
-            failing.onPower(true);
-            assertThat(nextCallback.await(5, TimeUnit.SECONDS)).isTrue();
-
-            assertThat(fakeDevice.connections()).isZero();
+            // Ten times the 50 ms first retry: an attempt that went on, or a retry, would have connected by now.
+            await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
+                    .until(() -> fakeDevice.connections() == 0);
             assertThat(failing.state().status()).isEqualTo(DeviceStatus.CONNECTING);
         }
     }
@@ -437,5 +447,27 @@ class AndroidTvSessionTest {
                 AndroidTvSettings.device("shield-1", "Test Shield", "127.0.0.1", fakeDevice.port(), null, Instant.now()),
                 ClientCertificate.generate("shield-remote"), timings, state -> {
         }, null);
+    }
+
+    @Test
+    void aPushThatChangesNothingIsNotPublishedAgain() throws Exception {
+        RecordingStateListener states = new RecordingStateListener();
+        Device device = AndroidTvSettings.device("shield-recorded", "Test Shield", "127.0.0.1", fakeDevice.port(),
+                null, Instant.now());
+
+        try (AndroidTvSession recorded = new AndroidTvSession(device, ClientCertificate.generate("shield-remote"),
+                TIMINGS, states, null)) {
+            recorded.start();
+            await().until(() -> recorded.state().status() == DeviceStatus.CONNECTED);
+            fakeDevice.pushVolume(12, 100, false);
+            await().until(() -> recorded.state().volumeLevel() == 12);
+            int published = states.all().size();
+
+            fakeDevice.pushVolume(12, 100, false);
+            fakeDevice.pushVolume(13, 100, false);
+
+            await().until(() -> recorded.state().volumeLevel() == 13);
+            assertThat(states.all()).hasSize(published + 1);
+        }
     }
 }
