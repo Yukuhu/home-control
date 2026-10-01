@@ -25,8 +25,8 @@ class DeviceUrisTest {
     void anEncodedPathAndQueryStayAsGiven() throws MalformedURLException {
         String pathAndQuery = "/api/v2/channels/samsung.remote.control?name=SG9tZQ%3D%3D&token=a%2Bb";
 
-        assertThat(DeviceUris.of("wss", "192.0.2.5", 8002, pathAndQuery).toString())
-                .isEqualTo("wss://192.0.2.5:8002" + pathAndQuery);
+        assertThat(DeviceUris.of("wss", "192.0.2.5", 8002, pathAndQuery))
+                .hasToString("wss://192.0.2.5:8002" + pathAndQuery);
     }
 
     @Test
@@ -55,5 +55,14 @@ class DeviceUrisTest {
                     .as(host)
                     .isInstanceOf(MalformedURLException.class);
         }
+    }
+
+    @Test
+    void aHostTheSetupPageWouldRefuseIsRefused() {
+        // A URL carries a 64-character label, but no host name has one: the same check as the setup page applies.
+        String host = "a".repeat(64) + ".local";
+
+        assertThatThrownBy(() -> DeviceUris.of("http", host, 80, "/"))
+                .isInstanceOf(MalformedURLException.class);
     }
 }
