@@ -4,10 +4,10 @@ import dev.andre.homecontrol.adapters.cast.protocol.CastConnection;
 import dev.andre.homecontrol.adapters.cast.protocol.CastDisconnectCause;
 import dev.andre.homecontrol.adapters.cast.protocol.CastIncoming;
 import dev.andre.homecontrol.adapters.cast.protocol.CastPayloads;
-import dev.andre.homecontrol.adapters.cast.protocol.CastTimeoutException;
 import dev.andre.homecontrol.adapters.cast.protocol.MediaStatus;
 import dev.andre.homecontrol.adapters.cast.protocol.ReceiverStatus;
 import dev.andre.homecontrol.adapters.net.Backoff;
+import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.CastAppQuery;
@@ -196,7 +196,7 @@ public class CastSession implements DeviceHandle, ReceiverApps {
             CastIncoming error;
             try {
                 error = rejection.await(timings.customMessageErrorWindow());
-            } catch (CastTimeoutException _) {
+            } catch (DeviceTimeoutException _) {
                 return; // no rejection: the receiver took the request
             } catch (IOException _) {
                 throw new DeviceOfflineException(device.name() + " dropped the connection while starting playback");
@@ -310,7 +310,7 @@ public class CastSession implements DeviceHandle, ReceiverApps {
     private <T> T call(CastCall<T> call, String what) {
         try {
             return call.run();
-        } catch (CastTimeoutException _) {
+        } catch (DeviceTimeoutException _) {
             throw new ActionFailedException(device.name() + " did not answer in time when asked to " + what);
         } catch (IOException _) {
             throw new DeviceOfflineException(device.name() + " dropped the connection while trying to " + what);

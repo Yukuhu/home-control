@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.webos;
 
+import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import org.junit.jupiter.api.AfterEach;
@@ -165,7 +166,7 @@ class SsapConnectionTest {
         server.ignoreRequests(SsapUris.SET_VOLUME);
 
         assertThatThrownBy(() -> opened.request(SsapUris.SET_VOLUME, SsapMessages.empty().put("volume", 5)))
-                .isInstanceOf(SsapTimeoutException.class)
+                .isInstanceOf(DeviceTimeoutException.class)
                 .hasMessageContaining("within 2 seconds");
 
         assertThat(opened.request(SsapUris.SYSTEM_INFO, SsapMessages.empty()).path("modelName").asString(""))
@@ -247,7 +248,7 @@ class SsapConnectionTest {
         // Refused because the connection is known to be closed, not after a request timeout.
         assertThatThrownBy(() -> connection.request(SsapUris.SYSTEM_INFO, SsapMessages.empty()))
                 .isInstanceOf(IOException.class)
-                .isNotInstanceOf(SsapTimeoutException.class)
+                .isNotInstanceOf(DeviceTimeoutException.class)
                 .hasMessageStartingWith("The TV closed the connection:");
     }
 }

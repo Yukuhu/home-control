@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.webos;
 
 import dev.andre.homecontrol.adapters.net.Backoff;
+import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
@@ -126,7 +127,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
         }
         try {
             current.request(SsapUris.SYSTEM_INFO, SsapMessages.empty());
-        } catch (SsapTimeoutException _) {
+        } catch (DeviceTimeoutException _) {
             lost(current, "no answer to the liveness check");
         } catch (SsapException _) {
             // The TV answered; it is alive even if it refuses this request.
@@ -211,7 +212,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
         SsapConnection current = requireConnected();
         try {
             current.button(name);
-        } catch (SsapTimeoutException _) {
+        } catch (DeviceTimeoutException _) {
             throw new ActionFailedException(device.name() + " did not answer in time when asked to press " + name);
         } catch (SsapException e) {
             throw new ActionFailedException(device.name() + " refused the " + name + " button: " + e.getMessage());
@@ -224,7 +225,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
         SsapConnection current = requireConnected();
         try {
             current.request(uri, payload);
-        } catch (SsapTimeoutException _) {
+        } catch (DeviceTimeoutException _) {
             // Reachable but silent is a refusal (502), not an offline device; the liveness check
             // decides separately whether the whole connection is gone.
             throw new ActionFailedException(device.name() + " did not answer in time when asked to " + what);

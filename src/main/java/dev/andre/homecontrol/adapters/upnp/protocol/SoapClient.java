@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
+import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import dev.andre.homecontrol.discovery.ssdp.DeviceFetch;
 import org.w3c.dom.Element;
 
@@ -81,7 +82,7 @@ public final class SoapClient {
         } catch (HttpConnectTimeoutException e) {
             throw e; // unreachable, not slow
         } catch (HttpTimeoutException _) {
-            throw new SoapTimeoutException("No answer to " + request.action() + " within " + timeout.toMillis() + " ms");
+            throw new DeviceTimeoutException("No answer to " + request.action() + " within " + timeout.toMillis() + " ms");
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new InterruptedIOException("Interrupted while calling " + request.action());
