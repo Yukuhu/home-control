@@ -1,7 +1,7 @@
 package dev.andre.homecontrol.adapters.sonos.protocol;
 
 import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
-import dev.andre.homecontrol.discovery.ssdp.DeviceFetch;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceFetch;
 
 import java.net.InetAddress;
 import java.net.URI;

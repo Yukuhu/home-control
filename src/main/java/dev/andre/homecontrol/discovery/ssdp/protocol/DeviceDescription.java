@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.discovery.ssdp;
+package dev.andre.homecontrol.discovery.ssdp.protocol;
 
 import java.net.URI;
 import java.util.List;

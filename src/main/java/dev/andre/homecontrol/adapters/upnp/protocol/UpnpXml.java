@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
-import dev.andre.homecontrol.discovery.ssdp.DeviceDescriptions;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceDescriptions;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
