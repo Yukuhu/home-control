@@ -96,7 +96,7 @@ public class FakeUpnpRenderer implements AutoCloseable {
         this("127.0.0.1", Layout.GENERIC);
     }
 
-    protected FakeUpnpRenderer(String bindAddress, Layout layout) throws IOException {
+    public FakeUpnpRenderer(String bindAddress, Layout layout) throws IOException {
         this.layout = layout;
         server = HttpServer.create(new InetSocketAddress(InetAddress.getByName(bindAddress), 0), 0);
         server.createContext("/", this::handle);

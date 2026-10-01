@@ -8,24 +8,20 @@ import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
 import dev.andre.homecontrol.adapters.support.RendererCommands;
 import dev.andre.homecontrol.adapters.support.RendererStatePoller;
 import dev.andre.homecontrol.adapters.support.StatePublisher;
+import dev.andre.homecontrol.adapters.upnp.protocol.RendererResolver;
 import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapFault;
 import dev.andre.homecontrol.adapters.upnp.protocol.UpnpActions;
-import dev.andre.homecontrol.adapters.upnp.protocol.VolumeRange;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceDescription;
-import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceDescriptions;
-import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceFetch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -44,8 +40,7 @@ public class UpnpSession implements DeviceHandle {
 
     private final Device device;
     private final UpnpSettings settings;
-    private final UpnpTimings timings;
-    private final HttpClient http;
+    private final RendererResolver resolver;
     private final RendererCommands commands;
     private final Function<String, Optional<URI>> locator;
     private final Runnable onClosed;
@@ -68,8 +63,7 @@ public class UpnpSession implements DeviceHandle {
                Function<String, Optional<URI>> locator, Consumer<DeviceState> onChange, Runnable onClosed) {
         this.device = device;
         this.settings = UpnpSettings.of(device);
-        this.timings = timings;
-        this.http = http;
+        this.resolver = new RendererResolver(http, timings.commandTimeout());
         this.commands = new RendererCommands(new SoapClient(http, timings.commandTimeout()), device.name());
         this.locator = locator;
         this.publisher = new StatePublisher(device.id(), DeviceState.initial(), onChange);
@@ -152,84 +146,22 @@ public class UpnpSession implements DeviceHandle {
     /** Every callback runs on the poll loop's thread. */
     private final class Link implements ReconnectingPoller.Link {
 
-        /**
-         * Reads the description and SCPD only under F1's rules ({@link DeviceFetch}): the location
-         * announced for this UDN, else the stored one — either way on the registered device's own address;
-         * plain HTTP to an IP literal, 64 KiB at most, no redirects — and only a description that names
-         * this device's UDN. Locations are never logged.
-         */
+        /** The announced location for this UDN, else the stored one; {@link RendererResolver} checks it. */
         private Endpoints resolve() throws IOException {
             Optional<URI> announced = Optional.ofNullable(settings.udn()).flatMap(locator);
-            URI location = announced.orElse(settings.location());
             // Whatever the source, the description must live on the registered device's address: an
             // announcement cannot move this session (and the stream URLs it sends) to another host.
-            if (location == null || !DeviceFetch.isSafeToFetch(location, device.host())) {
-                throw new IOException(device.id() + " has no description address on its own host");
-            }
-            Duration timeout = timings.commandTimeout();
-            DeviceDescription description;
-            try {
-                description = DeviceDescriptions.parse(
-                        DeviceFetch.get(http, location, timeout, DeviceFetch.MAX_DESCRIPTION_BYTES), location);
-            } catch (IllegalArgumentException _) {
-                throw new IOException("Unreadable description for " + device.id());
-            } catch (InterruptedException _) {
-                // Only close() interrupts the poll loop; the attempt fails like any unreachable device.
-                Thread.currentThread().interrupt();
-                throw new InterruptedIOException("Interrupted while reading the description of " + device.id());
-            }
-            if (settings.udn() != null && (description.udn() == null || !settings.udn().equalsIgnoreCase(description.udn()))) {
-                throw new IOException("The description at " + device.id() + "'s address belongs to another device");
-            }
-            ServiceEndpoint avTransport = service(description, UpnpActions.AV_TRANSPORT, location)
-                    .orElseThrow(() -> new IOException(device.id() + " offers no usable AVTransport service"));
-            ServiceEndpoint renderingControl = service(description, UpnpActions.RENDERING_CONTROL, location).orElse(null);
-            ServiceEndpoint connectionManager = service(description, UpnpActions.CONNECTION_MANAGER, location).orElse(null);
-            int volumeMax = renderingControl == null ? 0 : volumeMaximum(renderingControl, location, timeout);
+            RendererResolver.Renderer found = resolver.resolve(announced.orElse(settings.location()), device.host(),
+                    settings.udn());
             ProtocolInfo sink = ProtocolInfo.UNKNOWN;
-            if (connectionManager != null) {
+            if (found.connectionManager() != null) {
                 try {
-                    sink = commands.sink(connectionManager);
+                    sink = commands.sink(found.connectionManager());
                 } catch (SoapFault fault) {
                     log.debug("{} did not list its formats: {}", device.id(), fault.getMessage());
                 }
             }
-            return new Endpoints(avTransport, renderingControl, volumeMax, sink);
-        }
-
-        /** Services on another host than the (already verified) description location are refused (epic constraint). */
-        private Optional<ServiceEndpoint> service(DeviceDescription description, String typePrefix, URI location) {
-            return description.service(typePrefix).map(ServiceEndpoint::of).filter(endpoint -> {
-                boolean sameHost = onHost(endpoint.controlUrl(), location);
-                if (!sameHost) {
-                    log.warn("Ignoring {} of {}: its control URL is not on the host it announced itself from", typePrefix, device.id());
-                }
-                boolean validType = SoapClient.isValidServiceType(endpoint.serviceType());
-                if (!validType) {
-                    log.warn("Ignoring {} of {}: malformed service type", typePrefix, device.id());
-                }
-                return sameHost && validType;
-            });
-        }
-
-        private static boolean onHost(URI url, URI location) {
-            return url != null && "http".equalsIgnoreCase(url.getScheme()) && url.getHost() != null
-                    && url.getHost().equalsIgnoreCase(location.getHost());
-        }
-
-        private int volumeMaximum(ServiceEndpoint renderingControl, URI location, Duration timeout) {
-            URI scpd = renderingControl.scpdUrl();
-            if (!onHost(scpd, location)) {
-                return VolumeRange.DEFAULT_MAXIMUM;
-            }
-            try {
-                return VolumeRange.maximum(DeviceFetch.get(http, scpd, timeout, DeviceFetch.MAX_DESCRIPTION_BYTES));
-            } catch (IOException _) {
-                return VolumeRange.DEFAULT_MAXIMUM;
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-                return VolumeRange.DEFAULT_MAXIMUM;
-            }
+            return new Endpoints(found.avTransport(), found.renderingControl(), found.volumeMax(), sink);
         }
 
         /** Reads the device and publishes; runs on the poll loop only. */
