@@ -29,7 +29,7 @@ public final class InsecureTls {
                 .build();
     }
 
-    static SSLContext trustingAnyCertificate() {
+    public static SSLContext trustingAnyCertificate() {
         try {
             SSLContext context = SSLContext.getInstance("TLS");
             context.init(null, new TrustManager[]{new AcceptAny()}, new SecureRandom());
@@ -39,7 +39,8 @@ public final class InsecureTls {
         }
     }
 
-    // Only Tizen (wss 8002) and webOS (wss 3001) TVs: self-signed LAN certificates, none of them pinned.
+    // TVs (Tizen wss 8002, webOS wss 3001) and Cast receivers (TLS 8009): self-signed LAN certificates, none of
+    // them pinned.
     @SuppressWarnings("java:S4830")
     private static final class AcceptAny extends X509ExtendedTrustManager {
         @Override
