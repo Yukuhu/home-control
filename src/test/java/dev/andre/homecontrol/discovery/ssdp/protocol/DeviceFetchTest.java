@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.discovery.ssdp;
+package dev.andre.homecontrol.discovery.ssdp.protocol;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;

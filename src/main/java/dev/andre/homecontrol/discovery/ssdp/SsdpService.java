@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.discovery.ssdp;
 
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceDescription;
+
 import java.net.URI;
 import java.time.Instant;
 import java.util.Map;

@@ -18,9 +18,9 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.discovery.ssdp.DeviceDescription;
-import dev.andre.homecontrol.discovery.ssdp.DeviceDescriptions;
-import dev.andre.homecontrol.discovery.ssdp.DeviceFetch;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceDescription;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceDescriptions;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceFetch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

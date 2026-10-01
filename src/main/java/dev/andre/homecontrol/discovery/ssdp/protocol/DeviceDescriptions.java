@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.discovery.ssdp;
+package dev.andre.homecontrol.discovery.ssdp.protocol;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;

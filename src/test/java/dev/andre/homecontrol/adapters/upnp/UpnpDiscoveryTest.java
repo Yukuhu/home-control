@@ -2,12 +2,12 @@ package dev.andre.homecontrol.adapters.upnp;
 
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DiscoveredDevice;
-import dev.andre.homecontrol.discovery.ssdp.DeviceDescription;
 import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
 import dev.andre.homecontrol.discovery.ssdp.SsdpService;
 import dev.andre.homecontrol.discovery.ssdp.SsdpTimings;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceDescription;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

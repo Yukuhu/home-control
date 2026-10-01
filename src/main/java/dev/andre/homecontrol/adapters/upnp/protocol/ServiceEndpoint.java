@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
-import dev.andre.homecontrol.discovery.ssdp.DeviceDescription;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceDescription;
 
 import java.net.URI;
 

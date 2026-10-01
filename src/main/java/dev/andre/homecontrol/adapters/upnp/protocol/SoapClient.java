@@ -1,7 +1,7 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
 import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
-import dev.andre.homecontrol.discovery.ssdp.DeviceFetch;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceFetch;
 import org.w3c.dom.Element;
 
 import java.io.IOException;

@@ -1,5 +1,8 @@
 package dev.andre.homecontrol.discovery.ssdp;
 
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceDescription;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceDescriptions;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceFetch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;

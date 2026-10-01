@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.discovery.ssdp;
+package dev.andre.homecontrol.discovery.ssdp.protocol;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
