@@ -40,16 +40,16 @@ public final class TizenRemoteConnection implements AutoCloseable {
         this.channel = channel;
     }
 
-      /** Nothing that needs closing exists until the socket is open, so a failed open leaves nothing behind. */
-      public static TizenRemoteConnection open(HttpClient http, String host, TizenOptions options, String token,
-                                               Consumer<String> onClosed) throws IOException {
-          Channel channel = new Channel(onClosed);
-          TextWebSocket socket = TextWebSocket.connect(http,
-                  TizenMessages.remoteUri(host, options.port(), options.clientName(), token),
-                  options.connectTimeout(), channel);
-          return new TizenRemoteConnection(socket, channel);
-      }
-  
+    /** Nothing that needs closing exists until the socket is open, so a failed open leaves nothing behind. */
+    public static TizenRemoteConnection open(HttpClient http, String host, TizenOptions options, String token,
+                                             Consumer<String> onClosed) throws IOException {
+        Channel channel = new Channel(onClosed);
+        TextWebSocket socket = TextWebSocket.connect(http,
+                TizenMessages.remoteUri(host, options.port(), options.clientName(), token),
+                options.connectTimeout(), channel);
+        return new TizenRemoteConnection(socket, channel);
+    }
+
 
     public Authorization awaitAuthorization(Duration timeout) throws IOException {
         try {

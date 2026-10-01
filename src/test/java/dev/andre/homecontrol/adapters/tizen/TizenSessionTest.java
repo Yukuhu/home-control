@@ -496,10 +496,10 @@ class TizenSessionTest {
         assertThat(TizenSession.reportedMac(new TizenDeviceInfo("TV", "QE55", "on", "", true))).isEmpty();
     }
 
-      private static TizenProperties properties(FakeTizenServer fake) {
-          return new TizenProperties(true, fake.port(), fake.httpPort(), fake.httpPort(), "Home Control",
-                  Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(1),
-                  Duration.ofSeconds(0));
-      }
-  
+    private static TizenProperties properties(FakeTizenServer fake) {
+        return new TizenProperties(true, fake.port(), fake.httpPort(), fake.httpPort(), "Home Control",
+                Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(1),
+                Duration.ofSeconds(0));
+    }
+
 }

@@ -298,10 +298,10 @@ public class FakeTizenServer implements AutoCloseable {
         http.stop(0);
     }
 
-      /** Protocol clients pointed at this fake, with two-second waits. */
-      public TizenOptions options() {
-          return new TizenOptions(port(), httpPort(), httpPort(), "Home Control", Duration.ofSeconds(2),
-                  Duration.ofSeconds(2));
-      }
-  
+    /** Protocol clients pointed at this fake, with two-second waits. */
+    public TizenOptions options() {
+        return new TizenOptions(port(), httpPort(), httpPort(), "Home Control", Duration.ofSeconds(2),
+                Duration.ofSeconds(2));
+    }
+
 }
