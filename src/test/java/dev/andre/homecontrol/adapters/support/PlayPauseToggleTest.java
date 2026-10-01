@@ -22,7 +22,7 @@ class PlayPauseToggleTest {
     }
 
     @Test
-    void concurrentPressesStillAlternate() throws Exception {
+    void concurrentPressesStillAlternate() {
         // A press that reads the toggle while another flips it leaves it unflipped, and the next press repeats the
         // command before it. Under contention that happens many times over.
         PlayPauseToggle toggle = new PlayPauseToggle();
