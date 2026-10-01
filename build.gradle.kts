@@ -46,6 +46,12 @@ allprojects {
         toolVersion = "0.8.15"
     }
 
+    tasks.withType<JacocoReport>().configureEach {
+        reports {
+            xml.required = true
+        }
+    }
+
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
         testLogging { showExceptions = true }
@@ -67,9 +73,15 @@ allprojects {
     }
 }
 
-tasks.named<JacocoReport>("testCodeCoverageReport") {
-    reports {
-        xml.required = true
+// What only the modules need: Spring Boot's plugin gives the app's compiler -parameters, which the modules get the
+// same way here. `test --tests` runs its filter in every project: a module without a match passes, and the app's
+// `test` still fails when nothing matches, so a filter that matches no test anywhere fails the build.
+subprojects {
+    tasks.withType<JavaCompile>().configureEach {
+        options.compilerArgs.add("-parameters")
+    }
+    tasks.withType<Test>().configureEach {
+        filter.isFailOnNoMatchingTests = false
     }
 }
 
@@ -101,6 +113,7 @@ dependencies {
         implementation(libs.tomcat.embed.el)
         implementation(libs.tomcat.embed.websocket)
     }
+    implementation(project(":core"))
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
