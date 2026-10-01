@@ -11,8 +11,11 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A session's one thread, a virtual one, with at most one pending one-shot task. Once {@link #close()} has run, every
- * call is a no-op that returns false: a caller racing close() never sees a {@link RejectedExecutionException}.
+ * A session's one thread, a virtual one. A one-shot task waits in a {@link Timer}, which holds at most one: the loop's
+ * own ({@link #schedule}), or one a session takes for a second wait ({@link #timer()}). Once {@link #close()} has run,
+ * every call is a no-op that returns false: a caller racing close() never sees a {@link RejectedExecutionException}.
+ * A task that throws is logged with the loop's name: a {@link RuntimeException} as a warning, and the loop goes on; an
+ * {@link Error} as an error, and it still ends that task (a periodic one for good).
  */
 public final class SessionLoop implements AutoCloseable {
 
@@ -20,8 +23,7 @@ public final class SessionLoop implements AutoCloseable {
 
     private final String name;
     private final ScheduledExecutorService executor;
-    private final Object lock = new Object();
-    private ScheduledFuture<?> pending; // guarded by lock
+    private final Timer pending = new Timer();
     private volatile boolean closed;
 
     public SessionLoop(String name) {
@@ -34,34 +36,26 @@ public final class SessionLoop implements AutoCloseable {
             return false;
         }
         try {
-            executor.execute(task);
+            executor.execute(logged(task));
             return true;
         } catch (RejectedExecutionException _) {
             return false;
         }
     }
 
-    /** Runs {@code task} after {@code delay} as the one pending task, replacing the one scheduled before. */
+    /** Runs {@code task} after {@code delay} as the loop's pending task, replacing the one scheduled before. */
     public boolean schedule(Runnable task, Duration delay) {
-        synchronized (lock) {
-            cancelPendingLocked();
-            if (closed) {
-                return false;
-            }
-            try {
-                pending = executor.schedule(task, delay.toMillis(), TimeUnit.MILLISECONDS);
-                return true;
-            } catch (RejectedExecutionException _) {
-                return false;
-            }
-        }
+        return pending.schedule(task, delay);
     }
 
-    /** Drops the pending task if it has not started. */
+    /** Drops the loop's pending task if it has not started. */
     public void cancelPending() {
-        synchronized (lock) {
-            cancelPendingLocked();
-        }
+        pending.cancel();
+    }
+
+    /** A pending-task slot of its own, for a session that waits for two things at once. */
+    public Timer timer() {
+        return new Timer();
     }
 
     /** Runs {@code task} every {@code interval} after the previous run ends; a failed run is logged, the next still comes. */
@@ -70,13 +64,7 @@ public final class SessionLoop implements AutoCloseable {
             return false;
         }
         try {
-            executor.scheduleWithFixedDelay(() -> {
-                try {
-                    task.run();
-                } catch (RuntimeException e) {
-                    log.warn("{}: a periodic task failed", name, e);
-                }
-            }, interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
+            executor.scheduleWithFixedDelay(logged(task), interval.toMillis(), interval.toMillis(), TimeUnit.MILLISECONDS);
             return true;
         } catch (RejectedExecutionException _) {
             return false;
@@ -90,10 +78,56 @@ public final class SessionLoop implements AutoCloseable {
         executor.shutdownNow();
     }
 
-    private void cancelPendingLocked() {
-        if (pending != null) {
-            pending.cancel(false);
-            pending = null;
+    @SuppressWarnings("java:S1181") // an Error is logged and rethrown: it still ends the task
+    private Runnable logged(Runnable task) {
+        return () -> {
+            try {
+                task.run();
+            } catch (RuntimeException e) {
+                log.warn("{}: a task failed", name, e);
+            } catch (Error e) {
+                log.error("{}: a task failed", name, e);
+                throw e;
+            }
+        };
+    }
+
+    /** At most one pending one-shot task on this loop: scheduling another replaces it. */
+    public final class Timer {
+
+        private final Object lock = new Object();
+        private ScheduledFuture<?> task; // guarded by lock
+
+        private Timer() {
+        }
+
+        public boolean schedule(Runnable next, Duration delay) {
+            synchronized (lock) {
+                cancelLocked();
+                if (closed) {
+                    return false;
+                }
+                try {
+                    task = executor.schedule(logged(next), delay.toMillis(), TimeUnit.MILLISECONDS);
+                    return true;
+                } catch (RejectedExecutionException _) {
+                    return false;
+                }
+            }
+        }
+
+        /** Drops the pending task if it has not started. */
+        public void cancel() {
+            synchronized (lock) {
+                cancelLocked();
+            }
+        }
+
+        private void cancelLocked() {
+            if (task != null) {
+                task.cancel(false);
+                task = null;
+            }
         }
     }
 }

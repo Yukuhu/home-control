@@ -22,11 +22,17 @@ public final class ConnectionSlot<C extends AutoCloseable> {
         this.name = name;
     }
 
-    /** Makes {@code connection} the current one and closes the one before; false, and it is closed, once the slot is. */
+    /**
+     * Makes {@code connection} the current one and closes the one before, unless it is the same; false, and it is
+     * closed, once the slot is.
+     */
     public boolean set(C connection) {
         C givenUp;
         boolean accepted;
         synchronized (this) {
+            if (!closed && current == connection) {
+                return true;
+            }
             accepted = !closed;
             givenUp = accepted ? current : connection;
             if (accepted) {
