@@ -108,4 +108,15 @@ class ConnectionSlotTest {
         assertThat(slot.current()).isEmpty();
         assertThat(broken.closes).hasValue(1);
     }
+
+    @Test
+    void settingTheCurrentConnectionAgainKeepsItOpen() {
+        Connection connection = new Connection();
+        slot.set(connection);
+
+        assertThat(slot.set(connection)).isTrue();
+
+        assertThat(connection.closes).hasValue(0);
+        assertThat(slot.current()).containsSame(connection);
+    }
 }

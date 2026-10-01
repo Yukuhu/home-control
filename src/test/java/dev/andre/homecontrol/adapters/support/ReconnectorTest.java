@@ -113,7 +113,7 @@ class ReconnectorTest {
 
     @Test
     void retryInWaitsTheGivenTimeInsteadOfTheBackoff() {
-        Reconnector reconnector = reconnector(Duration.ofSeconds(10), Duration.ofSeconds(10), PENDING);
+        Reconnector reconnector = reconnector(Duration.ofSeconds(10), Duration.ofSeconds(10), RETRY);
         reconnector.start();
         await().atMost(Duration.ofSeconds(1)).until(() -> attempts.size() == 1);
 
@@ -138,5 +138,57 @@ class ReconnectorTest {
         int atClose = attempts.size();
 
         await().during(Duration.ofMillis(400)).atMost(Duration.ofSeconds(2)).until(() -> attempts.size() == atClose);
+    }
+
+    @Test
+    void whileConnectedReconnectNowAndRetryInAttemptNothing() {
+        Reconnector reconnector = reconnector(Duration.ofMillis(50), Duration.ofMillis(50));
+        reconnector.start();
+        await().atMost(Duration.ofSeconds(1)).until(() -> attempts.size() == 1);
+
+        reconnector.reconnectNow();
+        reconnector.retryIn(Duration.ofMillis(10));
+
+        await().during(Duration.ofMillis(400)).atMost(Duration.ofSeconds(2)).until(() -> attempts.size() == 1);
+    }
+
+    @Test
+    void whileAnAttemptWaitsReconnectNowAndRetryInAttemptNothing() {
+        Reconnector reconnector = reconnector(Duration.ofMillis(50), Duration.ofMillis(50), PENDING);
+        reconnector.start();
+        await().atMost(Duration.ofSeconds(1)).until(() -> attempts.size() == 1);
+
+        reconnector.reconnectNow();
+        reconnector.retryIn(Duration.ofMillis(10));
+
+        await().during(Duration.ofMillis(400)).atMost(Duration.ofSeconds(2)).until(() -> attempts.size() == 1);
+    }
+
+    @Test
+    void aPendingAttemptThatConnectsResetsTheBackoffForTheNextLoss() {
+        // Three retries grow the backoff to 800 ms; connected() resets it, so the attempt after the loss waits 100 ms.
+        Reconnector reconnector = reconnector(Duration.ofMillis(100), Duration.ofSeconds(10), RETRY, RETRY, RETRY,
+                PENDING);
+        reconnector.start();
+        await().atMost(Duration.ofSeconds(3)).until(() -> attempts.size() == 4);
+
+        reconnector.connected();
+        reconnector.reconnectNow();
+        await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2)).until(() -> attempts.size() == 4);
+
+        reconnector.lost();
+        await().atMost(Duration.ofMillis(600)).until(() -> attempts.size() == 5);
+    }
+
+    @Test
+    void stopEndsAnAttemptAlreadyScheduled() {
+        Reconnector reconnector = reconnector(Duration.ofMillis(200), Duration.ofMillis(200), RETRY, RETRY);
+        reconnector.start();
+        await().atMost(Duration.ofSeconds(1)).until(() -> attempts.size() == 1);
+
+        reconnector.stop();
+
+        await().during(Duration.ofMillis(600)).atMost(Duration.ofSeconds(2)).until(() -> attempts.size() == 1);
+        assertThat(reconnector.stopped()).isTrue();
     }
 }
