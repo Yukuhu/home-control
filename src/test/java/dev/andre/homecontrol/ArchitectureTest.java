@@ -44,6 +44,7 @@ class ArchitectureTest {
     @ArchTest
     static void coreLivesInItsModuleAlone(JavaClasses classes) {
         assertThat(classes.that(resideInAPackage("dev.andre.homecontrol.core..")))
+                .isNotEmpty()
                 .allSatisfy(javaClass -> assertThat(javaClass.getSource())
                         .hasValueSatisfying(source -> assertThat(source.getUri().toString())
                                 .as(javaClass.getName())
