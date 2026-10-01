@@ -34,9 +34,8 @@ Rules for everyone who changes this repository, people and coding agents alike. 
 
 - Only adapters speak device protocols, and only sources speak content APIs. `ArchitectureTest` enforces the package
   rules; see [Architecture](docs/dev/architecture.md).
-- Rules the code still breaks are frozen in `src/test/archunit-store`. When you fix a violation, commit the smaller
-  store. Never refreeze. When a change only alters a frozen violation's text, replace its store line by hand; see
-  [Frozen violations](docs/dev/architecture.md#frozen-violations).
+- Every package rule is strict. A change that breaks one changes the code, not the rule; a rule that needs an
+  exception names it in the rule, with its reason.
 - Decisions that are hard to reverse get an [architecture decision record](docs/adr/README.md).
 
 ## Where things live

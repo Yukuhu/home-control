@@ -11,7 +11,7 @@ What runs on every push and pull request, and how releases are made.
 | Find out what changed | Decides with `scripts/code-changed.sh` whether a pull request changes anything besides documentation; if it does not, the jobs that build and test are left out. A push to `main` runs them all. |
 | Verify dependency checksums | Resolves all dependency configurations before the builds and browser tests. For an unreviewed Dependabot update, uploads a checksum review patch and blocks the builds until reviewed metadata is committed. |
 | Build the jar | Builds the one jar of the run and works out its version; every image that is tested or published is built from it. |
-| Build and test | Runs `./gradlew build` with the full test suite, checks that the frozen architecture violations are committed, and uploads the reports. |
+| Build and test | Runs `./gradlew build` with the full test suite and uploads the reports. |
 | Build the self-contained image | Checks that `Dockerfile` and `Dockerfile.dist` describe the same runtime, and builds `Dockerfile` without pushing it. |
 | Smoke-test the image on amd64, arm64 | Builds the image that is published, natively on each architecture, and starts it; for a release, it pushes that image by digest. |
 | Smoke-test the Bluetooth image on amd64, arm64 | The same for the `-bluetooth` variant, in its own job so that it never gates the release. |

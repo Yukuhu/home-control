@@ -43,8 +43,6 @@ tasks.jacocoTestReport {
 
 tasks.test {
     finalizedBy(tasks.jacocoTestReport)
-    // ArchitectureTest compares the code with the committed store of frozen violations: a changed store must re-run it.
-    inputs.dir("src/test/archunit-store").withPropertyName("archunitStore").withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 tasks.named("sonar") {
