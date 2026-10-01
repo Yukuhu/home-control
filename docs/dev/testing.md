@@ -156,6 +156,16 @@ against a previously reviewed value.
   whole seconds for timeouts that must not fire; a "nothing happens" check (`await().during(...)`) covers at least five
   of the intervals it watches. Tests assert outcomes (the exception, its message, the order of events), never an upper
   bound on elapsed time unless that time is the behaviour under test (`EventStreamShutdownEndToEndTest`).
+- A device session composes the toolkit in `adapters.support`: a `SessionLoop` (one virtual thread), a
+  `StatePublisher`, a `ConnectionSlot` and, for Cast, Android TV and webOS, a `Reconnector`. The publisher drops a
+  state that repeats the last one in everything the UI shows, so a test counts connection attempts at the fake
+  (`connections()`), or counts CONNECTING states only where each follows a DISCONNECTED one.
+- `close()` interrupts the session's loop, and on a virtual thread that aborts a blocking socket call. A test that
+  needs a step to finish after `close()`, as a step that had already finished would, holds it in a step that ignores
+  the interrupt (`UpnpSessionTest.awaitIgnoringInterrupts`, `SonosSessionTest.HeldClock`).
+- A session's commands fail through `DeviceCalls`, so their messages read the same everywhere: "… did not answer in
+  time when asked to …", "… refused to …: …", "… could not be reached to …" and "… is not connected". A test asserts
+  one of these, or only the reason the device gave.
 - A test never shares a file or a fixed port with another test JVM: files go in `@TempDir` or
   `Files.createTempDirectory`, and servers bind port 0.
 - On a plain `ws://` connection, the JDK's WebSocket client loses an orderly close (FIN) that arrives while its
