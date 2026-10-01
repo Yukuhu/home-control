@@ -14,9 +14,12 @@ import org.freedesktop.dbus.types.Variant;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+
+import static org.awaitility.Awaitility.await;
 
 /** BlueZ objects exported on a private, in-process D-Bus; never opens the host's system bus. */
 public final class FakeBluezService implements ObjectManager, AutoCloseable {
@@ -31,6 +34,9 @@ public final class FakeBluezService implements ObjectManager, AutoCloseable {
         DBusConnection opened = null;
         try {
             daemon.startInBackgroundAndWait(5_000);
+            // dbus-java reports the daemon started once its socket is bound, but its accept loop stops after the first
+            // connection when the daemon thread is not running yet, and that connection breaks. Wait for the thread.
+            await().atMost(Duration.ofSeconds(5)).until(daemon::isRunning);
             opened = DBusConnectionBuilder.forAddress(address()).withShared(false).build();
             opened.exportObject("/", this);
             opened.requestBusName("org.bluez");
