@@ -24,12 +24,8 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
-import static com.tngtech.archunit.library.freeze.FreezingArchRule.freeze;
 
-/**
- * The package rules of docs/dev/architecture.md, checked on every build. Rules the code still breaks are frozen:
- * their known violations are recorded in src/test/archunit-store, and only new ones fail.
- */
+/** The package rules of docs/dev/architecture.md, checked on every build. Every rule is strict. */
 @AnalyzeClasses(packages = "dev.andre.homecontrol", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 
@@ -115,39 +111,37 @@ class ArchitectureTest {
                     + "wires the device package");
 
     @ArchTest
-    static final ArchRule protocolPackagesStandAlone = freeze(noClasses()
+    static final ArchRule protocolPackagesStandAlone = noClasses()
             .that().resideInAPackage("..protocol..")
             .should().dependOnClassesThat().resideInAPackage("org.springframework..")
             .orShould().dependOnClassesThat(resideInAPackage("dev.andre.homecontrol..")
                     .and(not(resideInAnyPackage("..protocol..", "dev.andre.homecontrol.adapters.net.."))))
-            .because("wire protocols are libraries: they take plain values and know nothing of Spring or the app"));
+            .because("wire protocols are libraries: they take plain values and know nothing of Spring or the app");
 
-    /** Frozen per cycle, by the packages it runs through (see {@link CycleViolations}). */
     @ArchTest
-    static final ArchRule topLevelPackagesAreFreeOfCycles = freeze(slices()
+    static final ArchRule topLevelPackagesAreFreeOfCycles = slices()
             .matching("dev.andre.homecontrol.(*)..")
             .should().beFreeOfCycles()
-            .because("packages in a cycle cannot be understood, tested or split apart on their own"))
-            .associateViolationLinesVia(new CycleViolations());
+            .because("packages in a cycle cannot be understood, tested or split apart on their own");
 
     @ArchTest
-    static final ArchRule sourcesDoNotDependOnAdapters = freeze(noClasses()
+    static final ArchRule sourcesDoNotDependOnAdapters = noClasses()
             .that().resideInAPackage("dev.andre.homecontrol.sources..")
             .should().dependOnClassesThat().resideInAPackage("dev.andre.homecontrol.adapters..")
-            .because("sources see devices only through the domain model in core"));
+            .because("sources see devices only through the domain model in core");
 
     @ArchTest
-    static final ArchRule adaptersDoNotDependOnSourcesOrWeb = freeze(noClasses()
+    static final ArchRule adaptersDoNotDependOnSourcesOrWeb = noClasses()
             .that().resideInAPackage("dev.andre.homecontrol.adapters..")
             .should().dependOnClassesThat().resideInAnyPackage("dev.andre.homecontrol.sources..",
                     "dev.andre.homecontrol.web..")
-            .because("adapters speak device protocols and nothing else"));
+            .because("adapters speak device protocols and nothing else");
 
     @ArchTest
-    static final ArchRule webDoesNotDependOnAdapters = freeze(noClasses()
+    static final ArchRule webDoesNotDependOnAdapters = noClasses()
             .that().resideInAPackage("dev.andre.homecontrol.web..")
             .should().dependOnClassesThat().resideInAPackage("dev.andre.homecontrol.adapters..")
-            .because("the web layer sees the domain model only"));
+            .because("the web layer sees the domain model only");
 
     @ArchTest
     static final ArchRule servletTypesStayAtTheWebEdge = noClasses()
