@@ -13,7 +13,11 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -32,14 +36,27 @@ public class LoginService {
     private final SecretStore store;
     private final Argon2PasswordHasher hasher;
     private final SecureRandom random;
+    /**
+     * Argon2 is CPU-bound for up to a second on a small board. Request threads are virtual, and a virtual thread that
+     * computes keeps its carrier, of which there are as many as cores; so the hashing runs on these platform threads,
+     * one per verification slot, while the request waits without holding a carrier.
+     */
+    private static final ExecutorService HASHING = Executors.newFixedThreadPool(2,
+            Thread.ofPlatform().daemon().name("login-hash-", 0).factory());
     /** Each verification holds ~19 MiB; two at a time bounds memory under a login flood. */
     private final Semaphore verifications = new Semaphore(2);
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
+    private final ExecutorService hashing;
 
     public LoginService(SecretStore store, Argon2PasswordHasher hasher, SecureRandom random) {
+        this(store, hasher, random, HASHING);
+    }
+
+    LoginService(SecretStore store, Argon2PasswordHasher hasher, SecureRandom random, ExecutorService hashing) {
         this.store = store;
         this.hasher = hasher;
         this.random = random;
+        this.hashing = hashing;
     }
 
     public boolean loginRequired() {
@@ -252,15 +269,33 @@ public class LoginService {
             throw new LoginBusyException();
         }
         try {
-            return hasher.matches(password, login.passwordHash());
+            return onHashingThread(() -> hasher.matches(password, login.passwordHash()));
         } finally {
             verifications.release();
+        }
+    }
+
+    private <T> T onHashingThread(Callable<T> work) {
+        try {
+            return hashing.submit(work).get();
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            throw new LoginBusyException();
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            if (e.getCause() instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException(e.getCause());
         }
     }
 
     private LoginCredential newCredential(String password) {
         byte[] version = new byte[16];
         random.nextBytes(version);
-        return new LoginCredential(hasher.hash(password), Base64.getUrlEncoder().withoutPadding().encodeToString(version));
+        String hash = onHashingThread(() -> hasher.hash(password));
+        return new LoginCredential(hash, Base64.getUrlEncoder().withoutPadding().encodeToString(version));
     }
 }
