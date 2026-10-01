@@ -1,9 +1,17 @@
-package dev.andre.homecontrol.adapters.upnp.protocol;
+package dev.andre.homecontrol.adapters.support;
 
-import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
+import dev.andre.homecontrol.adapters.upnp.protocol.DidlLite;
+import dev.andre.homecontrol.adapters.upnp.protocol.PositionInfo;
+import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
+import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
+import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
+import dev.andre.homecontrol.adapters.upnp.protocol.SoapFault;
+import dev.andre.homecontrol.adapters.upnp.protocol.SoapRequest;
+import dev.andre.homecontrol.adapters.upnp.protocol.TransportInfo;
+import dev.andre.homecontrol.adapters.upnp.protocol.UpnpActions;
+import dev.andre.homecontrol.adapters.upnp.protocol.VolumeRange;
+import dev.andre.homecontrol.adapters.upnp.protocol.VolumeReading;
 import dev.andre.homecontrol.core.Action;
-import dev.andre.homecontrol.core.ActionFailedException;
-import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 
 import java.io.IOException;
@@ -89,14 +97,13 @@ public final class RendererCommands {
     }
 
     public <T> T run(String what, SoapCall<T> call) {
-        try {
-            return call.call();
-        } catch (SoapFault fault) {
-            throw new RendererFaultException(deviceName + " refused to " + what + " (" + fault.getMessage() + ")", fault.errorCode());
-        } catch (DeviceTimeoutException _) {
-            throw new ActionFailedException(deviceName + " did not answer in time when asked to " + what);
-        } catch (IOException _) {
-            throw new DeviceOfflineException(deviceName + " could not be reached to " + what);
-        }
+        return DeviceCalls.run(deviceName, what, () -> {
+            try {
+                return call.call();
+            } catch (SoapFault fault) {
+                throw new RendererFaultException(deviceName + " refused to " + what + " (" + fault.getMessage() + ")",
+                        fault.errorCode());
+            }
+        });
     }
 }

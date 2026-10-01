@@ -5,18 +5,16 @@ import dev.andre.homecontrol.adapters.sonos.protocol.SonosEndpoints;
 import dev.andre.homecontrol.adapters.sonos.protocol.SonosUris;
 import dev.andre.homecontrol.adapters.sonos.protocol.ZoneGroupState;
 import dev.andre.homecontrol.adapters.support.ReconnectingPoller;
-import dev.andre.homecontrol.adapters.upnp.protocol.NowPlayings;
 import dev.andre.homecontrol.adapters.upnp.protocol.PlayedItem;
-import dev.andre.homecontrol.adapters.upnp.protocol.PositionInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
-import dev.andre.homecontrol.adapters.upnp.protocol.RendererCommands;
-import dev.andre.homecontrol.adapters.upnp.protocol.RendererFaultException;
+import dev.andre.homecontrol.adapters.support.RendererCommands;
+import dev.andre.homecontrol.adapters.support.RendererFaultException;
+import dev.andre.homecontrol.adapters.support.RendererStatePoller;
+import dev.andre.homecontrol.adapters.support.StatePublisher;
 import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapFault;
-import dev.andre.homecontrol.adapters.upnp.protocol.TransportInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.UpnpActions;
-import dev.andre.homecontrol.adapters.upnp.protocol.VolumeReading;
 import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
@@ -24,10 +22,8 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
-import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.GroupListing;
 import dev.andre.homecontrol.core.GroupMember;
-import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.SpeakerGroup;
 import dev.andre.homecontrol.core.SpeakerTopology;
 import dev.andre.homecontrol.core.UnsupportedActionException;
@@ -65,10 +61,11 @@ public class SonosSession implements DeviceHandle, GroupListing {
     private final SonosTimings timings;
     private final SoapClient soap;
     private final RendererCommands commands;
-    private final Consumer<DeviceState> onChange;
     private final Runnable onClosed;
     private final Clock clock;
     private final ReconnectingPoller poller;
+    private final StatePublisher publisher;
+    private final RendererStatePoller renderer;
 
     // Immutable, replaced wholesale by each topology read (poll loop or a grouping command); never modified in place.
     @SuppressWarnings("java:S3077")
@@ -77,14 +74,6 @@ public class SonosSession implements DeviceHandle, GroupListing {
     // Immutable, written by the poll loop on connect; command threads only read it.
     @SuppressWarnings("java:S3077")
     private volatile ProtocolInfo sink = ProtocolInfo.UNKNOWN;
-    /** Poll loop only: chooses the next poll delay. */
-    private TransportInfo transport = TransportInfo.NONE;
-    // Immutable record written by the command thread that played it; the poll loop only reads it.
-    @SuppressWarnings("java:S3077")
-    private volatile PlayedItem lastPlayed;
-    // Immutable snapshot written only by Link.publish on the poll loop; request threads only read it.
-    @SuppressWarnings("java:S3077")
-    private volatile DeviceState state = DeviceState.initial();
     /** True from a completed connect until a disconnect or close; commands and topology need it. */
     private volatile boolean live;
 
@@ -100,7 +89,9 @@ public class SonosSession implements DeviceHandle, GroupListing {
         this.timings = timings;
         this.soap = new SoapClient(http, timings.commandTimeout());
         this.commands = new RendererCommands(soap, device.name());
-        this.onChange = onChange;
+        this.publisher = new StatePublisher(device.id(), DeviceState.initial(), onChange);
+        this.renderer = new RendererStatePoller(device.id(), commands, publisher, timings.pollInterval(),
+                timings.idlePollInterval());
         this.onClosed = onClosed;
         this.clock = clock;
         this.poller = new ReconnectingPoller("sonos-" + device.id(),
@@ -108,11 +99,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
     }
 
     public void start() {
-        try {
-            onChange.accept(state);
-        } catch (RuntimeException e) {
-            log.warn("A device state listener failed for {}", device.id(), e);
-        }
+        publisher.announce();
         poller.start();
     }
 
@@ -126,7 +113,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
 
     @Override
     public DeviceState state() {
-        return state;
+        return publisher.current();
     }
 
     @Override
@@ -156,7 +143,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
                     Action.PlayMedia forSonos = new Action.PlayMedia(SonosUris.forPlayback(url, mimeType),
                             mimeType, title, subtitle);
                     onCoordinator(coordinator -> commands.playUri(coordinator, sink, forSonos, "*"));
-                    lastPlayed = new PlayedItem(forSonos.url().toString(), title);
+                    renderer.played(new PlayedItem(forSonos.url().toString(), title));
                 }
                 case Action.Pause _ -> onCoordinator(coordinator ->
                         commands.transport(coordinator, UpnpActions.pause(AV_TRANSPORT), "pause"));
@@ -268,36 +255,9 @@ public class SonosSession implements DeviceHandle, GroupListing {
     /** Every callback runs on the poll loop's thread. */
     private final class Link implements ReconnectingPoller.Link {
 
-        private void publish(DeviceState next) {
-            DeviceState previous = state;
-            state = next;
-            if (!next.sameIgnoringTime(previous)) {
-                try {
-                    onChange.accept(next);
-                } catch (RuntimeException e) {
-                    log.warn("A device state listener failed for {}", device.id(), e);
-                }
-            }
-        }
-
+        /** A grouped room shows its coordinator's track, and its own volume. */
         private void readState() throws IOException, SoapFault {
-            ServiceEndpoint coordinator = coordinatorAvTransport();
-            TransportInfo info = commands.transportInfo(coordinator);
-            VolumeReading volume = commands.volume(renderingControl(), 100);
-            transport = info;
-            NowPlaying nowPlaying = null;
-            if (info.active()) {
-                // A grouped room shows its coordinator's track; its title comes from the coordinator's metadata.
-                PositionInfo position;
-                try {
-                    position = commands.positionInfo(coordinator);
-                } catch (SoapFault _) {
-                    position = new PositionInfo("", "", null, null);
-                }
-                nowPlaying = NowPlayings.of(info, position, lastPlayed);
-            }
-            publish(state.withStatus(DeviceStatus.CONNECTED).withPower(true).withVolume(volume.percent(), 100, volume.muted())
-                    .withNowPlaying(nowPlaying));
+            renderer.read(new RendererStatePoller.Endpoints(coordinatorAvTransport(), renderingControl(), 100, true));
         }
 
         @Override
@@ -334,15 +294,14 @@ public class SonosSession implements DeviceHandle, GroupListing {
 
         @Override
         public Duration nextPollDelay() {
-            return transport.active() ? timings.pollInterval() : timings.idlePollInterval();
+            return renderer.nextPollDelay();
         }
 
         @Override
         public void disconnected(Exception cause) {
             live = false;
-            transport = TransportInfo.NONE;
             log.debug("Sonos player {} unreachable: {}", device.id(), cause.getMessage());
-            publish(state.withStatus(DeviceStatus.DISCONNECTED).withNowPlaying(null));
+            renderer.lost();
         }
     }
 }

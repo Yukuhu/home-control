@@ -1,5 +1,9 @@
-package dev.andre.homecontrol.adapters.upnp.protocol;
+package dev.andre.homecontrol.adapters.support;
 
+import dev.andre.homecontrol.adapters.upnp.protocol.DidlLite;
+import dev.andre.homecontrol.adapters.upnp.protocol.PlayedItem;
+import dev.andre.homecontrol.adapters.upnp.protocol.PositionInfo;
+import dev.andre.homecontrol.adapters.upnp.protocol.TransportInfo;
 import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
 

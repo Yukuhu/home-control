@@ -1,5 +1,13 @@
-package dev.andre.homecontrol.adapters.upnp.protocol;
+package dev.andre.homecontrol.adapters.support;
 
+import dev.andre.homecontrol.adapters.upnp.protocol.DidlLite;
+import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
+import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
+import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
+import dev.andre.homecontrol.adapters.upnp.protocol.SoapRequest;
+import dev.andre.homecontrol.adapters.upnp.protocol.TransportInfo;
+import dev.andre.homecontrol.adapters.upnp.protocol.UpnpActions;
+import dev.andre.homecontrol.adapters.upnp.protocol.VolumeReading;
 import dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
