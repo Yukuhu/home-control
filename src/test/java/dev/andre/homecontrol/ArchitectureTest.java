@@ -50,8 +50,10 @@ class ArchitectureTest {
                     "dev.andre.homecontrol.adapters.links..", "dev.andre.homecontrol.adapters.support.."))
             .ignoreDependency(resideInAPackage("dev.andre.homecontrol.adapters.sonos.."),
                     resideInAPackage("dev.andre.homecontrol.adapters.upnp.protocol.."))
+            .ignoreDependency(resideInAPackage("dev.andre.homecontrol.adapters.support.."),
+                    resideInAPackage("dev.andre.homecontrol.adapters.upnp.protocol.."))
             .because("each device adapter is a module that can be switched off; net, links and support are shared, "
-                    + "and Sonos speaks UPnP");
+                    + "and Sonos and the renderer helpers in support speak UPnP");
 
     @ArchTest
     static final ArchRule networkLibrariesStayInAdaptersSourcesAndDiscovery = noClasses()

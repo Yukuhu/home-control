@@ -2,25 +2,21 @@ package dev.andre.homecontrol.adapters.upnp;
 
 import dev.andre.homecontrol.adapters.support.ReconnectingPoller;
 import dev.andre.homecontrol.adapters.upnp.protocol.DidlLite;
-import dev.andre.homecontrol.adapters.upnp.protocol.NowPlayings;
 import dev.andre.homecontrol.adapters.upnp.protocol.PlayedItem;
-import dev.andre.homecontrol.adapters.upnp.protocol.PositionInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
-import dev.andre.homecontrol.adapters.upnp.protocol.RendererCommands;
+import dev.andre.homecontrol.adapters.support.RendererCommands;
+import dev.andre.homecontrol.adapters.support.RendererStatePoller;
+import dev.andre.homecontrol.adapters.support.StatePublisher;
 import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapFault;
-import dev.andre.homecontrol.adapters.upnp.protocol.TransportInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.UpnpActions;
 import dev.andre.homecontrol.adapters.upnp.protocol.VolumeRange;
-import dev.andre.homecontrol.adapters.upnp.protocol.VolumeReading;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
-import dev.andre.homecontrol.core.DeviceStatus;
-import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.discovery.ssdp.DeviceDescription;
 import dev.andre.homecontrol.discovery.ssdp.DeviceDescriptions;
@@ -52,21 +48,14 @@ public class UpnpSession implements DeviceHandle {
     private final HttpClient http;
     private final RendererCommands commands;
     private final Function<String, Optional<URI>> locator;
-    private final Consumer<DeviceState> onChange;
     private final Runnable onClosed;
     private final ReconnectingPoller poller;
+    private final StatePublisher publisher;
+    private final RendererStatePoller renderer;
 
     // Immutable record replaced wholesale by the poll loop (and cleared by close()); command threads only read it.
     @SuppressWarnings("java:S3077")
     private volatile Endpoints endpoints;
-    /** Poll loop only: chooses the next poll delay. */
-    private TransportInfo transport = TransportInfo.NONE;
-    // Immutable record written by the command thread that played it; the poll loop only reads it.
-    @SuppressWarnings("java:S3077")
-    private volatile PlayedItem lastPlayed;
-    // Immutable snapshot written only by Link.publish on the poll loop; request threads only read it.
-    @SuppressWarnings("java:S3077")
-    private volatile DeviceState state = DeviceState.initial();
 
     public UpnpSession(Device device, UpnpProperties properties, HttpClient http,
                        Function<String, Optional<URI>> locator, Consumer<DeviceState> onChange, Runnable onClosed) {
@@ -81,18 +70,16 @@ public class UpnpSession implements DeviceHandle {
         this.http = http;
         this.commands = new RendererCommands(new SoapClient(http, timings.commandTimeout()), device.name());
         this.locator = locator;
-        this.onChange = onChange;
+        this.publisher = new StatePublisher(device.id(), DeviceState.initial(), onChange);
+        this.renderer = new RendererStatePoller(device.id(), commands, publisher, timings.pollInterval(),
+                timings.idlePollInterval());
         this.onClosed = onClosed;
         this.poller = new ReconnectingPoller("upnp-" + device.id(),
                 timings.reconnectInitialDelay(), timings.reconnectMaxDelay(), new Link());
     }
 
     public void start() {
-        try {
-            onChange.accept(state);
-        } catch (RuntimeException e) {
-            log.warn("A device state listener failed for {}", device.id(), e);
-        }
+        publisher.announce();
         poller.start();
     }
 
@@ -106,7 +93,7 @@ public class UpnpSession implements DeviceHandle {
 
     @Override
     public DeviceState state() {
-        return state;
+        return publisher.current();
     }
 
     @Override
@@ -120,7 +107,7 @@ public class UpnpSession implements DeviceHandle {
             switch (action) {
                 case Action.PlayMedia play -> {
                     commands.playUri(current.avTransport(), current.sink(), play, DidlLite.DLNA_STREAMING);
-                    lastPlayed = new PlayedItem(play.url().toString(), play.title());
+                    renderer.played(new PlayedItem(play.url().toString(), play.title()));
                 }
                 case Action.Pause _ -> commands.transport(current.avTransport(), UpnpActions.pause(av), "pause");
                 case Action.Resume _ -> commands.transport(current.avTransport(), UpnpActions.play(av), "resume playback");
@@ -243,40 +230,8 @@ public class UpnpSession implements DeviceHandle {
 
         /** Reads the device and publishes; runs on the poll loop only. */
         private void readState(Endpoints current) throws IOException, SoapFault {
-            TransportInfo info = commands.transportInfo(current.avTransport());
-            transport = info;
-            NowPlaying nowPlaying = null;
-            if (info.active()) {
-                PositionInfo position;
-                try {
-                    position = commands.positionInfo(current.avTransport());
-                } catch (SoapFault _) {
-                    position = new PositionInfo("", "", null, null);
-                }
-                nowPlaying = NowPlayings.of(info, position, lastPlayed);
-            }
-            DeviceState next = state.withStatus(DeviceStatus.CONNECTED).withPower(true).withNowPlaying(nowPlaying);
-            if (current.renderingControl() != null) {
-                try {
-                    VolumeReading volume = commands.volume(current.renderingControl(), current.volumeMax());
-                    next = next.withVolume(volume.percent(), 100, volume.muted());
-                } catch (SoapFault fault) {
-                    log.debug("{} did not report its volume: {}", device.id(), fault.getMessage());
-                }
-            }
-            publish(next);
-        }
-
-        private void publish(DeviceState next) {
-            DeviceState previous = state;
-            state = next;
-            if (!next.sameIgnoringTime(previous)) {
-                try {
-                    onChange.accept(next);
-                } catch (RuntimeException e) {
-                    log.warn("A device state listener failed for {}", device.id(), e);
-                }
-            }
+            renderer.read(new RendererStatePoller.Endpoints(current.avTransport(), current.renderingControl(),
+                    current.volumeMax(), false));
         }
 
         @Override
@@ -308,15 +263,14 @@ public class UpnpSession implements DeviceHandle {
 
         @Override
         public Duration nextPollDelay() {
-            return transport.active() ? timings.pollInterval() : timings.idlePollInterval();
+            return renderer.nextPollDelay();
         }
 
         @Override
         public void disconnected(Exception cause) {
             endpoints = null;
-            transport = TransportInfo.NONE;
             log.debug("Media renderer {} unreachable: {}", device.id(), cause.getMessage());
-            publish(state.withStatus(DeviceStatus.DISCONNECTED).withNowPlaying(null));
+            renderer.lost();
         }
     }
 }

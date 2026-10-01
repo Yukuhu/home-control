@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.upnp.protocol;
+package dev.andre.homecontrol.adapters.support;
 
 import dev.andre.homecontrol.core.ActionFailedException;
 
