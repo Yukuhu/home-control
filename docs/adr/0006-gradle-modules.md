@@ -24,7 +24,10 @@
 ## Consequences
 
 - A class can move into a module only when everything it uses is in that module or in a module below it.
+- The compiler checks only the classes inside a module, so ArchUnit checks that no class or test of a module's
+  package sits in the app.
 - `test --tests` runs its filter in every module. A module without a match passes, and the app's `test` fails when
-  nothing matches, so a filter for a class of `core` runs with `:core:test --tests`.
+  nothing matches, so a filter for a class of `core` runs with `:core:test --tests`, which fails when nothing
+  matches.
 - Whether to split the app further is decided from the build times measured before and after each pull request
   (`docs/dev/architecture.md`, "Progress measures").

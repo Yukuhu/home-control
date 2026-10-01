@@ -26,7 +26,8 @@ root.
 ## Modules
 
 The build has two Gradle projects. Each compiles against only what its build file declares, so the compiler refuses an
-import that crosses a module's boundary.
+import that crosses a module's boundary. That holds only for the classes inside the module, so `ArchitectureTest` and
+`TestArchitectureTest` check that no class or test of package `core` sits in the app.
 
 | Module | Directory | Holds | Depends on |
 | --- | --- | --- | --- |
@@ -70,7 +71,7 @@ package sees devices.
 ## Package rules
 
 `src/test/java/dev/andre/homecontrol/ArchitectureTest.java` checks these rules on every build, except one whose status
-names a module: the compiler enforces it.
+names a module: the compiler enforces it, and `ArchitectureTest` checks that the package lives in that module alone.
 
 | Rule | Status |
 | --- | --- |
@@ -94,8 +95,9 @@ answer in time, a `DeviceRefusedException` when it answered no, with the device'
 may throw `IllegalArgumentException` for input it cannot read; its caller decides what that means. Sessions turn
 both into core exceptions through `DeviceCalls`, and pairing services into pairing results.
 
-`core`'s tests sit in the `core` module and compile against `core` alone. A source's own types are tested in its
-module; tests that need every module, such as the route keys and the application's preference ladder, sit in
+`core`'s tests sit in the `core` module and compile against `core` alone;
+`src/test/java/dev/andre/homecontrol/TestArchitectureTest.java` keeps the app's tests out of package `core`. A
+source's own types are tested in its module; tests that need every module, such as the route keys and the application's preference ladder, sit in
 `playback`.
 
 ## Progress measures

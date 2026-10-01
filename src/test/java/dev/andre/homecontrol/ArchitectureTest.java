@@ -39,6 +39,17 @@ class ArchitectureTest {
         assertThat(classes.contain(Device.class)).as("the import holds core's classes").isTrue();
     }
 
+    // The compiler keeps core to the JDK only for the classes in the core module, so the package lives there alone: a
+    // class of package core in the app would escape that check.
+    @ArchTest
+    static void coreLivesInItsModuleAlone(JavaClasses classes) {
+        assertThat(classes.that(resideInAPackage("dev.andre.homecontrol.core..")))
+                .allSatisfy(javaClass -> assertThat(javaClass.getSource())
+                        .hasValueSatisfying(source -> assertThat(source.getUri().toString())
+                                .as(javaClass.getName())
+                                .contains("home-control-core")));
+    }
+
     @ArchTest
     static final ArchRule sourcesAreIndependent = slices()
             .matching("dev.andre.homecontrol.sources.(*)..")
