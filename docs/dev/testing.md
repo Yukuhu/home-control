@@ -66,12 +66,15 @@ off Spring Framework 7's pausing, because `RailCache` cannot restart after a pau
 
 - Everything: `scripts/gradle.sh build`. It runs `./gradlew` in the `gradle:jdk25` Docker image, for machines without
   a JDK 25; with one, `./gradlew build` does the same.
-- One class: `scripts/gradle.sh test --tests 'dev.andre.homecontrol.core.ActionTest'`.
-- A failure's details: `grep -A20 '<failure' build/test-results/test/*.xml`.
+- One class of the app: `scripts/gradle.sh test --tests 'dev.andre.homecontrol.web.ErrorAdviceTest'`. One class of
+  `core`: `scripts/gradle.sh :core:test --tests 'dev.andre.homecontrol.core.ActionTest'`. `test --tests` runs its
+  filter in every module: a module without a match passes, and the app's `test` fails when nothing matches, so a
+  filter that matches no test anywhere fails the build.
+- A failure's details: `grep -A20 '<failure' build/test-results/test/*.xml core/build/test-results/test/*.xml`.
 - The unit tests run in up to four JVMs at once, and Gradle reuses the results of tasks whose inputs did not change,
   so a test that passed and was not touched is not run again.
-- Every test and lifecycle method has a 60 s timeout (`src/test/resources/junit-platform.properties`), off while a
-  debugger is attached. A test that needs longer declares `@Timeout` on the method, or on the class for its test
+- Every test and lifecycle method has a 60 s timeout (`junit-platform.properties` in `src/test/resources` and
+  `core/src/test/resources`), off while a debugger is attached. A test that needs longer declares `@Timeout` on the method, or on the class for its test
   methods; a long `@BeforeAll` or `@BeforeEach` needs its own.
 
 ## Dependency verification

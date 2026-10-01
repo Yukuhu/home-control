@@ -11,7 +11,7 @@ What runs on every push and pull request, and how releases are made.
 | Find out what changed | Decides with `scripts/code-changed.sh` whether a pull request changes anything besides documentation; if it does not, the jobs that build and test are left out. A push to `main` runs them all. |
 | Verify dependency checksums | Resolves all dependency configurations before the builds and browser tests. For an unreviewed Dependabot update, uploads a checksum review patch and blocks the builds until reviewed metadata is committed. |
 | Build the jar | Builds the one jar of the run and works out its version; every image that is tested or published is built from it. |
-| Build and test | Runs `./gradlew build` with the full test suite and uploads the reports. |
+| Build and test | Runs `./gradlew build` with every module's tests and uploads their results and reports, with one coverage report for all modules. |
 | Build the self-contained image | Checks that `Dockerfile` and `Dockerfile.dist` describe the same runtime, and builds `Dockerfile` without pushing it. |
 | Smoke-test the image on amd64, arm64 | Builds the image that is published, natively on each architecture, and starts it; for a release, it pushes that image by digest. |
 | Smoke-test the Bluetooth image on amd64, arm64 | The same for the `-bluetooth` variant, in its own job so that it never gates the release. |
@@ -42,6 +42,8 @@ missing `SONAR_TOKEN` fails the job. Main-branch
 scans update the analysis baseline without waiting for the gate. Keep `SONAR_TOKEN` in both
 the GitHub Actions and Dependabot secret stores. GitHub does not provide that secret to fork
 pull requests, so their build stays red until a separate scan path is configured.
+The Java coverage it reads is one JaCoCo report over every module, which the build job
+uploads with every module's test results.
 
 `main` requires one check, `CI passed`. It passes only if every other job passed or was left
 out on purpose, so a job is enforced by adding it to that job's `needs` in
