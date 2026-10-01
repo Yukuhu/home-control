@@ -10,6 +10,8 @@ import dev.andre.homecontrol.adapters.bluetooth.player.MpvNotInstalledException;
 import dev.andre.homecontrol.adapters.bluetooth.player.MpvPlayer;
 import dev.andre.homecontrol.adapters.bluetooth.player.PlayerStatus;
 import dev.andre.homecontrol.adapters.bluetooth.player.StreamRedaction;
+import dev.andre.homecontrol.adapters.support.SessionLoop;
+import dev.andre.homecontrol.adapters.support.StatePublisher;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
@@ -27,10 +29,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /** One Bluetooth speaker: polls BlueZ on one virtual thread and publishes state changes. */
@@ -48,18 +46,14 @@ public class BluetoothSpeakerSession implements DeviceHandle {
     private final BluezClient bluez;
     private final MpvPlayer player;
     private final AudioDeviceResolver audioDevices;
-    private final Consumer<DeviceState> onChange;
-    private final ScheduledExecutorService loop;
+    private final StatePublisher publisher;
+    private final SessionLoop loop;
     private final Object commands = new Object();
 
-    // Immutable snapshot written only by publish() on the loop thread; request threads only read it.
-    @SuppressWarnings("java:S3077")
-    private volatile DeviceState state = DeviceState.initial();
     private volatile int volume;
     private volatile boolean muted;
     private volatile boolean closed;
     private volatile String title;
-    private ScheduledFuture<?> nextPoll;      // loop thread only
     private boolean lookedOnce;                // loop thread only
 
     public BluetoothSpeakerSession(Device device, BluetoothProperties properties, BluezClient bluez, MpvPlayer player,
@@ -69,6 +63,14 @@ public class BluetoothSpeakerSession implements DeviceHandle {
 
     BluetoothSpeakerSession(Device device, BluetoothProperties properties, BluetoothTimings timings, BluezClient bluez,
                             MpvPlayer player, AudioDeviceResolver audioDevices, Consumer<DeviceState> onChange) {
+        this(device, properties, timings, bluez, player, audioDevices, onChange, new SessionLoop("bluetooth-" + device.id()));
+    }
+
+    // The collaborators of BluetoothSpeakerAdapter.connect(), plus the loop, injectable so a test can close it under a command.
+    @SuppressWarnings("java:S107")
+    BluetoothSpeakerSession(Device device, BluetoothProperties properties, BluetoothTimings timings, BluezClient bluez,
+                            MpvPlayer player, AudioDeviceResolver audioDevices, Consumer<DeviceState> onChange,
+                            SessionLoop loop) {
         this.device = device;
         this.settings = BluetoothSettings.of(device);
         this.properties = properties;
@@ -76,19 +78,19 @@ public class BluetoothSpeakerSession implements DeviceHandle {
         this.bluez = bluez;
         this.player = player;
         this.audioDevices = audioDevices;
-        this.onChange = onChange;
+        this.publisher = new StatePublisher(device.id(), DeviceState.initial(), onChange);
         this.volume = properties.defaultVolume();
-        this.loop = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().name("bluetooth-" + device.id()).factory());
+        this.loop = loop;
     }
 
     public void start() {
-        report(state);
+        publisher.announce();
         loop.execute(this::poll);
     }
 
     @Override
     public DeviceState state() {
-        return state;
+        return publisher.current();
     }
 
     @Override
@@ -125,7 +127,8 @@ public class BluetoothSpeakerSession implements DeviceHandle {
     @Override
     public void close() {
         closed = true;
-        loop.shutdownNow();
+        publisher.close();
+        loop.close();
         player.stop();
     }
 
@@ -207,10 +210,7 @@ public class BluetoothSpeakerSession implements DeviceHandle {
             log.warn("Reading the state of {} failed", device.name(), e);
         } finally {
             if (!closed) {
-                if (nextPoll != null) {
-                    nextPoll.cancel(false);
-                }
-                nextPoll = loop.schedule(this::poll, nextPollDelay().toMillis(), TimeUnit.MILLISECONDS);
+                loop.schedule(this::poll, nextPollDelay());
             }
         }
     }
@@ -243,8 +243,9 @@ public class BluetoothSpeakerSession implements DeviceHandle {
             }
             nowPlaying = new NowPlaying(shown, playbackState, now.positionSeconds(), now.durationSeconds());
         }
-        publish(state.withStatus(status).withPower(status == DeviceStatus.CONNECTED)
-                .withVolume(volume, 100, muted).withNowPlaying(nowPlaying));
+        NowPlaying shownNowPlaying = nowPlaying;
+        publisher.update(current -> current.withStatus(status).withPower(status == DeviceStatus.CONNECTED)
+                .withVolume(volume, 100, muted).withNowPlaying(shownNowPlaying));
     }
 
     private DeviceStatus bluetoothStatus() {
@@ -268,25 +269,6 @@ public class BluetoothSpeakerSession implements DeviceHandle {
         } catch (BluezException e) {
             log.debug("{}: {}", device.name(), e.getMessage());
             return DeviceStatus.DISCONNECTED;
-        }
-    }
-
-    private void publish(DeviceState next) {
-        if (!next.sameIgnoringTime(state)) {
-            state = next;
-            report(next);
-        }
-    }
-
-    /**
-     * The listener publishes a Spring event synchronously, to subscribers this class knows nothing about; their
-     * failure must not stop this session from starting or polling.
-     */
-    private void report(DeviceState next) {
-        try {
-            onChange.accept(next);
-        } catch (RuntimeException e) {
-            log.warn("A device state listener failed for {}", device.id(), e);
         }
     }
 }

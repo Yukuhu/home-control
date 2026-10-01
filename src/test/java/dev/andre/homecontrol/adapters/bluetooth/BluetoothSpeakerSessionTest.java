@@ -7,6 +7,7 @@ import dev.andre.homecontrol.adapters.bluetooth.player.FakeMpv;
 import dev.andre.homecontrol.adapters.bluetooth.player.InProcessMpvLauncher;
 import dev.andre.homecontrol.adapters.bluetooth.player.MpvNotInstalledException;
 import dev.andre.homecontrol.adapters.bluetooth.player.MpvPlayer;
+import dev.andre.homecontrol.adapters.support.SessionLoop;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
@@ -35,6 +36,7 @@ import java.util.function.Consumer;
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.BLUEZ_NOT_RUNNING;
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.UNREACHABLE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
@@ -466,5 +468,23 @@ class BluetoothSpeakerSessionTest {
         });
 
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+    }
+
+    @Test
+    void aCommandThatRacesCloseStillAnswers() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        SessionLoop loop = new SessionLoop("bluetooth-race");
+        MpvPlayer player = new MpvPlayer(launcher, MpvPlayer.socketFor(runtime, device.id()),
+                properties.playerStartTimeout(), properties.loadTimeout(), properties.commandTimeout());
+        AudioDeviceResolver resolver = new AudioDeviceResolver(launcher, properties.audioDeviceTemplate(),
+                properties.playerStartTimeout());
+        session = new BluetoothSpeakerSession(device, properties, TIMINGS, bluez, player, resolver, states, loop);
+        session.start();
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+
+        // What close() does first: a command already past its closed check still asks for a poll afterwards.
+        loop.close();
+
+        assertThatCode(() -> session.execute(new Action.SetVolume(30))).doesNotThrowAnyException();
     }
 }
