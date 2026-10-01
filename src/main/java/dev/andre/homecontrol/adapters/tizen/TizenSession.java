@@ -9,6 +9,10 @@ import dev.andre.homecontrol.adapters.support.PlayPauseToggle;
 import dev.andre.homecontrol.adapters.support.SessionLoop;
 import dev.andre.homecontrol.adapters.support.StatePublisher;
 import dev.andre.homecontrol.adapters.support.WakeOnLanPower;
+import dev.andre.homecontrol.adapters.tizen.protocol.DialClient;
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenDeviceInfo;
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenRemoteConnection;
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenRest;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
@@ -19,6 +23,7 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.LearnedSettings;
+import dev.andre.homecontrol.core.MacAddress;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import org.slf4j.Logger;
@@ -84,8 +89,8 @@ public class TizenSession implements DeviceHandle {
         this.properties = properties;
         this.timings = timings;
         this.http = http;
-        this.rest = new TizenRest(http, properties);
-        this.dial = new DialClient(http, properties);
+        this.rest = new TizenRest(http, properties.protocol());
+        this.dial = new DialClient(http, properties.protocol());
         this.registry = registry;
         this.learned = learned;
         this.secrets = secrets;
@@ -194,7 +199,7 @@ public class TizenSession implements DeviceHandle {
             return;
         }
         Optional<TizenDeviceInfo> info = rest.deviceInfo(device.host());
-        info.flatMap(TizenDeviceInfo::macAddress).ifPresent(learnedMac::offer);
+        info.flatMap(TizenSession::reportedMac).ifPresent(learnedMac::offer);
         if (info.isPresent() && !info.get().on()) {
             connection.current().ifPresent(connection::takeIf);
             publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
@@ -205,6 +210,15 @@ public class TizenSession implements DeviceHandle {
         }
         String app = visibleKnownApp();
         publisher.update(state -> state.withStatus(DeviceStatus.CONNECTED).withPower(true).withCurrentApp(app));
+    }
+
+    /** Named {@code wifiMac}, but it is the MAC of the active interface, wired or not; a garbled one is ignored. */
+    static Optional<String> reportedMac(TizenDeviceInfo info) {
+        try {
+            return info.wifiMac().isEmpty() ? Optional.empty() : Optional.of(MacAddress.normalize(info.wifiMac()));
+        } catch (IllegalArgumentException _) {
+            return Optional.empty();
+        }
     }
 
     private boolean handshakeBackingOff() {
@@ -222,7 +236,7 @@ public class TizenSession implements DeviceHandle {
         TizenRemoteConnection opened = null;
         boolean held = false;
         try {
-            opened = TizenRemoteConnection.open(http, device.host(), properties, settings.token(),
+            opened = TizenRemoteConnection.open(http, device.host(), properties.protocol(), settings.token(),
                     reason -> loop.execute(() -> lost(attempt.get(), reason)));
             attempt.set(opened);
             TizenRemoteConnection.Authorization answer = opened.awaitAuthorization(timings.requestTimeout());

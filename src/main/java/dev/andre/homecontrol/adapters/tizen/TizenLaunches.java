@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.tizen;
 
 import dev.andre.homecontrol.adapters.links.ContentLinks;
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenApp;
 import dev.andre.homecontrol.core.playback.AppLinks;
 
 import java.net.URI;

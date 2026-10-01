@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.tizen;
+package dev.andre.homecontrol.adapters.tizen.protocol;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -15,6 +15,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -296,4 +297,11 @@ public class FakeTizenServer implements AutoCloseable {
         remote.close();
         http.stop(0);
     }
+
+      /** Protocol clients pointed at this fake, with two-second waits. */
+      public TizenOptions options() {
+          return new TizenOptions(port(), httpPort(), httpPort(), "Home Control", Duration.ofSeconds(2),
+                  Duration.ofSeconds(2));
+      }
+  
 }

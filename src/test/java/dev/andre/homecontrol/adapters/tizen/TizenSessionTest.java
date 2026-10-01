@@ -3,6 +3,8 @@ package dev.andre.homecontrol.adapters.tizen;
 import dev.andre.homecontrol.adapters.net.FakeWakeOnLanReceiver;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
+import dev.andre.homecontrol.adapters.tizen.protocol.FakeTizenServer;
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenDeviceInfo;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
@@ -94,7 +96,7 @@ class TizenSessionTest {
         Device device = new Device("samsung", "Samsung TV", DeviceKind.TIZEN, "127.0.0.1",
                 Map.of("tizen", stored(settings)), Instant.now());
         registry.save(device);
-        session = new TizenSession(device, TizenRestTest.properties(tv), timings, InsecureTls.httpClient(Duration.ofSeconds(2)),
+        session = new TizenSession(device, properties(tv), timings, InsecureTls.httpClient(Duration.ofSeconds(2)),
                 registry, learned(), secrets, new WakeOnLan(receiver.address()), listener, () -> { });
         session.start();
         return session;
@@ -485,4 +487,19 @@ class TizenSessionTest {
         assertThat(receiver.nextPacket()).containsExactly(WakeOnLan.magicPacket("70:2A:D5:01:02:03"));
         connected();
     }
+
+    @Test
+    void aReportedMacIsNormalisedAndAGarbledOneIgnored() {
+        assertThat(TizenSession.reportedMac(new TizenDeviceInfo("TV", "QE55", "on", "70-2a-d5-01-02-03", true)))
+                .contains("70:2A:D5:01:02:03");
+        assertThat(TizenSession.reportedMac(new TizenDeviceInfo("TV", "QE55", "on", "not a mac", true))).isEmpty();
+        assertThat(TizenSession.reportedMac(new TizenDeviceInfo("TV", "QE55", "on", "", true))).isEmpty();
+    }
+
+      private static TizenProperties properties(FakeTizenServer fake) {
+          return new TizenProperties(true, fake.port(), fake.httpPort(), fake.httpPort(), "Home Control",
+                  Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(1),
+                  Duration.ofSeconds(0));
+      }
+  
 }

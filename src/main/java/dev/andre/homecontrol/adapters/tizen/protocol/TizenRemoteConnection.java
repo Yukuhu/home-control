@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.tizen;
+package dev.andre.homecontrol.adapters.tizen.protocol;
 
 import dev.andre.homecontrol.adapters.net.TextWebSocket;
 import org.slf4j.Logger;
@@ -22,12 +22,12 @@ import java.util.function.Consumer;
  * and an unanswered prompt yields nothing. Commands are fire-and-forget; the TV does not answer them.
  * Frames are never logged: the connect event carries the token.
  */
-final class TizenRemoteConnection implements AutoCloseable {
+public final class TizenRemoteConnection implements AutoCloseable {
 
     private static final String CHANNEL_CONNECT_EVENT = "ms.channel.connect";
     private static final String CHANNEL_UNAUTHORIZED_EVENT = "ms.channel.unauthorized";
 
-    enum Authorization { CONNECTED, UNAUTHORIZED, NO_ANSWER }
+    public enum Authorization { CONNECTED, UNAUTHORIZED, NO_ANSWER }
 
     private static final Logger log = LoggerFactory.getLogger(TizenRemoteConnection.class);
     private static final Duration LATE_ANSWER = Duration.ofMillis(300);
@@ -40,17 +40,18 @@ final class TizenRemoteConnection implements AutoCloseable {
         this.channel = channel;
     }
 
-    /** Nothing that needs closing exists until the socket is open, so a failed open leaves nothing behind. */
-    static TizenRemoteConnection open(HttpClient http, String host, TizenProperties properties, String token,
-                                      Consumer<String> onClosed) throws IOException {
-        Channel channel = new Channel(onClosed);
-        TextWebSocket socket = TextWebSocket.connect(http,
-                TizenMessages.remoteUri(host, properties.port(), properties.clientName(), token),
-                properties.connectTimeout(), channel);
-        return new TizenRemoteConnection(socket, channel);
-    }
+      /** Nothing that needs closing exists until the socket is open, so a failed open leaves nothing behind. */
+      public static TizenRemoteConnection open(HttpClient http, String host, TizenOptions options, String token,
+                                               Consumer<String> onClosed) throws IOException {
+          Channel channel = new Channel(onClosed);
+          TextWebSocket socket = TextWebSocket.connect(http,
+                  TizenMessages.remoteUri(host, options.port(), options.clientName(), token),
+                  options.connectTimeout(), channel);
+          return new TizenRemoteConnection(socket, channel);
+      }
+  
 
-    Authorization awaitAuthorization(Duration timeout) throws IOException {
+    public Authorization awaitAuthorization(Duration timeout) throws IOException {
         try {
             String event = channel.events.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
             if (event == null) {
@@ -73,29 +74,29 @@ final class TizenRemoteConnection implements AutoCloseable {
     }
 
     /** A token the TV issued on this connection (only after a fresh Allow). */
-    Optional<String> token() {
+    public Optional<String> token() {
         return Optional.ofNullable(channel.issuedToken);
     }
 
-    void key(String code) throws IOException {
+    public void key(String code) throws IOException {
         socket.send(TizenMessages.key(code));
     }
 
     /** {@code Press} or {@code Release} of a held key. */
-    void key(String code, String command) throws IOException {
+    public void key(String code, String command) throws IOException {
         socket.send(TizenMessages.key(code, command));
     }
 
-    void launchApp(String appId, String actionType) throws IOException {
+    public void launchApp(String appId, String actionType) throws IOException {
         socket.send(TizenMessages.launchApp(appId, actionType));
     }
 
-    void requestInstalledApps() throws IOException {
+    public void requestInstalledApps() throws IOException {
         socket.send(TizenMessages.installedAppsRequest());
     }
 
     /** Empty until the TV answered {@link #requestInstalledApps()}. */
-    Optional<List<TizenApp>> installedApps() {
+    public Optional<List<TizenApp>> installedApps() {
         return Optional.ofNullable(channel.installedApps);
     }
 

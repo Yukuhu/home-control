@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpServer;
 import dev.andre.homecontrol.adapters.net.FakeWakeOnLanReceiver;
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
+import dev.andre.homecontrol.adapters.tizen.protocol.FakeTizenServer;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
