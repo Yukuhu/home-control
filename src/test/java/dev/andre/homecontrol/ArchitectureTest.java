@@ -4,6 +4,10 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import tools.jackson.databind.json.JsonMapper;
@@ -152,4 +156,12 @@ class ArchitectureTest {
             .and().areNotMetaAnnotatedWith(ControllerAdvice.class)
             .should().dependOnClassesThat().resideInAPackage("jakarta.servlet..")
             .because("services and stores take values, not requests");
+
+    @ArchTest
+    static final ArchRule sessionsRunOnTheirSessionLoop = noClasses()
+            .that().resideInAPackage("dev.andre.homecontrol.adapters..")
+            .and().haveSimpleNameEndingWith("Session")
+            .should().dependOnClassesThat().belongToAnyOf(Executors.class, ThreadPoolExecutor.class,
+                    ScheduledThreadPoolExecutor.class, ForkJoinPool.class)
+            .because("a session's thread is its SessionLoop, which never throws once the session is closed");
 }
