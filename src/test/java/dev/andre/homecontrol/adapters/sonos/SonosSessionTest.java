@@ -276,8 +276,9 @@ class SonosSessionTest {
 
         await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
                 .until(() -> states.all().size() == publishedAtClose);
+        var pause = new Action.Pause();
         assertThat(session.speakerTopology()).isEmpty();
-        assertThatThrownBy(() -> session.execute(new Action.Pause())).isInstanceOf(DeviceOfflineException.class);
+        assertThatThrownBy(() -> session.execute(pause)).isInstanceOf(DeviceOfflineException.class);
     }
 
     /** Its first reading, right after the first topology call, waits through the interrupt close() sends. */

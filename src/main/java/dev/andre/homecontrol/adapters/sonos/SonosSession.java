@@ -268,16 +268,21 @@ public class SonosSession implements DeviceHandle, GroupListing {
         public void connect() throws IOException {
             try {
                 readTopology();
-                try {
-                    sink = commands.sink(own(SonosEndpoints.CONNECTION_MANAGER_PATH, SonosEndpoints.CONNECTION_MANAGER));
-                } catch (SoapFault _) {
-                    sink = ProtocolInfo.UNKNOWN;
-                }
+                sink = readSink();
                 readState();
             } catch (SoapFault fault) {
                 throw new IOException(device.id() + " refused to report its state: " + fault.getMessage());
             }
             live = true;
+        }
+
+        /** A speaker that will not say what it plays is still worth driving; it gets the default formats. */
+        private ProtocolInfo readSink() throws IOException {
+            try {
+                return commands.sink(own(SonosEndpoints.CONNECTION_MANAGER_PATH, SonosEndpoints.CONNECTION_MANAGER));
+            } catch (SoapFault _) {
+                return ProtocolInfo.UNKNOWN;
+            }
         }
 
         @Override

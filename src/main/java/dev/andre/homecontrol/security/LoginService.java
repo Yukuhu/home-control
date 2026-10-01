@@ -41,7 +41,7 @@ public class LoginService {
      * computes keeps its carrier, of which there are as many as cores; so the hashing runs on these platform threads,
      * one per verification slot, while the request waits without holding a carrier.
      */
-    private static final ExecutorService HASHING = Executors.newFixedThreadPool(2,
+    private static final ExecutorService HASHING_THREADS = Executors.newFixedThreadPool(2,
             Thread.ofPlatform().daemon().name("login-hash-", 0).factory());
     /** Each verification holds ~19 MiB; two at a time bounds memory under a login flood. */
     private final Semaphore verifications = new Semaphore(2);
@@ -49,7 +49,7 @@ public class LoginService {
     private final ExecutorService hashing;
 
     public LoginService(SecretStore store, Argon2PasswordHasher hasher, SecureRandom random) {
-        this(store, hasher, random, HASHING);
+        this(store, hasher, random, HASHING_THREADS);
     }
 
     LoginService(SecretStore store, Argon2PasswordHasher hasher, SecureRandom random, ExecutorService hashing) {

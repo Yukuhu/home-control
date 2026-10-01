@@ -483,7 +483,8 @@ class UpnpSessionTest {
 
         await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
                 .until(() -> states.all().size() == publishedAtClose);
-        assertThatThrownBy(() -> session.execute(new Action.Pause())).isInstanceOf(DeviceOfflineException.class);
+        var pause = new Action.Pause();
+        assertThatThrownBy(() -> session.execute(pause)).isInstanceOf(DeviceOfflineException.class);
     }
 
     /** A step that had already finished when close() interrupted the loop: it goes on as if nothing happened. */
