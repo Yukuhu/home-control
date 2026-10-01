@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.tizen;
+package dev.andre.homecontrol.adapters.tizen.protocol;
 
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import org.junit.jupiter.api.AfterEach;
@@ -15,16 +15,10 @@ class TizenRestTest {
     private FakeTizenServer fake;
     private TizenRest rest;
 
-    static TizenProperties properties(FakeTizenServer fake) {
-        return new TizenProperties(true, fake.port(), fake.httpPort(), fake.httpPort(), "Home Control",
-                Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(1),
-                Duration.ofSeconds(0));
-    }
-
     @BeforeEach
     void setUp() throws IOException {
         fake = new FakeTizenServer();
-        rest = new TizenRest(InsecureTls.httpClient(Duration.ofSeconds(2)), properties(fake));
+        rest = new TizenRest(InsecureTls.httpClient(Duration.ofSeconds(2)), fake.options());
     }
 
     @AfterEach
@@ -40,7 +34,7 @@ class TizenRestTest {
         assertThat(info.modelName()).isEqualTo("GU55TU8079UXZG");
         assertThat(info.powerState()).isEqualTo("on");
         assertThat(info.on()).isTrue();
-        assertThat(info.macAddress()).contains("70:2A:D5:01:02:03");
+        assertThat(info.wifiMac()).isEqualTo("70:2A:D5:01:02:03");
         assertThat(info.tokenAuthSupport()).isTrue();
     }
 
@@ -56,7 +50,7 @@ class TizenRestTest {
         TizenDeviceInfo info = TizenRest.parseDeviceInfo(TizenMessages.JSON.readTree("{\"device\":{\"name\":\"TV\"}}"));
 
         assertThat(info.on()).isTrue();
-        assertThat(info.macAddress()).isEmpty();
+        assertThat(info.wifiMac()).isEmpty();
     }
 
     @Test

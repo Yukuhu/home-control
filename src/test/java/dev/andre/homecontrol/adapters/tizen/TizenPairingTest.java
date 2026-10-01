@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.tizen;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
+import dev.andre.homecontrol.adapters.tizen.protocol.FakeTizenServer;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.PromptPairingResult;

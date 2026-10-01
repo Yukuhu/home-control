@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.tizen;
+package dev.andre.homecontrol.adapters.tizen.protocol;
 
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import org.junit.jupiter.api.AfterEach;
@@ -37,7 +37,7 @@ class TizenRemoteConnectionTest {
     }
 
     private TizenRemoteConnection open(String token) throws IOException {
-        connection = TizenRemoteConnection.open(http, "127.0.0.1", TizenRestTest.properties(fake), token, reasons::add);
+        connection = TizenRemoteConnection.open(http, "127.0.0.1", fake.options(), token, reasons::add);
         return connection;
     }
 

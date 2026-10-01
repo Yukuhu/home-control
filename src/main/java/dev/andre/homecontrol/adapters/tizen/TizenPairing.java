@@ -2,6 +2,9 @@ package dev.andre.homecontrol.adapters.tizen;
 
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.support.PairingKeys;
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenDeviceInfo;
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenRemoteConnection;
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenRest;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceQueries;
@@ -31,7 +34,7 @@ public class TizenPairing implements PromptPairing {
         this.enrollment = enrollment;
         this.keys = TizenSettings.keys(secrets);
         this.http = InsecureTls.httpClient(properties.connectTimeout());
-        this.rest = new TizenRest(http, properties);
+        this.rest = new TizenRest(http, properties.protocol());
     }
 
     @Override
@@ -52,7 +55,7 @@ public class TizenPairing implements PromptPairing {
 
     @Override
     public PromptPairingResult pair(String host, String name) {
-        try (TizenRemoteConnection connection = TizenRemoteConnection.open(http, host, properties, null, reason -> { })) {
+        try (TizenRemoteConnection connection = TizenRemoteConnection.open(http, host, properties.protocol(), null, reason -> { })) {
             return switch (connection.awaitAuthorization(properties.pairingTimeout())) {
                 case CONNECTED -> {
                     Map<String, String> settings = new LinkedHashMap<>();

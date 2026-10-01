@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.tizen;
+package dev.andre.homecontrol.adapters.tizen.protocol;
 
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
@@ -28,9 +28,8 @@ class DialClientTest {
 
     private DialClient dial(int dialPort) {
         return new DialClient(InsecureTls.httpClient(Duration.ofSeconds(2)),
-                new TizenProperties(true, fake.port(), fake.httpPort(), dialPort, "Home Control",
-                Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(1),
-                Duration.ofSeconds(0)));
+                new TizenOptions(fake.port(), fake.httpPort(), dialPort, "Home Control", Duration.ofSeconds(2),
+                        Duration.ofSeconds(2)));
     }
 
     @Test

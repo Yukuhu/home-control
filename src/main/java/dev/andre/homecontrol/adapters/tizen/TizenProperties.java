@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.tizen;
 
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenOptions;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -32,4 +33,9 @@ public record TizenProperties(@DefaultValue("true") boolean enabled,
                               Duration pollInterval,
                               @DefaultValue("3s") @DurationUnit(ChronoUnit.SECONDS) @DurationMin(nanos = 0)
                               Duration wakeGrace) {
+
+    /** The protocol clients' ports, name and waits. */
+    public TizenOptions protocol() {
+        return new TizenOptions(port, restPort, dialPort, clientName, connectTimeout, requestTimeout);
+    }
 }

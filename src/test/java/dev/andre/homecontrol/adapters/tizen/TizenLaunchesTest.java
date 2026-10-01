@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.adapters.tizen;
 
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenApp;
+import dev.andre.homecontrol.adapters.tizen.protocol.TizenMessages;
 import dev.andre.homecontrol.core.playback.ServiceLinks;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

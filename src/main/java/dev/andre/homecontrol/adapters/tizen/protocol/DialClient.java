@@ -1,27 +1,26 @@
-package dev.andre.homecontrol.adapters.tizen;
+package dev.andre.homecontrol.adapters.tizen.protocol;
 
-import dev.andre.homecontrol.core.Hosts;
+import dev.andre.homecontrol.adapters.net.DeviceUris;
+
 import java.io.IOException;
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 /** DIAL application launch (DIAL 2.x §6.1): {@code POST http://host:8080/ws/apps/<app>} with the app's arguments. */
-final class DialClient {
+public final class DialClient {
 
     private final HttpClient http;
-    private final TizenProperties properties;
+    private final TizenOptions options;
 
-    DialClient(HttpClient http, TizenProperties properties) {
+    public DialClient(HttpClient http, TizenOptions options) {
         this.http = http;
-        this.properties = properties;
+        this.options = options;
     }
 
-    void launch(String host, String app, String body) throws IOException {
-        String authority = Hosts.authority(host);
-        HttpRequest request = HttpRequest.newBuilder(URI.create("http://" + authority + ":" + properties.dialPort() + "/ws/apps/" + app))
-                .timeout(properties.requestTimeout())
+    public void launch(String host, String app, String body) throws IOException {
+        HttpRequest request = HttpRequest.newBuilder(DeviceUris.of("http", host, options.dialPort(), "/ws/apps/" + app))
+                .timeout(options.requestTimeout())
                 .header("Content-Type", "text/plain; charset=utf-8")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
