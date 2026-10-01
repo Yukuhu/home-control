@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.discovery.ssdp;
+package dev.andre.homecontrol.discovery.ssdp.protocol;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

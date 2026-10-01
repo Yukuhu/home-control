@@ -1,5 +1,7 @@
 package dev.andre.homecontrol.discovery.ssdp;
 
+import dev.andre.homecontrol.discovery.ssdp.protocol.SsdpMessage;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
