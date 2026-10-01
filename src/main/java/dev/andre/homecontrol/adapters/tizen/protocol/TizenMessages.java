@@ -5,6 +5,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -26,17 +27,17 @@ public final class TizenMessages {
     private TizenMessages() {
     }
 
-      /** The TV shows {@code name} in its Allow prompt and device list; the token proves an earlier Allow. */
-      static URI remoteUri(String host, int port, String clientName, String token) {
-          String name = Base64.getEncoder().encodeToString(clientName.getBytes(StandardCharsets.UTF_8));
-          StringBuilder pathAndQuery = new StringBuilder("/api/v2/channels/samsung.remote.control?name=")
-                  .append(URLEncoder.encode(name, StandardCharsets.UTF_8));
-          if (token != null && !token.isBlank()) {
-              pathAndQuery.append("&token=").append(URLEncoder.encode(token, StandardCharsets.UTF_8));
-          }
-          return DeviceUris.of("wss", host, port, pathAndQuery.toString());
-      }
-  
+    /** The TV shows {@code name} in its Allow prompt and device list; the token proves an earlier Allow. */
+    static URI remoteUri(String host, int port, String clientName, String token) throws MalformedURLException {
+        String name = Base64.getEncoder().encodeToString(clientName.getBytes(StandardCharsets.UTF_8));
+        StringBuilder pathAndQuery = new StringBuilder("/api/v2/channels/samsung.remote.control?name=")
+                .append(URLEncoder.encode(name, StandardCharsets.UTF_8));
+        if (token != null && !token.isBlank()) {
+            pathAndQuery.append("&token=").append(URLEncoder.encode(token, StandardCharsets.UTF_8));
+        }
+        return DeviceUris.of("wss", host, port, pathAndQuery.toString());
+    }
+
 
     /** A short press. */
     static String key(String code) {
