@@ -1,9 +1,9 @@
-package dev.andre.homecontrol.adapters.webos;
+package dev.andre.homecontrol.adapters.webos.protocol;
 
 /** Registration did not produce a client key. Only re-pairing can fix {@code KEY_REJECTED}. */
-class SsapPairingException extends SsapException {
+public class SsapPairingException extends SsapException {
 
-    enum Reason { DECLINED, TIMED_OUT, KEY_REJECTED }
+    public enum Reason { DECLINED, TIMED_OUT, KEY_REJECTED }
 
     private final Reason reason;
 
@@ -12,7 +12,7 @@ class SsapPairingException extends SsapException {
         this.reason = reason;
     }
 
-    Reason reason() {
+    public Reason reason() {
         return reason;
     }
 }

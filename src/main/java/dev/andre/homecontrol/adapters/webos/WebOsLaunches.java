@@ -1,6 +1,8 @@
 package dev.andre.homecontrol.adapters.webos;
 
 import dev.andre.homecontrol.adapters.links.ContentLinks;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapMessages;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapUris;
 import dev.andre.homecontrol.core.playback.AppLinks;
 import tools.jackson.databind.node.ObjectNode;
 

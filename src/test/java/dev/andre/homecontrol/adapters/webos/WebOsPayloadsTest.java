@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.webos;
 
+import dev.andre.homecontrol.adapters.webos.protocol.SsapMessages;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.TvInput;
 import org.junit.jupiter.api.Test;

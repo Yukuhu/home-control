@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.webos;
+package dev.andre.homecontrol.adapters.webos.protocol;
 
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -10,9 +10,9 @@ import java.util.List;
  * SSAP wire format. Every frame is a JSON object {@code {id, type, uri?, payload}}; the TV echoes
  * the id. The registration manifest is aiowebostv's (unsigned; see Decisions).
  */
-final class SsapMessages {
+public final class SsapMessages {
 
-    static final JsonMapper JSON = JsonMapper.builder().build();
+    public static final JsonMapper JSON = JsonMapper.builder().build();
 
     static final List<String> PERMISSIONS = List.of(
             "APP_TO_APP", "CLOSE", "CONTROL_AUDIO", "CONTROL_DISPLAY", "CONTROL_INPUT_JOYSTICK",
@@ -66,7 +66,7 @@ final class SsapMessages {
         return "type:button\nname:" + name + "\n\n";
     }
 
-    static ObjectNode empty() {
+    public static ObjectNode empty() {
         return JSON.createObjectNode();
     }
 }

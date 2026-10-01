@@ -11,6 +11,11 @@ import dev.andre.homecontrol.adapters.support.Reconnector;
 import dev.andre.homecontrol.adapters.support.SessionLoop;
 import dev.andre.homecontrol.adapters.support.StatePublisher;
 import dev.andre.homecontrol.adapters.support.WakeOnLanPower;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapConnection;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapException;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapMessages;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapPairingException;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapUris;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
@@ -220,7 +225,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
         AtomicReference<SsapConnection> attempt = new AtomicReference<>();
         SsapConnection opened = null;
         try {
-            opened = SsapConnection.open(http, device.host(), properties,
+            opened = SsapConnection.open(http, device.host(), properties.ssap(),
                     reason -> loop.execute(() -> lost(attempt.get(), reason)));
             attempt.set(opened);
             String key = opened.register(clientKey, timings.registerTimeout());
