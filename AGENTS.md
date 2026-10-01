@@ -33,13 +33,16 @@ Rules for everyone who changes this repository, people and coding agents alike. 
 ## Architecture rules
 
 - Only adapters speak device protocols, and only sources speak content APIs. `ArchitectureTest` enforces the package
-  rules; see [Architecture](docs/dev/architecture.md).
+  rules, and the Gradle modules what each module may depend on; see [Architecture](docs/dev/architecture.md).
 - Every package rule is strict. A change that breaks one changes the code, not the rule; a rule that needs an
   exception names it in the rule, with its reason.
 - Decisions that are hard to reverse get an [architecture decision record](docs/adr/README.md).
 
 ## Where things live
 
+- Modules: the root project is the app. `core/` holds the domain model (`dev.andre.homecontrol.core`), a Gradle
+  module that depends on the JDK alone; run its tests with `scripts/gradle.sh :core:test`. See
+  [Modules](docs/dev/architecture.md#modules).
 - Device adapters: `src/main/java/dev/andre/homecontrol/adapters/<device>/`, with the wire protocol in `protocol/`.
 - Content sources: `src/main/java/dev/andre/homecontrol/sources/<source>/`.
 - Tests sit in the same package as the code they test. Fakes of devices and services are named `Fake…` and speak
