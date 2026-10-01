@@ -211,7 +211,9 @@ class BluetoothSpeakerSessionTest {
         session.execute(PLAY);
 
         assertThat(launcher.starts.getLast()).contains("--volume=70");
-        assertThat(launcher.latest().commands().get(0)).isEqualTo(List.of("set_property", "mute", "true"));
+        // A status poll may read the new player first; what matters is that nothing changes it before the mute.
+        assertThat(launcher.latest().commands()).filteredOn(command -> !command.getFirst().equals("get_property"))
+                .first().isEqualTo(List.of("set_property", "mute", "true"));
     }
 
     @Test
