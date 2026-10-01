@@ -13,40 +13,72 @@ buildscript {
 plugins {
     java
     jacoco
+    `jacoco-report-aggregation`
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.protobuf)
     alias(libs.plugins.sonarqube)
     alias(libs.plugins.test.retry)
 }
 
-group = "dev.andre"
-// CI passes the version computed from conventional commits; local builds get an
-// honest SNAPSHOT rather than claiming to be a release.
-version = (findProperty("releaseVersion") as String? ?: "0.0.0-SNAPSHOT")
+// One coverage report for the whole build: the app's tests exercise the modules' code too, so a report per module
+// would count only each module's own tests. SonarCloud reads it for every module.
+val combinedCoverageReport =
+    layout.buildDirectory.file("reports/jacoco/testCodeCoverageReport/testCodeCoverageReport.xml")
 
-java {
-    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+// What every Java project of the build shares: the root project, which is the app, and the modules beside it
+// (docs/dev/architecture.md#modules).
+allprojects {
+    apply(plugin = "java")
+    apply(plugin = "jacoco")
+
+    group = "dev.andre"
+    // CI passes the version computed from conventional commits; local builds get an
+    // honest SNAPSHOT rather than claiming to be a release.
+    version = (findProperty("releaseVersion") as String? ?: "0.0.0-SNAPSHOT")
+
+    configure<JavaPluginExtension> {
+        toolchain { languageVersion = JavaLanguageVersion.of(25) }
+    }
+
+    repositories { mavenCentral() }
+
+    configure<JacocoPluginExtension> {
+        toolVersion = "0.8.15"
+    }
+
+    tasks.withType<Test>().configureEach {
+        useJUnitPlatform()
+        testLogging { showExceptions = true }
+    }
+
+    sonar {
+        properties {
+            property("sonar.coverage.jacoco.xmlReportPaths", combinedCoverageReport.get().asFile.absolutePath)
+        }
+    }
+
+    // Resolve artifacts before CI fans out into builds and browser tests. Task inputs force
+    // verification of every resolvable configuration without compiling or executing tests.
+    tasks.register("verifyDependencyChecksums") {
+        description = "Verifies dependency checksums across all configurations without compiling."
+        group = "verification"
+        inputs.files(configurations.filter { it.isCanBeResolved })
+        doLast { logger.lifecycle("Dependency checksums verified.") }
+    }
 }
 
-repositories { mavenCentral() }
-
-jacoco {
-    toolVersion = "0.8.15"
-}
-
-tasks.jacocoTestReport {
-    dependsOn(tasks.test)
+tasks.named<JacocoReport>("testCodeCoverageReport") {
     reports {
         xml.required = true
     }
 }
 
-tasks.test {
-    finalizedBy(tasks.jacocoTestReport)
+tasks.check {
+    dependsOn(tasks.named("testCodeCoverageReport"))
 }
 
 tasks.named("sonar") {
-    dependsOn(tasks.jacocoTestReport)
+    dependsOn(tasks.named("testCodeCoverageReport"))
 }
 
 sonar {
@@ -120,11 +152,6 @@ protobuf {
     protoc { artifact = libs.protoc.get().toString() }
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
-    testLogging { showExceptions = true }
-}
-
 // Browser tests (Playwright for Java) live in their own source set so `build` never resolves
 // Playwright (~200 MB driver bundle) and never needs installed browsers. Run: ./gradlew e2eTest
 
@@ -185,13 +212,4 @@ val installPlaywrightBrowsers by tasks.registering(JavaExec::class) {
     classpath = configurations["e2eRuntimeClasspath"]
     mainClass = "com.microsoft.playwright.CLI"
     args(listOf("install", "--with-deps") + ((findProperty("e2eBrowsers") as String?) ?: "chromium,firefox,webkit").split(","))
-}
-
-// Resolve artifacts before CI fans out into builds and browser tests. Task inputs force
-// verification of every resolvable configuration without compiling or executing tests.
-tasks.register("verifyDependencyChecksums") {
-    description = "Verifies dependency checksums across all configurations without compiling."
-    group = "verification"
-    inputs.files(configurations.filter { it.isCanBeResolved })
-    doLast { logger.lifecycle("Dependency checksums verified.") }
 }
