@@ -52,10 +52,12 @@ public class EventStream {
     /** Only keeps time: each tick queues a heartbeat on {@link #fanOut}, which sends it in order with the events. */
     private final ScheduledExecutorService ticks = Executors.newSingleThreadScheduledExecutor(daemon("home-control-sse-heartbeat"));
     private final ScheduledFuture<?> heartbeat;
+    /** Set first thing on close: a heartbeat a tick queued just before, or is queueing still, then sends nothing. */
+    private volatile boolean closed;
 
     public EventStream(EventStreamProperties properties) {
         long interval = properties.heartbeatInterval().toMillis();
-        heartbeat = ticks.scheduleWithFixedDelay(() -> enqueue(this::sendHeartbeat), interval, interval,
+        heartbeat = ticks.scheduleWithFixedDelay(() -> enqueue(this::heartbeatUnlessClosed), interval, interval,
                 TimeUnit.MILLISECONDS);
     }
 
@@ -150,6 +152,7 @@ public class EventStream {
      */
     @EventListener(ContextClosedEvent.class)
     public void onContextClosed() {
+        closed = true;
         heartbeat.cancel(false);
         for (SseEmitter emitter : List.copyOf(emitters)) {
             drop(emitter);
@@ -196,6 +199,12 @@ public class EventStream {
     /** The one place a device-state event becomes an SSE frame; package-private so a test can observe the object. */
     void sendData(SseEmitter emitter, DeviceStateChangedEvent event) throws IOException {
         emitter.send(SseEmitter.event().name("state").data(event));
+    }
+
+    private void heartbeatUnlessClosed(SseEmitter emitter) throws IOException {
+        if (!closed) {
+            sendHeartbeat(emitter);
+        }
     }
 
     /** A comment line: browsers ignore it, proxies see traffic, and a closed tab shows up as a failed send. */
