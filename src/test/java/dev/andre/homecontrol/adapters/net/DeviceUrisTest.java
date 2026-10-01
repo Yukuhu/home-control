@@ -29,6 +29,16 @@ class DeviceUrisTest {
     }
 
     @Test
+    void aHostThatWouldChangeTheUrlIsRefused() {
+        // A slash, a question mark or an at sign would point the request at another host, path or user.
+        for (String host : new String[] {"evil.example/x?", "tv.local?x", "user@tv.local", "tv.local#x"}) {
+            assertThatThrownBy(() -> DeviceUris.of("http", host, 80, "/"))
+                    .as(host)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
     void aHostNoUrlCanCarryIsRefused() {
         assertThatThrownBy(() -> DeviceUris.of("http", "not a host", 80, ""))
                 .isInstanceOf(IllegalArgumentException.class)
