@@ -1,11 +1,17 @@
 package dev.andre.homecontrol.adapters.webos;
 
-import dev.andre.homecontrol.adapters.net.Backoff;
 import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
+import dev.andre.homecontrol.adapters.support.Backoff;
+import dev.andre.homecontrol.adapters.support.ConnectionSlot;
+import dev.andre.homecontrol.adapters.support.DeviceCalls;
+import dev.andre.homecontrol.adapters.support.LearnedMac;
 import dev.andre.homecontrol.adapters.support.PlayPauseToggle;
+import dev.andre.homecontrol.adapters.support.Reconnector;
+import dev.andre.homecontrol.adapters.support.SessionLoop;
+import dev.andre.homecontrol.adapters.support.StatePublisher;
+import dev.andre.homecontrol.adapters.support.WakeOnLanPower;
 import dev.andre.homecontrol.core.Action;
-import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -19,7 +25,6 @@ import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.TvInput;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.core.WakeOnLanSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
@@ -27,18 +32,11 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
 
 /**
  * One LG webOS TV. Connects with the stored client key, mirrors foreground app, volume and power
@@ -49,7 +47,7 @@ import java.util.function.UnaryOperator;
  * through {@link LearnedSettings}, i.e. by the device package under its registry lock. A client key the TV hands out goes to
  * the device secrets, under the reference the settings already name.
  *
- * <p>Threading: connect, loss and reconnect run on one scheduler thread; commands run on the
+ * <p>Threading: connect, loss and the liveness check run on the session's loop; commands run on the
  * caller's thread against the current connection and never wait for a reconnect; subscription
  * callbacks only update state.
  */
@@ -63,25 +61,19 @@ public class WebOsSession implements DeviceHandle, InputListing {
     private final WebOsTimings timings;
     private final HttpClient http;
     private final DeviceRegistry registry;
-    private final LearnedSettings learned;
     private final DeviceSecrets secrets;
-    private final WakeOnLan wakeOnLan;
-    private final Consumer<DeviceState> onChange;
     private final Runnable onClose;
-    private final ScheduledExecutorService scheduler;
+    private final StatePublisher publisher;
+    private final SessionLoop loop;
+    private final Reconnector reconnector;
+    private final ConnectionSlot<SsapConnection> connection;
+    private final WakeOnLanPower power;
+    private final LearnedMac learnedMac;
     private final PlayPauseToggle playPause = new PlayPauseToggle();
 
-    /** Set by the scheduler thread; taken out (and closed) by whoever drops it, which close() does from any thread. */
-    private final AtomicReference<SsapConnection> connection = new AtomicReference<>();
-    // Immutable snapshot; every read-modify-write runs inside the synchronized update(), readers only read it.
-    @SuppressWarnings("java:S3077")
-    private volatile DeviceState state = DeviceState.initial();
-    // Immutable list replaced wholesale on the scheduler thread; request threads only read it.
+    // Immutable list replaced wholesale on the loop; request threads only read it.
     @SuppressWarnings("java:S3077")
     private volatile List<TvInput> inputs = List.of();
-    private volatile boolean closed;
-    private Duration backoff;                   // scheduler thread only
-    private ScheduledFuture<?> pendingConnect;  // scheduler thread only
 
     // Package-private, built only by WebOsAdapter: ten distinct collaborator types, nothing to group.
     @SuppressWarnings("java:S107")
@@ -93,50 +85,40 @@ public class WebOsSession implements DeviceHandle, InputListing {
         this.timings = timings;
         this.http = http;
         this.registry = registry;
-        this.learned = learned;
         this.secrets = secrets;
-        this.wakeOnLan = wakeOnLan;
-        this.onChange = onChange;
         this.onClose = onClose;
-        this.backoff = initialBackoff();
-        this.scheduler = Executors.newSingleThreadScheduledExecutor(
-                Thread.ofPlatform().daemon().name("webos-" + device.id()).factory());
+        this.publisher = new StatePublisher(device.id(), DeviceState.initial(), onChange);
+        this.loop = new SessionLoop("webos-" + device.id());
+        this.reconnector = new Reconnector(loop, new Backoff(timings.reconnectInitialDelay(),
+                timings.reconnectMaxDelay()), this::connect);
+        this.connection = new ConnectionSlot<>("webos-" + device.id());
+        this.power = new WakeOnLanPower(device.name(), this::current, WebOsSettings.ADAPTER_ID, wakeOnLan);
+        this.learnedMac = new LearnedMac(this::current, WebOsSettings.ADAPTER_ID, learned);
     }
 
     void start() {
-        onScheduler(this::connect);
-        long interval = timings.livenessInterval().toMillis();
-        try {
-            scheduler.scheduleWithFixedDelay(this::checkLiveness, interval, interval, TimeUnit.MILLISECONDS);
-        } catch (RejectedExecutionException _) {
-            // Closed before it started.
-        }
+        reconnector.start();
+        loop.every(this::checkLiveness, timings.livenessInterval());
     }
 
     /**
      * SSAP has no heartbeat and the JDK WebSocket does not ping, so a TV that lost power without
      * closing TCP would stay CONNECTED forever. A cheap request every {@link WebOsTimings#livenessInterval()}
      * settles it: any answer (even an error) proves the TV is there; silence past the request
-     * timeout means the connection is gone. Runs on the scheduler thread, so it never races
-     * {@link #connect} or {@link #lost}.
+     * timeout means the connection is gone. Runs on the loop, so it never races {@link #connect} or {@link #lost}.
      */
     private void checkLiveness() {
-        SsapConnection current = connection.get();
-        if (current == null || closed) {
-            return;
-        }
-        try {
-            current.request(SsapUris.SYSTEM_INFO, SsapMessages.empty());
-        } catch (DeviceTimeoutException _) {
-            lost(current, "no answer to the liveness check");
-        } catch (SsapException _) {
-            // The TV answered; it is alive even if it refuses this request.
-        } catch (IOException e) {
-            lost(current, e.getMessage());
-        } catch (RuntimeException e) {
-            // Never let an exception cancel the fixed-delay schedule.
-            log.warn("Checking the connection to {} failed", device.name(), e);
-        }
+        connection.current().ifPresent(current -> {
+            try {
+                current.request(SsapUris.SYSTEM_INFO, SsapMessages.empty());
+            } catch (DeviceTimeoutException _) {
+                lost(current, "no answer to the liveness check");
+            } catch (SsapException _) {
+                // The TV answered; it is alive even if it refuses this request.
+            } catch (IOException e) {
+                lost(current, e.getMessage());
+            }
+        });
     }
 
     String host() {
@@ -145,17 +127,12 @@ public class WebOsSession implements DeviceHandle, InputListing {
 
     /** SSDP heard the TV announce itself: skip whatever is left of the backoff. */
     void reconnectNow() {
-        onScheduler(() -> {
-            if (connection.get() == null && state.status() != DeviceStatus.UNPAIRED) {
-                backoff = initialBackoff();
-                connect();
-            }
-        });
+        reconnector.reconnectNow();
     }
 
     @Override
     public DeviceState state() {
-        return state;
+        return publisher.current();
     }
 
     @Override
@@ -201,7 +178,8 @@ public class WebOsSession implements DeviceHandle, InputListing {
             case POWER -> togglePower();
             case VOLUME_UP -> call(SsapUris.VOLUME_UP, SsapMessages.empty(), "raise the volume");
             case VOLUME_DOWN -> call(SsapUris.VOLUME_DOWN, SsapMessages.empty(), "lower the volume");
-            case VOLUME_MUTE -> call(SsapUris.SET_MUTE, SsapMessages.empty().put("mute", !state.muted()), "mute");
+            case VOLUME_MUTE -> call(SsapUris.SET_MUTE, SsapMessages.empty().put("mute", !publisher.current().muted()),
+                    "mute");
             case PLAY_PAUSE -> button(playPause.playNext() ? "PLAY" : "PAUSE");
             default -> button(WebOsKeys.button(key).orElseThrow(() ->
                     new UnsupportedActionException(device.name() + " has no " + key + " button")));
@@ -210,117 +188,76 @@ public class WebOsSession implements DeviceHandle, InputListing {
 
     private void button(String name) {
         SsapConnection current = requireConnected();
-        try {
-            current.button(name);
-        } catch (DeviceTimeoutException _) {
-            throw new ActionFailedException(device.name() + " did not answer in time when asked to press " + name);
-        } catch (SsapException e) {
-            throw new ActionFailedException(device.name() + " refused the " + name + " button: " + e.getMessage());
-        } catch (IOException _) {
-            throw new DeviceOfflineException(device.name() + " dropped the connection");
-        }
+        DeviceCalls.run(device.name(), "press " + name, () -> current.button(name));
     }
 
+    /** A TV that is reachable but silent fails the command; the liveness check decides whether the connection is gone. */
     private void call(String uri, ObjectNode payload, String what) {
         SsapConnection current = requireConnected();
-        try {
-            current.request(uri, payload);
-        } catch (DeviceTimeoutException _) {
-            // Reachable but silent is a refusal (502), not an offline device; the liveness check
-            // decides separately whether the whole connection is gone.
-            throw new ActionFailedException(device.name() + " did not answer in time when asked to " + what);
-        } catch (SsapException e) {
-            throw new ActionFailedException(device.name() + " could not " + what + ": " + e.getMessage());
-        } catch (IOException _) {
-            throw new DeviceOfflineException(device.name() + " dropped the connection");
-        }
+        DeviceCalls.run(device.name(), what, () -> current.request(uri, payload));
     }
 
     private void togglePower() {
-        SsapConnection current = connection.get();
-        if (current != null && state.powerOn()) {
-            try {
-                current.fire(SsapUris.TURN_OFF, SsapMessages.empty());
-            } catch (IOException _) {
-                throw new DeviceOfflineException(device.name() + " dropped the connection");
-            }
-            update(s -> s.withPower(false));
+        Optional<SsapConnection> current = connection.current();
+        if (current.isPresent() && publisher.current().powerOn()) {
+            DeviceCalls.run(device.name(), "switch off", () -> current.get().fire(SsapUris.TURN_OFF, SsapMessages.empty()));
+            publisher.update(state -> state.withPower(false));
             return;
         }
-        String mac = current().adapterSettings(WebOsSettings.ADAPTER_ID).get(WakeOnLanSettings.MAC_ADDRESS);
-        if (mac == null || mac.isBlank()) {
-            throw new DeviceOfflineException(device.name() + " is off and no MAC address is known for Wake-on-LAN;"
-                    + " switch it on once by hand or enter its MAC address on the setup page");
-        }
-        try {
-            wakeOnLan.wake(mac);
-        } catch (IOException | IllegalArgumentException e) {
-            throw new DeviceOfflineException("Could not send the Wake-on-LAN packet: " + e.getMessage());
-        }
-        onScheduler(() -> {
-            cancelPendingConnect();
-            backoff = initialBackoff();
-            pendingConnect = scheduler.schedule(this::connect, timings.wakeGrace().toMillis(), TimeUnit.MILLISECONDS);
-        });
+        power.wake();
+        reconnector.retryIn(timings.wakeGrace());
     }
 
-    private void connect() {
-        cancelPendingConnect();
-        if (closed || connection.get() != null) {
-            return;
-        }
+    /** Runs on the loop, through the {@link Reconnector}. */
+    private Reconnector.Outcome connect() {
         WebOsSettings settings = WebOsSettings.of(current(), secrets);
         String clientKey = settings.clientKey();
         if (clientKey == null) {
-            update(ignored -> DeviceState.unpaired());
-            return;
+            publisher.publish(DeviceState.unpaired());
+            return Reconnector.Outcome.STOP;
         }
-        update(s -> s.withStatus(DeviceStatus.CONNECTING));
+        publisher.update(state -> state.withStatus(DeviceStatus.CONNECTING));
         AtomicReference<SsapConnection> attempt = new AtomicReference<>();
         SsapConnection opened = null;
         try {
             opened = SsapConnection.open(http, device.host(), properties,
-                    reason -> onScheduler(() -> lost(attempt.get(), reason)));
+                    reason -> loop.execute(() -> lost(attempt.get(), reason)));
             attempt.set(opened);
             String key = opened.register(clientKey, timings.registerTimeout());
-            connection.set(opened);
-            if (closed) {
-                // close() ran while registering and may have missed this connection.
-                if (connection.compareAndSet(opened, null)) {
-                    opened.close();
-                }
-                return;
+            if (!connection.set(opened)) {
+                return Reconnector.Outcome.STOP; // closed while registering; the slot closed the connection
             }
-            backoff = initialBackoff();
             if (!key.equals(clientKey)) {
                 secrets.putDeviceSecret(WebOsSettings.secretName(settings.keyRef()), key); // a key implies a reference
             }
-            update(s -> s.withStatus(DeviceStatus.CONNECTED).withPower(true));
+            publisher.update(state -> state.withStatus(DeviceStatus.CONNECTED).withPower(true));
             subscribeToState(opened);
             loadInputs(opened);
             learnMacAddress(opened);
+            return Reconnector.Outcome.CONNECTED;
         } catch (SsapPairingException e) {
             closeQuietly(opened);
             log.warn("{} no longer accepts this server ({}); pair it again on the setup page", device.name(), e.getMessage());
-            update(ignored -> DeviceState.unpaired());
+            publisher.publish(DeviceState.unpaired());
+            return Reconnector.Outcome.STOP;
         } catch (IOException e) {
             closeQuietly(opened);
             log.debug("{} is not reachable: {}", device.name(), e.getMessage());
-            update(s -> s.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
-            scheduleReconnect();
+            publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
+            return Reconnector.Outcome.RETRY;
         }
     }
 
     private void subscribeToState(SsapConnection opened) {
         subscribe(opened, SsapUris.FOREGROUND_APP, payload -> {
             String appId = payload.path("appId").asString("");
-            update(s -> s.withCurrentApp(appId.isEmpty() ? null : appId));
+            publisher.update(state -> state.withCurrentApp(appId.isEmpty() ? null : appId));
         });
-        subscribe(opened, SsapUris.GET_VOLUME, payload -> update(s -> WebOsPayloads.volume(s, payload)));
+        subscribe(opened, SsapUris.GET_VOLUME, payload -> publisher.update(state -> WebOsPayloads.volume(state, payload)));
         subscribe(opened, SsapUris.POWER_STATE, payload -> {
-            String power = payload.path("state").asString("");
-            if (!power.isEmpty()) {
-                update(s -> s.withPower(!STANDBY_STATES.contains(power)));
+            String powerState = payload.path("state").asString("");
+            if (!powerState.isEmpty()) {
+                publisher.update(state -> state.withPower(!STANDBY_STATES.contains(powerState)));
             }
         });
     }
@@ -346,100 +283,37 @@ public class WebOsSession implements DeviceHandle, InputListing {
     private void learnMacAddress(SsapConnection opened) {
         try {
             WebOsPayloads.macAddress(opened.request(SsapUris.CONNECTION_INFO, SsapMessages.empty()), device.host())
-                    .ifPresent(mac -> {
-                        WebOsSettings settings = WebOsSettings.of(current(), secrets);
-                        if (!settings.macAddressManual() && !mac.equals(settings.macAddress())) {
-                            learned.store(Map.of(WakeOnLanSettings.MAC_ADDRESS, mac));
-                        }
-                    });
+                    .ifPresent(learnedMac::offer);
         } catch (IOException e) {
             log.debug("{} did not report its MAC address: {}", device.name(), e.getMessage());
         }
     }
 
+    /** Runs on the loop. */
     private void lost(SsapConnection which, String reason) {
-        if (which == null || !connection.compareAndSet(which, null)) {
+        if (which == null || !connection.takeIf(which)) {
             return;
         }
-        which.close();
         inputs = List.of();
         log.info("Lost the connection to {} ({}); reconnecting", device.name(), reason);
-        update(s -> s.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
-        scheduleReconnect();
-    }
-
-    private void scheduleReconnect() {
-        if (closed) {
-            return;
-        }
-        Duration delay = backoff;
-        backoff = Backoff.next(backoff, timings.reconnectMaxDelay());
-        try {
-            pendingConnect = scheduler.schedule(this::connect, delay.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (RejectedExecutionException _) {
-            // Closed meanwhile.
-        }
-    }
-
-    private void cancelPendingConnect() {
-        if (pendingConnect != null) {
-            pendingConnect.cancel(false);
-            pendingConnect = null;
-        }
+        publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
+        reconnector.lost();
     }
 
     private SsapConnection requireConnected() {
-        SsapConnection current = connection.get();
-        if (current != null) {
-            return current;
+        Optional<SsapConnection> current = connection.current();
+        if (current.isPresent()) {
+            return current.get();
         }
-        if (state.status() == DeviceStatus.UNPAIRED) {
+        if (publisher.current().status() == DeviceStatus.UNPAIRED) {
             throw new DeviceOfflineException(device.name() + " must be paired again before it can be controlled");
         }
-        throw new DeviceOfflineException(device.name() + " is not connected");
+        throw DeviceCalls.notConnected(device.name());
     }
 
     /** The registry's copy: settings (MAC, key) may have changed since this handle was created. */
     private Device current() {
         return registry.findById(device.id()).orElse(device);
-    }
-
-    /** Publishes only visible changes; entering CONNECTING is always published so every attempt shows. */
-    private synchronized void update(UnaryOperator<DeviceState> change) {
-        if (closed) {
-            return;
-        }
-        DeviceState next = change.apply(state);
-        if (next.sameIgnoringTime(state) && next.status() != DeviceStatus.CONNECTING) {
-            return;
-        }
-        state = next;
-        try {
-            onChange.accept(next);
-        } catch (RuntimeException e) {
-            // The listener publishes a Spring event synchronously, to subscribers this class knows nothing about.
-            // Their failure must not abort connect() after the connection is set but before its subscriptions exist.
-            log.warn("A device state listener failed for {}", device.id(), e);
-        }
-    }
-
-    private void onScheduler(Runnable task) {
-        if (closed) {
-            return;
-        }
-        try {
-            scheduler.execute(() -> {
-                if (!closed) {
-                    task.run();
-                }
-            });
-        } catch (RejectedExecutionException _) {
-            // Closed meanwhile.
-        }
-    }
-
-    private Duration initialBackoff() {
-        return timings.reconnectInitialDelay();
     }
 
     private static void closeQuietly(SsapConnection opened) {
@@ -450,9 +324,9 @@ public class WebOsSession implements DeviceHandle, InputListing {
 
     @Override
     public void close() {
-        closed = true;
-        scheduler.shutdownNow();
-        closeQuietly(connection.getAndSet(null));
+        publisher.close();
+        loop.close();
+        connection.close();
         onClose.run();
     }
 }

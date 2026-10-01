@@ -502,4 +502,17 @@ class WebOsSessionTest {
             assertThat(storedSetting("macAddress")).isEqualTo("A8:23:FE:01:02:03");
         });
     }
+
+    @Test
+    void anAnnouncementWhileConnectedOpensNoSecondConnection() throws Exception {
+        started();
+        connected();
+        int opened = tv.connections();
+
+        session.reconnectNow();
+        session.reconnectNow();
+
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2)).until(() -> tv.connections() == opened);
+        assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED);
+    }
 }
