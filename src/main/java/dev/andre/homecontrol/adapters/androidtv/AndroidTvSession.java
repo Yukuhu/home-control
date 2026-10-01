@@ -1,21 +1,25 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
+import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
+import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
+import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
+import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteListener;
+import dev.andre.homecontrol.adapters.androidtv.protocol.TlsSockets;
+import dev.andre.homecontrol.adapters.support.Backoff;
+import dev.andre.homecontrol.adapters.support.ConnectionSlot;
+import dev.andre.homecontrol.adapters.support.DeviceCalls;
+import dev.andre.homecontrol.adapters.support.Reconnector;
+import dev.andre.homecontrol.adapters.support.SessionLoop;
+import dev.andre.homecontrol.adapters.support.StatePublisher;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
-import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.LaunchedMedia;
-import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
-import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
-import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
-import dev.andre.homecontrol.adapters.androidtv.protocol.TlsSockets;
-import dev.andre.homecontrol.adapters.net.Backoff;
-import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.RedactedUris;
-import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteListener;
+import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,20 +28,17 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * One device's live connection: connects, keeps the last known {@link DeviceState},
- * and reconnects with exponential backoff — except when the device has rejected the
- * pairing, where retrying is pointless (spec §8).
+ * One device's live connection: connects, keeps the last known {@link DeviceState}, and reconnects with a growing
+ * backoff, except when the device has rejected the pairing, where retrying is pointless (spec §8). TLS alone does not
+ * make the session usable: the {@link Reconnector}'s attempt stays pending until the device finishes the Remote v2
+ * configure/active exchange. Everything that changes the session runs on its loop, and a callback of a connection that
+ * is no longer the current one is dropped there.
  */
-public class AndroidTvSession implements RemoteListener, DeviceHandle {
+public class AndroidTvSession implements DeviceHandle {
 
     private static final Logger log = LoggerFactory.getLogger(AndroidTvSession.class);
 
@@ -56,28 +57,18 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     private static final int UNPAIRED_CONFIRMATION_THRESHOLD = 5;
 
     private final Device device;
-    private final AndroidTvSettings settings;
-    private final AndroidTvTimings timings;
-    private final Consumer<DeviceState> onChange;
-    private final ScheduledExecutorService scheduler;
     private final ConnectionOpener opener;
+    private final StatePublisher publisher;
+    private final SessionLoop loop;
+    /** When what was launched next stops counting as playing; its own slot, so a reconnect never cancels it. */
+    private final SessionLoop.Timer playbackExpiry;
+    private final Reconnector reconnector;
+    private final ConnectionSlot<RemoteConnection> connection;
 
-    // Self-synchronized connection written only on the scheduler thread; request threads and close() just read it.
-    @SuppressWarnings("java:S3077")
-    private volatile RemoteConnection connection;
-    // Immutable snapshot; every read-modify-write runs on the scheduler thread, request threads only read it.
-    @SuppressWarnings("java:S3077")
-    private volatile DeviceState state = DeviceState.initial();
-    private volatile Duration backoff;
-    /** Tags reader callbacks so an old connection cannot update a newer attempt. */
-    private final AtomicLong generation = new AtomicLong();
-    /** Accessed only on the single-threaded scheduler. */
+    /** Loop thread only. */
     private int consecutiveUnpaired;
-    /** Accessed only on the single-threaded scheduler. Outlives a reconnect: the device keeps playing. */
+    /** Loop thread only. Outlives a reconnect: the device keeps playing. */
     private final InferredPlayback playback = new InferredPlayback();
-    /** Accessed only on the single-threaded scheduler. */
-    private ScheduledFuture<?> playbackTimer;
-    private volatile boolean closed;
 
     public AndroidTvSession(Device device, ClientCertificate credential,
                          AndroidTvProperties properties, Consumer<DeviceState> onChange) {
@@ -93,27 +84,25 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
                      AndroidTvTimings timings, Consumer<DeviceState> onChange,
                      ConnectionOpener opener) {
         this.device = device;
-        this.settings = AndroidTvSettings.of(device);
-        this.timings = timings;
-        this.onChange = onChange;
+        AndroidTvSettings settings = AndroidTvSettings.of(device);
         this.opener = opener == null
                 ? listener -> RemoteConnection.connect(device.host(), settings.port(), credential,
                         Math.toIntExact(timings.staleTimeout().toMillis()), listener, settings.certificateFingerprint())
                 : opener;
-        this.backoff = timings.reconnectInitialDelay();
-        this.scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "shield-session-" + device.id());
-            thread.setDaemon(true);
-            return thread;
-        });
+        this.publisher = new StatePublisher(device.id(), DeviceState.initial(), onChange);
+        this.loop = new SessionLoop("shield-session-" + device.id());
+        this.playbackExpiry = loop.timer();
+        this.reconnector = new Reconnector(loop, new Backoff(timings.reconnectInitialDelay(),
+                timings.reconnectMaxDelay()), this::connect);
+        this.connection = new ConnectionSlot<>("shield-session-" + device.id());
     }
 
     public void start() {
-        scheduler.execute(this::connect);
+        reconnector.start();
     }
 
     public DeviceState state() {
-        return state;
+        return publisher.current();
     }
 
     public void sendKey(RemoteKey key) {
@@ -122,20 +111,12 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
 
     public void sendKey(RemoteKey key, KeyPress press) {
         RemoteConnection current = requireConnected();
-        try {
-            current.sendKey(key, press);
-        } catch (IOException _) {
-            throw new DeviceOfflineException("The device dropped the connection while sending " + key);
-        }
+        DeviceCalls.run(device.name(), "press " + key, () -> current.sendKey(key, press));
     }
 
     public void openAppLink(URI uri) {
         RemoteConnection current = requireConnected();
-        try {
-            current.sendAppLink(uri.toString());
-        } catch (IOException _) {
-            throw new DeviceOfflineException("The device dropped the connection while opening " + RedactedUris.withoutQuery(uri));
-        }
+        DeviceCalls.run(device.name(), "open " + RedactedUris.withoutQuery(uri), () -> current.sendAppLink(uri.toString()));
     }
 
     @Override
@@ -145,7 +126,7 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
             case Action.OpenAppLink(var uri, var media) -> {
                 openAppLink(uri);
                 if (media != null) {
-                    runOnScheduler(generation.get(), () -> handleLaunched(media));
+                    loop.execute(() -> handleLaunched(media));
                 }
             }
             case Action.SetVolume _ -> throw new UnsupportedActionException(
@@ -172,104 +153,69 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
     }
 
     private RemoteConnection requireConnected() {
-        RemoteConnection current = connection;
-        if (current == null || state.status() != DeviceStatus.CONNECTED) {
-            throw new DeviceOfflineException("The device is not connected");
+        Optional<RemoteConnection> current = connection.current();
+        if (current.isEmpty() || publisher.current().status() != DeviceStatus.CONNECTED) {
+            throw DeviceCalls.notConnected(device.name());
         }
-        return current;
+        return current.get();
     }
 
-    private void connect() {
-        if (closed) {
-            return;
-        }
-        long attempt = generation.incrementAndGet();
-        update(state.withStatus(DeviceStatus.CONNECTING));
+    /** Runs on the loop, through the {@link Reconnector}. */
+    private Reconnector.Outcome connect() {
+        publisher.update(state -> state.withStatus(DeviceStatus.CONNECTING));
+        Attempt attempt = new Attempt();
         try {
-            RemoteConnection opened = opener.open(listenerFor(attempt));
-
-            connection = opened;
-            if (closed) {
-                // close() ran while the handshake above was blocking this thread and read
-                // connection before it was set, so nobody else will ever close this one.
-                // Both fields are volatile and close() sets closed before reading connection,
-                // so one of the two sides always sees the other.
-                opened.close();
-                connection = null;
+            RemoteConnection opened = opener.open(attempt);
+            attempt.own = opened;
+            if (!connection.set(opened)) {
+                return Reconnector.Outcome.STOP; // closed during the handshake; the slot closed the connection
             }
-            // TLS only proves transport setup. The reader reports Remote v2 readiness
-            // after the device's configure/active exchange, on this same scheduler.
+            // TLS only proves transport setup. The reader reports Remote v2 readiness after the device's
+            // configure/active exchange, on this loop.
+            return Reconnector.Outcome.PENDING;
         } catch (TlsSockets.CertificateMismatchException _) {
             log.warn("Device {} presented an unexpected certificate; refusing it", device.id());
-            update(state.withStatus(DeviceStatus.UNPAIRED));
+            publisher.update(state -> state.withStatus(DeviceStatus.UNPAIRED));
+            return Reconnector.Outcome.STOP;
         } catch (RemoteConnection.UnpairedException _) {
-            handleAmbiguousUnpaired();
+            return ambiguousUnpaired() ? Reconnector.Outcome.RETRY : Reconnector.Outcome.STOP;
         } catch (IOException e) {
             log.debug("Could not reach {}: {}", device.host(), e.getMessage());
             forgetAmbiguousVerdicts();
-            update(state.withStatus(DeviceStatus.DISCONNECTED));
-            scheduleReconnect();
+            publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED));
+            return Reconnector.Outcome.RETRY;
         }
-    }
-
-    private RemoteListener listenerFor(long attempt) {
-        return new RemoteListener() {
-            @Override
-            public void onReady() {
-                runOnScheduler(attempt, AndroidTvSession.this::handleReady);
-            }
-
-            @Override
-            public void onPower(boolean on) {
-                runOnScheduler(attempt, () -> handlePower(on));
-            }
-
-            @Override
-            public void onCurrentApp(String appPackage) {
-                runOnScheduler(attempt, () -> handleCurrentApp(appPackage));
-            }
-
-            @Override
-            public void onVolume(int level, int max, boolean muted) {
-                runOnScheduler(attempt, () -> update(state.withVolume(level, max, muted)));
-            }
-
-            @Override
-            public void onDisconnected(DisconnectCause cause) {
-                runOnScheduler(attempt, () -> handleDisconnect(cause));
-            }
-        };
     }
 
     private void handleReady() {
-        if (connection == null || state.status() != DeviceStatus.CONNECTING) {
+        if (publisher.current().status() != DeviceStatus.CONNECTING) {
             return;
         }
-        backoff = timings.reconnectInitialDelay();
         forgetAmbiguousVerdicts();
-        update(state.withStatus(DeviceStatus.CONNECTED));
+        reconnector.connected();
+        publisher.update(state -> state.withStatus(DeviceStatus.CONNECTED));
     }
 
     /**
-     * Handles an ambiguous UNPAIRED verdict — from either {@link RemoteConnection.UnpairedException}
-     * or {@link DisconnectCause#UNPAIRED} — by retrying like an ordinary drop until it has
-     * happened {@value #UNPAIRED_CONFIRMATION_THRESHOLD} times in a row, spanning a plausible
-     * device reboot, then latching.
+     * Counts an ambiguous UNPAIRED verdict — from either {@link RemoteConnection.UnpairedException}
+     * or {@link DisconnectCause#UNPAIRED} — and says whether to retry like an ordinary drop: until it
+     * has happened {@value #UNPAIRED_CONFIRMATION_THRESHOLD} times in a row, spanning a plausible
+     * device reboot. Then the session latches UNPAIRED.
      * A certificate fingerprint MISMATCH is not ambiguous and does not go through here —
      * it latches immediately, on the first occurrence (see {@link TlsSockets.CertificateMismatchException}).
      */
-    private void handleAmbiguousUnpaired() {
+    private boolean ambiguousUnpaired() {
         consecutiveUnpaired++;
         if (consecutiveUnpaired < UNPAIRED_CONFIRMATION_THRESHOLD) {
             log.info("Device {} looked unpaired ({}/{}); retrying before giving up",
                     device.id(), consecutiveUnpaired, UNPAIRED_CONFIRMATION_THRESHOLD);
-            update(state.withStatus(DeviceStatus.DISCONNECTED));
-            scheduleReconnect();
-        } else {
-            log.warn("Could not establish the remote session for {} after {} authentication-like failures; try pairing again",
-                    device.id(), consecutiveUnpaired);
-            update(state.withStatus(DeviceStatus.UNPAIRED));
+            publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED));
+            return true;
         }
+        log.warn("Could not establish the remote session for {} after {} authentication-like failures; try pairing again",
+                device.id(), consecutiveUnpaired);
+        publisher.update(state -> state.withStatus(DeviceStatus.UNPAIRED));
+        return false;
     }
 
     /**
@@ -285,147 +231,99 @@ public class AndroidTvSession implements RemoteListener, DeviceHandle {
         consecutiveUnpaired = 0;
     }
 
-    private void scheduleReconnect() {
-        if (closed) {
-            return;
-        }
-        Duration delay = backoff;
-        backoff = Backoff.next(backoff, timings.reconnectMaxDelay());
-        scheduler.schedule(this::connect, delay.toMillis(), TimeUnit.MILLISECONDS);
-    }
-
-    /*
-     * RemoteListener callbacks arrive on the protocol reader or idle-watchdog thread.
-     * RemoteConnection's constructor starts those threads before its connect() factory
-     * even returns, so any of these can fire while connect() — running on this
-     * session's own scheduler thread — is still executing its success path for the
-     * very same connection. Each of these does a read-modify-write on `state` (and
-     * onDisconnected additionally writes connection/backoff/consecutiveUnpaired); left
-     * unserialized, connect()'s own writes could interleave with one of these and get
-     * silently clobbered, or clobber one of these in turn. So none of them touch that
-     * state directly — each hands its work off to runOnScheduler(), the same
-     * single-threaded scheduler connect() already runs on, making every mutation of
-     * connection/state/backoff/consecutiveUnpaired happen on exactly one thread.
-     */
-
-    @Override
-    public void onPower(boolean on) {
-        runOnScheduler(generation.get(), () -> handlePower(on));
-    }
-
-    @Override
-    public void onCurrentApp(String appPackage) {
-        runOnScheduler(generation.get(), () -> handleCurrentApp(appPackage));
-    }
-
-    @Override
-    public void onVolume(int level, int max, boolean isMuted) {
-        runOnScheduler(generation.get(), () -> update(state.withVolume(level, max, isMuted)));
-    }
-
-    @Override
-    public void onDisconnected(DisconnectCause cause) {
-        runOnScheduler(generation.get(), () -> handleDisconnect(cause));
-    }
-
     private void handlePower(boolean on) {
         if (!on) {
             playback.poweredOff();
         }
-        update(state.withPower(on).withNowPlaying(playback.current(Instant.now())));
+        publisher.update(state -> state.withPower(on).withNowPlaying(playback.current(Instant.now())));
     }
 
     private void handleCurrentApp(String appPackage) {
         playback.appChanged(appPackage);
-        update(state.withCurrentApp(appPackage).withNowPlaying(playback.current(Instant.now())));
+        publisher.update(state -> state.withCurrentApp(appPackage).withNowPlaying(playback.current(Instant.now())));
     }
 
     private void handleLaunched(LaunchedMedia media) {
-        playback.launched(media, state.currentApp(), Instant.now());
+        playback.launched(media, publisher.current().currentApp(), Instant.now());
         refreshPlayback();
     }
 
     /** Publishes what plays now, then comes back when that is next due to change by itself. */
     private void refreshPlayback() {
         Instant now = Instant.now();
-        DeviceState refreshed = state.withNowPlaying(playback.current(now));
-        if (!refreshed.sameIgnoringTime(state)) {
-            update(refreshed);
-        }
-        if (playbackTimer != null) {
-            playbackTimer.cancel(false);
-        }
-        playback.nextDeadline().ifPresent(deadline -> {
-            try {
-                playbackTimer = scheduler.schedule(this::refreshPlayback,
-                        Math.max(0, Duration.between(now, deadline).toMillis()) + 1, TimeUnit.MILLISECONDS);
-            } catch (RejectedExecutionException _) {
-                // close() shut the scheduler down; the session is going away.
-            }
-        });
+        publisher.update(state -> state.withNowPlaying(playback.current(now)));
+        playback.nextDeadline().ifPresentOrElse(
+                deadline -> playbackExpiry.schedule(this::refreshPlayback,
+                        Duration.ofMillis(Math.max(0, Duration.between(now, deadline).toMillis()) + 1)),
+                playbackExpiry::cancel);
     }
 
-    private void handleDisconnect(DisconnectCause cause) {
-        connection = null;
+    private void handleDisconnect(Attempt attempt, DisconnectCause cause) {
+        if (attempt.own == null || !connection.takeIf(attempt.own)) {
+            return; // a connection that is no longer the current one
+        }
         if (cause == DisconnectCause.UNPAIRED) {
-            handleAmbiguousUnpaired();
+            if (ambiguousUnpaired()) {
+                reconnector.lost();
+            } else {
+                reconnector.stop();
+            }
             return;
         }
         log.info("Lost the connection to {} ({}); reconnecting", device.id(), cause);
         forgetAmbiguousVerdicts();
-        update(state.withStatus(DeviceStatus.DISCONNECTED));
-        scheduleReconnect();
-    }
-
-    /**
-     * Hands one {@link RemoteListener} callback's work off to the scheduler, guarded against
-     * a session that is already closing — checked once here before scheduling, and again
-     * (inside the scheduled task itself) in case {@link #close()} shuts the scheduler down
-     * between that check and the task actually running. A single guard, used by every
-     * callback above, so the guard cannot drift out of sync between them.
-     */
-    private void runOnScheduler(long attempt, Runnable task) {
-        if (closed) {
-            return;
-        }
-        try {
-            scheduler.execute(() -> {
-                if (!closed && attempt == generation.get()) {
-                    task.run();
-                }
-            });
-        } catch (RejectedExecutionException _) {
-            // The scheduler was shut down by close between the check above and this handoff.
-            // The session is going away, so there is nothing left to update.
-        }
-    }
-
-    private void update(DeviceState updated) {
-        if (closed) {
-            // connect() runs on the scheduler thread and can still be mid-flight when
-            // close() flips this flag from another thread (e.g. a blocking connect() call
-            // returning just after forget() closed this session); without this guard it
-            // would publish a state — even CONNECTED — for a session nobody holds anymore.
-            return;
-        }
-        state = updated;
-        try {
-            onChange.accept(updated);
-        } catch (RuntimeException e) {
-            // The listener publishes a Spring event, delivered synchronously on this thread
-            // to subscribers this class knows nothing about. Recoverable listener failures
-            // must not prevent scheduleReconnect(); Errors abort the current task.
-            log.warn("A device state listener failed for {}", device.id(), e);
-        }
+        publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED));
+        reconnector.lost();
     }
 
     @Override
     public void close() {
-        closed = true;
-        scheduler.shutdownNow();
-        RemoteConnection current = connection;
-        if (current != null) {
-            current.close();
+        publisher.close();
+        loop.close();
+        connection.close();
+    }
+
+    /**
+     * One attempt's listener. Its callbacks arrive on the protocol reader or idle-watchdog thread, which
+     * {@link RemoteConnection} starts before its factory returns; each hands its work to the loop, where
+     * {@code connect()} itself runs, so every change of state happens on one thread and in order.
+     */
+    private final class Attempt implements RemoteListener {
+
+        /** Set on the loop before any callback of this attempt runs there. */
+        private RemoteConnection own;
+
+        private void onLoop(Runnable task) {
+            loop.execute(() -> {
+                if (own != null && connection.current().filter(live -> live == own).isPresent()) {
+                    task.run();
+                }
+            });
+        }
+
+        @Override
+        public void onReady() {
+            onLoop(AndroidTvSession.this::handleReady);
+        }
+
+        @Override
+        public void onPower(boolean on) {
+            onLoop(() -> handlePower(on));
+        }
+
+        @Override
+        public void onCurrentApp(String appPackage) {
+            onLoop(() -> handleCurrentApp(appPackage));
+        }
+
+        @Override
+        public void onVolume(int level, int max, boolean muted) {
+            onLoop(() -> publisher.update(state -> state.withVolume(level, max, muted)));
+        }
+
+        @Override
+        public void onDisconnected(DisconnectCause cause) {
+            loop.execute(() -> handleDisconnect(this, cause));
         }
     }
 }
