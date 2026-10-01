@@ -9,6 +9,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceRegistry;
+import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.LearnedSettings;
@@ -29,8 +30,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
@@ -84,11 +87,15 @@ class TizenSessionTest {
     }
 
     private TizenSession start(Map<String, String> settings, TizenTimings timings) {
+        return start(settings, timings, states);
+    }
+
+    private TizenSession start(Map<String, String> settings, TizenTimings timings, Consumer<DeviceState> listener) {
         Device device = new Device("samsung", "Samsung TV", DeviceKind.TIZEN, "127.0.0.1",
                 Map.of("tizen", stored(settings)), Instant.now());
         registry.save(device);
         session = new TizenSession(device, TizenRestTest.properties(tv), timings, InsecureTls.httpClient(Duration.ofSeconds(2)),
-                registry, learned(), secrets, new WakeOnLan(receiver.address()), states, () -> { });
+                registry, learned(), secrets, new WakeOnLan(receiver.address()), listener, () -> { });
         session.start();
         return session;
     }
@@ -444,5 +451,38 @@ class TizenSessionTest {
         tv.dropConnections();
 
         await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).until(() -> states.all().isEmpty());
+    }
+
+    @Test
+    void aFailingStateListenerNeverReachesAButtonPress() throws Exception {
+        start(PAIRED, TIMINGS, state -> {
+            states.accept(state);
+            throw new IllegalStateException("a subscriber failed");
+        });
+        connected();
+
+        var power = new Action.PressKey(RemoteKey.POWER);
+        assertThatCode(() -> session.execute(power)).doesNotThrowAnyException();
+
+        assertThat(tv.nextKey()).isEqualTo("KEY_POWER");
+    }
+
+    @Test
+    void aWokenTvIsPolledAfterTheWakeGraceNotTheNextInterval() throws Exception {
+        TizenTimings slowPoll = new TizenTimings(Duration.ofSeconds(30), Duration.ofMillis(100), Duration.ofMillis(500),
+                TizenTimings.HANDSHAKE_BACKOFF_CAP);
+        Map<String, String> settings = new LinkedHashMap<>(PAIRED);
+        settings.put("macAddress", "70:2A:D5:01:02:03");
+        start(settings, slowPoll);
+        connected();
+        tv.switchOff();
+        tv.dropConnections();
+        awaitStatus(DeviceStatus.DISCONNECTED);
+        tv.switchOn();
+
+        session.execute(new Action.PressKey(RemoteKey.POWER));
+
+        assertThat(receiver.nextPacket()).containsExactly(WakeOnLan.magicPacket("70:2A:D5:01:02:03"));
+        connected();
     }
 }
