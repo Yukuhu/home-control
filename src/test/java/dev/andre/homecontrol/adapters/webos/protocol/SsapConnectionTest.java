@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.webos;
+package dev.andre.homecontrol.adapters.webos.protocol;
 
 import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
@@ -26,10 +26,8 @@ class SsapConnectionTest {
     private FakeSsapServer server;
     private SsapConnection connection;
 
-    static WebOsProperties properties(int port, int securePort, int pairingTimeoutSeconds) {
-        return new WebOsProperties(true, port, securePort, Duration.ofSeconds(2), Duration.ofSeconds(2),
-                Duration.ofSeconds(pairingTimeoutSeconds), Duration.ofSeconds(1), Duration.ofSeconds(2),
-                Duration.ofSeconds(0));
+    static SsapOptions options(int port, int securePort) {
+        return new SsapOptions(port, securePort, Duration.ofSeconds(2), Duration.ofSeconds(2));
     }
 
     @BeforeEach
@@ -47,7 +45,7 @@ class SsapConnectionTest {
 
     private SsapConnection open() throws IOException {
         connection = SsapConnection.open(http, "127.0.0.1",
-                properties(server.port(), FakeWebSocketServer.closedPort(), 2), reason -> { });
+                options(server.port(), FakeWebSocketServer.closedPort()), reason -> { });
         return connection;
     }
 
@@ -224,7 +222,7 @@ class SsapConnectionTest {
     void fallsBackToTlsWhenThePlainPortIsClosed() throws IOException {
         try (FakeSsapServer tls = new FakeSsapServer(true)) {
             connection = SsapConnection.open(http, "127.0.0.1",
-                    properties(FakeWebSocketServer.closedPort(), tls.port(), 2), reason -> { });
+                    options(FakeWebSocketServer.closedPort(), tls.port()), reason -> { });
 
             assertThat(connection.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1)))
                     .isEqualTo(FakeSsapServer.CLIENT_KEY);
@@ -235,7 +233,7 @@ class SsapConnectionTest {
     void theTvDroppingTheConnectionIsReportedOnce() throws Exception {
         BlockingQueue<String> reasons = new LinkedBlockingQueue<>();
         connection = SsapConnection.open(http, "127.0.0.1",
-                properties(server.port(), FakeWebSocketServer.closedPort(), 2), reasons::add);
+                options(server.port(), FakeWebSocketServer.closedPort()), reasons::add);
         connection.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
 
         // A reset, not a FIN: register() returns while the JDK WebSocket may still hand the registration to the

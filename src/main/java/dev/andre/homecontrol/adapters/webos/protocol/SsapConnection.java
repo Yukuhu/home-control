@@ -1,7 +1,7 @@
-package dev.andre.homecontrol.adapters.webos;
+package dev.andre.homecontrol.adapters.webos.protocol;
 
 import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
-import dev.andre.homecontrol.core.Hosts;
+import dev.andre.homecontrol.adapters.net.DeviceUris;
 import dev.andre.homecontrol.adapters.net.TextWebSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +30,7 @@ import java.util.function.Consumer;
  * opened on first use. Blocking API; never call it from a subscription callback. Frames are
  * never logged: the registration answer carries the client key.
  */
-final class SsapConnection implements AutoCloseable {
+public final class SsapConnection implements AutoCloseable {
 
     private static final String PAYLOAD_FIELD = "payload";
     private static final String ERROR_FIELD = "error";
@@ -52,16 +52,16 @@ final class SsapConnection implements AutoCloseable {
     private volatile String closedReason;
     private TextWebSocket pointer; // guarded by this
 
-    private SsapConnection(HttpClient http, WebOsProperties properties) {
+    private SsapConnection(HttpClient http, SsapOptions options) {
         this.http = http;
-        this.connectTimeout = properties.connectTimeout();
-        this.requestTimeout = properties.requestTimeout();
+        this.connectTimeout = options.connectTimeout();
+        this.requestTimeout = options.requestTimeout();
     }
 
     /** ws://host:port first, then wss://host:securePort (firmware that closed the plain port or insists on TLS). */
-    static SsapConnection open(HttpClient http, String host, WebOsProperties properties, Consumer<String> onClosed)
+    public static SsapConnection open(HttpClient http, String host, SsapOptions options, Consumer<String> onClosed)
             throws IOException {
-        SsapConnection connection = new SsapConnection(http, properties);
+        SsapConnection connection = new SsapConnection(http, options);
         TextWebSocket.Listener listener = new TextWebSocket.Listener() {
             @Override
             public void onText(String text) {
@@ -74,14 +74,13 @@ final class SsapConnection implements AutoCloseable {
                 onClosed.accept(reason);
             }
         };
-        String authority = Hosts.authority(host);
         try {
-            connection.socket = TextWebSocket.connect(http,
-                    URI.create("ws://" + authority + ":" + properties.port()), connection.connectTimeout, listener);
+            connection.socket = TextWebSocket.connect(http, DeviceUris.of("ws", host, options.port(), ""),
+                    connection.connectTimeout, listener);
         } catch (IOException plainFailed) {
             try {
-                connection.socket = TextWebSocket.connect(http,
-                        URI.create("wss://" + authority + ":" + properties.securePort()), connection.connectTimeout, listener);
+                connection.socket = TextWebSocket.connect(http, DeviceUris.of("wss", host, options.securePort(), ""),
+                        connection.connectTimeout, listener);
             } catch (IOException secureFailed) {
                 secureFailed.addSuppressed(plainFailed);
                 throw secureFailed;
@@ -96,7 +95,7 @@ final class SsapConnection implements AutoCloseable {
      * {@code registered} (accepted) or {@code error} (declined). A PROMPT despite a stored key means
      * the TV forgot this client.
      */
-    String register(String clientKey, Duration promptTimeout) throws IOException {
+    public String register(String clientKey, Duration promptTimeout) throws IOException {
         registration.clear();
         socket.send(SsapMessages.register(clientKey));
         JsonNode answer = awaitRegistration(requestTimeout);
@@ -130,17 +129,17 @@ final class SsapConnection implements AutoCloseable {
         };
     }
 
-    JsonNode request(String uri, ObjectNode payload) throws IOException {
+    public JsonNode request(String uri, ObjectNode payload) throws IOException {
         return payloadOf(uri, send("req_" + ids.incrementAndGet(), "request", uri, payload));
     }
 
     /** Sends without waiting; for {@code system/turnOff}, whose answer is unreliable while the TV shuts down. */
-    void fire(String uri, ObjectNode payload) throws IOException {
+    public void fire(String uri, ObjectNode payload) throws IOException {
         socket.send(SsapMessages.command("req_" + ids.incrementAndGet(), "request", uri, payload));
     }
 
     /** {@code onPayload} receives the first answer's payload and every later push for this subscription. */
-    void subscribe(String uri, Consumer<JsonNode> onPayload) throws IOException {
+    public void subscribe(String uri, Consumer<JsonNode> onPayload) throws IOException {
         String id = "sub_" + ids.incrementAndGet();
         subscriptions.put(id, onPayload);
         try {
@@ -151,7 +150,7 @@ final class SsapConnection implements AutoCloseable {
         }
     }
 
-    synchronized void button(String name) throws IOException {
+    public synchronized void button(String name) throws IOException {
         if (pointer == null || !pointer.isOpen()) {
             String path = request(SsapUris.POINTER_INPUT_SOCKET, SsapMessages.empty()).path("socketPath").asString("");
             if (path.isEmpty()) {

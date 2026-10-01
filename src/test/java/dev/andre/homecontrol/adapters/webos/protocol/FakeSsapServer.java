@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.webos;
+package dev.andre.homecontrol.adapters.webos.protocol;
 
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
 import tools.jackson.databind.JsonNode;

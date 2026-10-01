@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.webos;
 
+import dev.andre.homecontrol.adapters.webos.protocol.SsapOptions;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.Duration;
@@ -53,5 +54,10 @@ public record WebOsProperties(@DefaultValue("true") boolean enabled,
                            Duration wakeGrace) {
         this(enabled, port, securePort, connectTimeout, requestTimeout, pairingTimeout,
                 reconnectInitialDelay, reconnectMaxDelay, wakeGrace, Duration.ofSeconds(30));
+    }
+
+    /** The SSAP connection's ports and waits. */
+    public SsapOptions ssap() {
+        return new SsapOptions(port, securePort, connectTimeout, requestTimeout);
     }
 }

@@ -2,6 +2,10 @@ package dev.andre.homecontrol.adapters.webos;
 
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.support.PairingKeys;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapConnection;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapMessages;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapPairingException;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapUris;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceKind;
@@ -60,7 +64,7 @@ public class WebOsPairing implements PromptPairing {
     public PromptPairingResult pair(String host, String name) {
         SsapConnection connection = null;
         try {
-            connection = SsapConnection.open(http, host, properties, reason -> { });
+            connection = SsapConnection.open(http, host, properties.ssap(), reason -> { });
             String key = connection.register(null, properties.pairingTimeout());
             String keyRef = keys.storePaired(devices.devices(), host, key);
             Device device = enrollment.attach(host, deviceName(connection, host, name), DeviceKind.WEBOS,

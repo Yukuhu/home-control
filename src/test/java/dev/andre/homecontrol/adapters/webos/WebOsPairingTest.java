@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.webos;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
+import dev.andre.homecontrol.adapters.webos.protocol.FakeSsapServer;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.PromptPairingResult;

@@ -4,6 +4,8 @@ import dev.andre.homecontrol.adapters.net.FakeWakeOnLanReceiver;
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
 import dev.andre.homecontrol.adapters.net.InsecureTls;
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
+import dev.andre.homecontrol.adapters.webos.protocol.FakeSsapServer;
+import dev.andre.homecontrol.adapters.webos.protocol.SsapUris;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;

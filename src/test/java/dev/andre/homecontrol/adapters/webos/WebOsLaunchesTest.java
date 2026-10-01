@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.webos;
 
+import dev.andre.homecontrol.adapters.webos.protocol.SsapMessages;
 import dev.andre.homecontrol.core.playback.ServiceLinks;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
