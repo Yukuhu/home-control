@@ -399,10 +399,19 @@ public class CastSession implements DeviceHandle, ReceiverApps {
             }
             MediaStatus latest = statuses.getFirst().fillFrom(lastMedia);
             lastMedia = latest;
-            PlaybackState playback = latest.playbackState();
+            PlaybackState playback = playback(latest.state());
             NowPlaying playing = playback == PlaybackState.IDLE ? null
                     : new NowPlaying(latest.displayTitle(), playback, latest.currentTime(), latest.duration());
             publisher.update(state -> state.withNowPlaying(playing));
+        }
+
+        private static PlaybackState playback(MediaStatus.PlayerState state) {
+            return switch (state) {
+                case PLAYING -> PlaybackState.PLAYING;
+                case PAUSED -> PlaybackState.PAUSED;
+                case IDLE -> PlaybackState.IDLE;
+                case BUFFERING -> PlaybackState.BUFFERING;
+            };
         }
 
         private void handleDisconnect(CastDisconnectCause cause) {

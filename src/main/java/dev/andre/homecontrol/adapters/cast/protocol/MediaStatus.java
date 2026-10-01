@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.adapters.cast.protocol;
 
-import dev.andre.homecontrol.core.PlaybackState;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URLDecoder;
@@ -41,13 +40,16 @@ public record MediaStatus(long mediaSessionId, String playerState, double curren
                 idleReason);
     }
 
+    /** Cast's player states, as this server tells them apart. */
+    public enum PlayerState { PLAYING, PAUSED, IDLE, BUFFERING }
+
     /** LOADING and anything a newer receiver invents count as buffering. */
-    public PlaybackState playbackState() {
+    public PlayerState state() {
         return switch (playerState) {
-            case "PLAYING" -> PlaybackState.PLAYING;
-            case "PAUSED" -> PlaybackState.PAUSED;
-            case "IDLE" -> PlaybackState.IDLE;
-            case null, default -> PlaybackState.BUFFERING;
+            case "PLAYING" -> PlayerState.PLAYING;
+            case "PAUSED" -> PlayerState.PAUSED;
+            case "IDLE" -> PlayerState.IDLE;
+            case null, default -> PlayerState.BUFFERING;
         };
     }
 

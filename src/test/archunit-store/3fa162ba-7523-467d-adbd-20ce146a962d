@@ -1,8 +1,3 @@
-Method <dev.andre.homecontrol.adapters.cast.protocol.MediaStatus.playbackState()> gets field <dev.andre.homecontrol.core.PlaybackState.BUFFERING> in (MediaStatus.java:50)
-Method <dev.andre.homecontrol.adapters.cast.protocol.MediaStatus.playbackState()> gets field <dev.andre.homecontrol.core.PlaybackState.IDLE> in (MediaStatus.java:49)
-Method <dev.andre.homecontrol.adapters.cast.protocol.MediaStatus.playbackState()> gets field <dev.andre.homecontrol.core.PlaybackState.PAUSED> in (MediaStatus.java:48)
-Method <dev.andre.homecontrol.adapters.cast.protocol.MediaStatus.playbackState()> gets field <dev.andre.homecontrol.core.PlaybackState.PLAYING> in (MediaStatus.java:47)
-Method <dev.andre.homecontrol.adapters.cast.protocol.MediaStatus.playbackState()> has return type <dev.andre.homecontrol.core.PlaybackState> in (MediaStatus.java:0)
 Method <dev.andre.homecontrol.adapters.sonos.protocol.SonosEndpoints.isLanLocation(java.net.URI, boolean)> calls method <dev.andre.homecontrol.discovery.ssdp.DeviceFetch.isSafeToFetch(java.net.URI, java.lang.String)> in (SonosEndpoints.java:39)
 Method <dev.andre.homecontrol.adapters.sonos.protocol.SonosEndpoints.isLoopback(java.lang.String)> calls method <dev.andre.homecontrol.discovery.ssdp.DeviceFetch.isIpLiteral(java.lang.String)> in (SonosEndpoints.java:53)
 Method <dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint.of(dev.andre.homecontrol.discovery.ssdp.DeviceDescription$Service)> calls method <dev.andre.homecontrol.discovery.ssdp.DeviceDescription$Service.controlUrl()> in (ServiceEndpoint.java:10)
