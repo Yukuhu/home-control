@@ -11,7 +11,6 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.PlaybackState;
-import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.testsupport.EventStreamReader;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -148,7 +147,7 @@ class CastEndToEndTest {
                         && receiver.virtualConnections().contains("receiver-0"));
 
                 assertThat(post("/devices/shield-e2e/key/HOME", "").statusCode()).isEqualTo(204);
-                assertThat(remote.nextKeyPress()).isEqualTo(RemoteKey.HOME.code());
+                assertThat(remote.nextKeyPress()).isEqualTo(3);
                 assertThat(post("/devices/shield-e2e/volume", "level=40").statusCode()).isEqualTo(204);
                 assertThat(receiver.volumeLevel()).isEqualTo(0.4);
 

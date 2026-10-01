@@ -10,6 +10,7 @@ import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import org.junit.jupiter.api.BeforeEach;
@@ -123,7 +124,7 @@ class JellyfinRouteExecutorTest {
         executor.execute(new JellyfinRoute.Session("stale", "item-1", 600L, "Android TV"), shield);
 
         var order = inOrder(commands, sessions);
-        order.verify(commands).execute(eq("shield"), argThat(action -> action instanceof Action.PressKey key && key.key().code() == 224));
+        order.verify(commands).execute(eq("shield"), argThat(action -> action instanceof Action.PressKey key && key.key() == RemoteKey.WAKEUP));
         order.verify(commands).execute("shield", LAUNCH);
         order.verify(sessions).playNow("fresh", "item-1", 600L);
         verify(sessions, never()).playNow(eq("stale"), anyString(), anyLong());
