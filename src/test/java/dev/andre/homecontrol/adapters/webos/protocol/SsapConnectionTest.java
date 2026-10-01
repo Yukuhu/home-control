@@ -249,4 +249,12 @@ class SsapConnectionTest {
                 .isNotInstanceOf(DeviceTimeoutException.class)
                 .hasMessageStartingWith("The TV closed the connection:");
     }
+
+    @Test
+    void aHostNoUrlCanCarryIsUnreachable() throws IOException {
+        var options = options(server.port(), FakeWebSocketServer.closedPort());
+
+        assertThatThrownBy(() -> SsapConnection.open(http, "lg_tv.fritz.box", options, reason -> { }))
+                .isInstanceOf(IOException.class);
+    }
 }

@@ -47,10 +47,10 @@ public final class TizenRest {
     }
 
     private Optional<JsonNode> getJson(String host, String path) {
-        HttpRequest request = HttpRequest.newBuilder(DeviceUris.of("http", host, options.restPort(), path))
-                .timeout(options.requestTimeout())
-                .GET().build();
         try {
+            HttpRequest request = HttpRequest.newBuilder(DeviceUris.of("http", host, options.restPort(), path))
+                    .timeout(options.requestTimeout())
+                    .GET().build();
             HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream body = response.body()) {
                 if (response.statusCode() != 200) {

@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.tizen.protocol;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -11,22 +12,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TizenMessagesTest {
 
     @Test
-    void theRemoteUrlCarriesTheBase64ClientName() {
+    void theRemoteUrlCarriesTheBase64ClientName() throws MalformedURLException {
         assertThat(TizenMessages.remoteUri("192.168.1.61", 8002, "Home Control", null)).hasToString("wss://192.168.1.61:8002/api/v2/channels/samsung.remote.control?name=SG9tZSBDb250cm9s");
     }
 
     @Test
-    void aStoredTokenIsAppended() {
+    void aStoredTokenIsAppended() throws MalformedURLException {
         assertThat(TizenMessages.remoteUri("192.168.1.61", 8002, "Home Control", "73184052")).hasToString("wss://192.168.1.61:8002/api/v2/channels/samsung.remote.control?name=SG9tZSBDb250cm9s&token=73184052");
     }
 
     @Test
-    void base64PaddingIsUrlEncoded() {
+    void base64PaddingIsUrlEncoded() throws MalformedURLException {
         assertThat(TizenMessages.remoteUri("192.168.1.61", 8002, "TV", null).toString()).endsWith("name=VFY%3D");
     }
 
     @Test
-    void ipv6HostsAreBracketed() {
+    void ipv6HostsAreBracketed() throws MalformedURLException {
         assertThat(TizenMessages.remoteUri("fe80::1", 8002, "Home Control", null).toString()).startsWith("wss://[fe80::1]:8002/");
     }
 
@@ -34,7 +35,7 @@ class TizenMessagesTest {
     void aHostThatWouldChangeTheUrlIsRefused() {
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> TizenMessages.remoteUri("evil.example/x?", 8002, "Home Control", null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MalformedURLException.class);
     }
 
     @Test
