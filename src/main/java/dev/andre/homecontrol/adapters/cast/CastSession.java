@@ -6,14 +6,18 @@ import dev.andre.homecontrol.adapters.cast.protocol.CastIncoming;
 import dev.andre.homecontrol.adapters.cast.protocol.CastPayloads;
 import dev.andre.homecontrol.adapters.cast.protocol.MediaStatus;
 import dev.andre.homecontrol.adapters.cast.protocol.ReceiverStatus;
-import dev.andre.homecontrol.adapters.net.Backoff;
 import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
+import dev.andre.homecontrol.adapters.support.Backoff;
+import dev.andre.homecontrol.adapters.support.ConnectionSlot;
+import dev.andre.homecontrol.adapters.support.DeviceCalls;
+import dev.andre.homecontrol.adapters.support.Reconnector;
+import dev.andre.homecontrol.adapters.support.SessionLoop;
+import dev.andre.homecontrol.adapters.support.StatePublisher;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.CastAppQuery;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
-import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.NowPlaying;
@@ -25,17 +29,11 @@ import org.slf4j.LoggerFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.CONNECTION;
@@ -44,43 +42,35 @@ import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.PLATFO
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.RECEIVER;
 
 /**
- * One Cast receiver's live connection, shaped like the Android TV session: every mutation of
- * connection and state happens on one scheduler thread; reconnects back off exponentially.
- * Commands run on the caller's thread and fail immediately when they cannot be sent (nothing is
- * queued). The session follows the media channel of whichever app is in front, so casts started
- * from a phone show up as now playing too. Cast has no pairing, so there is no UNPAIRED state.
+ * One Cast receiver's live connection. Connection, receiver and media state change only on the session's loop, and
+ * the {@link Reconnector} retries with a growing backoff. Commands run on the caller's thread and fail at once when
+ * they cannot be sent (nothing is queued). The session follows the media channel of whichever app is in front, so
+ * casts started from a phone show up as now playing too. Cast has no pairing, so there is no UNPAIRED state.
  */
 public class CastSession implements DeviceHandle, ReceiverApps {
 
     private static final String RECEIVER_STATUS_TYPE = "RECEIVER_STATUS";
     private static final String REACH_PREFIX = "reach ";
     private static final String STATUS_FIELD = "status";
+    private static final Set<String> CUSTOM_ERROR_TYPES = Set.of("error", "connectionerror", "playbackerror");
 
     private static final Logger log = LoggerFactory.getLogger(CastSession.class);
 
     private final Device device;
     private final CastSettings settings;
     private final CastTimings timings;
-    private final Consumer<DeviceState> onChange;
-    private final ScheduledExecutorService scheduler;
+    private final StatePublisher publisher;
+    private final SessionLoop loop;
+    private final Reconnector reconnector;
+    private final ConnectionSlot<CastConnection> connection;
 
-    // Self-synchronized connection written only on the scheduler thread; command threads and close() just read it.
-    @SuppressWarnings("java:S3077")
-    private volatile CastConnection connection;
-    /** Incremented per connection attempt; callbacks from older connections are ignored. */
-    private final AtomicLong generation = new AtomicLong();
-    // Immutable snapshot; every read-modify-write runs on the scheduler thread, command threads only read it.
-    @SuppressWarnings("java:S3077")
-    private volatile DeviceState state = DeviceState.initial();
-    // Immutable record replaced wholesale on the scheduler thread; command threads only read it.
+    // Immutable record replaced wholesale on the loop; command threads only read it.
     @SuppressWarnings("java:S3077")
     private volatile ReceiverStatus receiver;
     /** Transport of the foreground app whose media channel we follow, or null. */
     private volatile String mediaTransportId;
-    /** The last media status, so partial statuses (without {@code media}) keep their title. Scheduler thread only. */
+    /** The last media status, so partial statuses (without {@code media}) keep their title. Loop thread only. */
     private MediaStatus lastMedia;
-    private volatile Duration backoff;
-    private volatile boolean closed;
 
     public CastSession(Device device, CastProperties properties, Consumer<DeviceState> onChange) {
         this(device, CastTimings.from(properties), onChange);
@@ -90,24 +80,21 @@ public class CastSession implements DeviceHandle, ReceiverApps {
         this.device = device;
         this.settings = CastSettings.of(device);
         this.timings = timings;
-        this.onChange = onChange;
-        this.backoff = timings.reconnectInitialDelay();
-        this.scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "cast-session-" + device.id());
-            thread.setDaemon(true);
-            return thread;
-        });
+        this.publisher = new StatePublisher(device.id(), DeviceState.initial(), onChange);
+        this.loop = new SessionLoop("cast-session-" + device.id());
+        this.reconnector = new Reconnector(loop, new Backoff(timings.reconnectInitialDelay(),
+                timings.reconnectMaxDelay()), this::connect);
+        this.connection = new ConnectionSlot<>("cast-session-" + device.id());
     }
 
     public void start() {
-        scheduler.execute(this::connect);
-        long interval = timings.mediaStatusInterval().toMillis();
-        scheduler.scheduleWithFixedDelay(this::pollMediaPosition, interval, interval, TimeUnit.MILLISECONDS);
+        reconnector.start();
+        loop.every(this::pollMediaPosition, timings.mediaStatusInterval());
     }
 
     @Override
     public DeviceState state() {
-        return state;
+        return publisher.current();
     }
 
     @Override
@@ -133,13 +120,13 @@ public class CastSession implements DeviceHandle, ReceiverApps {
     }
 
     /**
-     * Receiver-namespace commands are answered with a RECEIVER_STATUS; anything else is a refusal.
-     * Runs on the caller's thread: the reply arrives on the reader thread, and the scheduler
-     * thread keeps handling state updates meanwhile.
+     * Receiver-namespace commands are answered with a RECEIVER_STATUS; anything else is a refusal. Runs on the
+     * caller's thread: the reply arrives on the reader thread, and the loop keeps handling state updates meanwhile.
      */
     private void receiverCommand(ObjectNode payload, String what) {
         CastConnection current = requireConnected();
-        CastIncoming reply = call(() -> current.request(RECEIVER, PLATFORM_RECEIVER_ID, payload, commandTimeout()), what);
+        CastIncoming reply = DeviceCalls.run(device.name(), what,
+                () -> current.request(RECEIVER, PLATFORM_RECEIVER_ID, payload, timings.commandTimeout()));
         if (!RECEIVER_STATUS_TYPE.equals(reply.type())) {
             throw new ActionFailedException(device.name() + " refused to " + what + " (" + reply.describeFailure() + ")");
         }
@@ -161,18 +148,14 @@ public class CastSession implements DeviceHandle, ReceiverApps {
         ReceiverStatus.ReceiverApp app = Optional.ofNullable(receiver)
                 .flatMap(status -> status.app(appId))
                 .orElseGet(() -> launch(current, appId));
-        call(() -> {
-            current.connect(app.transportId()); // harmless if the media follower already connected
-            return null;
-        }, REACH_PREFIX + describe(app));
-        CastIncoming reply = call(() -> current.request(MEDIA, app.transportId(),
-                CastPayloads.load(app.sessionId(), body), loadTimeout()), "load the media");
+        // Harmless if the media follower already connected.
+        DeviceCalls.run(device.name(), REACH_PREFIX + describe(app), () -> current.connect(app.transportId()));
+        CastIncoming reply = DeviceCalls.run(device.name(), "load the media", () -> current.request(MEDIA,
+                app.transportId(), CastPayloads.load(app.sessionId(), body), timings.loadTimeout()));
         if (!"MEDIA_STATUS".equals(reply.type())) {
             throw new ActionFailedException(device.name() + " could not play it (" + reply.describeFailure() + ")");
         }
     }
-
-    private static final Set<String> CUSTOM_ERROR_TYPES = Set.of("error", "connectionerror", "playbackerror");
 
     /** Launch the app unless it runs, wait until it speaks {@code namespace}, connect, send; a quick error reply fails. */
     private void customMessage(String appId, String namespace, Map<String, Object> message) {
@@ -181,30 +164,31 @@ public class CastSession implements DeviceHandle, ReceiverApps {
                 .flatMap(status -> status.app(appId))
                 .orElseGet(() -> launch(current, appId));
         ReceiverStatus.ReceiverApp app = running.speaks(namespace) ? running : awaitNamespace(current, appId, namespace);
-        call(() -> {
-            current.connect(app.transportId());
-            return null;
-        }, REACH_PREFIX + describe(app));
+        DeviceCalls.run(device.name(), REACH_PREFIX + describe(app), () -> current.connect(app.transportId()));
         CastConnection.Waiter rejection = current.expect(incoming -> namespace.equals(incoming.namespace())
                 && app.transportId().equals(incoming.sourceId())
                 && CUSTOM_ERROR_TYPES.contains(incoming.type()));
         try {
-            call(() -> {
-                current.send(namespace, app.transportId(), CastPayloads.custom(message));
-                return null;
-            }, "send the request to " + describe(app));
-            CastIncoming error;
-            try {
-                error = rejection.await(timings.customMessageErrorWindow());
-            } catch (DeviceTimeoutException _) {
+            DeviceCalls.run(device.name(), "send the request to " + describe(app),
+                    () -> current.send(namespace, app.transportId(), CastPayloads.custom(message)));
+            Optional<CastIncoming> error = DeviceCalls.run(device.name(), "start playback", () -> awaitRejection(rejection));
+            if (error.isEmpty()) {
                 return; // no rejection: the receiver took the request
-            } catch (IOException _) {
-                throw new DeviceOfflineException(device.name() + " dropped the connection while starting playback");
             }
-            String reason = error.payload().path("message").asString("");
-            throw new ActionFailedException(device.name() + " refused to play it (" + (reason.isBlank() ? error.type() : reason) + ")");
+            String reason = error.get().payload().path("message").asString("");
+            throw new ActionFailedException(device.name() + " refused to play it ("
+                    + (reason.isBlank() ? error.get().type() : reason) + ")");
         } finally {
             rejection.cancel();
+        }
+    }
+
+    /** Receivers check a custom request at once: silence through the error window means they took it. */
+    private Optional<CastIncoming> awaitRejection(CastConnection.Waiter rejection) throws IOException {
+        try {
+            return Optional.of(rejection.await(timings.customMessageErrorWindow()));
+        } catch (DeviceTimeoutException _) {
+            return Optional.empty();
         }
     }
 
@@ -220,18 +204,15 @@ public class CastSession implements DeviceHandle, ReceiverApps {
                 .orElseGet(() -> launch(current, query.receiverAppId()));
         ReceiverStatus.ReceiverApp app = running.speaks(query.namespace())
                 ? running : awaitNamespace(current, query.receiverAppId(), query.namespace());
-        call(() -> {
-            current.connect(app.transportId());
-            return null;
-        }, REACH_PREFIX + describe(app));
+        DeviceCalls.run(device.name(), REACH_PREFIX + describe(app), () -> current.connect(app.transportId()));
         CastConnection.Waiter answer = current.expect(incoming -> query.namespace().equals(incoming.namespace())
                 && app.transportId().equals(incoming.sourceId())
                 && (query.replyType().equals(incoming.type()) || CUSTOM_ERROR_TYPES.contains(incoming.type())));
         try {
-            CastIncoming reply = call(() -> {
+            CastIncoming reply = DeviceCalls.run(device.name(), "answer " + query.replyType(), () -> {
                 current.send(query.namespace(), app.transportId(), CastPayloads.custom(query.message()));
-                return answer.await(commandTimeout());
-            }, "answer " + query.replyType());
+                return answer.await(timings.commandTimeout());
+            });
             if (!query.replyType().equals(reply.type())) {
                 String reason = reply.payload().path("message").asString("");
                 throw new ActionFailedException(device.name() + " refused the request ("
@@ -249,14 +230,14 @@ public class CastSession implements DeviceHandle, ReceiverApps {
                 && RECEIVER_STATUS_TYPE.equals(incoming.type())
                 && ReceiverStatus.parse(incoming.payload().path(STATUS_FIELD)).app(appId)
                         .filter(candidate -> candidate.speaks(namespace)).isPresent());
-        CastIncoming status = call(() -> {
+        CastIncoming status = DeviceCalls.run(device.name(), "start receiver app " + appId, () -> {
             try {
                 current.send(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus());
-                return ready.await(loadTimeout());
+                return ready.await(timings.loadTimeout());
             } finally {
                 ready.cancel();
             }
-        }, "start receiver app " + appId);
+        });
         return ReceiverStatus.parse(status.payload().path(STATUS_FIELD)).app(appId).orElseThrow();
     }
 
@@ -270,14 +251,14 @@ public class CastSession implements DeviceHandle, ReceiverApps {
                 && ((RECEIVER_STATUS_TYPE.equals(message.type())
                         && ReceiverStatus.parse(message.payload().path(STATUS_FIELD)).app(appId).isPresent())
                     || (message.requestId() == requestId && !RECEIVER_STATUS_TYPE.equals(message.type()))));
-        CastIncoming reply = call(() -> {
+        CastIncoming reply = DeviceCalls.run(device.name(), "start receiver app " + appId, () -> {
             try {
                 current.send(RECEIVER, PLATFORM_RECEIVER_ID, launch);
-                return outcome.await(loadTimeout());
+                return outcome.await(timings.loadTimeout());
             } finally {
                 outcome.cancel();
             }
-        }, "start receiver app " + appId);
+        });
         if (!RECEIVER_STATUS_TYPE.equals(reply.type())) {
             throw new ActionFailedException(device.name() + " could not start receiver app " + appId
                     + " (" + reply.describeFailure() + ")");
@@ -294,84 +275,51 @@ public class CastSession implements DeviceHandle, ReceiverApps {
     }
 
     private CastConnection requireConnected() {
-        CastConnection current = connection;
-        if (closed || current == null || state.status() != DeviceStatus.CONNECTED) {
-            throw new DeviceOfflineException(device.name() + " is not connected");
+        Optional<CastConnection> current = connection.current();
+        if (current.isEmpty() || publisher.current().status() != DeviceStatus.CONNECTED) {
+            throw DeviceCalls.notConnected(device.name());
         }
-        return current;
+        return current.get();
     }
 
-    @FunctionalInterface
-    private interface CastCall<T> {
-        T run() throws IOException;
-    }
-
-    /** Maps protocol failures onto the core vocabulary: no answer → failed; lost channel → offline. */
-    private <T> T call(CastCall<T> call, String what) {
-        try {
-            return call.run();
-        } catch (DeviceTimeoutException _) {
-            throw new ActionFailedException(device.name() + " did not answer in time when asked to " + what);
-        } catch (IOException _) {
-            throw new DeviceOfflineException(device.name() + " dropped the connection while trying to " + what);
-        }
-    }
-
-    private Duration commandTimeout() {
-        return timings.commandTimeout();
-    }
-
-    private Duration loadTimeout() {
-        return timings.loadTimeout();
-    }
-
-    private void connect() {
-        if (closed) {
-            return;
-        }
-        long attempt = generation.incrementAndGet();
-        update(state.withStatus(DeviceStatus.CONNECTING));
+    /** Runs on the loop, through the {@link Reconnector}. */
+    private Reconnector.Outcome connect() {
+        publisher.update(state -> state.withStatus(DeviceStatus.CONNECTING));
+        Link link = new Link();
         CastConnection opened = null;
         try {
             opened = CastConnection.open(settings.host(), settings.port(),
                     timings.heartbeatInterval(),
                     timings.staleTimeout(),
-                    new Link(attempt));
+                    link);
             opened.send(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus()); // the reply arrives via Link
-            connection = opened;
-            if (closed) {
-                // close() ran while open() was blocking this thread and read connection before
-                // it was set, so nobody else will ever close this one. Both fields are volatile
-                // and close() sets closed before reading connection: one side always sees the other.
-                opened.close();
-                connection = null;
-                return;
+            link.own = opened;
+            if (!connection.set(opened)) {
+                return Reconnector.Outcome.STOP; // closed meanwhile; the slot closed the connection
             }
-            backoff = timings.reconnectInitialDelay();
-            update(state.withStatus(DeviceStatus.CONNECTED));
+            publisher.update(state -> state.withStatus(DeviceStatus.CONNECTED));
+            return Reconnector.Outcome.CONNECTED;
         } catch (IOException e) {
             if (opened != null) {
                 opened.close();
             }
-            generation.incrementAndGet(); // anything the failed attempt still reports is stale
             log.debug("Could not reach Cast receiver {} at {}:{}: {}", device.id(), settings.host(), settings.port(), e.getMessage());
-            update(state.withStatus(DeviceStatus.DISCONNECTED));
-            scheduleReconnect();
+            publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED));
+            return Reconnector.Outcome.RETRY;
         }
     }
 
-    /** Receivers only push on changes; ask while playing so the position moves. */
+    /** Receivers only push on changes; ask while playing so the position moves. Runs on the loop. */
     private void pollMediaPosition() {
+        Optional<CastConnection> current = connection.current();
+        String transport = mediaTransportId;
+        NowPlaying playing = publisher.current().nowPlaying();
+        if (current.isEmpty() || transport == null || playing == null || playing.state() != PlaybackState.PLAYING) {
+            return;
+        }
         try {
-            CastConnection current = connection;
-            String transport = mediaTransportId;
-            NowPlaying playing = state.nowPlaying();
-            if (!closed && current != null && transport != null && playing != null
-                    && playing.state() == PlaybackState.PLAYING) {
-                sendMediaGetStatus(current, transport);
-            }
-        } catch (IOException | RuntimeException e) {
-            // Never let it escape: a scheduled task that throws is silently never run again.
+            sendMediaGetStatus(current.get(), transport);
+        } catch (IOException e) {
             log.debug("Media status poll failed for {}: {}", device.id(), e.getMessage());
         }
     }
@@ -383,49 +331,21 @@ public class CastSession implements DeviceHandle, ReceiverApps {
         current.send(MEDIA, transportId, getStatus);
     }
 
-    private void scheduleReconnect() {
-        if (closed) {
-            return;
-        }
-        Duration delay = backoff;
-        backoff = Backoff.next(backoff, timings.reconnectMaxDelay());
-        try {
-            scheduler.schedule(this::connect, delay.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (RejectedExecutionException _) {
-            // Closing.
-        }
-    }
-
-    private void update(DeviceState updated) {
-        if (closed) {
-            // connect() can still be mid-flight on the scheduler thread when close() runs;
-            // a closed session must not publish state for a handle nobody holds anymore.
-            return;
-        }
-        state = updated;
-        try {
-            onChange.accept(updated);
-        } catch (RuntimeException t) {
-            log.warn("A device state listener failed for {}", device.id(), t);
-        }
-    }
-
     @Override
     public void close() {
-        closed = true;
-        scheduler.shutdownNow();
-        CastConnection current = connection;
-        if (current != null) {
-            current.close();
-        }
+        publisher.close();
+        loop.close();
+        connection.close();
     }
 
+    /** One connection's listener: its callbacks run on the loop, and only while its connection is the current one. */
     private final class Link implements CastConnection.Listener {
 
-        private final long attempt;
+        /** Set on the loop before any callback of this connection runs there. */
+        private CastConnection own;
 
-        Link(long attempt) {
-            this.attempt = attempt;
+        private boolean current() {
+            return own != null && connection.current().filter(live -> live == own).isPresent();
         }
 
         private void handle(CastIncoming message) {
@@ -439,14 +359,14 @@ public class CastSession implements DeviceHandle, ReceiverApps {
                 // The app closed our virtual connection (it stopped); the next RECEIVER_STATUS says what replaced it.
                 mediaTransportId = null;
                 lastMedia = null;
-                update(state.withNowPlaying(null));
+                publisher.update(state -> state.withNowPlaying(null));
             }
         }
 
         private void onReceiverStatus(ReceiverStatus status) {
             receiver = status;
             Optional<ReceiverStatus.ReceiverApp> foreground = status.foregroundApp();
-            update(state.withPower(!status.standBy())
+            publisher.update(state -> state.withPower(!status.standBy())
                     .withCurrentApp(foreground.map(ReceiverStatus.ReceiverApp::displayName).orElse(null))
                     .withVolume(status.volumePercent(), 100, status.muted()));
             followMedia(foreground.filter(app -> app.speaks(MEDIA)).map(ReceiverStatus.ReceiverApp::transportId).orElse(null));
@@ -460,16 +380,12 @@ public class CastSession implements DeviceHandle, ReceiverApps {
             mediaTransportId = transportId;
             lastMedia = null;
             if (transportId == null) {
-                update(state.withNowPlaying(null));
-                return;
-            }
-            CastConnection current = connection;
-            if (current == null) {
+                publisher.update(state -> state.withNowPlaying(null));
                 return;
             }
             try {
-                current.connect(transportId);
-                sendMediaGetStatus(current, transportId);
+                own.connect(transportId);
+                sendMediaGetStatus(own, transportId);
             } catch (IOException e) {
                 log.debug("Could not follow media on {}: {}", device.id(), e.getMessage()); // the reader reports the drop
             }
@@ -478,50 +394,44 @@ public class CastSession implements DeviceHandle, ReceiverApps {
         private void onMediaStatus(List<MediaStatus> statuses) {
             if (statuses.isEmpty()) {
                 lastMedia = null;
-                update(state.withNowPlaying(null));
+                publisher.update(state -> state.withNowPlaying(null));
                 return;
             }
             MediaStatus latest = statuses.getFirst().fillFrom(lastMedia);
             lastMedia = latest;
             PlaybackState playback = latest.playbackState();
-            update(state.withNowPlaying(playback == PlaybackState.IDLE ? null
-                    : new NowPlaying(latest.displayTitle(), playback, latest.currentTime(), latest.duration())));
+            NowPlaying playing = playback == PlaybackState.IDLE ? null
+                    : new NowPlaying(latest.displayTitle(), playback, latest.currentTime(), latest.duration());
+            publisher.update(state -> state.withNowPlaying(playing));
         }
 
         private void handleDisconnect(CastDisconnectCause cause) {
-            connection = null;
+            connection.takeIf(own);
             receiver = null;
             mediaTransportId = null;
             lastMedia = null;
             log.info("Lost the Cast connection to {} ({}); reconnecting", device.id(), cause);
-            update(state.withStatus(DeviceStatus.DISCONNECTED).withNowPlaying(null));
-            scheduleReconnect();
+            publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED).withNowPlaying(null));
+            reconnector.lost();
         }
 
-        /** Hands a reader-thread callback to the scheduler, dropping it if its connection is outdated. */
-        private void runOnScheduler(Runnable task) {
-            if (closed) {
-                return;
-            }
-            try {
-                scheduler.execute(() -> {
-                    if (!closed && attempt == generation.get()) {
-                        task.run();
-                    }
-                });
-            } catch (RejectedExecutionException _) {
-                // close() shut the scheduler down in between.
-            }
+        /** Hands a reader-thread callback to the loop, which drops it once its connection is outdated. */
+        private void onLoop(Runnable task) {
+            loop.execute(() -> {
+                if (current()) {
+                    task.run();
+                }
+            });
         }
 
         @Override
         public void onMessage(CastIncoming message) {
-            runOnScheduler(() -> handle(message));
+            onLoop(() -> handle(message));
         }
 
         @Override
         public void onDisconnected(CastDisconnectCause cause) {
-            runOnScheduler(() -> handleDisconnect(cause));
+            onLoop(() -> handleDisconnect(cause));
         }
     }
 }
