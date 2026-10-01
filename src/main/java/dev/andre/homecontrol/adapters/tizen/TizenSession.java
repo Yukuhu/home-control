@@ -1,9 +1,15 @@
 package dev.andre.homecontrol.adapters.tizen;
 
 import dev.andre.homecontrol.adapters.net.WakeOnLan;
+import dev.andre.homecontrol.adapters.support.Backoff;
+import dev.andre.homecontrol.adapters.support.ConnectionSlot;
+import dev.andre.homecontrol.adapters.support.DeviceCalls;
+import dev.andre.homecontrol.adapters.support.LearnedMac;
 import dev.andre.homecontrol.adapters.support.PlayPauseToggle;
+import dev.andre.homecontrol.adapters.support.SessionLoop;
+import dev.andre.homecontrol.adapters.support.StatePublisher;
+import dev.andre.homecontrol.adapters.support.WakeOnLanPower;
 import dev.andre.homecontrol.core.Action;
-import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -15,7 +21,6 @@ import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
-import dev.andre.homecontrol.core.WakeOnLanSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,13 +30,8 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
 
 /**
  * One Samsung Tizen TV. Samsung pushes no state, so a poll (every {@link TizenTimings#pollInterval()})
@@ -61,21 +61,19 @@ public class TizenSession implements DeviceHandle {
     private final DeviceRegistry registry;
     private final LearnedSettings learned;
     private final DeviceSecrets secrets;
-    private final WakeOnLan wakeOnLan;
-    private final Consumer<DeviceState> onChange;
     private final Runnable onClose;
-    private final ScheduledExecutorService scheduler;
+    private final StatePublisher publisher;
+    private final SessionLoop loop;
+    private final ConnectionSlot<TizenRemoteConnection> connection;
+    private final WakeOnLanPower power;
+    private final LearnedMac learnedMac;
     private final PlayPauseToggle playPause = new PlayPauseToggle();
+    /** How long the next handshake waits after one went unanswered: from two poll intervals up to the cap. */
+    private final Backoff handshakeBackoff;
 
-    /** Set by the scheduler thread; taken out (and closed) by whoever drops it, which close() does from any thread. */
-    private final AtomicReference<TizenRemoteConnection> connection = new AtomicReference<>();
-    // Immutable snapshot; every read-modify-write runs inside the synchronized update(), readers only read it.
-    @SuppressWarnings("java:S3077")
-    private volatile DeviceState state = DeviceState.initial();
-    private volatile boolean closed;
     private volatile boolean stopped;
-    private Duration handshakeBackoff;  // scheduler thread only; null while no handshake went unanswered
-    private long connectNotBefore;      // scheduler thread only; System.nanoTime()
+    private boolean handshakeWaiting; // loop thread only
+    private long connectNotBefore;    // loop thread only; System.nanoTime(), meaningful while handshakeWaiting
 
     // Package-private, built only by TizenAdapter: ten distinct collaborator types, nothing to group.
     @SuppressWarnings("java:S107")
@@ -91,19 +89,18 @@ public class TizenSession implements DeviceHandle {
         this.registry = registry;
         this.learned = learned;
         this.secrets = secrets;
-        this.wakeOnLan = wakeOnLan;
-        this.onChange = onChange;
         this.onClose = onClose;
-        this.scheduler = Executors.newSingleThreadScheduledExecutor(
-                Thread.ofPlatform().daemon().name("tizen-" + device.id()).factory());
+        this.publisher = new StatePublisher(device.id(), DeviceState.initial(), onChange);
+        this.loop = new SessionLoop("tizen-" + device.id());
+        this.connection = new ConnectionSlot<>("tizen-" + device.id());
+        this.power = new WakeOnLanPower(device.name(), this::current, TizenSettings.ADAPTER_ID, wakeOnLan);
+        this.learnedMac = new LearnedMac(this::current, TizenSettings.ADAPTER_ID, learned);
+        this.handshakeBackoff = new Backoff(timings.pollInterval().multipliedBy(2), timings.handshakeBackoffCap());
     }
 
     void start() {
-        try {
-            scheduler.scheduleWithFixedDelay(this::poll, 0, timings.pollInterval().toMillis(), TimeUnit.MILLISECONDS);
-        } catch (RejectedExecutionException _) {
-            // Closed before it started.
-        }
+        loop.execute(this::poll);
+        loop.every(this::poll, timings.pollInterval());
     }
 
     String host() {
@@ -112,12 +109,12 @@ public class TizenSession implements DeviceHandle {
 
     /** SSDP heard the TV: poll now instead of at the next interval. */
     void pollNow() {
-        onScheduler(this::poll);
+        loop.execute(this::poll);
     }
 
     @Override
     public DeviceState state() {
-        return state;
+        return publisher.current();
     }
 
     @Override
@@ -150,11 +147,9 @@ public class TizenSession implements DeviceHandle {
             String code = TizenKeys.code(key).orElseThrow(() ->
                     new UnsupportedActionException(device.name() + " cannot hold " + key));
             TizenRemoteConnection current = requireConnected();
-            try {
-                current.key(code, press == KeyPress.START_LONG ? "Press" : "Release");
-            } catch (IOException _) {
-                throw new DeviceOfflineException(device.name() + " dropped the connection");
-            }
+            boolean starts = press == KeyPress.START_LONG;
+            DeviceCalls.run(device.name(), (starts ? "hold " : "release ") + key,
+                    () -> current.key(code, starts ? "Press" : "Release"));
             return;
         }
         switch (key) {
@@ -167,32 +162,16 @@ public class TizenSession implements DeviceHandle {
 
     private void sendKey(String code) {
         TizenRemoteConnection current = requireConnected();
-        try {
-            current.key(code);
-        } catch (IOException _) {
-            throw new DeviceOfflineException(device.name() + " dropped the connection");
-        }
+        DeviceCalls.run(device.name(), "press " + code, () -> current.key(code));
     }
 
     private void openAppLink(URI uri) {
         TizenRemoteConnection current = requireConnected();
         switch (TizenLaunches.forUri(uri, current.installedApps())) {
-            case TizenLaunch.Dial(var app, var body) -> {
-                try {
-                    dial.launch(device.host(), app, body);
-                } catch (DialException e) {
-                    throw new ActionFailedException(device.name() + ": " + e.getMessage());
-                } catch (IOException _) {
-                    throw new DeviceOfflineException(device.name() + " did not answer the DIAL request");
-                }
-            }
-            case TizenLaunch.App app -> {
-                try {
-                    current.launchApp(app.appId(), app.actionType());
-                } catch (IOException _) {
-                    throw new DeviceOfflineException(device.name() + " dropped the connection");
-                }
-            }
+            case TizenLaunch.Dial(var app, var body) ->
+                    DeviceCalls.run(device.name(), "start " + app, () -> dial.launch(device.host(), app, body));
+            case TizenLaunch.App app ->
+                    DeviceCalls.run(device.name(), "open " + app.name(), () -> current.launchApp(app.appId(), app.actionType()));
             case TizenLaunch.Unsupported(var reason) -> throw new UnsupportedActionException(
                     device.name() + ": " + reason);
         }
@@ -200,77 +179,59 @@ public class TizenSession implements DeviceHandle {
     }
 
     private void togglePower() {
-        if (connection.get() != null && state.powerOn()) {
+        if (connection.current().isPresent() && publisher.current().powerOn()) {
             sendKey("KEY_POWER");
-            update(s -> s.withPower(false));
+            publisher.update(state -> state.withPower(false));
             return;
         }
-        String mac = current().adapterSettings(TizenSettings.ADAPTER_ID).get(WakeOnLanSettings.MAC_ADDRESS);
-        if (mac == null || mac.isBlank()) {
-            throw new DeviceOfflineException(device.name() + " is off and no MAC address is known for Wake-on-LAN;"
-                    + " switch it on once by hand or enter its MAC address on the setup page");
-        }
-        try {
-            wakeOnLan.wake(mac);
-        } catch (IOException | IllegalArgumentException e) {
-            throw new DeviceOfflineException("Could not send the Wake-on-LAN packet: " + e.getMessage());
-        }
-        try {
-            scheduler.schedule(this::poll, timings.wakeGrace().toMillis(), TimeUnit.MILLISECONDS);
-        } catch (RejectedExecutionException _) {
-            // Closed meanwhile.
-        }
+        power.wake();
+        loop.schedule(this::poll, timings.wakeGrace());
     }
 
+    /** Runs on the loop; a poll that throws is logged there and the next one still comes. */
     private void poll() {
-        if (closed || stopped) {
+        if (stopped) {
             return;
         }
-        try {
-            Optional<TizenDeviceInfo> info = rest.deviceInfo(device.host());
-            info.ifPresent(this::learnMacAddress);
-            if (info.isPresent() && !info.get().on()) {
-                dropConnection();
-                update(s -> s.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
-                return;
-            }
-            if (connection.get() == null && (handshakeBackingOff() || !connect())) {
-                return;
-            }
-            String app = visibleKnownApp();
-            update(s -> s.withStatus(DeviceStatus.CONNECTED).withPower(true).withCurrentApp(app));
-        } catch (RuntimeException e) {
-            // Never let an exception cancel the fixed-delay schedule.
-            log.warn("Polling {} failed", device.name(), e);
+        Optional<TizenDeviceInfo> info = rest.deviceInfo(device.host());
+        info.flatMap(TizenDeviceInfo::macAddress).ifPresent(learnedMac::offer);
+        if (info.isPresent() && !info.get().on()) {
+            connection.current().ifPresent(connection::takeIf);
+            publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
+            return;
         }
+        if (connection.current().isEmpty() && (handshakeBackingOff() || !connect())) {
+            return;
+        }
+        String app = visibleKnownApp();
+        publisher.update(state -> state.withStatus(DeviceStatus.CONNECTED).withPower(true).withCurrentApp(app));
     }
 
     private boolean handshakeBackingOff() {
-        return handshakeBackoff != null && System.nanoTime() - connectNotBefore < 0;
+        return handshakeWaiting && System.nanoTime() - connectNotBefore < 0;
     }
 
     private boolean connect() {
         TizenSettings settings = TizenSettings.of(current(), secrets);
         if (!settings.paired()) {
             stopped = true;
-            update(ignored -> DeviceState.unpaired());
+            publisher.publish(DeviceState.unpaired());
             return false;
         }
         AtomicReference<TizenRemoteConnection> attempt = new AtomicReference<>();
         TizenRemoteConnection opened = null;
+        boolean held = false;
         try {
             opened = TizenRemoteConnection.open(http, device.host(), properties, settings.token(),
-                    reason -> onScheduler(() -> lost(attempt.get(), reason)));
+                    reason -> loop.execute(() -> lost(attempt.get(), reason)));
             attempt.set(opened);
             TizenRemoteConnection.Authorization answer = opened.awaitAuthorization(timings.requestTimeout());
             if (answer == TizenRemoteConnection.Authorization.CONNECTED) {
-                handshakeBackoff = null;
-                connectNotBefore = 0;
-                connection.set(opened);
-                if (closed) {
-                    // close() ran while waiting for the TV and may have missed this connection.
-                    closeIfCurrent(opened);
-                    return false;
+                handshakeWaiting = false;
+                handshakeBackoff.reset();
+                held = connection.set(opened);
+                if (!held) {
+                    return false; // closed while waiting for the TV; the slot closed the channel
                 }
                 opened.token().filter(token -> !token.equals(settings.token())).ifPresent(this::storeToken);
                 opened.requestInstalledApps();
@@ -280,44 +241,36 @@ public class TizenSession implements DeviceHandle {
             if (answer == TizenRemoteConnection.Authorization.NO_ANSWER) {
                 // A slow-booting TV, or a forgotten token putting the Allow prompt on screen: never unpair
                 // for silence. Keep the token and back off so a real prompt does not reappear every poll.
-                Duration delay = nextHandshakeBackoff();
+                Duration delay = handshakeBackoff.next();
+                handshakeWaiting = true;
+                connectNotBefore = System.nanoTime() + delay.toNanos();
                 log.info("{} did not answer the connection within {} ms; retrying in {} ms",
                         device.name(), timings.requestTimeout().toMillis(), delay.toMillis());
-                update(s -> s.withStatus(DeviceStatus.DISCONNECTED).withCurrentApp(null));
+                publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED).withCurrentApp(null));
                 return false;
             }
             stopped = true;
             log.warn("{} refused the stored pairing; pair it again on the setup page", device.name());
-            update(ignored -> DeviceState.unpaired());
+            publisher.publish(DeviceState.unpaired());
             return false;
         } catch (IOException e) {
-            if (opened != null) {
-                connection.compareAndSet(opened, null);
+            if (held) {
+                connection.takeIf(opened); // the slot closes it, unless it was already given up
+            } else if (opened != null) {
                 opened.close();
             }
             log.debug("{} is not reachable: {}", device.name(), e.getMessage());
-            update(s -> s.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
+            publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
             return false;
         }
     }
 
-    /** Doubles from two poll intervals up to the handshake-backoff cap; the next connect waits that long. */
-    private Duration nextHandshakeBackoff() {
-        Duration first = timings.pollInterval().multipliedBy(2);
-        handshakeBackoff = handshakeBackoff == null ? first : handshakeBackoff.multipliedBy(2);
-        if (handshakeBackoff.compareTo(timings.handshakeBackoffCap()) > 0) {
-            handshakeBackoff = timings.handshakeBackoffCap();
-        }
-        connectNotBefore = System.nanoTime() + handshakeBackoff.toNanos();
-        return handshakeBackoff;
-    }
-
     private String visibleKnownApp() {
-        TizenRemoteConnection current = connection.get();
-        if (current == null) {
+        Optional<TizenRemoteConnection> current = connection.current();
+        if (current.isEmpty()) {
             return null;
         }
-        for (TizenLaunch.App app : TizenLaunches.knownApps(current.installedApps())) {
+        for (TizenLaunch.App app : TizenLaunches.knownApps(current.get().installedApps())) {
             if (rest.appVisible(device.host(), app.appId()).orElse(false)) {
                 return app.name();
             }
@@ -337,48 +290,24 @@ public class TizenSession implements DeviceHandle {
         }
     }
 
-    private void learnMacAddress(TizenDeviceInfo info) {
-        info.macAddress().ifPresent(mac -> {
-            TizenSettings settings = TizenSettings.of(current(), secrets);
-            if (!settings.macAddressManual() && !mac.equals(settings.macAddress())) {
-                learned.store(Map.of(WakeOnLanSettings.MAC_ADDRESS, mac));
-            }
-        });
-    }
-
+    /** Runs on the loop. */
     private void lost(TizenRemoteConnection which, String reason) {
-        if (which == null || !closeIfCurrent(which)) {
+        if (which == null || !connection.takeIf(which)) {
             return;
         }
         log.info("Lost the connection to {} ({})", device.name(), reason);
-        update(s -> s.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
-    }
-
-    private void dropConnection() {
-        TizenRemoteConnection current = connection.getAndSet(null);
-        if (current != null) {
-            current.close();
-        }
-    }
-
-    /** Drops {@code which} only if it is still the connection, so it is closed exactly once. */
-    private boolean closeIfCurrent(TizenRemoteConnection which) {
-        if (!connection.compareAndSet(which, null)) {
-            return false;
-        }
-        which.close();
-        return true;
+        publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
     }
 
     private TizenRemoteConnection requireConnected() {
-        TizenRemoteConnection current = connection.get();
-        if (current != null) {
-            return current;
+        Optional<TizenRemoteConnection> current = connection.current();
+        if (current.isPresent()) {
+            return current.get();
         }
-        if (state.status() == DeviceStatus.UNPAIRED) {
+        if (publisher.current().status() == DeviceStatus.UNPAIRED) {
             throw new DeviceOfflineException(device.name() + " must be paired again before it can be controlled");
         }
-        throw new DeviceOfflineException(device.name() + " is not connected");
+        throw DeviceCalls.notConnected(device.name());
     }
 
     /** The registry's copy: settings (MAC, token) may have changed since this handle was created. */
@@ -386,35 +315,11 @@ public class TizenSession implements DeviceHandle {
         return registry.findById(device.id()).orElse(device);
     }
 
-    /** Publishes only visible changes. */
-    private synchronized void update(UnaryOperator<DeviceState> change) {
-        if (closed) {
-            return;
-        }
-        DeviceState next = change.apply(state);
-        if (next.sameIgnoringTime(state)) {
-            return;
-        }
-        state = next;
-        onChange.accept(next);
-    }
-
-    private void onScheduler(Runnable task) {
-        if (closed) {
-            return;
-        }
-        try {
-            scheduler.execute(task);
-        } catch (RejectedExecutionException _) {
-            // Closed meanwhile.
-        }
-    }
-
     @Override
     public void close() {
-        closed = true;
-        scheduler.shutdownNow();
-        dropConnection();
+        publisher.close();
+        loop.close();
+        connection.close();
         onClose.run();
     }
 }
