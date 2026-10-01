@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -462,5 +464,39 @@ class UpnpSessionTest {
         long lastAllowed = closedAt + Duration.ofMillis(300).toNanos();
         await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).untilAsserted(() ->
                 assertThat(fake.calls()).allSatisfy(call -> assertThat(call.receivedNanos()).isLessThan(lastAllowed)));
+    }
+
+    @Test
+    void aConnectThatFinishesAfterCloseNeitherPublishesNorTakesCommands() throws Exception {
+        CountDownLatch resolving = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        session = start(fake.device("kitchen"), udn -> {
+            resolving.countDown();
+            awaitIgnoringInterrupts(release);
+            return Optional.empty();
+        });
+        assertThat(resolving.await(5, TimeUnit.SECONDS)).isTrue();
+
+        session.close();
+        int publishedAtClose = states.all().size();
+        release.countDown();
+
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
+                .until(() -> states.all().size() == publishedAtClose);
+        assertThatThrownBy(() -> session.execute(new Action.Pause())).isInstanceOf(DeviceOfflineException.class);
+    }
+
+    /** A step that had already finished when close() interrupted the loop: it goes on as if nothing happened. */
+    @SuppressWarnings("java:S2142") // swallowing the interrupt is the point: it models a step that no longer sees it
+    private static void awaitIgnoringInterrupts(CountDownLatch latch) {
+        while (true) {
+            try {
+                if (latch.await(10, TimeUnit.SECONDS)) {
+                    return;
+                }
+            } catch (InterruptedException _) {
+                // keep waiting
+            }
+        }
     }
 }

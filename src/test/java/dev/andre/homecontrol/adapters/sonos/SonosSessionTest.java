@@ -21,8 +21,13 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -254,5 +259,55 @@ class SonosSessionTest {
         var pause = new Action.Pause();
         assertThatThrownBy(() -> session.execute(pause)).isInstanceOf(DeviceOfflineException.class);
         assertThat(session.speakerTopology()).isEmpty();
+    }
+
+    @Test
+    void aConnectThatFinishesAfterCloseNeitherPublishesNorTakesCommands() throws Exception {
+        HeldClock clock = new HeldClock();
+        SonosSession session = new SonosSession(kitchen.device("sonos-" + kitchen.uuid()), timings,
+                SoapClient.httpClient(Duration.ofSeconds(1)), states, () -> { }, clock);
+        sessions.add(session);
+        session.start();
+        assertThat(clock.reading.await(5, TimeUnit.SECONDS)).isTrue();
+
+        session.close();
+        int publishedAtClose = states.all().size();
+        clock.release.countDown();
+
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
+                .until(() -> states.all().size() == publishedAtClose);
+        assertThat(session.speakerTopology()).isEmpty();
+        assertThatThrownBy(() -> session.execute(new Action.Pause())).isInstanceOf(DeviceOfflineException.class);
+    }
+
+    /** Its first reading, right after the first topology call, waits through the interrupt close() sends. */
+    private static final class HeldClock extends Clock {
+        final CountDownLatch reading = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        @SuppressWarnings("java:S2142") // swallowing the interrupt is the point: it models a step that no longer sees it
+        public Instant instant() {
+            reading.countDown();
+            while (true) {
+                try {
+                    if (release.await(10, TimeUnit.SECONDS)) {
+                        return Instant.now();
+                    }
+                } catch (InterruptedException _) {
+                    // keep waiting
+                }
+            }
+        }
     }
 }
