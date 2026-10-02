@@ -194,6 +194,78 @@ class RailCacheTest {
     }
 
     @Test
+    void aRefreshDuringALoadLoadsAgainOnceTheLoadEnds() {
+        cache.snapshot("stub", "a");
+        cache.refresh("stub", "a");
+
+        executor.runAll();
+        assertThat(executor.queued).as("the follow-up load").hasSize(1);
+        assertThat(a().refreshing()).isTrue();
+
+        executor.runAll();
+        assertThat(source.calls).hasValue(2);
+        assertThat(a().items()).extracting(ContentItem::id).containsExactly("i-2");
+        assertThat(a().refreshing()).isFalse();
+        assertThat(executor.queued).isEmpty();
+    }
+
+    @Test
+    void refreshesDuringOneLoadAddUpToOneMoreLoad() {
+        cache.snapshot("stub", "a");
+        cache.refresh("stub", "a");
+        cache.refresh("stub", "a");
+        cache.refresh("stub", "a");
+
+        executor.runAll();
+        executor.runAll();
+
+        assertThat(source.calls).hasValue(2);
+        assertThat(executor.queued).isEmpty();
+    }
+
+    @Test
+    void aRefreshDuringAFailingLoadStillLoadsAgain() {
+        source.failure = new ContentSourceException(ContentSourceException.Kind.UNREACHABLE, "Stub is down");
+        cache.snapshot("stub", "a");
+        cache.refresh("stub", "a");
+
+        executor.runAll();
+        source.failure = null;
+        executor.runAll();
+
+        assertThat(a().status()).isEqualTo(RailStatus.READY);
+        assertThat(a().error()).isNull();
+    }
+
+    @Test
+    void pageReadsAndTicksDuringALoadAskForNoFollowUp() {
+        cache.snapshots();
+        cache.snapshots();
+        cache.snapshot("stub", "a");
+        cache.tick();
+
+        executor.runAll();
+
+        assertThat(executor.queued).isEmpty();
+        assertThat(source.calls).hasValue(2);
+    }
+
+    @Test
+    void anInterruptedLoadStartsNoFollowUp() {
+        cache.snapshot("stub", "a");
+        cache.refresh("stub", "a");
+        Thread.currentThread().interrupt();
+        try {
+            executor.runAll();
+        } finally {
+            Thread.interrupted();
+        }
+
+        assertThat(executor.queued).isEmpty();
+        assertThat(source.calls).hasValue(0);
+    }
+
+    @Test
     void refreshesWhenTheSourceIntervalHasPassed() {
         cache.snapshots();
         executor.runAll();

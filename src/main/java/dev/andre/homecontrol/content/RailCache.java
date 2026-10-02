@@ -58,6 +58,8 @@ public class RailCache implements SmartLifecycle {
         Instant dueAt;
         int failures;
         boolean inFlight;
+        /** A refresh was asked for while a load ran: one more load starts when it ends. */
+        boolean loadAgain;
 
         Entry(RailDescriptor descriptor, RailSnapshot snapshot, Instant dueAt) {
             this.descriptor = descriptor;
@@ -130,6 +132,10 @@ public class RailCache implements SmartLifecycle {
         }
     }
 
+    /**
+     * Loads the rail now. If it is loading already, that load may have begun before whatever made the caller ask
+     * (a settings change, a new pin), so one more load follows it.
+     */
     public Optional<RailSnapshot> refresh(String sourceId, String railId) {
         reconcile();
         Entry entry;
@@ -139,7 +145,7 @@ public class RailCache implements SmartLifecycle {
         if (entry == null) {
             return Optional.empty();
         }
-        start(entry);
+        start(entry, true);
         synchronized (this) {
             return Optional.of(entry.snapshot);
         }
@@ -216,9 +222,18 @@ public class RailCache implements SmartLifecycle {
     }
 
     private void start(Entry entry) {
+        start(entry, false);
+    }
+
+    /** Starts a load unless one runs; {@code loadAgainIfLoading} asks for one more after the running one. */
+    private void start(Entry entry, boolean loadAgainIfLoading) {
         RailSnapshot marked;
         synchronized (this) {
-            if (entry.inFlight || entries.get(RailSnapshot.key(entry.descriptor)) != entry) {
+            if (entries.get(RailSnapshot.key(entry.descriptor)) != entry) {
+                return;
+            }
+            if (entry.inFlight) {
+                entry.loadAgain |= loadAgainIfLoading;
                 return;
             }
             entry.inFlight = true;
@@ -231,8 +246,16 @@ public class RailCache implements SmartLifecycle {
         } catch (RejectedExecutionException _) {
             synchronized (this) {
                 entry.inFlight = false;
+                entry.loadAgain = false;
             }
         }
+    }
+
+    /** Whether a refresh was asked for while the load that just ended ran; answers each request once. */
+    private synchronized boolean takeLoadAgain(Entry entry) {
+        boolean again = entry.loadAgain;
+        entry.loadAgain = false;
+        return again;
     }
 
     private void fetch(Entry entry) {
@@ -245,6 +268,7 @@ public class RailCache implements SmartLifecycle {
             Thread.currentThread().interrupt();
             synchronized (this) {
                 entry.inFlight = false;
+                entry.loadAgain = false;
             }
             return;
         }
@@ -271,6 +295,9 @@ public class RailCache implements SmartLifecycle {
         }
         if (published != null) {
             events.publishEvent(new RailUpdatedEvent(published));
+        }
+        if (takeLoadAgain(entry)) {
+            start(entry);
         }
     }
 
