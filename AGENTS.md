@@ -70,4 +70,4 @@ Rules for everyone who changes this repository, people and coding agents alike. 
 - Stage only the files you changed (`git add <paths>`, never `git add -A`); other work may be in progress in the same
   tree.
 - A deliberate exception to a SonarCloud rule uses the narrowest `@SuppressWarnings("java:S…")` possible, with a
-  one-line reason.
+  one-line reason. The same goes for an Error Prone check, which fails compilation: `@SuppressWarnings("CheckName")`.
