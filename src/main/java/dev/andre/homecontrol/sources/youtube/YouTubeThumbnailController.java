@@ -41,7 +41,7 @@ public class YouTubeThumbnailController {
         }
         YouTubeHttp.Response response;
         try {
-            response = http.get(YouTubeHttp.uri(properties.thumbnailBaseUrl(), "/vi/" + videoId + "/mqdefault.jpg", Map.of()), Map.of());
+            response = http.thumbnail(YouTubeHttp.uri(properties.thumbnailBaseUrl(), "/vi/" + videoId + "/mqdefault.jpg", Map.of()));
         } catch (YouTubeException _) {
             return ResponseEntity.status(502).body(LOAD_ERROR.getBytes());
         }

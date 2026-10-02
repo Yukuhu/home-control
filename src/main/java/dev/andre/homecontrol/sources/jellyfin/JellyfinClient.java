@@ -43,12 +43,14 @@ public class JellyfinClient implements AutoCloseable {
     private static final HttpUrls.Rules SERVER_URLS = new HttpUrls.Rules(false, false, true, false, 0);
     /** A generous cap on one artwork image; a well-behaved server never comes close. */
     static final int MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-    /** Artwork and session pages load many at once from the LAN server. */
-    private static final int MAX_CONCURRENT = 16;
+    /** Pages load many images, or session states, at once from the LAN server: per client, below. */
+    static final int MAX_CONCURRENT = 16;
     /** Raster types only: an SVG served from our own origin could carry a script. */
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
 
     private final GuardedHttpClient http;
+    /** Artwork has slots of its own: a page full of posters must not hold up the calls rails and sessions make. */
+    private final GuardedHttpClient images;
     private final String version;
     private static final JsonMapper MAPPER = Json.MAPPER;
 
@@ -63,6 +65,9 @@ public class JellyfinClient implements AutoCloseable {
         this.http = new GuardedHttpClient(new GuardedHttpClient.Profile(NAME, GuardedHttpClient.Redirects.NONE,
                 0, MAX_JSON_BYTES, properties.connectTimeout(), properties.requestTimeout(), MAX_CONCURRENT, SERVER_URLS),
                 new OutboundAddressPolicy(true), JellyfinClient::failure);
+        this.images = new GuardedHttpClient(new GuardedHttpClient.Profile(NAME, GuardedHttpClient.Redirects.NONE,
+                0, MAX_IMAGE_BYTES, properties.connectTimeout(), properties.requestTimeout(), MAX_CONCURRENT,
+                SERVER_URLS), new OutboundAddressPolicy(true), JellyfinClient::failure);
     }
 
     private static JellyfinException failure(OutboundFailure failure) {
@@ -74,6 +79,7 @@ public class JellyfinClient implements AutoCloseable {
     @Override
     public void close() {
         http.close();
+        images.close();
     }
 
     /** http(s) scheme, a host, no user info, query or fragment; trailing slashes removed. */
@@ -189,7 +195,7 @@ public class JellyfinClient implements AutoCloseable {
         if (tag != null) {
             query.put("tag", tag);
         }
-        OutboundResponse response = http.send(OutboundRequest.get(uri(serverUrl, "/Items/" + id(itemId) + "/Images/" + type, query))
+        OutboundResponse response = images.send(OutboundRequest.get(uri(serverUrl, "/Items/" + id(itemId) + "/Images/" + type, query))
                 .header("Accept", "image/*").limitedTo(MAX_IMAGE_BYTES));
         if (response.status() == 404) {
             return Optional.empty();

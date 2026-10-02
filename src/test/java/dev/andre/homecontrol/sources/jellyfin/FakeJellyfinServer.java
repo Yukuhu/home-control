@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 /** In-process Jellyfin: canned responses keyed by "METHOD /path", every request recorded. Unknown routes → 404. */
 public final class FakeJellyfinServer implements AutoCloseable {
@@ -59,6 +60,13 @@ public final class FakeJellyfinServer implements AutoCloseable {
         Response response = Response.of(status, contentType, body);
         server.respond(method, path, status >= 300 && status < 400
                 ? response.withHeader("Location", "http://elsewhere.invalid/") : response);
+        return this;
+    }
+
+    /** Holds every request for {@code itemId}'s primary image until {@code release} opens, then sends a small JPEG. */
+    public FakeJellyfinServer holdImage(String itemId, CountDownLatch release) {
+        server.hold("GET", "/Items/" + itemId + "/Images/Primary", release,
+                Response.of(200, "image/jpeg", new byte[] {1, 2, 3}));
         return this;
     }
 

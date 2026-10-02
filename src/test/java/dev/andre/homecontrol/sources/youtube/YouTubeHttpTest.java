@@ -10,12 +10,17 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.awaitility.Awaitility.await;
 
 class YouTubeHttpTest {
 
@@ -65,6 +70,36 @@ class YouTubeHttpTest {
         assertThat(recorded.form()).isEqualTo(Map.of("client_id", "c"));
         assertThat(recorded.header("x-test")).isEqualTo("1");
         assertThat(response.json().path("user_code").asString()).isEqualTo("GQVQ-JKEC");
+    }
+
+    @Test
+    void thumbnailsThatFillEverySlotLeaveSignInFree() throws IOException {
+        fake = new FakeGoogleServer();
+        fake.respond("POST", "/oauth/device/code", FakeGoogleServer.Canned.fixture(200, "oauth-device-code.json"));
+        CountDownLatch release = new CountDownLatch(1);
+        try (FakeHttpServer thumbnails = FakeHttpServer.start(); YouTubeHttp http = new YouTubeHttp(fake.properties());
+             ExecutorService dashboard = Executors.newVirtualThreadPerTaskExecutor()) {
+            try {
+                thumbnails.hold("GET", "/vi/aqz-KE-bpKQ/mqdefault.jpg", release,
+                        Response.of(200, "image/jpeg", new byte[] {1, 2, 3}));
+                URI thumbnail = thumbnails.url("/vi/aqz-KE-bpKQ/mqdefault.jpg");
+                for (int i = 0; i < YouTubeHttp.MAX_CONCURRENT; i++) {
+                    dashboard.submit(() -> http.thumbnail(thumbnail));
+                }
+                await().until(() -> thumbnails.requests("GET", "/vi/aqz-KE-bpKQ/mqdefault.jpg").size()
+                        == YouTubeHttp.MAX_CONCURRENT);
+
+                long started = System.nanoTime();
+                YouTubeHttp.Response response = http.postForm(URI.create(fake.base() + "/oauth/device/code"),
+                        Map.of("client_id", "c"), Map.of());
+
+                assertThat(response.json().path("user_code").asString()).isEqualTo("GQVQ-JKEC");
+                assertThat(Duration.ofNanos(System.nanoTime() - started)).as("did not wait for a thumbnail slot")
+                        .isLessThan(Duration.ofSeconds(2));
+            } finally {
+                release.countDown();
+            }
+        }
     }
 
     @Test

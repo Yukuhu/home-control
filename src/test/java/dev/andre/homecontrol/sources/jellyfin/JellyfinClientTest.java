@@ -11,10 +11,14 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 class JellyfinClientTest {
 
@@ -41,6 +45,32 @@ class JellyfinClientTest {
         assertThat(recorded.header("authorization")).isEqualTo(
                 "MediaBrowser Client=\"Home+Control\", Device=\"Home+Control\", DeviceId=\"dev-1\", Version=\"0.8.0\", Token=\"tok-1\"");
         assertThat(recorded.header("accept")).isEqualTo("application/json");
+    }
+
+    @Test
+    void artworkThatFillsEveryImageSlotLeavesTheApiFree() throws IOException {
+        String itemId = "b1c2d3e4f5061728394a5b6c7d8e9f01";
+        CountDownLatch release = new CountDownLatch(1);
+        fake = new FakeJellyfinServer().holdImage(itemId, release)
+                .respond("GET", "/System/Info/Public", 200, "system-info-public.json");
+        try (ExecutorService posters = Executors.newVirtualThreadPerTaskExecutor()) {
+            try {
+                for (int i = 0; i < JellyfinClient.MAX_CONCURRENT; i++) {
+                    posters.submit(() -> client.image(fake.url(), itemId, "Primary", null, 480));
+                }
+                await().until(() -> fake.requests("GET", "/Items/" + itemId + "/Images/Primary").size()
+                        == JellyfinClient.MAX_CONCURRENT);
+
+                long started = System.nanoTime();
+                JsonNode info = client.publicInfo(fake.url());
+
+                assertThat(info.path("ServerName").asString()).isEqualTo("nas");
+                assertThat(Duration.ofNanos(System.nanoTime() - started)).as("did not wait for an image slot")
+                        .isLessThan(Duration.ofSeconds(2));
+            } finally {
+                release.countDown();
+            }
+        }
     }
 
     @Test
