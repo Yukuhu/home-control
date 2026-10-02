@@ -18,4 +18,11 @@ class TestArchitectureTest {
     static final ArchRule coreTestsSitInTheCoreModule = noClasses()
             .should().resideInAPackage("dev.andre.homecontrol.core..")
             .because("core's tests sit in the core module, which compiles them against core alone");
+
+    @ArchTest
+    static final ArchRule protocolTestsSitInTheProtocolsModule = noClasses()
+            .should().resideInAnyPackage("..protocol..", "dev.andre.homecontrol.adapters.net..",
+                    "dev.andre.homecontrol.sources.sports.ics..")
+            .because("the tests of protocols' packages sit in the protocols module, which compiles them against "
+                    + "protocols and core alone");
 }

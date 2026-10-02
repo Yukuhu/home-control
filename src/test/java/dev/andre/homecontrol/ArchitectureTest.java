@@ -5,6 +5,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import dev.andre.homecontrol.adapters.net.DeviceUris;
 import dev.andre.homecontrol.core.Device;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -50,6 +51,30 @@ class ArchitectureTest {
                         .hasValueSatisfying(source -> assertThat(source.getUri().toString())
                                 .as(javaClass.getName())
                                 .contains("home-control-core")));
+    }
+
+    // protocols is a module too: its classes reach this test as a jar, and its test fixtures, which hold fakes in
+    // protocol packages, stay out of the import.
+    @ArchTest
+    static void protocolsClassesAreImported(JavaClasses classes) {
+        assertThat(classes.contain(DeviceUris.class)).as("the import holds protocols' classes").isTrue();
+        assertThat(classes.contain("dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer"))
+                .as("the import leaves out the test fixtures")
+                .isFalse();
+    }
+
+    // As for core: the compiler keeps Spring out of protocols only for the classes in that module, so its packages
+    // live there alone.
+    @ArchTest
+    static void protocolsLiveInTheirModuleAlone(JavaClasses classes) {
+        assertThat(classes.that(resideInAnyPackage("..protocol..", "dev.andre.homecontrol.adapters.net..",
+                "dev.andre.homecontrol.sources.sports.ics..")))
+                .isNotEmpty()
+                .allSatisfy(javaClass -> assertThat(javaClass.getSource())
+                        .hasValueSatisfying(source -> assertThat(source.getUri().toString())
+                                .as(javaClass.getName())
+                                .contains("home-control-protocols")
+                                .doesNotContain("test-fixtures")));
     }
 
     @ArchTest
