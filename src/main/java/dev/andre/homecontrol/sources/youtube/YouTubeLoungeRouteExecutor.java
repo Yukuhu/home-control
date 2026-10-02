@@ -35,7 +35,7 @@ public class YouTubeLoungeRouteExecutor implements RouteExecutor {
 
     @Override
     public Set<String> keys() {
-        return Set.of(YouTubeLoungeRoute.KEY);
+        return Set.of(YouTubeLoungeRoute.ROUTE_KEY);
     }
 
     @Override

@@ -139,9 +139,9 @@ class SportsCompetitionsTest {
                 5242880, 3, true),
                 new SportsProperties.TheSportsDb(true, server.apiBase(), "123", Duration.ofHours(24),
                 Duration.ofSeconds(1), Duration.ofSeconds(2), null, true));
-        TheSportsDbClient client = new TheSportsDbClient(limited.theSportsDb());
-        TheSportsDbKeys keys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), limited);
-        SportsCompetitions limitedCompetitions = new SportsCompetitions(settingsService, client, keys, schedule, login,
+        TheSportsDbClient limitedClient = new TheSportsDbClient(limited.theSportsDb());
+        TheSportsDbKeys limitedKeys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), limited);
+        SportsCompetitions limitedCompetitions = new SportsCompetitions(settingsService, limitedClient, limitedKeys, schedule, login,
                 limited, Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC));
 
         limitedCompetitions.add("4331");

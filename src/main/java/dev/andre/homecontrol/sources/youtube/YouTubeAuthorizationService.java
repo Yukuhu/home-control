@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -156,6 +157,18 @@ public class YouTubeAuthorizationService implements AutoCloseable {
         status = Status.of(State.IDLE, null);
     }
 
+    /**
+     * Trouble on the way to Google, or all of Home Control's connections to it in use: the code stays valid, so the
+     * next poll may well succeed. The status line for that, or empty when the failure ends the authorization.
+     */
+    private static Optional<String> stillTrying(ContentSourceException.Kind kind) {
+        return switch (kind) {
+            case UNREACHABLE, SERVER_ERROR -> Optional.of("Could not reach Google; still trying");
+            case RATE_LIMITED -> Optional.of("Home Control is busy talking to Google; still trying");
+            default -> Optional.empty();
+        };
+    }
+
     /** One poll if one is due. Returns true while the authorization is still pending. */
     public boolean pollOnce() {
         GoogleOAuthClient.DeviceCode code;
@@ -182,15 +195,11 @@ public class YouTubeAuthorizationService implements AutoCloseable {
                 if (pending != code) {
                     return pending != null;
                 }
-                // Trouble on the way to Google, or all of Home Control's connections to it in use: the code stays
-                // valid, so the next poll may well succeed.
-                if (e.kind() == ContentSourceException.Kind.UNREACHABLE || e.kind() == ContentSourceException.Kind.SERVER_ERROR
-                        || e.kind() == ContentSourceException.Kind.RATE_LIMITED) {
+                Optional<String> stillTrying = stillTrying(e.kind());
+                if (stillTrying.isPresent()) {
                     nextPollAt = clock.instant().plus(interval);
                     status = new Status(State.PENDING, code.userCode(), code.verificationUrl(), code.expiresAt(),
-                            e.kind() == ContentSourceException.Kind.RATE_LIMITED
-                                    ? "Home Control is busy talking to Google; still trying"
-                                    : "Could not reach Google; still trying");
+                            stillTrying.get());
                     return true;
                 }
                 return finish(State.FAILED, e.getMessage());

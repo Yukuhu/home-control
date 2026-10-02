@@ -154,10 +154,10 @@ class SportsCalendarsTest {
 
     /** A real login, as the app has it: no password yet, so the first one must be strong enough. */
     private LoginService realLogin() {
-        SecureRandom random = new SecureRandom();
-        SecretStore secrets = new SecretStore(dir.resolve("secrets.json"),
-                new SecretKeySource(null, dir.resolve("secret.key"), random), random);
-        return new LoginService(secrets, new Argon2PasswordHasher(random), random);
+        SecureRandom strong = new SecureRandom();
+        SecretStore store = new SecretStore(dir.resolve("secrets.json"),
+                new SecretKeySource(null, dir.resolve("secret.key"), strong), strong);
+        return new LoginService(store, new Argon2PasswordHasher(strong), strong);
     }
 
     @Test

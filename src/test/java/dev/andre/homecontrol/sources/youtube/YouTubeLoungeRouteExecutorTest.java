@@ -156,7 +156,7 @@ class YouTubeLoungeRouteExecutorTest {
     void aRouteOfAnotherKindIsRefusedByName() {
         DelegatedRoute other = new DelegatedRoute() {
             @Override public String source() { return "Other"; }
-            @Override public String key() { return YouTubeLoungeRoute.KEY; }
+            @Override public String key() { return YouTubeLoungeRoute.ROUTE_KEY; }
             @Override public String describe() { return "Another route under the same key"; }
         };
 

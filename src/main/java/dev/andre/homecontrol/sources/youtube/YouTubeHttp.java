@@ -30,6 +30,8 @@ public class YouTubeHttp implements AutoCloseable {
     static final int MAX_CONCURRENT = 16;
     private static final HttpUrls.Rules GOOGLE_URLS = new HttpUrls.Rules(true, false, true, false, 0);
 
+    /** As failures name the other side: "Could not reach Google at …". */
+    private static final String NAME = "Google";
     private static final JsonMapper MAPPER = Json.MAPPER;
 
     /** An HTTP answer; compared by its body's content, and printed with the body's size only. */
@@ -74,15 +76,15 @@ public class YouTubeHttp implements AutoCloseable {
 
     public YouTubeHttp(YouTubeProperties properties) {
         // Every caller reads Google's error bodies (OAuth error codes, quota reasons), so every request asks for them.
-        this.http = new GuardedHttpClient(new GuardedHttpClient.Profile("Google", GuardedHttpClient.Redirects.NONE, 0,
+        this.http = new GuardedHttpClient(new GuardedHttpClient.Profile(NAME, GuardedHttpClient.Redirects.NONE, 0,
                 MAX_RESPONSE_BYTES, properties.connectTimeout(), properties.requestTimeout(), MAX_CONCURRENT,
                 GOOGLE_URLS), new OutboundAddressPolicy(properties.allowLoopback()),
-                failure -> new YouTubeException(failure.kind(), failure.describe("Google")));
-        this.thumbnails = new GuardedHttpClient(new GuardedHttpClient.Profile("Google",
+                failure -> new YouTubeException(failure.kind(), failure.describe(NAME)));
+        this.thumbnails = new GuardedHttpClient(new GuardedHttpClient.Profile(NAME,
                 GuardedHttpClient.Redirects.NONE, 0, MAX_RESPONSE_BYTES, properties.connectTimeout(),
                 properties.requestTimeout(), MAX_CONCURRENT, GOOGLE_URLS),
                 new OutboundAddressPolicy(properties.allowLoopback()),
-                failure -> new YouTubeException(failure.kind(), failure.describe("Google")));
+                failure -> new YouTubeException(failure.kind(), failure.describe(NAME)));
     }
 
     public Response get(URI uri, Map<String, String> headers) {
