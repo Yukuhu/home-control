@@ -239,18 +239,18 @@ class DevicesExecuteTest {
 
     @Test
     void aSelectInputIsRefusedWithoutReachingAnAdapterThatCannotSwitchInputs() {
-        registry.save(new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.41", orderedAdapters("remote"),
+        registry.save(new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.41", orderedAdapters("androidtv"),
                 Instant.now()));
-        StubAdapter remote = new StubAdapter("remote", DeviceKind.ANDROID_TV, false, true, Capability.REMOTE_KEYS,
+        StubAdapter androidTv = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, true, Capability.REMOTE_KEYS,
                 Capability.APP_LINK, Capability.ANDROID_APPS);
-        try (Devices tv = Devices.assemble(registry, List.of(remote), event -> { })) {
+        try (Devices tv = Devices.assemble(registry, List.of(androidTv), event -> { })) {
             tv.start();
             DeviceCommands commands = tv.commands();
             var hdmi = new Action.SelectInput("HDMI_1");
 
             assertThatThrownBy(() -> commands.execute("tv", hdmi))
                     .isInstanceOf(UnsupportedActionException.class).hasMessage("TV cannot switch inputs");
-            assertThat(remote.handles.get("tv").executed).isEmpty();
+            assertThat(androidTv.handles.get("tv").executed).isEmpty();
         }
     }
 
@@ -274,8 +274,8 @@ class DevicesExecuteTest {
     @Test
     void volumeOnAShieldWithCastReachesCastOnly() {
         registry.save(new Device("living", "Living", DeviceKind.ANDROID_TV, "10.0.0.43",
-                orderedAdapters("remote", "cast"), Instant.now()));
-        StubAdapter shield = new StubAdapter("remote", DeviceKind.ANDROID_TV, false, true, Capability.REMOTE_KEYS,
+                orderedAdapters("androidtv", "cast"), Instant.now()));
+        StubAdapter shield = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, true, Capability.REMOTE_KEYS,
                 Capability.APP_LINK, Capability.ANDROID_APPS);
         StubAdapter shieldCast = new StubAdapter("cast", DeviceKind.CAST, true, false, Capability.CAST_RECEIVER,
                 Capability.VOLUME);
