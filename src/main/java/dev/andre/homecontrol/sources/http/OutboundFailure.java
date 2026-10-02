@@ -32,8 +32,9 @@ public record OutboundFailure(Kind kind, String host, String reason, int limit) 
         return switch (kind) {
             case BLOCKED -> "Home Control does not connect to " + host + " (" + reason + ")";
             case TOO_LARGE -> capitalized(name) + " at " + host + " sent more than " + size(limit);
-            case BAD_RESPONSE -> capitalized(name) + " at " + host + " sent a response Home Control cannot read ("
-                    + reason + ")";
+            case BAD_RESPONSE -> INVALID_REDIRECT.equals(reason)
+                    ? capitalized(name) + " at " + host + " redirects to a link Home Control does not follow"
+                    : capitalized(name) + " at " + host + " sent a response Home Control cannot read (" + reason + ")";
             case RATE_LIMITED -> "Home Control is busy talking to " + name + "; try again in a moment";
             default -> "Could not reach " + name + " at " + host + " (" + reason + ")";
         };

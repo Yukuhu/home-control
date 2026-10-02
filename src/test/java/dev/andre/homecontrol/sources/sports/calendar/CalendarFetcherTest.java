@@ -167,7 +167,22 @@ class CalendarFetcherTest {
         assertThatThrownBy(() -> blockedFetcher.fetch(ftpRedirectUrl))
                 .isInstanceOf(CalendarFetchException.class)
                 .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BAD_RESPONSE)
-                .hasMessage("The calendar at 127.0.0.1 sent a response Home Control cannot read (redirect to a link Home Control does not follow)");
+                .hasMessage("The calendar at 127.0.0.1 redirects to a link Home Control does not follow");
+    }
+
+    @Test
+    void aCalendarOnThisMachineIsRefusedWithTheSettingThatAllowsIt() throws Exception {
+        try (CalendarFetcher local = new CalendarFetcher(properties, new OutboundAddressPolicy(false))) {
+            var onThisMachine = server.url("/private/token-abc123/bl.ics");
+
+            assertThatThrownBy(() -> local.fetch(onThisMachine))
+                    .isInstanceOf(CalendarFetchException.class)
+                    .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.BLOCKED)
+                    .hasMessage("Home Control does not connect to 127.0.0.1 (address not allowed): that address belongs to"
+                            + " this machine or its network link. If the calendar is served on this machine, set"
+                            + " HOME_CONTROL_SPORTS_CALENDAR_ALLOW_LOOPBACK=true.");
+        }
+        assertThat(server.count("/private/token-abc123/bl.ics")).isZero();
     }
 
     @Test

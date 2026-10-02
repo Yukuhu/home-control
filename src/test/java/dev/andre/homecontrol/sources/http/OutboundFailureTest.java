@@ -20,6 +20,8 @@ class OutboundFailureTest {
                 .isEqualTo("The calendar at cal.example sent more than 64 bytes");
         assertThat(new OutboundFailure(Kind.BAD_RESPONSE, "cal.example", OutboundFailure.COMPRESSED, 0).describe("the calendar"))
                 .isEqualTo("The calendar at cal.example sent a response Home Control cannot read (response compression is not supported)");
+        assertThat(new OutboundFailure(Kind.BAD_RESPONSE, "cal.example", OutboundFailure.INVALID_REDIRECT, 0).describe("the calendar"))
+                .isEqualTo("The calendar at cal.example redirects to a link Home Control does not follow");
         assertThat(new OutboundFailure(Kind.RATE_LIMITED, "cal.example", OutboundFailure.BUSY, 0).describe("the calendar"))
                 .isEqualTo("Home Control is busy talking to the calendar; try again in a moment");
     }
