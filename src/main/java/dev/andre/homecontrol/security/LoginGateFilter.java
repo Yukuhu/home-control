@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Once a login exists every path except the login page, its stylesheets, theme script and fonts,
@@ -28,15 +29,21 @@ public class LoginGateFilter extends OncePerRequestFilter {
      */
     static final Set<String> OPEN_PATHS = Set.of(
             "/login", "/health", "/app.css", "/manifest.webmanifest", "/offline.html",
-            "/themes/cyberpunk.css", "/themes/fonts/rajdhani-500.woff2", "/themes/fonts/rajdhani-700.woff2",
             "/js/theme.js",
+            "/themes/catalog.js", "/themes/catalog.json",
             "/icons/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png",
             "/icons/maskable-512.png", "/icons/apple-touch-icon.png");
 
     private final LoginService login;
+    private final Predicate<String> publicAssets;
 
     public LoginGateFilter(LoginService login) {
+        this(login, _ -> false);
+    }
+
+    public LoginGateFilter(LoginService login, Predicate<String> publicAssets) {
         this.login = login;
+        this.publicAssets = publicAssets;
     }
 
     @Override
@@ -47,7 +54,7 @@ public class LoginGateFilter extends OncePerRequestFilter {
             return;
         }
         String path = path(request);
-        if (OPEN_PATHS.contains(path) || login.isAuthenticated(request)) {
+        if (OPEN_PATHS.contains(path) || publicAssets.test(path) || login.isAuthenticated(request)) {
             chain.doFilter(request, response);
             return;
         }

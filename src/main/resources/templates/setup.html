@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<html xmlns:th="http://www.thymeleaf.org" lang="en" data-theme="default">
 <head>
     <th:block th:replace="~{fragments/layout :: pageHead(false)}"></th:block>
     <title>Home Control · Setup</title>
@@ -29,6 +29,7 @@
         <a href="#workflows" th:if="${workflows != null}"><span aria-hidden="true">↳</span> Workflows</a>
         <a href="#sources" th:if="${sourcesSetup != null}"><span aria-hidden="true">03</span> Dashboard</a>
         <a href="#account"><span aria-hidden="true">04</span> Account</a>
+        <a th:href="@{/setup/appearance}">Appearance</a>
         <a href="#install"><span aria-hidden="true">↗</span> Install app</a>
         <p class="hint">A little setup.<br>A home that feels connected.</p>
     </nav>

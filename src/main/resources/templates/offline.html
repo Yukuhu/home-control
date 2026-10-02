@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en" data-theme="default">
+<head>
+    <th:block th:replace="~{fragments/layout :: pageHead(false)}"></th:block>
+    <title>Home Control is offline</title>
+</head>
+<body class="auth-page">
+<main class="auth-card">
+    <th:block th:replace="~{fragments/layout :: brand}"></th:block>
+    <p class="eyebrow">LET'S RECONNECT</p>
+    <h1>A little out of reach.</h1>
+    <p>Home Control is offline. Connect to your home network and check that the Home Control server is running.</p>
+    <a class="button primary" href="/">Try again <span aria-hidden="true">↻</span></a>
+    <p class="hint">Your devices and favorites will be here when you're connected again.</p>
+</main>
+</body>
+</html>

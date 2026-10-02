@@ -287,7 +287,7 @@ class InterfaceE2eTest extends E2eApplicationTest {
             assertNoPageOverflow(page);
             assertInsideViewport(page.locator("#search-q"), width);
             assertInsideViewport(page.locator(".drawer-toggle"), width);
-            assertInsideViewport(page.locator(".theme-toggle"), width);
+            assertInsideViewport(page.locator("[data-theme-picker]"), width);
             screenshot(page, browser, width, prefix + "dashboard");
 
             page.locator(".drawer-toggle").click();
@@ -301,7 +301,7 @@ class InterfaceE2eTest extends E2eApplicationTest {
             for (Locator field : visibleFields(page).all()) {
                 assertInsideViewport(field, width);
             }
-            assertInsideViewport(page.locator(".theme-toggle"), width);
+            assertInsideViewport(page.locator("[data-theme-picker]"), width);
             screenshot(page, browser, width, prefix + "setup");
         }
     }

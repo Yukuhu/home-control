@@ -131,6 +131,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.apache.httpcomponents.client5:httpclient5")
+    implementation(libs.ph.css)
     implementation(libs.jmdns)
     // Argon2id for the login hash and the HOME_CONTROL_SECRET key.
     implementation(libs.bouncycastle.bcprov)

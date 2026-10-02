@@ -1,11 +1,13 @@
 package dev.andre.homecontrol.security;
 
 import dev.andre.homecontrol.storage.DataDirectory;
+import dev.andre.homecontrol.config.PublicAssetPaths;
 import dev.andre.homecontrol.storage.SecretKeySource;
 import dev.andre.homecontrol.storage.SecretStore;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.Ordered;
 
 import java.security.SecureRandom;
@@ -57,8 +59,10 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public FilterRegistrationBean<LoginGateFilter> loginGateFilter(LoginService login) {
-        FilterRegistrationBean<LoginGateFilter> registration = new FilterRegistrationBean<>(new LoginGateFilter(login));
+    public FilterRegistrationBean<LoginGateFilter> loginGateFilter(LoginService login,
+                                                                  ObjectProvider<PublicAssetPaths> assets) {
+        FilterRegistrationBean<LoginGateFilter> registration = new FilterRegistrationBean<>(
+                new LoginGateFilter(login, path -> assets.stream().anyMatch(paths -> paths.contains(path))));
         registration.addUrlPatterns("/*");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         return registration;

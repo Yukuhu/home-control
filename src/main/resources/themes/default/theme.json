@@ -1,0 +1,10 @@
+{
+  "formatVersion": 1,
+  "themeApiVersion": 1,
+  "id": "default",
+  "name": "Default",
+  "version": "1.0.0",
+  "author": "Home Control contributors",
+  "description": "Calm green surfaces, soft corners and readable controls.",
+  "license": "MIT"
+}

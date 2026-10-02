@@ -12,6 +12,11 @@ server:
         secure: ${HOME_CONTROL_SECURE_COOKIE:false}
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+      file-size-threshold: 0
   threads:
     # Request threads are virtual: a request waiting on a slow device holds no platform thread. Argon2 hashing runs
     # on two platform threads of its own (LoginService), so a login never holds one of the few carrier threads.

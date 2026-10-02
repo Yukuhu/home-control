@@ -114,6 +114,7 @@ Every section this README used to hold now lives in one of these pages, under th
 - [Content sources](docs/user/sources.md): login, dynamic workflows, Jellyfin, play routes, Netflix, Prime Video and
   DAZN, YouTube, sport.
 - [Configuration](docs/user/configuration.md): every property and environment variable.
+- [Themes](docs/user/themes.md): choosing, installing, sharing and recovering themes.
 - [Security](docs/user/security.md): what is protected, secrets, reverse proxies, allowed hosts and origins.
 
 **Working on Home Control:**
@@ -121,6 +122,7 @@ Every section this README used to hold now lives in one of these pages, under th
 - [Architecture](docs/dev/architecture.md), [Testing](docs/dev/testing.md) and
   [CI and releases](docs/dev/ci-and-releases.md).
 - [Architecture decisions](docs/adr/README.md).
+- [Theme authoring](docs/dev/themes.md): package format, tokens, styling hooks and local assets.
 
 ## Security
 
@@ -132,4 +134,4 @@ the details.
 
 MIT. See [LICENSE](LICENSE). The Cyberpunk theme bundles the Rajdhani font by the Indian Type
 Foundry under the SIL Open Font License 1.1 (see
-[`OFL.txt`](src/main/resources/static/themes/fonts/OFL.txt)).
+[`OFL.txt`](src/main/resources/themes/cyberpunk/assets/OFL.txt)).

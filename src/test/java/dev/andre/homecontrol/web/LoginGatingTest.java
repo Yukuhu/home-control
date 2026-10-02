@@ -4,12 +4,14 @@ import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.testsupport.FullAppReset;
 import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.themes.ThemeCatalog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -22,6 +24,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
@@ -38,6 +41,9 @@ class LoginGatingTest extends FullAppTest {
 
     @Autowired
     LoginService login;
+
+    @Autowired
+    ThemeCatalog themes;
 
     @Autowired
     ApplicationContext context;
@@ -250,16 +256,66 @@ class LoginGatingTest extends FullAppTest {
         storeAFirstSecret();
 
         mockMvc.perform(get("/login")).andExpect(status().isOk())
-                .andExpect(content().string(allOf(containsString("href=\"/themes/cyberpunk.css\""),
+                .andExpect(content().string(allOf(containsString("href=\"" + themes.require("default").stylesheet() + "\""),
+                        containsString("src=\"/themes/catalog.js\""),
                         containsString("src=\"/js/theme.js\""))));
-        for (String path : new String[] {"/themes/cyberpunk.css", "/js/theme.js",
-                "/themes/fonts/rajdhani-500.woff2", "/themes/fonts/rajdhani-700.woff2"}) {
+        for (String path : new String[] {"/themes/catalog.js", "/themes/catalog.json", "/js/theme.js"}) {
             mockMvc.perform(get(path)).andExpect(status().isOk());
         }
+        for (var theme : themes.themes()) {
+            for (String path : theme.assets()) {
+                mockMvc.perform(get(path)).andExpect(status().isOk());
+            }
+        }
 
-        mockMvc.perform(get("/themes/fonts/OFL.txt")).andExpect(status().isUnauthorized());
-        mockMvc.perform(get(URI.create("/themes/..;/setup"))).andExpect(status().isUnauthorized());
-        mockMvc.perform(get(URI.create("/js/theme.js;x"))).andExpect(status().isUnauthorized());
+        String stylesheet = themes.require("cyberpunk").stylesheet();
+        for (String path : new String[] {"/themes/..;/setup", "/js/theme.js;x", "/themes/catalog.json;x",
+                "/themes/catalog.js/extra", stylesheet + ";x", stylesheet.replace("/cyberpunk/", "/%63yberpunk/"),
+                stylesheet.replace("theme.css", "../theme.css"), stylesheet.replace("theme.css", "theme.json"),
+                stylesheet.replace("theme.css", "LICENSE"), stylesheet.replace("theme.css", "assets/OFL.txt"),
+                stylesheet.replace("theme.css", "assets/missing.png")}) {
+            mockMvc.perform(get(URI.create(path))).andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void recoveryLoginKeepsDefaultStylingThroughARejectedPassword() throws Exception {
+        storeAFirstSecret();
+        String recovery = "/setup/appearance/recovery";
+
+        mockMvc.perform(get(recovery).accept("text/html"))
+                .andExpect(redirectedUrl("/login?next=%2Fsetup%2Fappearance%2Frecovery"));
+        mockMvc.perform(get("/login").param("next", recovery)).andExpect(status().isOk())
+                .andExpect(content().string(allOf(containsString("data-theme=\"default\""),
+                        containsString("name=\"theme-recovery\" content=\"true\""),
+                        containsString("href=\"" + themes.require("default").stylesheet() + "\""))));
+        mockMvc.perform(post("/login").param("next", recovery).param("password", "wrong password"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(containsString("name=\"theme-recovery\" content=\"true\"")));
+        mockMvc.perform(get("/login")).andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("name=\"theme-recovery\""))));
+    }
+
+    @Test
+    void themeManagementAndDownloadsRequireLoginWhenAHouseholdPasswordExists() throws Exception {
+        storeAFirstSecret();
+
+        mockMvc.perform(get("/setup/appearance").accept("text/html"))
+                .andExpect(redirectedUrl("/login?next=%2Fsetup%2Fappearance"));
+        mockMvc.perform(get("/setup/appearance/default/export")).andExpect(status().isUnauthorized());
+        mockMvc.perform(multipart("/setup/appearance/preview")
+                        .file(new MockMultipartFile("package", "theme.zip", "application/zip", themes.export("default"))))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/setup/appearance/install").param("token", "unreviewed"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/setup/appearance/default/remove")).andExpect(status().isUnauthorized());
+
+        MockHttpSession session = loggedIn();
+        mockMvc.perform(get("/setup/appearance").session(session)).andExpect(status().isOk());
+        mockMvc.perform(get("/setup/appearance/default/export").session(session))
+                .andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith("application/zip"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(content().bytes(themes.export("default")));
     }
 
     /**

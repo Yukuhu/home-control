@@ -22,6 +22,7 @@ root.
 | `security` | Login, the host allowlist, cross-origin protection and the security headers, among them a Content-Security-Policy that allows scripts only from this server. A controller that needs the login takes a `LoginContext` argument and passes it on; `LoginService` and services and stores decide with it, so nothing outside the web edge reads the HTTP request or session. |
 | `storage` | The data directory, the one writer for its files (`AtomicFiles`), the versioned JSON files the stores hold (`VersionedJsonFile`), the encrypted secret store and its key, and source settings. See [ADR 0002](../adr/0002-versioned-data-files-and-device-secrets.md). |
 | `crypto` | Argon2id hashing for the login password and the secret key. |
+| `themes` | Validated theme ZIPs, typed design tokens, scoped CSS compilation and the atomic theme catalog. Default and Cyberpunk are bundled packages with protected IDs. Public descriptors contain only presentation metadata and immutable asset URLs; the configuration root supplies their exact path allowlist to security. See [Theme authoring](themes.md) and [ADR 0007](../adr/0007-theme-packages.md). |
 
 ## Modules
 
@@ -57,6 +58,8 @@ flowchart TD
     web --> content
     web --> security
     web --> storage
+    web --> themes
+    themes --> storage
     content --> storage
     device --> storage
     adapters --> discovery
