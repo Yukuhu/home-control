@@ -90,14 +90,9 @@ class BluetoothDeploymentTest {
 
     @Test
     void imagesInstallMpvOnlyOnRequest() throws Exception {
-        assertMpvOnlyAfterLastFrom(Path.of("Dockerfile"));
-        assertMpvOnlyAfterLastFrom(Path.of("Dockerfile.dist"));
-    }
-
-    private static void assertMpvOnlyAfterLastFrom(Path path) throws Exception {
-        String text = Files.readString(path);
-        int lastFrom = text.lastIndexOf("FROM ");
-        assertThat(lastFrom).as("%s has a FROM line", path).isGreaterThanOrEqualTo(0);
+        String text = Files.readString(Path.of("Dockerfile"));
+        int lastFrom = text.lastIndexOf("\nFROM ");
+        assertThat(lastFrom).as("the Dockerfile has a runtime stage").isGreaterThanOrEqualTo(0);
         String before = text.substring(0, lastFrom);
         String after = text.substring(lastFrom);
         assertThat(after).contains("ARG WITH_MPV=false");
@@ -127,13 +122,11 @@ class BluetoothDeploymentTest {
     /** Only root may talk to BlueZ on the host's D-Bus, so only this variant runs as root. */
     @Test
     void onlyTheBluetoothVariantRunsAsRoot() throws Exception {
-        for (String dockerfile : List.of("Dockerfile", "Dockerfile.dist")) {
-            String text = Files.readString(Path.of(dockerfile));
-            String runtime = text.substring(text.lastIndexOf("FROM "));
-            assertThat(runtime).as(dockerfile).contains("ARG RUN_AS=1000:1000\n").contains("\nUSER ${RUN_AS}\n");
-            assertThat(runtime.indexOf("chown \"$RUN_AS\" /data")).as("%s hands /data over before declaring the volume", dockerfile)
-                    .isBetween(0, runtime.indexOf("VOLUME /data"));
-        }
+        String text = Files.readString(Path.of("Dockerfile"));
+        String runtime = text.substring(text.lastIndexOf("\nFROM "));
+        assertThat(runtime).contains("ARG RUN_AS=1000:1000\n").contains("\nUSER ${RUN_AS}\n");
+        assertThat(runtime.indexOf("chown \"$RUN_AS\" /data")).as("the image hands /data over before declaring the volume")
+                .isBetween(0, runtime.indexOf("VOLUME /data"));
 
         String names = maps(map(load(".github/actions/smoke-image/action.yml"), "runs"), "steps").stream()
                 .filter(step -> "names".equals(step.get("id"))).findFirst().orElseThrow().get("run").toString();

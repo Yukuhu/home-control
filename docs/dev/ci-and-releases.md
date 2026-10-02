@@ -12,8 +12,8 @@ What runs on every push and pull request, and how releases are made.
 | Verify dependency checksums | Resolves all dependency configurations before the builds and browser tests. For an unreviewed Dependabot update, uploads a checksum review patch and blocks the builds until reviewed metadata is committed. |
 | Build the jar | Builds the one jar of the run and works out its version; every image that is tested or published is built from it. |
 | Build and test | Runs `./gradlew build` with every module's tests and uploads their results and reports, with one coverage report for all modules. |
-| Build the self-contained image | Checks that `Dockerfile` and `Dockerfile.dist` describe the same runtime, and builds `Dockerfile` without pushing it. |
-| Smoke-test the image on amd64, arm64 | Builds the image that is published, natively on each architecture, and starts it; for a release, it pushes that image by digest. |
+| Build the self-contained image | Builds `Dockerfile` from source, as `docker compose up --build` does, without pushing it. |
+| Smoke-test the image on amd64, arm64 | Builds the image that is published from the run's jar, natively on each architecture, starts it and waits until its healthcheck reports it healthy; for a release, it pushes that image by digest. |
 | Smoke-test the Bluetooth image on amd64, arm64 | The same for the `-bluetooth` variant, in its own job so that it never gates the release. |
 | Browser tests (Chromium) | Runs the Playwright tests in Chromium, records their JavaScript coverage for SonarCloud, and tests the pull request summary script. |
 | Browser tests (Firefox) | Runs the Playwright tests in Firefox. |

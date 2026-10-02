@@ -27,6 +27,9 @@ the bundled host-networking setup that is the only change required. In the
 commented bridge-mode alternative you must update the `ports:` mapping to match,
 or the container will publish 8080 while the app listens on your chosen port.
 
+The image checks its own health: `docker ps` (and CasaOS) shows the container as
+`healthy` once the app answers, usually within a minute of starting.
+
 ## Running a prebuilt image
 
 CI publishes a multi-arch image (`linux/amd64` and `linux/arm64`) to
