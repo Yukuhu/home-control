@@ -95,9 +95,9 @@ class BluetoothDeploymentTest {
         assertThat(lastFrom).as("the Dockerfile has a runtime stage").isGreaterThanOrEqualTo(0);
         String before = text.substring(0, lastFrom);
         String after = text.substring(lastFrom);
-        assertThat(after).contains("ARG WITH_MPV=false");
-        assertThat(after).contains("      && apt-get install -y --no-install-recommends mpv \\");
-        assertThat(after).contains("if [ \"$WITH_MPV\" = \"true\" ]; then \\");
+        assertThat(after).contains("ARG WITH_MPV=false")
+                .contains("      && apt-get install -y --no-install-recommends mpv \\")
+                .contains("if [ \"$WITH_MPV\" = \"true\" ]; then \\");
         assertThat(before).doesNotContain("mpv");
     }
 
