@@ -30,6 +30,7 @@ archunit = "1.5.1"
 jacoco = "0.8.15"
 errorprone = "2.50.0"
 errorprone-plugin = "5.1.1"
+spotless = "8.10.3"
 
 ph-css = "8.2.2"
 
@@ -63,3 +64,4 @@ protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
 sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
 test-retry = { id = "org.gradle.test-retry", version.ref = "test-retry" }
 errorprone = { id = "net.ltgt.errorprone", version.ref = "errorprone-plugin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
