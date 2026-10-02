@@ -1,19 +1,27 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.security.Argon2PasswordHasher;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.security.PasswordRejectedException;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
+import dev.andre.homecontrol.storage.SecretKeySource;
+import dev.andre.homecontrol.storage.SecretStore;
 import dev.andre.homecontrol.testsupport.FakeLoginContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +44,9 @@ class SportsCompetitionsTest {
     private SportsSettingsService settingsService;
     private LoginService login;
     private TheSportsDbSchedule schedule;
+    private TheSportsDbClient client;
+    private TheSportsDbKeys keys;
+    private SportsProperties properties;
     private SportsCompetitions competitions;
     private FakeLoginContext http;
 
@@ -51,14 +62,14 @@ class SportsCompetitionsTest {
         given(login.loginRequired()).willReturn(false);
         http = FakeLoginContext.loggedInBrowser();
 
-        SportsProperties properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
+        properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
                 new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
                 5242880, 3, true),
                 new SportsProperties.TheSportsDb(true, server.apiBase(), "123", Duration.ofHours(24),
                 Duration.ofSeconds(1), Duration.ofSeconds(2), null, true));
 
-        TheSportsDbClient client = new TheSportsDbClient(properties.theSportsDb());
-        TheSportsDbKeys keys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), properties);
+        client = new TheSportsDbClient(properties.theSportsDb());
+        keys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), properties);
         dev.andre.homecontrol.sources.sports.settings.SportsTimeZones zones =
                 mock(dev.andre.homecontrol.sources.sports.settings.SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
@@ -72,6 +83,28 @@ class SportsCompetitionsTest {
     @AfterEach
     void tearDown() {
         server.close();
+    }
+
+    /** A real login, as the app has it: no password yet, so the first one must be strong enough. */
+    private LoginService realLogin() {
+        SecureRandom random = new SecureRandom();
+        SecretStore secrets = new SecretStore(dir.resolve("secrets.json"),
+                new SecretKeySource(null, dir.resolve("secret.key"), random), random);
+        return new LoginService(secrets, new Argon2PasswordHasher(random), random);
+    }
+
+    @Test
+    void aWeakFirstPasswordIsRefusedBeforeTheKeyIsTried() {
+        LoginService household = realLogin();
+        SportsCompetitions guarded = new SportsCompetitions(settingsService, client, keys, schedule, household,
+                properties,
+                Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC));
+        var weak = new SportsCompetitions.PersonalKey(FakeTheSportsDbServer.PERSONAL_KEY, "short", "short");
+        LoginContext browser = new RequestLoginContext(new MockHttpServletRequest(), household);
+
+        assertThatThrownBy(() -> guarded.usePersonalKey(weak, browser)).isInstanceOf(PasswordRejectedException.class);
+        assertThat(server.count("lookupleague.php")).isZero();
+        assertThat(household.loginRequired()).isFalse();
     }
 
     @Test
