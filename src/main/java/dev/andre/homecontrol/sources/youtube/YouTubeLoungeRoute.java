@@ -7,6 +7,10 @@ import dev.andre.homecontrol.core.playback.DelegatedRoute;
  * {@link YouTubeLoungeRouteExecutor}, not an adapter; the device part goes through DeviceCommands.query.
  */
 public record YouTubeLoungeRoute(String videoId) implements DelegatedRoute {
+
+    /** The key {@link YouTubeLoungeRouteExecutor} is found by. */
+    public static final String KEY = "youtube-lounge";
+
     @Override
     public String source() {
         return "YouTube";
@@ -14,7 +18,7 @@ public record YouTubeLoungeRoute(String videoId) implements DelegatedRoute {
 
     @Override
     public String key() {
-        return "youtube-lounge";
+        return KEY;
     }
 
     @Override

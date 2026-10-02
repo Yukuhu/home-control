@@ -32,7 +32,7 @@ public final class WorkflowCastRouteExecutor implements RouteExecutor {
     }
 
     @Override public Set<String> keys() {
-        return Set.of("workflow-cast");
+        return Set.of(WorkflowCastRoute.KEY);
     }
 
     @Override public void execute(DelegatedRoute route, Device device) {

@@ -7,6 +7,7 @@ import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.UnsupportedActionException;
+import dev.andre.homecontrol.core.playback.DelegatedRoute;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -148,6 +149,18 @@ class YouTubeLoungeRouteExecutorTest {
 
     @Test
     void executesOnlyLoungeRoutes() {
-        assertThat(executor.keys()).containsExactly("youtube-lounge");
+        assertThat(executor.keys()).containsExactly(ROUTE.key());
+    }
+
+    @Test
+    void aRouteOfAnotherKindIsRefusedByName() {
+        DelegatedRoute other = new DelegatedRoute() {
+            @Override public String source() { return "Other"; }
+            @Override public String key() { return YouTubeLoungeRoute.KEY; }
+            @Override public String describe() { return "Another route under the same key"; }
+        };
+
+        assertThatThrownBy(() -> executor.execute(other, kitchen))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Not a YouTube Lounge route");
     }
 }
