@@ -162,6 +162,7 @@ public class ThemeController {
         reviews.values().removeIf(pending -> !pending.expires().isAfter(now));
     }
 
+    @SuppressWarnings("java:S6206") // A record would compare the upload by array identity (java:S6218).
     private static final class Pending {
         private final String token;
         private final byte[] bytes;
