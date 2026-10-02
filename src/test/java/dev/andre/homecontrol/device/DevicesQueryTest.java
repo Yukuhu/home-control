@@ -33,7 +33,7 @@ class DevicesQueryTest {
     Path dir;
 
     private final StubAdapter androidtv = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, true,
-            Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.VOLUME);
+            Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.ANDROID_APPS);
     private final StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false,
             Capability.CAST_RECEIVER, Capability.VOLUME);
     private DeviceRegistry registry;

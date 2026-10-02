@@ -33,7 +33,8 @@ class DevicesExecuteTest {
     @TempDir
     Path dir;
 
-    private final StubAdapter androidtv = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, true,
+    /** A TV adapter that also takes absolute volume, as webOS does; asked before the receiver. */
+    private final StubAdapter remote = new StubAdapter("remote", DeviceKind.ANDROID_TV, false, true,
             Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.VOLUME);
     private final StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false,
             Capability.CAST_RECEIVER, Capability.VOLUME);
@@ -44,10 +45,10 @@ class DevicesExecuteTest {
     void aMergedShield() {
         registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
         Map<String, Map<String, String>> adapters = new LinkedHashMap<>();
-        adapters.put("androidtv", Map.of("port", "6466"));
+        adapters.put("remote", Map.of("port", "6466"));
         adapters.put("cast", Map.of("port", "8009"));
         registry.save(new Device("shield", "Shield", DeviceKind.ANDROID_TV, "10.0.0.5", adapters, Instant.now()));
-        devices = Devices.assemble(registry, List.of(androidtv, cast), event -> { });
+        devices = Devices.assemble(registry, List.of(remote, cast), event -> { });
         devices.start();
     }
 
@@ -60,13 +61,13 @@ class DevicesExecuteTest {
     void theFirstAdapterThatCanDoItIsTheOnlyOneAsked() {
         devices.commands().execute("shield", new Action.SetVolume(10));
 
-        assertThat(androidtv.handles.get("shield").executed).containsExactly(new Action.SetVolume(10));
+        assertThat(remote.handles.get("shield").executed).containsExactly(new Action.SetVolume(10));
         assertThat(cast.handles.get("shield").executed).isEmpty();
     }
 
     @Test
     void anActionTheFirstAdapterCannotDoFallsThroughToTheNext() {
-        androidtv.handles.get("shield").failure = new UnsupportedActionException("no absolute volume");
+        remote.handles.get("shield").failure = new UnsupportedActionException("no absolute volume");
 
         devices.commands().execute("shield", new Action.SetVolume(40));
 
@@ -75,7 +76,7 @@ class DevicesExecuteTest {
 
     @Test
     void anOfflineFirstAdapterFallsThroughToo() {
-        androidtv.handles.get("shield").failure = new DeviceOfflineException("must be paired again");
+        remote.handles.get("shield").failure = new DeviceOfflineException("must be paired again");
 
         devices.commands().execute("shield", new Action.Mute(true));
 
@@ -84,7 +85,7 @@ class DevicesExecuteTest {
 
     @Test
     void whenNoAdapterCouldSendTheOfflineReasonWins() {
-        androidtv.handles.get("shield").failure = new DeviceOfflineException("Shield must be paired again");
+        remote.handles.get("shield").failure = new DeviceOfflineException("Shield must be paired again");
         cast.handles.get("shield").failure = new UnsupportedActionException("not this one");
 
         var setVolume = new Action.SetVolume(5);
@@ -96,7 +97,7 @@ class DevicesExecuteTest {
 
     @Test
     void whenEveryAdapterRefusesTheLastReasonIsGiven() {
-        androidtv.handles.get("shield").failure = new UnsupportedActionException("first reason");
+        remote.handles.get("shield").failure = new UnsupportedActionException("first reason");
         cast.handles.get("shield").failure = new UnsupportedActionException("last reason");
 
         var setVolume = new Action.SetVolume(5);
@@ -108,7 +109,7 @@ class DevicesExecuteTest {
 
     @Test
     void aRefusalByTheDeviceIsFinal() {
-        androidtv.handles.get("shield").failure = new ActionFailedException("Shield refused");
+        remote.handles.get("shield").failure = new ActionFailedException("Shield refused");
 
         var setVolume = new Action.SetVolume(5);
         DeviceCommands commands = devices.commands();
@@ -121,13 +122,13 @@ class DevicesExecuteTest {
     void onlyAdaptersDeclaringTheCapabilityAreAsked() {
         devices.commands().execute("shield", new Action.Stop());
 
-        assertThat(androidtv.handles.get("shield").executed).isEmpty();
+        assertThat(remote.handles.get("shield").executed).isEmpty();
         assertThat(cast.handles.get("shield").executed).containsExactly(new Action.Stop());
     }
 
     @Test
     void declaringAdaptersWithoutLiveHandlesMeanOfflineNotUnsupported() {
-        StubAdapter broken = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, true,
+        StubAdapter broken = new StubAdapter("remote", DeviceKind.ANDROID_TV, false, true,
                 Capability.REMOTE_KEYS, Capability.VOLUME) {
             @Override
             public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
@@ -238,9 +239,9 @@ class DevicesExecuteTest {
 
     @Test
     void aSelectInputIsRefusedWithoutReachingAnAdapterThatCannotSwitchInputs() {
-        registry.save(new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.41", orderedAdapters("androidtv"),
+        registry.save(new Device("tv", "TV", DeviceKind.ANDROID_TV, "10.0.0.41", orderedAdapters("remote"),
                 Instant.now()));
-        StubAdapter remote = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, true, Capability.REMOTE_KEYS,
+        StubAdapter remote = new StubAdapter("remote", DeviceKind.ANDROID_TV, false, true, Capability.REMOTE_KEYS,
                 Capability.APP_LINK, Capability.ANDROID_APPS);
         try (Devices tv = Devices.assemble(registry, List.of(remote), event -> { })) {
             tv.start();
@@ -273,8 +274,8 @@ class DevicesExecuteTest {
     @Test
     void volumeOnAShieldWithCastReachesCastOnly() {
         registry.save(new Device("living", "Living", DeviceKind.ANDROID_TV, "10.0.0.43",
-                orderedAdapters("androidtv", "cast"), Instant.now()));
-        StubAdapter shield = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, true, Capability.REMOTE_KEYS,
+                orderedAdapters("remote", "cast"), Instant.now()));
+        StubAdapter shield = new StubAdapter("remote", DeviceKind.ANDROID_TV, false, true, Capability.REMOTE_KEYS,
                 Capability.APP_LINK, Capability.ANDROID_APPS);
         StubAdapter shieldCast = new StubAdapter("cast", DeviceKind.CAST, true, false, Capability.CAST_RECEIVER,
                 Capability.VOLUME);
