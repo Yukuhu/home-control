@@ -2,12 +2,17 @@ package dev.andre.homecontrol.adapters.support;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.time.Duration;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static dev.andre.homecontrol.adapters.support.Reconnector.Outcome.CONNECTED;
 import static dev.andre.homecontrol.adapters.support.Reconnector.Outcome.PENDING;
@@ -73,6 +78,55 @@ class ReconnectorTest {
         loop.execute(reconnector::lost);
 
         await().atMost(Duration.ofMillis(600)).until(() -> attempts.size() == 5);
+    }
+
+    @Test
+    void aWaitAskedForWhileAnAttemptRunsOutlastsThatAttemptsRetry() throws InterruptedException {
+        CountDownLatch running = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Reconnector reconnector = new Reconnector(loop, new Backoff(Duration.ofMillis(100), Duration.ofSeconds(10)), () -> {
+            attempts.add(System.nanoTime());
+            if (attempts.size() == 1) {
+                running.countDown();
+                awaitUninterruptibly(release);
+                return RETRY;
+            }
+            return CONNECTED;
+        });
+        reconnector.start();
+        assertThat(running.await(2, TimeUnit.SECONDS)).isTrue();
+
+        // A TV woken while the attempt runs: it should be tried once its wake grace is over, not a backoff later.
+        long woken = System.nanoTime();
+        reconnector.retryIn(Duration.ofMillis(600));
+        release.countDown();
+
+        await().atMost(Duration.ofSeconds(3)).until(() -> attempts.size() == 2);
+        assertThat((attempts.get(1) - woken) / 1_000_000).isGreaterThanOrEqualTo(550);
+    }
+
+    private static void awaitUninterruptibly(CountDownLatch latch) {
+        boolean interrupted = false;
+        while (true) {
+            try {
+                latch.await();
+                break;
+            } catch (InterruptedException _) {
+                interrupted = true;
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void aFailedAttemptIsLoggedWithTheLoopsName(CapturedOutput output) {
+        reconnector(Duration.ofSeconds(10), Duration.ofSeconds(10), new IllegalStateException("adapter bug")).start();
+
+        await().atMost(Duration.ofSeconds(2)).until(() -> output.getOut().contains("adapter bug"));
+        assertThat(output.getOut()).contains("reconnector-test: a connection attempt failed unexpectedly");
     }
 
     @Test
