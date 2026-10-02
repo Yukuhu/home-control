@@ -88,7 +88,7 @@
             repeating-linear-gradient(-45deg, rgba(255, 95, 88, .16) 0 5px, transparent 5px 10px);
         background-origin: border-box;
     }
-    & button.danger:not(:disabled):hover { --line: var(--cp-red); color: #fff; background-color: rgba(255, 95, 88, .28); }
+    & button.danger:not(:disabled):hover { --line: var(--cp-red); color: #fff; background-color: #4f231f; }
 
     /* Header */
     & .app-header { position: relative; border-bottom-color: rgba(255, 95, 88, .5); background: linear-gradient(rgba(255, 95, 88, .07), transparent); }
@@ -198,7 +198,7 @@
         --line: var(--cp-red); border-color: var(--line); border-left-width: 3px; color: #ffc3bf;
         background:
             var(--cp-tr),
-            repeating-linear-gradient(-45deg, rgba(255, 95, 88, .09) 0 6px, transparent 6px 12px), #15090c;
+            repeating-linear-gradient(-45deg, #2a1113 0 6px, #15090c 6px 12px), #15090c;
         background-origin: border-box;
     }
     & .rail-empty {

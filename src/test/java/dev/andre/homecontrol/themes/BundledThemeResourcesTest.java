@@ -27,7 +27,7 @@ class BundledThemeResourcesTest {
         schema.properties().forEach(property -> {
             names.add(property.getKey());
             assertThat(property.getKey()).doesNotStartWith("--");
-            assertThat(TOKEN_TYPES).contains(property.getValue().asString());
+            assertThat(property.getValue().asString()).isIn(TOKEN_TYPES);
             assertThat(tokens.has(property.getKey())).as("%s token %s", id, property.getKey()).isTrue();
         });
         assertThat(names).contains("theme-color", "bg", "surface", "fg", "accent", "danger", "font-body");
@@ -61,7 +61,7 @@ class BundledThemeResourcesTest {
             String path = matcher.group(1);
             assertThat(path).startsWith("assets/").doesNotContain("..", ":", "\\");
             byte[] asset = resource("cyberpunk/" + path);
-            assertThat(asset.length).isGreaterThan(4);
+            assertThat(asset).hasSizeGreaterThan(4);
             assertThat(new String(asset, 0, 4, StandardCharsets.US_ASCII)).isEqualTo("wOF2");
             assets.add(path);
         }

@@ -190,6 +190,11 @@ private data out of theme files.
 | Installed imported themes | 32 |
 | Imported storage, including retained revisions | 256 MiB |
 
+Servlet upload limits live in `web.ThemeUploadConfiguration`: files spool to disk immediately, each file is
+capped at 10 MiB and the whole multipart request at 11 MiB. The narrow `java:S5693` exception preserves that
+package contract above Sonar's generic 8 MiB recommendation. The controller separately bounds reads to 10 MiB,
+retains at most eight pending reviews across all sessions, and expires them after ten minutes.
+
 For application maintainers: stored source digests are independent of public CSS revisions. Startup verifies the
 source and compiles it again. Public revisions include source bytes, token schema/defaults and the compiler
 fingerprint in `ThemeArchive.revision`. Bump that fingerprint whenever compiler changes can alter emitted CSS;

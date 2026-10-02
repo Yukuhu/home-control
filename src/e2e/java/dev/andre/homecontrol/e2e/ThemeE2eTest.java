@@ -145,6 +145,8 @@ class ThemeE2eTest extends E2eApplicationTest {
             second.evaluate("() => window.dispatchEvent(new Event('focus'))");
             assertThat(second.locator("html")).hasAttribute("data-theme", "default");
             assertThat(themePicker(second).locator("option[value=ocean]")).hasCount(0);
+            org.assertj.core.api.Assertions.assertThat(second.evaluate(
+                    "() => localStorage.getItem('" + THEME_KEY + "')")).isEqualTo("default");
         }
     }
 

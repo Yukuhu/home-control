@@ -26,6 +26,10 @@ import java.util.Set;
 public final class ThemeCatalog {
     private static final int MAX_IMPORTS = 32;
     private static final long MAX_STORAGE = 256L * 1024 * 1024;
+    private static final String THEMES = "themes";
+    private static final String TOKENS = "tokens.json";
+    private static final String STYLESHEET = "theme.css";
+    private static final String REVISION_PATTERN = "[a-f0-9]{64}";
     private final Path directory;
     private final ThemeTokens tokenSchema = new ThemeTokens();
     private final VersionedJsonFile<Map<String, Revision>> registry;
@@ -38,7 +42,7 @@ public final class ThemeCatalog {
     private boolean damagedRegistry;
 
     public ThemeCatalog(DataDirectory data) {
-        directory = data.resolve("themes");
+        directory = data.resolve(THEMES).toAbsolutePath().normalize();
         registry = new VersionedJsonFile<>(directory.resolve("catalog.json"), "the theme catalog", 1,
                 Map::of, ThemeCatalog::readRegistry, ThemeCatalog::writeRegistry);
         for (String id : List.of("default", "cyberpunk")) {
@@ -65,7 +69,7 @@ public final class ThemeCatalog {
         ThemePackage theme = requirePackage(id);
         Map<String, byte[]> source = new LinkedHashMap<>(theme.files());
         // Export all additive token defaults while retaining original author CSS and relative asset paths.
-        source.put("tokens.json", Json.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(new java.util.TreeMap<>(theme.tokens())));
+        source.put(TOKENS, Json.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(new java.util.TreeMap<>(theme.tokens())));
         return ThemeArchive.write(source);
     }
 
@@ -129,10 +133,10 @@ public final class ThemeCatalog {
 
     private ThemePackage validate(Map<String, byte[]> files, boolean builtin) {
         ThemeManifest manifest = ThemeArchive.manifest(files.get("theme.json"), builtin);
-        Map<String, String> tokens = tokenSchema.read(files.get("tokens.json"));
+        Map<String, String> tokens = tokenSchema.read(files.get(TOKENS));
         Map<String, String> types = ThemeAssets.validate(files);
         String revision = ThemeArchive.revision(files);
-        String css = ThemeArchive.utf8(files.getOrDefault("theme.css", new byte[0]));
+        String css = ThemeArchive.utf8(files.getOrDefault(STYLESHEET, new byte[0]));
         if (css.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > ThemeArchive.MAX_CSS) throw ThemeException.tooLarge("Theme CSS exceeds 256 KiB.");
         String compiled = new ThemeCss(manifest.id(), revision, types).compile(tokens, css);
         return new ThemePackage(manifest, revision, tokens, files, compiled, types);
@@ -158,7 +162,7 @@ public final class ThemeCatalog {
         try {
             if (Files.isSymbolicLink(directory) || Files.isSymbolicLink(registry.file())) throw new StorageException("Theme catalog cannot be a symbolic link.");
             entries = registry.read();
-        } catch (StorageException e) {
+        } catch (StorageException _) {
             damagedRegistry = true;
             problems.add("The theme catalog is unreadable or incompatible. It has been preserved; restore or repair /data/themes/catalog.json before changing themes.");
             return;
@@ -168,14 +172,14 @@ public final class ThemeCatalog {
                 ThemePackage theme = readRevision(id, revision.current());
                 installed.put(id, theme);
                 publicAssets.putAll(theme.presentation());
-            } catch (RuntimeException | IOException e) { problems.add("Imported theme '" + id + "' is damaged or incompatible and has been excluded."); }
+            } catch (RuntimeException | IOException _) { problems.add("Imported theme '" + id + "' is damaged or incompatible and has been excluded."); }
             if (revision.previous() != null) {
                 try {
                     ThemePackage previous = readRevision(id, revision.previous());
                     retained.put(id, previous);
                     publicAssets.putAll(previous.presentation());
                 }
-                catch (RuntimeException | IOException e) { problems.add("A retained revision of theme '" + id + "' is unavailable."); }
+                catch (RuntimeException | IOException _) { problems.add("A retained revision of theme '" + id + "' is unavailable."); }
             }
         });
     }
@@ -197,7 +201,7 @@ public final class ThemeCatalog {
                 files.put(name, Files.readAllBytes(path));
             }
         }
-        if (!files.keySet().containsAll(Set.of("theme.json", "tokens.json", "LICENSE"))) throw ThemeException.invalid("Incomplete stored theme.");
+        if (!files.keySet().containsAll(Set.of("theme.json", TOKENS, "LICENSE"))) throw ThemeException.invalid("Incomplete stored theme.");
         ThemePackage theme = validate(files, false);
         if (!theme.manifest().id().equals(id) || !theme.sourceRevision().equals(revision)) throw ThemeException.invalid("Stored theme revision does not match the catalog.");
         return theme;
@@ -214,7 +218,7 @@ public final class ThemeCatalog {
         Path staging = Files.createTempDirectory(target.getParent(), ".staging-");
         try {
             for (var file : theme.files().entrySet()) AtomicFiles.write(staging.resolve("source").resolve(file.getKey()), file.getValue(), false);
-            AtomicFiles.write(staging.resolve("theme.css"), theme.presentation().get(theme.prefix() + "theme.css").bytes(), false);
+            AtomicFiles.write(staging.resolve(STYLESHEET), theme.presentation().get(theme.prefix() + STYLESHEET).bytes(), false);
             Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
             return true;
         } finally { deleteTree(staging); }
@@ -239,7 +243,12 @@ public final class ThemeCatalog {
     private static void protect(String id) {
         if (ThemeArchive.reserved(id)) throw new ThemeException(409, "Built-in themes cannot be removed or replaced.");
     }
-    private Path revisionPath(String id, String revision) { return directory.resolve("packages").resolve(id).resolve(revision); }
+    private Path revisionPath(String id, String revision) {
+        if (!ThemeArchive.validId(id) || ThemeArchive.reserved(id) || !revision.matches(REVISION_PATTERN)) {
+            throw ThemeException.invalid("Invalid imported theme storage path.");
+        }
+        return directory.resolve("packages").resolve(id).resolve(revision);
+    }
     private void noLinks(Path path) throws IOException {
         Path part = directory;
         if (Files.isSymbolicLink(part)) throw new IOException("Theme storage is a symbolic link.");
@@ -251,17 +260,23 @@ public final class ThemeCatalog {
     private void revoke(String id) { publicAssets.keySet().removeIf(path -> path.startsWith("/themes/packages/" + id + "/")); }
     private void reclaim(String id, String revision) {
         try { deleteTree(revisionPath(id, revision)); }
-        catch (IOException e) { problems.add("An unused revision of theme '" + id + "' could not be reclaimed."); }
+        catch (IOException _) { problems.add("An unused revision of theme '" + id + "' could not be reclaimed."); }
     }
-    private static void deleteTree(Path root) throws IOException {
-        if (!Files.exists(root, LinkOption.NOFOLLOW_LINKS)) return;
-        try (var paths = Files.walk(root)) {
+    private void deleteTree(Path root) throws IOException {
+        Path packages = directory.resolve("packages");
+        Path normalized = root.toAbsolutePath().normalize();
+        if (!normalized.startsWith(packages) || normalized.equals(packages)) {
+            throw new IOException("Theme cleanup must stay inside package storage.");
+        }
+        noLinks(normalized);
+        if (!Files.exists(normalized, LinkOption.NOFOLLOW_LINKS)) return;
+        try (var paths = Files.walk(normalized)) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
         }
     }
 
     private static Map<String, Revision> readRegistry(JsonNode document) {
-        JsonNode themes = document.path("themes");
+        JsonNode themes = document.path(THEMES);
         if (!themes.isObject()) throw new IllegalArgumentException("Theme catalog needs a themes object.");
         Map<String, Revision> entries = new LinkedHashMap<>();
         themes.properties().forEach(field -> {
@@ -270,7 +285,7 @@ public final class ThemeCatalog {
             String current = field.getValue().path("current").asString("");
             JsonNode previousNode = field.getValue().path("previous");
             String previous = previousNode.isString() ? previousNode.asString() : null;
-            if (!current.matches("[a-f0-9]{64}") || (previous != null && !previous.matches("[a-f0-9]{64}"))) throw new IllegalArgumentException("Invalid imported theme revision.");
+            if (!current.matches(REVISION_PATTERN) || (previous != null && !previous.matches(REVISION_PATTERN))) throw new IllegalArgumentException("Invalid imported theme revision.");
             entries.put(id, new Revision(current, previous));
         });
         if (entries.size() > MAX_IMPORTS) throw new IllegalArgumentException("Too many imported themes.");
@@ -278,7 +293,7 @@ public final class ThemeCatalog {
     }
     private static ObjectNode writeRegistry(Map<String, Revision> entries) {
         ObjectNode document = Json.MAPPER.createObjectNode();
-        ObjectNode themes = document.putObject("themes");
+        ObjectNode themes = document.putObject(THEMES);
         new java.util.TreeMap<>(entries).forEach((id, revision) -> {
             ObjectNode item = themes.putObject(id).put("current", revision.current());
             if (revision.previous() != null) item.put("previous", revision.previous());

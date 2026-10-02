@@ -162,5 +162,22 @@ public class ThemeController {
         reviews.values().removeIf(pending -> !pending.expires().isAfter(now));
     }
 
-    private record Pending(String token, byte[] bytes, String previousRevision, Instant expires) { }
+    private static final class Pending {
+        private final String token;
+        private final byte[] bytes;
+        private final String previousRevision;
+        private final Instant expires;
+
+        private Pending(String token, byte[] bytes, String previousRevision, Instant expires) {
+            this.token = token;
+            this.bytes = bytes;
+            this.previousRevision = previousRevision;
+            this.expires = expires;
+        }
+
+        private String token() { return token; }
+        private byte[] bytes() { return bytes; }
+        private String previousRevision() { return previousRevision; }
+        private Instant expires() { return expires; }
+    }
 }

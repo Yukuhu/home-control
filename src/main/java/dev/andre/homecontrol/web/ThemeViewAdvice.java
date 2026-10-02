@@ -21,10 +21,10 @@ public class ThemeViewAdvice {
     public void appearance(HttpServletRequest request, Model model) {
         model.addAttribute("availableThemes", themes.themes());
         model.addAttribute("themeDefault", themes.require("default"));
-        model.addAttribute("themeRecovery", recovery(request));
+        model.addAttribute("themeRecovery", isRecovery(request));
     }
 
-    static boolean recovery(HttpServletRequest request) {
+    static boolean isRecovery(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         return RECOVERY.equals(path)
                 || ("/login".equals(path) && RECOVERY.equals(LoginController.safeNext(request.getParameter("next"))));
