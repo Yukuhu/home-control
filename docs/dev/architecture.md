@@ -24,6 +24,12 @@ root.
 | `crypto` | Argon2id hashing for the login password and the secret key. |
 | `themes` | Validated theme ZIPs, typed design tokens, scoped CSS compilation and the atomic theme catalog. Default and Cyberpunk are bundled packages with protected IDs. Public descriptors contain only presentation metadata and immutable asset URLs; the configuration root supplies their exact path allowlist to security. See [Theme authoring](themes.md) and [ADR 0007](../adr/0007-theme-packages.md). |
 
+The pages' own code is plain ES modules under `static/js`, one per job: `app.js` starts the dashboard and hands the
+remote drawer to `remote-drawer.js`, the touchpad to `touchpad.js`, and so on. The one third-party script,
+`static/vendor/htmx.min.js`, is htmx 2.0.10, byte for byte as published at
+`https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js`; `VendoredHtmxTest` pins its SHA-256. To upgrade it,
+replace the file with the new release's `dist/htmx.min.js` and update the version and checksum in that test and here.
+
 ## Modules
 
 The build has three Gradle projects. Each compiles against only what its build file declares, so the compiler refuses
