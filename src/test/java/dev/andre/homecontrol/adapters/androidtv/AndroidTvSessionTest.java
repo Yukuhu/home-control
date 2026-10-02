@@ -1,10 +1,12 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
+import dev.andre.homecontrol.adapters.androidtv.protocol.remote.RemoteDirection;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.LaunchedMedia;
 import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
@@ -24,6 +26,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -211,6 +214,19 @@ class AndroidTvSessionTest {
         session.sendKey(RemoteKey.DPAD_UP);
 
         assertThat(fakeDevice.nextKeyPress()).isEqualTo(19);
+    }
+
+    @Test
+    void aLongPressReachesTheTvAsItsStartAndEnd() {
+        session.start();
+        await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
+
+        session.sendKey(RemoteKey.DPAD_CENTER, KeyPress.START_LONG);
+        session.sendKey(RemoteKey.DPAD_CENTER, KeyPress.END_LONG);
+
+        await().atMost(Duration.ofSeconds(5)).until(() -> fakeDevice.receivedKeyPresses().size() == 2);
+        assertThat(fakeDevice.receivedKeyPresses()).containsExactly(
+                Map.entry(23, RemoteDirection.START_LONG), Map.entry(23, RemoteDirection.END_LONG));
     }
 
     @Test
