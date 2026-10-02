@@ -181,6 +181,31 @@ class AndroidTvSessionTest {
         assertThat(session.state().nowPlaying()).isNotNull();
     }
 
+    /**
+     * The expiry has a timer of its own: a reconnect in between neither cancels it nor is cancelled by it. The app
+     * grace is short as well, because the timer armed at the launch (app not yet in front) is the one that comes back
+     * and moves on to the clip's end.
+     */
+    @Test
+    void launchedMediaExpiresWhileTheSessionReconnects() throws Exception {
+        AndroidTvTimings quick = new AndroidTvTimings(Duration.ofSeconds(10), Duration.ofMillis(300),
+                Duration.ofMillis(300), Duration.ofMillis(500), Duration.ZERO);
+        try (AndroidTvSession expiring = sessionWith(quick)) {
+            expiring.start();
+            await().until(() -> expiring.state().status() == DeviceStatus.CONNECTED);
+            expiring.execute(new Action.OpenAppLink(URI.create("vlc://http://nas.lan/stream"),
+                    new LaunchedMedia("org.videolan.vlc", "Short Clip", 1.0)));
+            fakeDevice.pushCurrentApp("org.videolan.vlc");
+            await().until(() -> expiring.state().nowPlaying() != null);
+
+            fakeDevice.hangUp();
+
+            await().atMost(Duration.ofSeconds(5)).until(() -> fakeDevice.connections() == 2
+                    && expiring.state().status() == DeviceStatus.CONNECTED);
+            await().atMost(Duration.ofSeconds(5)).until(() -> expiring.state().nowPlaying() == null);
+        }
+    }
+
     @Test
     void anAppLinkWithoutMediaShowsNothingPlaying() throws Exception {
         session.start();

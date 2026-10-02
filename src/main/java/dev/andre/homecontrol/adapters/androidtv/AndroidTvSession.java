@@ -68,7 +68,7 @@ public class AndroidTvSession implements DeviceHandle {
     /** Loop thread only. */
     private int consecutiveUnpaired;
     /** Loop thread only. Outlives a reconnect: the device keeps playing. */
-    private final InferredPlayback playback = new InferredPlayback();
+    private final InferredPlayback playback;
 
     public AndroidTvSession(Device device, ClientCertificate credential,
                          AndroidTvProperties properties, Consumer<DeviceState> onChange) {
@@ -92,6 +92,7 @@ public class AndroidTvSession implements DeviceHandle {
         this.publisher = new StatePublisher(device.id(), DeviceState.initial(), onChange);
         this.loop = new SessionLoop("shield-session-" + device.id());
         this.playbackExpiry = loop.timer();
+        this.playback = new InferredPlayback(timings.playbackAppGrace(), timings.playbackExpiryMargin());
         this.reconnector = new Reconnector(loop, new Backoff(timings.reconnectInitialDelay(),
                 timings.reconnectMaxDelay()), this::connect);
         this.connection = new ConnectionSlot<>("shield-session-" + device.id());
