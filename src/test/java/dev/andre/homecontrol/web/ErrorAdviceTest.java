@@ -7,6 +7,7 @@ import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.security.LoginRequiredException;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -23,6 +24,7 @@ import java.util.stream.Stream;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Every core exception becomes one status and a plain-text body a toast can show as it is. */
@@ -66,5 +68,16 @@ class ErrorAdviceTest {
                 .andExpect(status().is(status))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
                 .andExpect(content().string(body));
+    }
+
+    /** As the login gate does: htmx follows the header to the login page instead of showing the 401 in place. */
+    @Test
+    void aLoginRequiredInsideAnHtmxRequestSendsItToTheLoginPage() throws Exception {
+        mockMvc.perform(get("/throw/login").header("HX-Request", "true"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("HX-Redirect", "/login"));
+        mockMvc.perform(get("/throw/login"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().doesNotExist("HX-Redirect"));
     }
 }
