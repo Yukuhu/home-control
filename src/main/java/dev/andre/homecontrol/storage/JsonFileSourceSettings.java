@@ -2,6 +2,8 @@ package dev.andre.homecontrol.storage;
 
 import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.core.content.SourcePreferences;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -26,6 +28,8 @@ import java.util.function.Function;
  * untouched. Secrets never live here; they go in {@link SecretStore}.
  */
 public class JsonFileSourceSettings {
+
+    private static final Logger log = LoggerFactory.getLogger(JsonFileSourceSettings.class);
 
     private static final int VERSION = 2;
     private static final String SOURCES = "sources";
@@ -90,11 +94,24 @@ public class JsonFileSourceSettings {
         if (flat == null) {
             return Optional.empty();
         }
-        Optional<T> converted = fromVersionOne.apply(flat);
+        Optional<T> converted = convert(sourceId, flat, fromVersionOne);
         file.update(current -> converted
                 .map(value -> current.withSource(sourceId, MAPPER.valueToTree(value)))
                 .orElseGet(() -> current.without(sourceId)));
         return converted;
+    }
+
+    private static <T> Optional<T> convert(String sourceId, Map<String, String> flat,
+                                           Function<Map<String, String>, Optional<T>> fromVersionOne) {
+        try {
+            return fromVersionOne.apply(flat);
+        } catch (RuntimeException e) {
+            // A damaged value (a link, an id) makes the source's own parsing throw; its message would repeat the value,
+            // which may be private, so only the section and the kind of failure are named.
+            log.warn("The {} section of the source settings could not be read ({}); it reads as not connected",
+                    sourceId, e.getClass().getSimpleName());
+            return Optional.empty();
+        }
     }
 
     public synchronized void put(String sourceId, Object settings) {
