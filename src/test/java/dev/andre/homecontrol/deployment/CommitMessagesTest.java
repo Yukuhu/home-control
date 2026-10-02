@@ -25,6 +25,7 @@ class CommitMessagesTest {
                 build(deps): bump org.bouncycastle:bcprov-jdk18on from 1.85 to 1.86
                 refactor!: core becomes a Gradle module of its own
                 revert: feat: a feature that broke the build
+                Revert "feat: GET /health answers ok without a login"
                 """);
 
         assertThat(result.exitCode()).as(result.output()).isZero();
