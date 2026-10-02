@@ -8,6 +8,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -61,6 +62,16 @@ class StaticAssetsTest extends FullAppTest {
                 .andExpect(content().string(containsString("beforeinstallprompt")))
                 .andExpect(content().string(containsString("location.protocol === \"https:\"")));
         mockMvc.perform(get("/offline.html")).andExpect(status().isOk());
+    }
+
+    @Test
+    void servesTheRemoteDrawerModuleThatTheDashboardStarts() throws Exception {
+        mockMvc.perform(get("/js/remote-drawer.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("export function initRemoteDrawer()")));
+        mockMvc.perform(get("/js/app.js")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("import { initRemoteDrawer } from \"./remote-drawer.js\";")))
+                .andExpect(content().string(containsString("initRemoteDrawer();")))
+                .andExpect(content().string(not(containsString("remote-drawer\")"))));
     }
 
     @Test
