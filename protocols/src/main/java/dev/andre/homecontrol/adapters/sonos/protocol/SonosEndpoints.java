@@ -1,9 +1,11 @@
 package dev.andre.homecontrol.adapters.sonos.protocol;
 
+import dev.andre.homecontrol.adapters.net.DeviceUris;
 import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
 import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceFetch;
 
 import java.net.InetAddress;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.UnknownHostException;
 
@@ -60,7 +62,12 @@ public final class SonosEndpoints {
         }
     }
 
-    public static ServiceEndpoint endpoint(String host, int port, String path, String serviceType) {
-        return new ServiceEndpoint(serviceType, URI.create("http://" + host + ":" + port + path), null);
+    /**
+     * The service at {@code path} on the speaker at {@code host}, an address as stored (an IPv6 address without
+     * brackets). A host no URL can carry, or one that would change the URL, is refused as {@link DeviceUris} does.
+     */
+    public static ServiceEndpoint endpoint(String host, int port, String path, String serviceType)
+            throws MalformedURLException {
+        return new ServiceEndpoint(serviceType, DeviceUris.of("http", host, port, path), null);
     }
 }
