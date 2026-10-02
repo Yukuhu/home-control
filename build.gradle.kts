@@ -159,7 +159,6 @@ tasks.named<Test>("test") {
         ".github/workflows/dependency-checksums.yml",
         ".github/actions/smoke-image/action.yml",
         "Dockerfile",
-        "Dockerfile.dist",
         "compose.yaml",
         "compose.bluetooth.yaml",
         "casaos/docker-compose.yml",

@@ -343,14 +343,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # The images CI tests and publishes are built from Dockerfile.dist. What they run is only
-      # what a build from source runs if the two files agree on everything after the build.
-      - name: Check that both Dockerfiles describe the same runtime
-        run: scripts/compare-dockerfiles.sh
-
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
-      # Proves `docker compose up --build` works from a clean checkout. amd64 only: this job
+      # Proves `docker compose up --build` works from a clean checkout: the same Dockerfile the
+      # published images come from, with its build stage instead of CI's jar. amd64 only: this job
       # is a correctness check, not a release artifact. Without a cache, which could hold
       # nothing of use: the build stage copies the whole checkout, so every commit rebuilds it.
       - name: Build Dockerfile

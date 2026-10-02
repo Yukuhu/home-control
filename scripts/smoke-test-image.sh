@@ -73,7 +73,8 @@ if $bluetooth; then
   echo "mpv: $(head -n 1 "$work/mpv")"
 fi
 
-run_args=(--detach --name "$name" --publish "127.0.0.1:$port:8080")
+# The image's HEALTHCHECK runs every 2 s here instead of every 30 s, so a healthy app is reported quickly.
+run_args=(--detach --name "$name" --publish "127.0.0.1:$port:8080" --health-interval 2s)
 if $bluetooth; then
   run_args+=(--env HOME_CONTROL_BLUETOOTH_ENABLED=true)
   # The host's system bus when it has one (a GitHub runner does), so the JVM's D-Bus client has a real bus to try.
@@ -93,6 +94,16 @@ until curl --silent --fail --location --output /dev/null "http://127.0.0.1:$port
 done
 docker logs "$name" > "$work/log" 2>&1
 grep -m 1 'Started HomeControlApplication' "$work/log" || true
+
+# Compose, CasaOS and `docker ps` read the container's health from the image's HEALTHCHECK.
+until [[ "$(docker container inspect --format '{{.State.Health.Status}}' "$name")" == healthy ]]; do
+  if ((SECONDS >= deadline)); then
+    docker container inspect --format '{{json .State.Health}}' "$name" >&2 || true
+    fail "the container answered on port $port but did not report itself healthy within ${timeout}s"
+  fi
+  sleep 2
+done
+echo "Health: healthy"
 
 curl --silent --show-error --fail --output "$work/setup.html" "http://127.0.0.1:$port/setup" \
   || fail "the setup page did not render"
