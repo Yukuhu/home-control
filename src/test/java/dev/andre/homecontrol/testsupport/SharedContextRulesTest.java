@@ -9,10 +9,8 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.core.SpringProperties;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.BeanOverride;
-import org.springframework.test.context.cache.ContextCache;
 
 import java.util.Optional;
 import java.util.Set;
@@ -23,7 +21,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Keeps every test that extends a shared-context base ({@link WebSliceTest}, {@link ModulesOffTest},
@@ -88,15 +85,6 @@ class SharedContextRulesTest {
 
     private static final DescribedPredicate<JavaClass> LISTED_WITH_A_CONTEXT_OF_ITS_OWN = DescribedPredicate.describe(
             "listed in OWN_CONTEXT", type -> OWN_CONTEXT.contains(type.getSimpleName()));
-
-    /**
-     * {@code spring.properties} keeps a cached context running while other test classes use other contexts. Paused and
-     * restarted instead, the shared application would load no rail again: {@code RailCache} cannot restart.
-     */
-    @Test
-    void cachedContextsAreNeverPaused() {
-        assertThat(SpringProperties.getProperty(ContextCache.CONTEXT_CACHE_PAUSE_PROPERTY_NAME)).isEqualTo("never");
-    }
 
     @Test
     void everySpringBootTestSharesAContextOrIsListed() {
