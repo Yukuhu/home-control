@@ -1,5 +1,6 @@
 package dev.andre.homecontrol;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -7,6 +8,10 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import dev.andre.homecontrol.adapters.net.DeviceUris;
 import dev.andre.homecontrol.core.Device;
+import dev.andre.homecontrol.security.LoginContext;
+import dev.andre.homecontrol.security.LoginGateFilter;
+import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -22,6 +27,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameMatching;
 import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -47,10 +53,8 @@ class ArchitectureTest {
     static void coreLivesInItsModuleAlone(JavaClasses classes) {
         assertThat(classes.that(resideInAPackage("dev.andre.homecontrol.core..")))
                 .isNotEmpty()
-                .allSatisfy(javaClass -> assertThat(javaClass.getSource())
-                        .hasValueSatisfying(source -> assertThat(source.getUri().toString())
-                                .as(javaClass.getName())
-                                .contains("home-control-core")));
+                .allSatisfy(javaClass -> assertThat(jarName(javaClass)).as(javaClass.getName())
+                        .startsWith("home-control-core-").endsWith(".jar"));
     }
 
     // protocols is a module too: its classes reach this test as a jar, and its test fixtures, which hold fakes in
@@ -70,11 +74,18 @@ class ArchitectureTest {
         assertThat(classes.that(resideInAnyPackage("..protocol..", "dev.andre.homecontrol.adapters.net..",
                 "dev.andre.homecontrol.sources.sports.ics..")))
                 .isNotEmpty()
-                .allSatisfy(javaClass -> assertThat(javaClass.getSource())
-                        .hasValueSatisfying(source -> assertThat(source.getUri().toString())
-                                .as(javaClass.getName())
-                                .contains("home-control-protocols")
-                                .doesNotContain("test-fixtures")));
+                .allSatisfy(javaClass -> assertThat(jarName(javaClass)).as(javaClass.getName())
+                        .startsWith("home-control-protocols-").endsWith(".jar").doesNotContain("test-fixtures"));
+    }
+
+    /**
+     * The file name of the jar a class was read from, or its whole URI when it was not read from a jar: a directory
+     * whose path happens to hold a module's name must not pass for that module's jar.
+     */
+    private static String jarName(JavaClass javaClass) {
+        String uri = javaClass.getSource().orElseThrow().getUri().toString();
+        int end = uri.indexOf("!/");
+        return end < 0 ? uri : uri.substring(uri.lastIndexOf('/', end) + 1, end);
     }
 
     @ArchTest
@@ -119,16 +130,17 @@ class ArchitectureTest {
             .layer("Source").definedBy("dev.andre.homecontrol.sources.sports")
             .layer("Calendars").definedBy("dev.andre.homecontrol.sources.sports.calendar..")
             .layer("Competitions").definedBy("dev.andre.homecontrol.sources.sports.thesportsdb..")
-            .layer("Shared").definedBy("dev.andre.homecontrol.sources.sports.feed..",
-                    "dev.andre.homecontrol.sources.sports.settings..")
+            .layer("Feed").definedBy("dev.andre.homecontrol.sources.sports.feed..")
+            .layer("Settings").definedBy("dev.andre.homecontrol.sources.sports.settings..")
             .layer("Ics").definedBy("dev.andre.homecontrol.sources.sports.ics..")
             .whereLayer("Source").mayNotBeAccessedByAnyLayer()
             .whereLayer("Calendars").mayOnlyBeAccessedByLayers("Source")
             .whereLayer("Competitions").mayOnlyBeAccessedByLayers("Source")
-            .whereLayer("Shared").mayOnlyBeAccessedByLayers("Source", "Calendars", "Competitions")
+            .whereLayer("Feed").mayOnlyBeAccessedByLayers("Source", "Calendars", "Competitions")
+            .whereLayer("Settings").mayOnlyBeAccessedByLayers("Source", "Calendars", "Competitions")
             .whereLayer("Ics").mayOnlyBeAccessedByLayers("Calendars")
-            .because("the feeds build on the shared sports types and the source builds on the feeds; an edge back "
-                    + "up would tie them into a cycle again");
+            .because("the feeds build on the shared sports types and settings, which know nothing of each other, and "
+                    + "the source builds on the feeds; an edge back up would tie them into a cycle again");
 
     @ArchTest
     static final ArchRule icsIsALibrary = classes()
@@ -140,9 +152,19 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule onlyTheConfigurationBuildsAJsonMapper = noClasses()
             .that().resideOutsideOfPackages("dev.andre.homecontrol.config..", "dev.andre.homecontrol.adapters..")
-            .should().callMethodWhere(target(name("builder")).and(target(owner(assignableTo(JsonMapper.class)))))
+            .should().callMethodWhere(target(nameMatching("builder|shared"))
+                    .and(target(owner(assignableTo(JsonMapper.class)))))
+            .orShould().callConstructorWhere(target(owner(assignableTo(JsonMapper.class))))
             .because("one mapper, hardened against hostile JSON, reads every data file and every source's answer; "
                     + "device protocols keep their own");
+
+    @ArchTest
+    static final ArchRule configurationDependsOnNoAppPackage = noClasses()
+            .that().resideInAPackage("dev.andre.homecontrol.config..")
+            .should().dependOnClassesThat(resideInAPackage("dev.andre.homecontrol..")
+                    .and(not(resideInAPackage("dev.andre.homecontrol.config.."))))
+            .because("every module reads its switch, its setup section and the mapper from config, so config "
+                    + "depending on a module would tie the two together");
 
     @ArchTest
     static final ArchRule onlyTheConfigurationReachesIntoDevice = noClasses()
@@ -173,6 +195,13 @@ class ArchitectureTest {
             .because("sources see devices only through the domain model in core");
 
     @ArchTest
+    static final ArchRule sourcesDoNotDependOnWeb = noClasses()
+            .that().resideInAPackage("dev.andre.homecontrol.sources..")
+            .should().dependOnClassesThat().resideInAPackage("dev.andre.homecontrol.web..")
+            .because("a source brings its own setup section and controllers; the web layer builds pages from them, "
+                    + "not the other way round");
+
+    @ArchTest
     static final ArchRule adaptersDoNotDependOnSourcesOrWeb = noClasses()
             .that().resideInAPackage("dev.andre.homecontrol.adapters..")
             .should().dependOnClassesThat().resideInAnyPackage("dev.andre.homecontrol.sources..",
@@ -186,6 +215,29 @@ class ArchitectureTest {
             .because("the web layer sees the domain model only");
 
     @ArchTest
+    static final ArchRule onlyTheLoginServiceStartsAndEndsSessions = noClasses()
+            .that().doNotBelongToAnyOf(LoginService.class)
+            .should().callMethodWhere(target(nameMatching("startSession|endSession"))
+                    .and(target(owner(assignableTo(LoginContext.class)))))
+            .because("a session starts only after LoginService has checked the password, and ends with its listeners "
+                    + "told");
+
+    @ArchTest
+    static final ArchRule onlyTheResolverBindsALoginToARequest = noClasses()
+            .that().doNotHaveFullyQualifiedName("dev.andre.homecontrol.security.LoginContextResolver")
+            .should().callConstructorWhere(target(owner(assignableTo(RequestLoginContext.class))))
+            .because("a controller receives the login of its own request as an argument, and a login context lives "
+                    + "only as long as that request");
+
+    @ArchTest
+    static final ArchRule onlyTheGateAndTheContextAskWhetherABrowserIsLoggedIn = noClasses()
+            .that().doNotBelongToAnyOf(LoginService.class, RequestLoginContext.class, LoginGateFilter.class)
+            .should().callMethodWhere(target(name("isAuthenticated"))
+                    .and(target(owner(assignableTo(LoginService.class)))))
+            .because("everything past the gate asks its LoginContext, whose whileLoggedIn() also covers work that "
+                    + "outlives the request");
+
+    @ArchTest
     static final ArchRule servletTypesStayAtTheWebEdge = noClasses()
             .that().resideOutsideOfPackages("dev.andre.homecontrol.web..", "dev.andre.homecontrol.security..")
             .and().areNotMetaAnnotatedWith(Controller.class)
@@ -196,7 +248,7 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule sessionsRunOnTheirSessionLoop = noClasses()
             .that().resideInAPackage("dev.andre.homecontrol.adapters..")
-            .and().haveSimpleNameEndingWith("Session")
+            .and().haveNameMatching(".*Session(\\$.*)?")
             .should().dependOnClassesThat().belongToAnyOf(Executors.class, ThreadPoolExecutor.class,
                     ScheduledThreadPoolExecutor.class, ForkJoinPool.class)
             .because("a session's thread is its SessionLoop, which never throws once the session is closed");
