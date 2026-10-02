@@ -154,6 +154,19 @@ class TizenSessionTest {
     }
 
     @Test
+    void aKeyTheTvLacksIsNamedForPeople() throws Exception {
+        start(PAIRED);
+        connected();
+        var next = new Action.PressKey(RemoteKey.MEDIA_NEXT);
+        var heldNext = new Action.PressKey(RemoteKey.MEDIA_NEXT, KeyPress.START_LONG);
+
+        assertThatThrownBy(() -> session.execute(next))
+                .isInstanceOf(UnsupportedActionException.class).hasMessage("Samsung TV has no next track key");
+        assertThatThrownBy(() -> session.execute(heldNext))
+                .isInstanceOf(UnsupportedActionException.class).hasMessage("Samsung TV cannot hold next track");
+    }
+
+    @Test
     void keysAreRemoteControlClicks() throws Exception {
         start(PAIRED);
         connected();

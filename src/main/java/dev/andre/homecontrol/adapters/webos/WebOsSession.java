@@ -185,15 +185,20 @@ public class WebOsSession implements DeviceHandle, InputListing {
             case VOLUME_DOWN -> call(SsapUris.VOLUME_DOWN, SsapMessages.empty(), "lower the volume");
             case VOLUME_MUTE -> call(SsapUris.SET_MUTE, SsapMessages.empty().put("mute", !publisher.current().muted()),
                     "mute");
-            case PLAY_PAUSE -> button(playPause.playNext() ? "PLAY" : "PAUSE");
+            case PLAY_PAUSE -> {
+                boolean play = playPause.playNext();
+                button(play ? "PLAY" : "PAUSE", play ? "play" : "pause");
+            }
             default -> button(WebOsKeys.button(key).orElseThrow(() ->
-                    new UnsupportedActionException(device.name() + " has no " + key + " button")));
+                    new UnsupportedActionException(device.name() + " has no " + key.label() + " button")),
+                    "press " + key.label());
         }
     }
 
-    private void button(String name) {
+    /** Presses {@code name}; {@code what} says what that does, for "LG TV did not answer … to press home". */
+    private void button(String name, String what) {
         SsapConnection current = requireConnected();
-        DeviceCalls.run(device.name(), "press " + name, () -> current.button(name));
+        DeviceCalls.run(device.name(), what, () -> current.button(name));
     }
 
     /** A TV that is reachable but silent fails the command; the liveness check decides whether the connection is gone. */

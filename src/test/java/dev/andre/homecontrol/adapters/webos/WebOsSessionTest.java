@@ -417,6 +417,21 @@ class WebOsSessionTest {
     }
 
     @Test
+    void aButtonIsNamedForPeopleWhenTheTvDoesNotAnswerOrLacksIt() throws Exception {
+        started();
+        connected();
+        tv.ignoreRequests(SsapUris.POINTER_INPUT_SOCKET);
+        var home = new Action.PressKey(RemoteKey.HOME);
+        var next = new Action.PressKey(RemoteKey.MEDIA_NEXT);
+
+        assertThatThrownBy(() -> session.execute(home))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessage("LG TV did not answer in time when asked to press home");
+        assertThatThrownBy(() -> session.execute(next))
+                .isInstanceOf(UnsupportedActionException.class).hasMessage("LG TV has no next track button");
+    }
+
+    @Test
     void aTvThatStopsAnsweringFailsTheCommandButStaysConnected() throws Exception {
         started();
         connected();

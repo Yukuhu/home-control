@@ -131,7 +131,7 @@ public class TizenSession implements DeviceHandle {
                     device.name() + " does not list its inputs; use the Source button of the TV remote");
             case Action.SetVolume _ -> throw volumeKeysOnly();
             case Action.Mute _ -> throw volumeKeysOnly();
-            case Action.Stop _ -> sendKey("KEY_STOP");
+            case Action.Stop _ -> sendKey("KEY_STOP", "stop");
             case Action.CastLoad _ -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
             case Action.CastMessage _ -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
             case Action.PlayMedia _ -> throw new UnsupportedActionException(device.name() + " cannot play a direct stream");
@@ -150,24 +150,29 @@ public class TizenSession implements DeviceHandle {
         if (press != KeyPress.SHORT) {
             // Held keys (navigation only) map onto the remote channel's own Press and Release.
             String code = TizenKeys.code(key).orElseThrow(() ->
-                    new UnsupportedActionException(device.name() + " cannot hold " + key));
+                    new UnsupportedActionException(device.name() + " cannot hold " + key.label()));
             TizenRemoteConnection current = requireConnected();
             boolean starts = press == KeyPress.START_LONG;
-            DeviceCalls.run(device.name(), (starts ? "hold " : "release ") + key,
+            DeviceCalls.run(device.name(), (starts ? "hold " : "release ") + key.label(),
                     () -> current.key(code, starts ? "Press" : "Release"));
             return;
         }
         switch (key) {
             case POWER -> togglePower();
-            case PLAY_PAUSE -> sendKey(playPause.playNext() ? "KEY_PLAY" : "KEY_PAUSE");
+            case PLAY_PAUSE -> {
+                boolean play = playPause.playNext();
+                sendKey(play ? "KEY_PLAY" : "KEY_PAUSE", play ? "play" : "pause");
+            }
             default -> sendKey(TizenKeys.code(key).orElseThrow(() ->
-                    new UnsupportedActionException(device.name() + " has no " + key + " key")));
+                    new UnsupportedActionException(device.name() + " has no " + key.label() + " key")),
+                    "press " + key.label());
         }
     }
 
-    private void sendKey(String code) {
+    /** Sends {@code code}; {@code what} says what that does, for "Samsung TV did not answer … to press home". */
+    private void sendKey(String code, String what) {
         TizenRemoteConnection current = requireConnected();
-        DeviceCalls.run(device.name(), "press " + code, () -> current.key(code));
+        DeviceCalls.run(device.name(), what, () -> current.key(code));
     }
 
     private void openAppLink(URI uri) {
@@ -185,7 +190,7 @@ public class TizenSession implements DeviceHandle {
 
     private void togglePower() {
         if (connection.current().isPresent() && publisher.current().powerOn()) {
-            sendKey("KEY_POWER");
+            sendKey("KEY_POWER", "switch off");
             publisher.update(state -> state.withPower(false));
             return;
         }

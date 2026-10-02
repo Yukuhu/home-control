@@ -111,7 +111,7 @@ public class AndroidTvSession implements DeviceHandle {
 
     public void sendKey(RemoteKey key, KeyPress press) {
         RemoteConnection current = requireConnected();
-        DeviceCalls.run(device.name(), "press " + key,
+        DeviceCalls.run(device.name(), "press " + key.label(),
                 () -> current.sendKey(AndroidTvKeys.code(key), AndroidTvKeys.direction(press)));
     }
 
