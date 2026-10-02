@@ -22,6 +22,7 @@ plugins {
     alias(libs.plugins.sonarqube)
     alias(libs.plugins.test.retry)
     alias(libs.plugins.errorprone)
+    alias(libs.plugins.spotless)
 }
 
 // Read here, in the root project: inside allprojects {}, `libs` would be looked up on a module that has none yet.
@@ -113,6 +114,27 @@ subprojects {
 
 tasks.check {
     dependsOn(tasks.named("testCodeCoverageReport"))
+}
+
+// Tidiness, not formatting: no trailing whitespace and a final newline everywhere, and in Java no leading tabs and no
+// unused imports. Every file already is, so the check covers them all and needs no git history; spotlessApply fixes
+// what spotlessCheck finds. The vendored htmx, the recorded fixtures and generated files keep their bytes.
+spotless {
+    java {
+        target("src/*/java/**/*.java", "core/src/*/java/**/*.java", "protocols/src/*/java/**/*.java")
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+        leadingTabsToSpaces(4)
+    }
+    format("misc") {
+        target("**/*.kts", "**/*.md", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.properties", "**/*.sh",
+            "**/*.js", "**/*.mjs", "**/*.css", "**/*.html")
+        targetExclude("**/build/**", "**/.gradle/**", "**/node_modules/**", "**/fixtures/**",
+            "src/main/resources/static/vendor/**", ".superpowers/**", ".claude/**")
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }
 
 tasks.named("sonar") {
