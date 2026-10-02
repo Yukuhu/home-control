@@ -6,11 +6,11 @@ import dev.andre.homecontrol.core.playback.DelegatedRoute;
 public record WorkflowCastRoute(String workflowId, long revision, String entryKey) implements DelegatedRoute {
 
     /** The key {@link WorkflowCastRouteExecutor} is found by. */
-    public static final String KEY = "workflow-cast";
+    public static final String ROUTE_KEY = "workflow-cast";
 
     @Override public String source() { return "Workflows"; }
 
-    @Override public String key() { return KEY; }
+    @Override public String key() { return ROUTE_KEY; }
 
     @Override public String describe() { return "Cast with the Default Media Receiver"; }
 }

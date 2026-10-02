@@ -9,7 +9,7 @@ import dev.andre.homecontrol.core.playback.DelegatedRoute;
 public record YouTubeLoungeRoute(String videoId) implements DelegatedRoute {
 
     /** The key {@link YouTubeLoungeRouteExecutor} is found by. */
-    public static final String KEY = "youtube-lounge";
+    public static final String ROUTE_KEY = "youtube-lounge";
 
     @Override
     public String source() {
@@ -18,7 +18,7 @@ public record YouTubeLoungeRoute(String videoId) implements DelegatedRoute {
 
     @Override
     public String key() {
-        return KEY;
+        return ROUTE_KEY;
     }
 
     @Override

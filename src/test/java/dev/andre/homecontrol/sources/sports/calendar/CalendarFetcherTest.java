@@ -171,7 +171,7 @@ class CalendarFetcherTest {
     }
 
     @Test
-    void aCalendarOnThisMachineIsRefusedWithTheSettingThatAllowsIt() throws Exception {
+    void aCalendarOnThisMachineIsRefusedWithTheSettingThatAllowsIt() {
         try (CalendarFetcher local = new CalendarFetcher(properties, new OutboundAddressPolicy(false))) {
             var onThisMachine = server.url("/private/token-abc123/bl.ics");
 
