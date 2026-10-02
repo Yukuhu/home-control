@@ -137,8 +137,9 @@ class JellyfinSetupServiceTest {
     void aSecretPersistenceFailureRevokesTheNewPasswordToken() throws IOException {
         preventSecretPersistence();
         LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
+        var connectRequest = passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD);
 
-        assertThatThrownBy(() -> setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), request))
+        assertThatThrownBy(() -> setup.connect(connectRequest, request))
                 .isInstanceOf(StorageException.class).hasMessageContaining("Could not write")
                 .hasMessageNotContaining(FakeJellyfinServer.ACCESS_TOKEN).hasMessageNotContaining("user pw");
 
@@ -173,8 +174,9 @@ class JellyfinSetupServiceTest {
         preventSecretPersistence();
         fake.respondJson("POST", "/Sessions/Logout", 500, "{}");
         LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
+        var connectRequest = passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD);
 
-        assertThatThrownBy(() -> setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), request))
+        assertThatThrownBy(() -> setup.connect(connectRequest, request))
                 .isInstanceOf(StorageException.class).hasMessageContaining("Could not write");
 
         assertThat(fake.requests("POST", "/Sessions/Logout")).hasSize(1);
