@@ -903,6 +903,28 @@ jobs:
           push-to-registry: true
           create-storage-record: false
 
+  commits:
+    name: Check commit messages
+    # Releases and the changelog are made from commit messages, so every commit of a pull request
+    # follows Conventional Commits, a documentation-only one included: its commits reach the
+    # changelog all the same. A push to main is not checked: its commits were checked in their
+    # pull request.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # The whole history, so that both ends of the pull request are there.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check every commit of the pull request
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: git log --no-merges --format=%s "$BASE..$HEAD" | scripts/check-commits.sh
+
   ci-passed:
     name: CI passed
     # The one check that main requires. It passes only if every job it needs passed, or was
@@ -912,6 +934,7 @@ jobs:
     if: always()
     needs:
       - changes
+      - commits
       - checksums
       - jar
       - test

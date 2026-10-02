@@ -9,6 +9,7 @@ What runs on every push and pull request, and how releases are made.
 | Job | What it does |
 | --- | --- |
 | Find out what changed | Decides with `scripts/code-changed.sh` whether a pull request changes anything besides documentation; if it does not, the jobs that build and test are left out. A push to `main` runs them all. |
+| Check commit messages | On a pull request, checks with `scripts/check-commits.sh` that every commit message follows Conventional Commits, from which releases and the changelog are made. |
 | Verify dependency checksums | Resolves all dependency configurations before the builds and browser tests. For an unreviewed Dependabot update, uploads a checksum review patch and blocks the builds until reviewed metadata is committed. |
 | Build the jar | Builds the one jar of the run and works out its version; every image that is tested or published is built from it. |
 | Build and test | Runs `./gradlew build` with every module's tests and uploads their results and reports, with one coverage report for all modules. |
