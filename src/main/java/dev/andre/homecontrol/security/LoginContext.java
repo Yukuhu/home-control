@@ -4,7 +4,8 @@ import java.util.function.BooleanSupplier;
 
 /**
  * One browser's login, as controllers, services and stores see it. Controllers receive it as an argument; the
- * request-backed {@link RequestLoginContext} is the only code that touches the HTTP session for the login.
+ * request-backed {@link RequestLoginContext} is the only code that touches the HTTP session for the login. A context
+ * lives only as long as its request: work that outlives it, such as an event stream, keeps {@link #whileLoggedIn()}.
  */
 public interface LoginContext {
 

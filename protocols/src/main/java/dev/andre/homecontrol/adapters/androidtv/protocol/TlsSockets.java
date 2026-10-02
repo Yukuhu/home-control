@@ -148,8 +148,8 @@ public final class TlsSockets {
     }
 
     static KeyManager[] keyManagers(ClientCertificate credential) throws GeneralSecurityException {
-        // This password only protects a transient key entry. Persistent credentials retain
-        // the configured CertificateStore password, so existing pairings are unaffected.
+        // This password only protects a transient key entry. Persistent credentials keep the
+        // CertificateStore's password, so existing pairings are unaffected.
         char[] password = new char[32];
         for (int i = 0; i < password.length; i++) {
             password[i] = (char) ('!' + KEY_PASSWORD_RANDOM.nextInt(94));
