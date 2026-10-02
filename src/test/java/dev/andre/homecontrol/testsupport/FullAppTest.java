@@ -18,11 +18,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * The one full-application context the end-to-end tests share: every module on, a real port, MockMvc, a data
- * directory made for this context, and the web APIs pointed at {@link SharedFakes}. {@link FullAppReset} brings it
- * back to a fresh install after every test class. A test class extends it and adds nothing to the context
- * ({@code SharedContextRulesTest}); a test that needs different beans or properties keeps a context of its own and is
- * listed there.
+ * The one full-application context the end-to-end tests share: every module that is on by default, a real port,
+ * MockMvc, a data directory made for this context, and the web APIs pointed at {@link SharedFakes}.
+ * {@link FullAppReset} brings it back to a fresh install after every test class. A test class extends it and adds
+ * nothing to the context ({@code SharedContextRulesTest}); a test that needs different beans or properties keeps a
+ * context of its own and is listed there.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
@@ -56,13 +56,15 @@ public abstract class FullAppTest {
         registry.add("home-control.youtube.thumbnail-base-url", () -> SharedFakes.google().base() + "/thumbs");
     }
 
-    /** Before the first test class that uses a newly started context: its data directory's files, as startup left them. */
+    /** Before the first test class that uses a newly started context: its data directory's files, as startup left
+     * them. */
     @BeforeAll
     static void noteTheFilesAtStartup(ApplicationContext context) throws IOException {
         if (context != started) {
             started = context;
             try (Stream<Path> files = Files.list(dataDir)) {
-                filesAtStartup = files.map(file -> file.getFileName().toString()).collect(Collectors.toUnmodifiableSet());
+                filesAtStartup = files.map(file -> file.getFileName().toString())
+                        .collect(Collectors.toUnmodifiableSet());
             }
         }
     }

@@ -40,8 +40,9 @@ import java.util.List;
  * schedules remember that they have run once; neither changes what a later class sees. Every module that is on by
  * default is on in {@link FullAppTest}, so a missing bean fails the reset instead of being skipped. The order matters:
  * the secrets go before YouTube disconnects (so no revoke request reaches the shared Google fake) and before the
- * workflows reload, and the fakes are reset last (so a fetch the reset itself triggers cannot leave a recorded request
- * behind).
+ * workflows reload, and the fakes are reset last, which clears what the reset's own calls recorded. A fetch that runs
+ * in the background, such as a rail refreshed after a content change, can still reach a fake after its reset, so a
+ * test that sets one off waits for it to end.
  */
 public final class FullAppReset implements AfterAllCallback {
 

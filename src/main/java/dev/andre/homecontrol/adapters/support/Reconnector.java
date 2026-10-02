@@ -12,7 +12,9 @@ import java.util.function.Supplier;
  * for the session to call {@link #connected()} or {@link #lost()}; {@code STOP}, like {@link #stop()}, ends the
  * attempts for good: a session that must start over, after a new pairing, is replaced by its owner. While connected,
  * while an attempt waits, or once stopped, {@link #reconnectNow()} and {@link #retryIn} do nothing. The session's
- * policies, such as when to stop, stay in its {@code connect()}.
+ * policies, such as when to stop, stay in its {@code connect()}. The session calls {@link #lost()},
+ * {@link #connected()} and {@link #stop()} on its loop: they change the phase and the backoff without a lock, so a
+ * call from another thread could race an attempt.
  */
 public final class Reconnector {
 

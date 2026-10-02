@@ -45,11 +45,11 @@ combination, such as sports on with TheSportsDB off, keeps a `@SpringBootTest` o
 
 ## Full-application tests
 
-A test of the whole application extends `testsupport.FullAppTest`: one context per test JVM with every module on, a
-real port and MockMvc. After every class, `FullAppReset` returns the application to a fresh install: no devices, no
-installed themes, no login or secrets, no sports settings, pins or workflows, an unused YouTube quota, no rate
-limit, no pending pairing, fresh rails and settings files, empty caches of TMDB, YouTube and TheSportsDB answers, and
-the shared web-API fakes (`SharedFakes`: TMDB, Google, TheSportsDB) reset.
+A test of the whole application extends `testsupport.FullAppTest`: one context per test JVM with every module that is on
+by default, a real port and MockMvc. After every class, `FullAppReset` returns the application to a fresh install: no
+devices, no installed themes, no login or secrets, no sports settings, pins or workflows, an unused YouTube quota, no
+rate limit, no pending pairing, fresh rails and settings files, empty caches of TMDB, YouTube and TheSportsDB answers,
+and the shared web-API fakes (`SharedFakes`: TMDB, Google, TheSportsDB) reset.
 
 - A test that sets up state it cannot leave for the next class relies on that reset; a test class that needs a fresh
   install after every test calls `FullAppReset.reset(context)` in `@AfterEach`, as `LoginGatingTest` does.
@@ -73,9 +73,10 @@ the shared web-API fakes (`SharedFakes`: TMDB, Google, TheSportsDB) reset.
 - One class of the app: `scripts/gradle.sh test --tests 'dev.andre.homecontrol.web.ErrorAdviceTest'`. One class of
   `core`: `scripts/gradle.sh :core:test --tests 'dev.andre.homecontrol.core.ActionTest'`. One class of `protocols`:
   `scripts/gradle.sh :protocols:test --tests 'dev.andre.homecontrol.adapters.net.DeviceUrisTest'`. `test --tests`
-  runs its filter in every module: a module without a match passes, and the app's `test` fails when nothing matches,
-  so a filter that matches no test anywhere fails the build. A module's own test task (`:core:test --tests`,
-  `:protocols:test --tests`) fails when nothing in it matches.
+  runs its filter in every module: a module without a match passes, but the app's own `test` fails when nothing in the
+  app matches. So `test --tests` naming only a class of `core` or `protocols` runs it there and still fails the build
+  at the app's `test`; run such a class with its module's task, as above. A module's own test task
+  (`:core:test --tests`, `:protocols:test --tests`) fails when nothing in it matches.
 - A failure's details: `grep -A20 '<failure' build/test-results/test/*.xml core/build/test-results/test/*.xml
   protocols/build/test-results/test/*.xml`.
 - The unit tests run in up to four JVMs at once, and Gradle reuses the results of tasks whose inputs did not change,
@@ -117,11 +118,12 @@ Dependabot does not update Gradle verification metadata
 ([upstream request](https://github.com/dependabot/dependabot-core/issues/1996)). A dependency update therefore
 needs a maintainer to review and commit its new checksums before strict CI can pass.
 
-CI's `Verify dependency checksums` job resolves all dependency configurations, and the formatter Spotless fetches
-when `spotlessJava` runs, before the jar, unit tests, source image and browser jobs start. It checks out the same merge revision those builds test. For Dependabot, it downloads
-into a fresh cache and, if verification fails, generates candidate metadata and uploads a patch and the head
-SHA as an artifact. It then reports that checksum review is required; the dependent builds stay skipped and
-`CI passed` stays blocked. There is one CI workflow, and candidate preparation does not run the test suite.
+CI's `Verify dependency checksums` job resolves all dependency configurations, and the formatter Spotless fetches when
+`spotlessJava` runs, before the jar, unit tests, source image and browser jobs start. It checks out the same merge
+revision those builds test. For Dependabot, it downloads into a fresh cache and, if verification fails, generates
+candidate metadata and uploads a patch and the head SHA as an artifact. It then reports that checksum review is
+required; the dependent builds stay skipped and `CI passed` stays blocked. There is one CI workflow, and candidate
+preparation does not run the test suite.
 
 This job has a read-only token, saves no dependency cache, and does not commit or approve the checksums.
 Other Gradle failures remain failures and do not trigger checksum generation. When the committed metadata
