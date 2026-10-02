@@ -1,0 +1,28 @@
+# Editor settings for everyone, whatever the editor (https://editorconfig.org).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+[{*.{yml,yaml,json,toml,md,sh,proto},Dockerfile}]
+indent_size = 2
+
+[*.bat]
+end_of_line = crlf
+
+# Bytes that something depends on: the vendored htmx is pinned by its checksum, the fixtures are recordings, and
+# Gradle writes the checksum metadata itself.
+[{src/main/resources/static/vendor/**,**/fixtures/**,gradle/verification-metadata.xml}]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset
+max_line_length = unset
