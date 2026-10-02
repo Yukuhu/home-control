@@ -244,6 +244,23 @@ class PlaybackServiceTest {
     }
 
     @Test
+    void previewAndAttemptKeepTheResolversNotes() {
+        given(devices.device("shield")).willReturn(Optional.of(shield));
+        given(devices.capabilities("shield")).willReturn(EnumSet.of(Capability.APP_LINK));
+        PlaybackService service = new PlaybackService(devices, commands, Planners.production(),
+                List.of(resolverReturning(new PlayableResolver.Resolution(
+                        List.of(new PlayableRef.StreamUrl(URI.create("http://nas/x.mp4?ApiKey=k"), "video/mp4")),
+                        Set.of(), List.of("no Jellyfin app is open on Shield")))),
+                List.of());
+        String reason = "no Jellyfin app is open on Shield; this device cannot play a direct stream";
+
+        assertThat(service.preview(JELLYFIN_ITEM, "shield").reason()).isEqualTo(reason);
+        assertThat(service.attempt(JELLYFIN_ITEM, "shield", Set.of()))
+                .isEqualTo(new PlayAttempt.Unroutable(shield, reason));
+        verify(commands, never()).execute(any(), any());
+    }
+
+    @Test
     void previewExplainsWhenNothingRoutes() {
         given(devices.device("shield")).willReturn(Optional.of(shield));
         given(devices.capabilities("shield")).willReturn(EnumSet.noneOf(Capability.class));
