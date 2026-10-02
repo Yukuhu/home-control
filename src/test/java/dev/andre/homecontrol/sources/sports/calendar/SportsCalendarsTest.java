@@ -1,8 +1,10 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
+import dev.andre.homecontrol.core.content.ContentChangedEvent;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
+import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
@@ -25,8 +27,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,6 +49,7 @@ class SportsCalendarsTest {
     private FakeCalendarServer server;
     private SecretStore secrets;
     private LoginService login;
+    private ApplicationEventPublisher events;
     private SportsSettingsService settingsService;
     private SportsProperties properties;
     private OutboundAddressPolicy policy;
@@ -77,7 +82,7 @@ class SportsCalendarsTest {
         random = incrementingRandom();
 
         JsonFileSportsStore store = new JsonFileSportsStore(dir.resolve("sports.json"));
-        ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+        events = mock(ApplicationEventPublisher.class);
         settingsService = new SportsSettingsService(store, events);
 
         properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
@@ -122,6 +127,24 @@ class SportsCalendarsTest {
         assertThat(entry.provider()).isNull();
 
         assertThat(server.count("/private/token-abc123/bl.ics")).isEqualTo(1);
+    }
+
+    @Test
+    void theRailRefreshThatAddingACalendarCausesFindsItCached() {
+        String url = server.url("/private/token-abc123/bl.ics").toString();
+        given(secrets.secret(any())).willReturn(Optional.of(url));
+        List<FeedResult> passes = new ArrayList<>();
+        // The sports rail refreshes when the settings change; here that pass runs inside the event.
+        doAnswer(invocation -> passes.add(schedule.events())).when(events).publishEvent(any(ContentChangedEvent.class));
+
+        calendars.add(new SportsCalendars.AddCalendar(url, "", "household password", "household password"), http);
+
+        assertThat(passes).singleElement().satisfies(pass -> {
+            assertThat(pass.succeeded()).isEqualTo(1);
+            assertThat(pass.errors()).isEmpty();
+        });
+        assertThat(server.count("/private/token-abc123/bl.ics")).as("only the download that checked the link")
+                .isEqualTo(1);
     }
 
     @Test

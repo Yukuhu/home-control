@@ -85,13 +85,15 @@ public class SportsCalendars {
                 request.loginPasswordConfirmation(), context);
         SportsSettings.CalendarEntry entry = new SportsSettings.CalendarEntry(
                 id, resolvedLabel(label, parsed, uri), uri.getHost(), null, clock.instant());
+        // Cached before the settings name it: saving them refreshes the sports rail, which should find the calendar
+        // instead of downloading it again. If saving fails, the next pass drops the unnamed entry.
+        schedule.prime(id, parsed);
         try {
             settingsService.update(s -> s.withCalendars(append(s.calendars(), entry)));
         } catch (RuntimeException e) {
             login.removeSecrets(List.of(secretName(id)));
             throw e;
         }
-        schedule.prime(id, parsed);
         return entry;
     }
 
