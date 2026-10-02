@@ -40,3 +40,14 @@ dependencies {
 protobuf {
     protoc { artifact = libs.protoc.get().toString() }
 }
+
+// SonarCloud analyses the shared fakes as test code, as it did before they moved here; left alone, the scanner reads
+// only the test source set. Their classes and classpath come along, so the rules that read bytecode see them too.
+sonar {
+    properties {
+        val testCode = listOf(sourceSets["test"], sourceSets["testFixtures"])
+        property("sonar.tests", testCode.flatMap { it.java.srcDirs }.filter { it.exists() })
+        property("sonar.java.test.binaries", testCode.flatMap { it.output.classesDirs })
+        property("sonar.java.test.libraries", testCode.flatMap { it.compileClasspath })
+    }
+}
