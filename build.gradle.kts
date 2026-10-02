@@ -21,6 +21,9 @@ plugins {
     alias(libs.plugins.test.retry)
 }
 
+// Read here, in the root project: inside allprojects {}, `libs` would be looked up on a module that has none yet.
+val jacocoVersion = libs.versions.jacoco.get()
+
 // One coverage report for the whole build: the app's tests exercise the modules' code too, so a report per module
 // would count only each module's own tests. SonarCloud reads it for every module.
 val combinedCoverageReport =
@@ -44,7 +47,7 @@ allprojects {
     repositories { mavenCentral() }
 
     configure<JacocoPluginExtension> {
-        toolVersion = "0.8.15"
+        toolVersion = jacocoVersion
     }
 
     tasks.withType<JacocoReport>().configureEach {
