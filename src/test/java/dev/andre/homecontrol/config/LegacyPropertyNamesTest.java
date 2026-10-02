@@ -3,6 +3,14 @@ package dev.andre.homecontrol.config;
 import org.apache.commons.logging.Log;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.source.ConfigurationProperty;
+import org.springframework.boot.context.properties.source.ConfigurationPropertyName;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.boot.env.OriginTrackedMapPropertySource;
+import org.springframework.boot.origin.Origin;
+import org.springframework.boot.origin.OriginTrackedValue;
+import org.springframework.boot.origin.TextResourceOrigin;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.MutablePropertySources;
 import org.springframework.core.env.StandardEnvironment;
@@ -10,6 +18,8 @@ import org.springframework.core.env.SystemEnvironmentPropertySource;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -55,6 +65,25 @@ class LegacyPropertyNamesTest {
         apply();
 
         assertThat(environment.getProperty("home-control.webos.connect-timeout")).isEqualTo("7s");
+    }
+
+    @Test
+    void aCopiedValueKeepsWhereTheOldKeyWasSet() {
+        Origin where = new TextResourceOrigin(new ClassPathResource("application.yaml"),
+                new TextResourceOrigin.Location(4, 2));
+        sources.addLast(new OriginTrackedMapPropertySource("jar",
+                Map.of("home-control.webos.connect-timeout-seconds", OriginTrackedValue.of("abc", where))));
+
+        apply();
+
+        ConfigurationPropertyName copied = ConfigurationPropertyName.of("home-control.webos.connect-timeout");
+        ConfigurationProperty property = StreamSupport
+                .stream(ConfigurationPropertySources.get(environment).spliterator(), false)
+                .map(source -> source.getConfigurationProperty(copied))
+                .filter(Objects::nonNull)
+                .findFirst().orElseThrow();
+        // The binder wraps it with the copy's property source; what it says is the old key's file and line.
+        assertThat(property.getOrigin()).hasToString(where.toString());
     }
 
     @Test
