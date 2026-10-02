@@ -18,10 +18,26 @@ import java.util.stream.Stream;
 /** One Playwright and one browser per kind for the whole JVM; a fresh context per test. */
 public final class Browsers {
 
+    private static final String SERVICE_WORKER_CSP_MESSAGE = "home-control-test:csp-violation";
     private static Playwright playwright;
     private static final Map<String, Browser> browsers = new HashMap<>();
 
     private Browsers() {
+    }
+
+    /**
+     * A service worker's Content-Security-Policy blocks happen where no page listens, and no browser reports them to
+     * Playwright; so a test origin that serves a worker script puts this in front of it, and the worker passes each
+     * block to its pages, whose session collects it.
+     */
+    public static String reportingCspViolations(String workerScript) {
+        return """
+                self.addEventListener("securitypolicyviolation", (e) => {
+                    const text = e.violatedDirective + " " + (e.blockedURI || "inline") + " in the service worker";
+                    self.clients.matchAll({ includeUncontrolled: true, type: "window" }).then((pages) =>
+                            pages.forEach((page) => page.postMessage({ type: "%s", text })));
+                });
+                """.formatted(SERVICE_WORKER_CSP_MESSAGE) + workerScript;
     }
 
     public static Stream<String> names() {
@@ -79,7 +95,10 @@ public final class Browsers {
             context.addInitScript("""
                     document.addEventListener("securitypolicyviolation", (e) => window.__cspViolation(
                             e.violatedDirective + " " + (e.blockedURI || "inline") + " at " + e.sourceFile + ":" + e.lineNumber));
-                    """);
+                    navigator.serviceWorker?.addEventListener("message", (e) => {
+                        if (e.data?.type === "%s") window.__cspViolation(e.data.text);
+                    });
+                    """.formatted(SERVICE_WORKER_CSP_MESSAGE));
             Page page = context.newPage();
             return new BrowserSession(context, page, trace, BrowserCoverage.start(page, browser, trace), cspViolations);
         } catch (RuntimeException e) {
