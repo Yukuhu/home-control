@@ -45,16 +45,18 @@ class FeedFetchesTest {
         return running;
     }
 
-    private static void awaitStillWaiting(Future<?> waiter) {
-        await().during(Duration.ofMillis(200)).atMost(Duration.ofSeconds(2)).until(() -> !waiter.isDone());
+    private Future<?> submitWaiting(String key, Runnable fetch) {
+        return FeedFetchWaiters.submitWaiting(pool, () -> {
+            fetches.run(key, fetch);
+            return null;
+        });
     }
 
     @Test
     void aSecondCallerWaitsForTheRunningFetchInsteadOfStartingOne() throws Exception {
         Future<?> first = startHeld("calendar");
         AtomicInteger secondRuns = new AtomicInteger();
-        Future<?> second = pool.submit(() -> fetches.run("calendar", secondRuns::incrementAndGet));
-        awaitStillWaiting(second);
+        Future<?> second = submitWaiting("calendar", secondRuns::incrementAndGet);
 
         release.countDown();
         first.get(5, TimeUnit.SECONDS);
@@ -84,20 +86,19 @@ class FeedFetchesTest {
 
     @Test
     void aFailingFetchReachesTheRunnerAndEveryWaiterAndFreesTheKey() {
+        // Not an IllegalStateException: FeedFetches wraps checked causes in one, so the same type could hide a wrap.
+        RuntimeException parserBug = new UnsupportedOperationException("parser bug");
         Future<?> first = pool.submit(() -> fetches.run("calendar", () -> {
             heldFetch();
-            throw new IllegalStateException("parser bug");
+            throw parserBug;
         }));
         await().until(() -> runs.get() == 1);
-        Future<?> second = pool.submit(() -> fetches.run("calendar", runs::incrementAndGet));
-        awaitStillWaiting(second);
+        Future<?> second = submitWaiting("calendar", runs::incrementAndGet);
 
         release.countDown();
 
-        assertThatThrownBy(() -> first.get(5, TimeUnit.SECONDS))
-                .hasCauseInstanceOf(IllegalStateException.class).hasRootCauseMessage("parser bug");
-        assertThatThrownBy(() -> second.get(5, TimeUnit.SECONDS))
-                .hasCauseInstanceOf(IllegalStateException.class).hasRootCauseMessage("parser bug");
+        assertThatThrownBy(() -> first.get(5, TimeUnit.SECONDS)).cause().isSameAs(parserBug);
+        assertThatThrownBy(() -> second.get(5, TimeUnit.SECONDS)).cause().isSameAs(parserBug);
         fetches.run("calendar", runs::incrementAndGet);
         assertThat(runs).hasValue(2);
     }
@@ -106,11 +107,10 @@ class FeedFetchesTest {
     void anInterruptedWaiterReturnsWhileTheFetchRunsAndKeepsItsFlag() throws Exception {
         startHeld("calendar");
         AtomicBoolean stillInterrupted = new AtomicBoolean();
-        Thread waiter = Thread.ofVirtual().start(() -> {
+        Thread waiter = FeedFetchWaiters.startWaiting(() -> {
             fetches.run("calendar", runs::incrementAndGet);
             stillInterrupted.set(Thread.currentThread().isInterrupted());
         });
-        await().during(Duration.ofMillis(200)).atMost(Duration.ofSeconds(2)).until(waiter::isAlive);
 
         waiter.interrupt();
 
