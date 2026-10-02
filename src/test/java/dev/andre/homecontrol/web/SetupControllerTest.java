@@ -170,6 +170,7 @@ class SetupControllerTest extends WebSliceTest {
                 .andExpect(content().string(containsString("Kitchen TV")))
                 .andExpect(content().string(containsString("removes the stored pairing credential")))
                 .andExpect(content().string(containsString("pair again")))
+                .andExpect(content().string(containsString("While Android TV is switched off")))
                 .andExpect(content().string(containsString("name=\"host\"")))
                 .andReturn().getResponse().getContentAsString();
 
