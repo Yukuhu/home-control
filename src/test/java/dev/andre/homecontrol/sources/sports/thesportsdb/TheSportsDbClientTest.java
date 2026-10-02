@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
@@ -189,6 +191,37 @@ class TheSportsDbClientTest {
             assertThat(e).hasNoCause();
         }
         assertThat(server.count("lookupleague.php")).isZero();
+    }
+
+    @Test
+    void neverLeaksTheKeyOnACompressedAnswer() {
+        server.respondGzipped("lookupleague.php", Map.of("id", "gzip"));
+
+        TheSportsDbException e = assertThrows(TheSportsDbException.class,
+                () -> client.lookupLeague(FakeTheSportsDbServer.PERSONAL_KEY, "gzip"));
+
+        assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
+        assertThat(e.getMessage()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
+        assertThat(e).hasNoCause();
+    }
+
+    @Test
+    void neverLeaksTheKeyForAHostGivenByName() throws IOException {
+        int closedPort;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            closedPort = socket.getLocalPort();
+        }
+        SportsProperties.TheSportsDb named = new SportsProperties.TheSportsDb(true,
+                URI.create("http://localhost:" + closedPort + "/api/v1/json"), "123", Duration.ofHours(24),
+                Duration.ofSeconds(1), Duration.ofSeconds(2), null, true);
+        try (TheSportsDbClient byName = new TheSportsDbClient(named)) {
+            TheSportsDbException e = assertThrows(TheSportsDbException.class,
+                    () -> byName.lookupLeague(FakeTheSportsDbServer.PERSONAL_KEY, "4331"));
+
+            assertThat(e.getMessage()).contains("localhost")
+                    .doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
+            assertThat(e).hasNoCause();
+        }
     }
 
     @Test

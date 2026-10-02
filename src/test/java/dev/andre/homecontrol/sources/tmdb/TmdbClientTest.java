@@ -11,6 +11,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.net.URI;
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -187,6 +188,28 @@ class TmdbClientTest {
 
         assertNoLeak(() -> client.get(apiKey, "/leak-big", Map.of()));
         assertNoLeak(() -> client.get(bearer, "/leak-big", Map.of()));
+    }
+
+    @Test
+    void noMessageLeaksTheKeyOnACompressedBody() {
+        fake.respondGzipped("/3/leak-gzip");
+
+        assertNoLeak(() -> client.get(apiKey, "/leak-gzip", Map.of()));
+        assertNoLeak(() -> client.get(bearer, "/leak-gzip", Map.of()));
+    }
+
+    @Test
+    void noMessageLeaksTheKeyForAHostGivenByName() throws IOException {
+        int closedPort;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            closedPort = socket.getLocalPort();
+        }
+        TmdbClient byName = new TmdbClient(new TmdbProperties(true, URI.create("http://localhost:" + closedPort + "/3"),
+                null, Duration.ofSeconds(1), Duration.ofSeconds(1), 20, 40, Duration.ofHours(24), Duration.ofHours(24),
+                null, true));
+
+        assertNoLeak(() -> byName.get(apiKey, "/authentication", Map.of()));
+        assertNoLeak(() -> byName.get(bearer, "/authentication", Map.of()));
     }
 
     @Test

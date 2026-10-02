@@ -206,6 +206,21 @@ class JellyfinClientTest {
     }
 
     @Test
+    void namesAServerGivenByNameWithoutLeakingTheToken() throws IOException {
+        URI dead;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            dead = URI.create("http://localhost:" + socket.getLocalPort());
+        }
+        JellyfinConnection connection = new JellyfinConnection(dead, "secret-token-xyz", "dev", "user");
+
+        assertThatThrownBy(() -> client.get(connection, "/x", Map.of()))
+                .isInstanceOf(JellyfinException.class)
+                .hasMessageStartingWith("Could not reach Jellyfin at localhost (")
+                .satisfies(e -> assertThat(e.getMessage()).doesNotContain("secret-token-xyz"))
+                .hasNoCause();
+    }
+
+    @Test
     void normalizesServerUrls() {
         assertThat(JellyfinClient.normalizeServerUrl("http://nas:8096/")).isEqualTo(URI.create("http://nas:8096"));
         assertThat(JellyfinClient.normalizeServerUrl("https://h.example/jellyfin/")).isEqualTo(URI.create("https://h.example/jellyfin"));
