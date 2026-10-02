@@ -29,7 +29,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 class LoginServiceTest {
 
@@ -195,6 +198,19 @@ class LoginServiceTest {
         assertThatThrownBy(() -> login.setPassword("another password", "another password", requestContext))
                 .isInstanceOf(PasswordRejectedException.class)
                 .hasMessage("A login password is already set; change it instead");
+    }
+
+    /** Argon2 is slow on purpose: a request that is refused anyway does not make it run. */
+    @Test
+    void aSecondPasswordIsRefusedBeforeItIsHashed() {
+        Argon2PasswordHasher hasher = mock(Argon2PasswordHasher.class);
+        LoginService scripted = withScriptedHasher(hasher);
+        clearInvocations(hasher);
+        LoginContext requestContext = context(scripted, new MockHttpServletRequest());
+
+        assertThatThrownBy(() -> scripted.setPassword("another password", "another password", requestContext))
+                .isInstanceOf(PasswordRejectedException.class);
+        verify(hasher, never()).hash(anyString());
     }
 
     @Test
