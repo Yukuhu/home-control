@@ -359,6 +359,19 @@ class TizenSessionTest {
     }
 
     @Test
+    void powerOnAClosedSessionWakesNothing() throws Exception {
+        start(PAIRED);
+        connected();
+        await().atMost(Duration.ofSeconds(5)).until(() -> stored("macAddress") != null);
+        session.close();
+
+        var power = new Action.PressKey(RemoteKey.POWER);
+        assertThatThrownBy(() -> session.execute(power))
+                .isInstanceOf(DeviceOfflineException.class).hasMessageContaining("not connected");
+        assertThat(receiver.received()).isZero();
+    }
+
+    @Test
     void powerWhileOffWakesTheTv() throws Exception {
         start(PAIRED);
         connected();
