@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.tizen;
 
 import dev.andre.homecontrol.adapters.net.InsecureTls;
+import dev.andre.homecontrol.adapters.support.DurationText;
 import dev.andre.homecontrol.adapters.support.PairingKeys;
 import dev.andre.homecontrol.adapters.tizen.protocol.TizenDeviceInfo;
 import dev.andre.homecontrol.adapters.tizen.protocol.TizenRemoteConnection;
@@ -50,7 +51,7 @@ public class TizenPairing implements PromptPairing {
     @Override
     public String instructions() {
         return "The TV asks whether to allow \"" + properties.clientName() + "\". Choose Allow with the TV remote within "
-                + properties.pairingTimeout().toSeconds() + " seconds.";
+                + DurationText.of(properties.pairingTimeout()) + ".";
     }
 
     @Override
@@ -69,7 +70,7 @@ public class TizenPairing implements PromptPairing {
                 }
                 case UNAUTHORIZED -> new PromptPairingResult.Declined("The TV declined the connection request");
                 case NO_ANSWER -> new PromptPairingResult.Failed("Nobody allowed the connection on the TV within "
-                        + properties.pairingTimeout().toSeconds() + " seconds; try again");
+                        + DurationText.of(properties.pairingTimeout()) + "; try again");
             };
         } catch (IOException e) {
             return new PromptPairingResult.Failed("Could not reach a Samsung TV at " + host + ": " + e.getMessage());

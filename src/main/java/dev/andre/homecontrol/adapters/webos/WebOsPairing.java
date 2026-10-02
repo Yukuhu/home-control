@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.webos;
 
 import dev.andre.homecontrol.adapters.net.InsecureTls;
+import dev.andre.homecontrol.adapters.support.DurationText;
 import dev.andre.homecontrol.adapters.support.PairingKeys;
 import dev.andre.homecontrol.adapters.webos.protocol.SsapConnection;
 import dev.andre.homecontrol.adapters.webos.protocol.SsapMessages;
@@ -57,7 +58,7 @@ public class WebOsPairing implements PromptPairing {
     @Override
     public String instructions() {
         return "The TV asks whether to allow Home Control. Accept with the TV remote within "
-                + properties.pairingTimeout().toSeconds() + " seconds.";
+                + DurationText.of(properties.pairingTimeout()) + ".";
     }
 
     @Override

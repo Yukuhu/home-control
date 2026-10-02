@@ -45,7 +45,8 @@ class CastPropertiesTest {
         assertThatThrownBy(() -> new CastProperties(true, heartbeatInterval, heartbeatInterval,
                 reconnectInitialDelay, reconnectMaxDelay, heartbeatInterval, loadTimeout, heartbeatInterval))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("must be greater than");
+                .hasMessage("home-control.cast.stale-timeout (5 seconds) must be greater than"
+                        + " home-control.cast.heartbeat-interval (5 seconds)");
     }
 
     @Test

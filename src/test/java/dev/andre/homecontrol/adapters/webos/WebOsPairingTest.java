@@ -136,6 +136,6 @@ class WebOsPairingTest {
 
         assertThat(pairing.adapterId()).isEqualTo("webos");
         assertThat(pairing.displayName()).isEqualTo("LG webOS TV");
-        assertThat(pairing.instructions()).contains("60 seconds");
+        assertThat(pairing.instructions()).contains("within 1 minute");
     }
 }

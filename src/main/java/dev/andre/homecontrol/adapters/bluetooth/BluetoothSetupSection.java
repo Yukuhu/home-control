@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.bluetooth;
 
+import dev.andre.homecontrol.adapters.support.DurationText;
 import dev.andre.homecontrol.config.ConditionalOnModule;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.config.SetupSection;
@@ -20,7 +21,7 @@ public class BluetoothSetupSection extends SetupSection {
     public record SpeakerRow(String id, String name, String address, String status, String audioDevice) {
     }
 
-    public record View(List<HostCheck> checks, boolean hostReady, BluetoothScan scan, int scanSeconds,
+    public record View(List<HostCheck> checks, boolean hostReady, BluetoothScan scan, String scanTime,
                        List<SpeakerRow> speakers, Set<String> registeredAddresses) {
     }
 
@@ -57,7 +58,7 @@ public class BluetoothSetupSection extends SetupSection {
                 })
                 .toList();
         return new View(results, results.stream().allMatch(HostCheck::ok), service.lastScan(),
-                Math.toIntExact(props.scanDuration().toSeconds()),
+                DurationText.of(props.scanDuration()),
                 speakers, speakers.stream().map(SpeakerRow::address).collect(Collectors.toSet()));
     }
 }

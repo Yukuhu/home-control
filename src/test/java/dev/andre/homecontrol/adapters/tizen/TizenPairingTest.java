@@ -119,7 +119,7 @@ class TizenPairingTest {
         tv.setAuthorization(FakeTizenServer.Authorization.IGNORE);
 
         assertThat(pairing(tv.port(), 1).pair("127.0.0.1", "TV")).isInstanceOfSatisfying(PromptPairingResult.Failed.class,
-                failed -> assertThat(failed.reason()).contains("within 1 seconds"));
+                failed -> assertThat(failed.reason()).contains("within 1 second;"));
         verify(enrollment, never()).attach(anyString(), anyString(), any(), anyString(), anyMap());
     }
 
