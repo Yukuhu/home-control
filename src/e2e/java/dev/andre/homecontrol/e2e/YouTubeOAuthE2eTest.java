@@ -4,8 +4,10 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Route;
 import com.microsoft.playwright.options.AriaRole;
+import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.youtube.FakeGoogleServer;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupService;
+import dev.andre.homecontrol.storage.SecretStore;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,9 +58,16 @@ class YouTubeOAuthE2eTest extends E2eApplicationTest {
     }
 
     @Autowired YouTubeSetupService youtube;
+    @Autowired LoginService login;
+    @Autowired SecretStore secrets;
 
+    /** The test sets a login password; left behind, it would meet the next browser's run with a login page. */
     @AfterEach
-    void disconnectYouTube() { youtube.disconnect(); }
+    void disconnectYouTubeAndRemoveTheLogin() {
+        youtube.disconnect();
+        login.removeSecrets(secrets.accountCredentialNames());
+        secrets.removeLogin();
+    }
 
     @AfterAll
     static void closeGoogle() { GOOGLE.close(); }
