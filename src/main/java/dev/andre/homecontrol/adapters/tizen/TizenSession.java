@@ -77,6 +77,7 @@ public class TizenSession implements DeviceHandle {
     private final Backoff handshakeBackoff;
 
     private volatile boolean stopped;
+    private volatile boolean closed;
     private boolean handshakeWaiting; // loop thread only
     private long connectNotBefore;    // loop thread only; System.nanoTime(), meaningful while handshakeWaiting
 
@@ -189,6 +190,10 @@ public class TizenSession implements DeviceHandle {
     }
 
     private void togglePower() {
+        // A handle closed by a removal, a re-pair or shutdown has no connection either, but must not wake the TV.
+        if (closed) {
+            throw DeviceCalls.notConnected(device.name());
+        }
         if (connection.current().isPresent() && publisher.current().powerOn()) {
             sendKey("KEY_POWER", "switch off");
             publisher.update(state -> state.withPower(false));
@@ -336,6 +341,7 @@ public class TizenSession implements DeviceHandle {
 
     @Override
     public void close() {
+        closed = true;
         publisher.close();
         loop.close();
         connection.close();

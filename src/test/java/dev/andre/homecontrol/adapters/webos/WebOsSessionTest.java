@@ -285,6 +285,19 @@ class WebOsSessionTest {
     }
 
     @Test
+    void powerOnAClosedSessionWakesNothing() throws Exception {
+        startedWithLivenessCheck();
+        connected();
+        await().atMost(Duration.ofSeconds(5)).until(() -> storedSetting("macAddress") != null);
+        session.close();
+
+        var power = new Action.PressKey(RemoteKey.POWER);
+        assertThatThrownBy(() -> session.execute(power))
+                .isInstanceOf(DeviceOfflineException.class).hasMessageContaining("not connected");
+        assertThat(receiver.received()).isZero();
+    }
+
+    @Test
     void powerWhileOffWithoutAMacExplainsTheFix() throws IOException {
         tv.refuseConnections(true);
         started();

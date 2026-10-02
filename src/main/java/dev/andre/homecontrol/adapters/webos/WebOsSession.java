@@ -79,6 +79,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
     // Immutable list replaced wholesale on the loop; request threads only read it.
     @SuppressWarnings("java:S3077")
     private volatile List<TvInput> inputs = List.of();
+    private volatile boolean closed;
 
     // Package-private, built only by WebOsAdapter: ten distinct collaborator types, nothing to group.
     @SuppressWarnings("java:S107")
@@ -208,6 +209,10 @@ public class WebOsSession implements DeviceHandle, InputListing {
     }
 
     private void togglePower() {
+        // A handle closed by a removal, a re-pair or shutdown has no connection either, but must not wake the TV.
+        if (closed) {
+            throw DeviceCalls.notConnected(device.name());
+        }
         Optional<SsapConnection> current = connection.current();
         if (current.isPresent() && publisher.current().powerOn()) {
             DeviceCalls.run(device.name(), "switch off", () -> current.get().fire(SsapUris.TURN_OFF, SsapMessages.empty()));
@@ -334,6 +339,7 @@ public class WebOsSession implements DeviceHandle, InputListing {
 
     @Override
     public void close() {
+        closed = true;
         publisher.close();
         loop.close();
         connection.close();
