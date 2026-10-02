@@ -33,7 +33,7 @@ class SportsUnconfiguredTest extends FullAppTest {
 
     @Test
     void theApplicationStartsWithoutWritingTheSportsSettings() {
-        // Startup writes nothing to the data directory, so the listing is empty: the file is the subject, not the list.
-        assertThat(DataDirectory.SPORTS).isNotIn(filesAtStartup());
+        // Startup writes nothing to the data directory, so the listing is empty: keep only sports.json and find nothing.
+        assertThat(filesAtStartup()).filteredOn(DataDirectory.SPORTS::equals).isEmpty();
     }
 }
