@@ -7,6 +7,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -131,6 +133,19 @@ class JsonFileSourceSettingsTest {
 
         assertThat(probe(new JsonFileSourceSettings(file), "jellyfin")).isEmpty();
         assertThat(probe(new JsonFileSourceSettings(file), "jellyfin")).isEmpty();
+    }
+
+    @Test
+    void aVersionOneSectionItsSourceCannotConvertReadsAsNotConnectedAndIsDropped() throws IOException {
+        Path file = dir.resolve("sources.json");
+        Files.writeString(file, "{\"version\":1,\"sources\":{\"jellyfin\":{\"serverUrl\":\"http://bad host/\"}}}");
+        JsonFileSourceSettings settings = new JsonFileSourceSettings(file);
+        // As a source's own conversion does when a value it parses is damaged: URI.create throws.
+        Function<Map<String, String>, Optional<Probe>> parsing =
+                flat -> Optional.of(new Probe(URI.create(flat.get("serverUrl")).toString(), Map.of()));
+
+        assertThat(settings.get("jellyfin", Probe.class, parsing)).isEmpty();
+        assertThat(Files.readString(file)).doesNotContain("bad host");
     }
 
     @Test
