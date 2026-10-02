@@ -1,11 +1,10 @@
-package dev.andre.homecontrol.adapters.upnp;
+package dev.andre.homecontrol.adapters.upnp.protocol;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import dev.andre.homecontrol.adapters.upnp.protocol.UpnpXml;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
-import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
+import dev.andre.homecontrol.discovery.ssdp.protocol.FakeSsdpResponder;
 import dev.andre.homecontrol.testsupport.Fixtures;
 import org.w3c.dom.Element;
 

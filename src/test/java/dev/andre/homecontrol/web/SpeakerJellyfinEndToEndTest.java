@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.web;
 
-import dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer;
+import dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer;
 import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceStatus;

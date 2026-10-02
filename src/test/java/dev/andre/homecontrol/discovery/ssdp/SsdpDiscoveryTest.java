@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.discovery.ssdp;
 
 import com.sun.net.httpserver.HttpServer;
+import dev.andre.homecontrol.discovery.ssdp.protocol.FakeSsdpResponder;
 import dev.andre.homecontrol.testsupport.Fixtures;
 import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;

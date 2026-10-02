@@ -29,7 +29,8 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** The package rules of docs/dev/architecture.md, checked on every build. Every rule is strict. */
-@AnalyzeClasses(packages = "dev.andre.homecontrol", importOptions = ImportOption.DoNotIncludeTests.class)
+@AnalyzeClasses(packages = "dev.andre.homecontrol",
+        importOptions = {ImportOption.DoNotIncludeTests.class, ImportOption.DoNotIncludeGradleTestFixtures.class})
 class ArchitectureTest {
 
     // core is a module of its own, and its classes reach this test as a jar on the classpath. Were they missing from

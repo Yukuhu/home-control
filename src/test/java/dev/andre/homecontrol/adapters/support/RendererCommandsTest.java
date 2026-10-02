@@ -8,7 +8,7 @@ import dev.andre.homecontrol.adapters.upnp.protocol.SoapRequest;
 import dev.andre.homecontrol.adapters.upnp.protocol.TransportInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.UpnpActions;
 import dev.andre.homecontrol.adapters.upnp.protocol.VolumeReading;
-import dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer;
+import dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.DeviceOfflineException;
@@ -21,10 +21,10 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 
-import static dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer.AUDIO_SINK;
-import static dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer.AV_TRANSPORT;
-import static dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer.CONNECTION_MANAGER;
-import static dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer.RENDERING_CONTROL;
+import static dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer.AUDIO_SINK;
+import static dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer.AV_TRANSPORT;
+import static dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer.CONNECTION_MANAGER;
+import static dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer.RENDERING_CONTROL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

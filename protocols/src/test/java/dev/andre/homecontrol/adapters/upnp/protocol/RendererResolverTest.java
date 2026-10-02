@@ -1,6 +1,5 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
-import dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer;
 import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

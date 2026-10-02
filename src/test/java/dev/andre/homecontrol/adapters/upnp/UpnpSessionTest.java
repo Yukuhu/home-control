@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.upnp;
 
+import dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;

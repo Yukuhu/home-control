@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * A request {@link FakeHttpServer} received. Header names are lower case; a header sent more than once is joined
+ * A request {@code FakeHttpServer} received. Header names are lower case; a header sent more than once is joined
  * with commas.
  */
 public record Request(String method, URI uri, Map<String, String> query, Map<String, String> headers, String body) {

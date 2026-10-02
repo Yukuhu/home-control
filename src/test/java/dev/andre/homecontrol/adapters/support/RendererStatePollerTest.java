@@ -1,6 +1,6 @@
 package dev.andre.homecontrol.adapters.support;
 
-import dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer;
+import dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer;
 import dev.andre.homecontrol.adapters.upnp.protocol.PlayedItem;
 import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
@@ -20,8 +20,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import static dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer.AV_TRANSPORT;
-import static dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer.RENDERING_CONTROL;
+import static dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer.AV_TRANSPORT;
+import static dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer.RENDERING_CONTROL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

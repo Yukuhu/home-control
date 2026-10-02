@@ -1,8 +1,9 @@
 package dev.andre.homecontrol.adapters.upnp;
 
+import dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DiscoveredDevice;
-import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
+import dev.andre.homecontrol.discovery.ssdp.protocol.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
 import dev.andre.homecontrol.discovery.ssdp.SsdpService;
