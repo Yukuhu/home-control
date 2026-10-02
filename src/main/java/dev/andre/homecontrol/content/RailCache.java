@@ -47,7 +47,7 @@ public class RailCache implements SmartLifecycle {
 
     /** Guarded by {@code this}; iteration order is display order. */
     private Map<String, Entry> entries = new LinkedHashMap<>();
-    // Assigned once in start() and only read (never read-modify-written) in stop(); the executor is thread-safe.
+    // Assigned in start() and only read (never read-modify-written) in stop(); the executor is thread-safe.
     @SuppressWarnings("java:S3077")
     private volatile ScheduledExecutorService ticker;
     private volatile boolean running;
@@ -351,6 +351,10 @@ public class RailCache implements SmartLifecycle {
         ticker = scheduler;
     }
 
+    /**
+     * Stops the scheduled refreshes; {@link #start()} resumes them. Loads already running finish, and page reads
+     * still load rails, as with the scheduler switched off.
+     */
     @Override
     public void stop() {
         running = false;
@@ -358,6 +362,11 @@ public class RailCache implements SmartLifecycle {
         if (scheduler != null) {
             scheduler.shutdownNow();
         }
+    }
+
+    /** Ends the cache when the application closes: stops the scheduled refreshes and interrupts running loads. */
+    public void close() {
+        stop();
         fetches.shutdownNow();
     }
 
