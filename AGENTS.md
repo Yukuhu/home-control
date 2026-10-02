@@ -63,7 +63,8 @@ Rules for everyone who changes this repository, people and coding agents alike. 
 ## Commits and pull requests
 
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org): `feat:`, `fix:`, `refactor:`,
-  `test:`, `docs:`, `build:`, `ci:`, `chore:`. Releases and the changelog are made from them; see
+  `test:`, `docs:`, `build:`, `ci:`, `chore:`, and `revert:`. Releases and the changelog are made from them, and CI
+  checks every commit of a pull request (`scripts/check-commits.sh`); see
   [CI and releases](docs/dev/ci-and-releases.md).
 - Pull requests follow `.github/pull_request_template.md`.
 - Stage only the files you changed (`git add <paths>`, never `git add -A`); other work may be in progress in the same
