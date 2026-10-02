@@ -73,6 +73,11 @@ public final class GuardedHttpClient implements AutoCloseable {
     }
 
     private static final Set<Integer> REDIRECT_STATUSES = Set.of(301, 302, 303, 307, 308);
+    /**
+     * What a request still carries after a redirect to another origin: nothing that could be a credential, so a
+     * source that signs its requests cannot hand its token to whatever a redirect points at.
+     */
+    private static final Set<String> CROSS_ORIGIN_HEADERS = Set.of("accept", "user-agent");
 
     private final Profile profile;
     private final OutboundAddressPolicy policy;
@@ -226,6 +231,7 @@ public final class GuardedHttpClient implements AutoCloseable {
     private OutboundResponse exchange(OutboundRequest request) throws IOException {
         Exchange<?> exchange = current.get();
         URI uri = request.uri();
+        OutboundRequest hop = request;
         for (int redirects = 0; ; redirects++) {
             exchange.hop.set(host(uri));
             // HttpClient can connect to a literal without asking the DNS hook, so judge literals here as well.
@@ -233,8 +239,8 @@ public final class GuardedHttpClient implements AutoCloseable {
                 policy.addresses(uri.getHost());
             }
             exchange.check();
-            OutboundResponse response = once(request, uri, exchange);
-            if (!follows(request.method(), response.status())) {
+            OutboundResponse response = once(hop, uri, exchange);
+            if (!follows(hop.method(), response.status())) {
                 return response;
             }
             String location = response.header("location");
@@ -244,7 +250,11 @@ public final class GuardedHttpClient implements AutoCloseable {
             if (redirects >= profile.maxRedirects()) {
                 throw new Failed(new OutboundFailure(Kind.BAD_RESPONSE, host(uri), OutboundFailure.TOO_MANY_REDIRECTS, 0));
             }
+            URI from = uri;
             uri = next(uri, location);
+            if (!sameOrigin(from, uri)) {
+                hop = hop.keepingOnly(CROSS_ORIGIN_HEADERS);
+            }
         }
     }
 
@@ -272,6 +282,10 @@ public final class GuardedHttpClient implements AutoCloseable {
                 .setConnectionRequestTimeout(timeout(exchange.remaining()))
                 .setResponseTimeout(timeout(exchange.remaining())).build());
         request.headers().forEach(message::setHeader);
+        // Compressed answers are refused below, so none is asked for; a caller may still ask for one itself.
+        if (request.headers().keySet().stream().noneMatch("Accept-Encoding"::equalsIgnoreCase)) {
+            message.setHeader("Accept-Encoding", "identity");
+        }
         if (request.body() != null) {
             // A request that names no content type sends none, as the JDK client did for an empty POST.
             message.setEntity(new ByteArrayEntity(request.body(), request.contentType() == null

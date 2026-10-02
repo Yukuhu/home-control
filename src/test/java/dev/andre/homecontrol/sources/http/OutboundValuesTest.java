@@ -7,11 +7,25 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Requests and responses compare by their bodies' content and never print a body, a path or a header value. */
 class OutboundValuesTest {
 
     private static final URI ANSWERED = URI.create("https://api.example/answer");
+
+    @Test
+    void aBodyCapWithNoRoomForOneMoreByteIsRefused() {
+        OutboundRequest request = OutboundRequest.get(ANSWERED);
+
+        assertThatThrownBy(() -> request.limitedTo(Integer.MAX_VALUE)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aDeadlineKeepsARequestFailingFastWhenBusy() {
+        assertThat(OutboundRequest.get(ANSWERED).failingFastWhenBusy().endingBy(42).waitForSlot()).isFalse();
+        assertThat(OutboundRequest.get(ANSWERED).endingBy(42).waitForSlot()).isTrue();
+    }
 
     @Test
     void aResponseComparesByContentAndPrintsOnlyItsSize() {

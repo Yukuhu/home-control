@@ -5,6 +5,7 @@ import dev.andre.homecontrol.core.content.ContentSourceException.Kind;
 import dev.andre.homecontrol.sources.http.GuardedHttpClient.Profile;
 import dev.andre.homecontrol.sources.http.GuardedHttpClient.Redirects;
 import dev.andre.homecontrol.testsupport.FakeHttpServer;
+import dev.andre.homecontrol.testsupport.Request;
 import dev.andre.homecontrol.testsupport.Response;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,7 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -179,6 +181,41 @@ class GuardedHttpClientTest {
             assertThat(failureOf(() -> client.send(OutboundRequest.get(at("source.test", "/metadata")))).kind())
                     .isEqualTo(Kind.BLOCKED);
         }
+    }
+
+    @Test
+    void aRedirectToAnotherOriginCarriesOnlyAcceptAndUserAgent() {
+        server.respond("GET", "/away", Response.empty(302).withHeader("Location", at("other.test", "/b").toString()));
+        server.respond("GET", "/near", Response.empty(302).withHeader("Location", "/b"));
+        server.respond("GET", "/b", Response.of(200, "text/plain", "b"));
+        try (var client = client(Redirects.CHECKED)) {
+            client.send(credentialed(at("source.test", "/away")));
+            client.send(credentialed(at("source.test", "/near")));
+        }
+
+        List<Request> arrived = server.requests("GET", "/b");
+        assertThat(arrived).hasSize(2);
+        Request otherOrigin = arrived.getFirst();
+        assertThat(otherOrigin.header("accept")).isEqualTo("text/calendar");
+        assertThat(otherOrigin.header("user-agent")).isEqualTo("HomeControl");
+        assertThat(otherOrigin.header("authorization")).isNull();
+        assertThat(otherOrigin.header("x-api-key")).isNull();
+        assertThat(arrived.getLast().header("authorization")).as("same origin").isEqualTo("Bearer secret-token");
+    }
+
+    private static OutboundRequest credentialed(URI uri) {
+        return OutboundRequest.get(uri).header("Accept", "text/calendar").header("User-Agent", "HomeControl")
+                .header("Authorization", "Bearer secret-token").header("X-Api-Key", "secret-key");
+    }
+
+    @Test
+    void everyRequestAsksForAnUncompressedAnswer() {
+        server.respond("GET", "/plain", Response.of(200, "text/plain", "plain"));
+        try (var client = client(Redirects.NONE)) {
+            client.send(OutboundRequest.get(at("source.test", "/plain")));
+        }
+
+        assertThat(server.requests("GET", "/plain").getFirst().header("accept-encoding")).isEqualTo("identity");
     }
 
     @Test

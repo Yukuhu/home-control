@@ -4,9 +4,11 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Set;
 
 /**
  * One GET or POST for a {@link GuardedHttpClient}. Headers are sent in order; a later header replaces an earlier one
@@ -29,6 +31,9 @@ public record OutboundRequest(String method, URI uri, Map<String, String> header
         headers = Collections.unmodifiableMap(new LinkedHashMap<>(headers));
         if (maxBytes < 0) {
             throw new IllegalArgumentException("A body cap cannot be negative");
+        }
+        if (maxBytes == Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("A body cap needs room for the one byte more that shows it was exceeded");
         }
         Objects.requireNonNull(notAfter);
     }
@@ -60,10 +65,22 @@ public record OutboundRequest(String method, URI uri, Map<String, String> header
     /**
      * Waits for a slot until {@code nanoTime}, which may be later than the profile's deadline allows (a workflow run
      * queues its calls); once admitted, the exchange ends within the profile's deadline or by {@code nanoTime},
-     * whichever comes first.
+     * whichever comes first. A request that {@linkplain #failingFastWhenBusy() fails fast when busy} keeps doing so.
      */
     public OutboundRequest endingBy(long nanoTime) {
-        return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, true, OptionalLong.of(nanoTime), errorBody);
+        return new OutboundRequest(method, uri, headers, body, contentType, maxBytes, waitForSlot,
+                OptionalLong.of(nanoTime), errorBody);
+    }
+
+    /** The same request with only the headers named in {@code names} (lower case), whatever case they were set in. */
+    public OutboundRequest keepingOnly(Set<String> names) {
+        Map<String, String> kept = new LinkedHashMap<>();
+        headers.forEach((name, value) -> {
+            if (names.contains(name.toLowerCase(Locale.ROOT))) {
+                kept.put(name, value);
+            }
+        });
+        return new OutboundRequest(method, uri, kept, body, contentType, maxBytes, waitForSlot, notAfter, errorBody);
     }
 
     /** Reads the body of an answer other than 200 too, for a source whose errors explain themselves there. */
