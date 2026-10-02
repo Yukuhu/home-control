@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.androidtv;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceOfflineException;
+import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.LaunchedMedia;
 import dev.andre.homecontrol.core.NowPlaying;
@@ -28,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -423,13 +425,14 @@ class AndroidTvSessionTest {
         FakeRemoteServer.ConnectionGate gate = fakeDevice.stallNextConnection();
         fakeDevice.closeNextConnections(3);
 
-        try (AndroidTvSession retrying = sessionWith(SHORT_TIMEOUT)) {
+        RecordingStateListener states = new RecordingStateListener();
+        try (AndroidTvSession retrying = sessionWith(SHORT_TIMEOUT, states)) {
             retrying.start();
 
             gate.awaitEntered();
-            await().atMost(Duration.ofSeconds(5))
-                    .until(() -> fakeDevice.connections() == 3
-                            && retrying.state().status() == DeviceStatus.DISCONNECTED);
+            // While the gate holds the fake, the session retries every 1 s and is DISCONNECTED for only 50 ms of
+            // each cycle: read what it published instead of polling for that moment.
+            await().atMost(Duration.ofSeconds(5)).until(() -> attemptEnded(states, 3));
             gate.release();
 
             await().atMost(Duration.ofSeconds(40))
@@ -443,10 +446,27 @@ class AndroidTvSessionTest {
     }
 
     private AndroidTvSession sessionWith(AndroidTvTimings timings) {
+        return sessionWith(timings, state -> {
+        });
+    }
+
+    private AndroidTvSession sessionWith(AndroidTvTimings timings, Consumer<DeviceState> states) {
         return new AndroidTvSession(
                 AndroidTvSettings.device("shield-1", "Test Shield", "127.0.0.1", fakeDevice.port(), null, Instant.now()),
-                ClientCertificate.generate("shield-remote"), timings, state -> {
-        }, null);
+                ClientCertificate.generate("shield-remote"), timings, states, null);
+    }
+
+    /** Whether the session published DISCONNECTED after its {@code attempt}-th CONNECTING. */
+    private static boolean attemptEnded(RecordingStateListener states, int attempt) {
+        int attempts = 0;
+        for (DeviceState state : states.all()) {
+            if (state.status() == DeviceStatus.CONNECTING) {
+                attempts++;
+            } else if (state.status() == DeviceStatus.DISCONNECTED && attempts == attempt) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Test
