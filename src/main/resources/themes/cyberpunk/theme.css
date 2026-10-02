@@ -1,32 +1,27 @@
-/* Cyberpunk theme, after the Cyberpunk 2077 HUD: neon red lines on a night-city black, cyan for
-   whatever you can touch, yellow for what matters most, and chamfered corners throughout.
-   Every rule is scoped to :root[data-theme="cyberpunk"], which js/theme.js sets; without it this
-   stylesheet changes nothing and app.css is the whole look. */
+/* Cyberpunk's decorative source. The package compiler scopes :root and local assets.
+   Shared component structure and accessibility remain in app.css. Rajdhani's original
+   copyright and SIL Open Font License are retained in assets/OFL.txt. */
 @font-face {
-    font-family: "Rajdhani";
+    font-family: "theme-rajdhani";
     font-weight: 500;
     font-display: fallback;
     size-adjust: 110%;
-    src: url(fonts/rajdhani-500.woff2) format("woff2");
+    src: url(assets/rajdhani-500.woff2) format("woff2");
 }
 @font-face {
-    font-family: "Rajdhani";
+    font-family: "theme-rajdhani";
     font-weight: 700;
     font-display: fallback;
     size-adjust: 110%;
-    src: url(fonts/rajdhani-700.woff2) format("woff2");
+    src: url(assets/rajdhani-700.woff2) format("woff2");
 }
 
 /* Chamfers are clip-paths, which also cut off borders on the diagonal: a 1px gradient line at
    cut × √½ from the corner redraws them, so --line and --cut must match the element's clip. */
-:root[data-theme="cyberpunk"] {
+:root {
     --cp-red: #ff5f58; --cp-cyan: #5ef6ff; --cp-yellow: #fcee0a; --cp-ink: #07080d;
     --cp-panel: #0a0c12;
     --cp-mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
-    --bg: #07080d; --surface: #0d1017; --surface-raised: #151a24; --fg: #e6f3f4;
-    --muted: #8fa3ad; --border: #3d1f26; --accent: var(--cp-cyan); --accent-ink: #031316;
-    --danger: var(--cp-red); --btn: rgba(255, 95, 88, .07);
-    font-family: "Rajdhani", "Bahnschrift SemiCondensed", "Bahnschrift", "Roboto Condensed", "Arial Narrow", sans-serif;
     scrollbar-color: #5a2a31 var(--bg);
 
     & body {
@@ -253,7 +248,7 @@
     & .mode-switch { background: #05060a; border-color: rgba(255, 95, 88, .35); }
     & .mode-switch button { --line: transparent; --fill: transparent; color: var(--muted); }
     & .mode-switch button:not(:disabled):hover { --line: transparent; }
-    & .mode-switch [aria-selected=true] { --fill: rgba(94, 246, 255, .12); color: var(--cp-cyan); box-shadow: inset 0 -2px 0 var(--cp-cyan); }
+    & .mode-switch [aria-selected="true"] { --fill: rgba(94, 246, 255, .12); color: var(--cp-cyan); box-shadow: inset 0 -2px 0 var(--cp-cyan); }
     & .dpad button { --line: transparent; --fill: rgba(255, 95, 88, .13); border: 0; color: var(--cp-red); }
     & .dpad button:not(:disabled):hover { --line: transparent; --fill: rgba(94, 246, 255, .18); }
     & .dpad button:focus-visible { --fill: rgba(94, 246, 255, .25); color: var(--cp-cyan); }
@@ -286,7 +281,7 @@
 
     /* Play sheet */
     & .sheet-item img { --cut: 10px; clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); }
-    & .sheet-device[aria-checked=true] { --line: var(--cp-cyan); --fill: rgba(94, 246, 255, .12); color: var(--cp-cyan); }
+    & .sheet-device[aria-checked="true"] { --line: var(--cp-cyan); --fill: rgba(94, 246, 255, .12); color: var(--cp-cyan); }
     & .sheet-route { font-family: var(--cp-mono); font-size: .78rem; background: #04060a; border-left: 3px solid var(--cp-cyan); color: #b9f3f6; }
     & .sheet-route.unroutable { border-left-color: var(--cp-red); color: var(--cp-red); }
 
@@ -366,29 +361,24 @@
     }
 
     @media (prefers-reduced-motion: no-preference) {
-        & .brand:hover > span:last-child { animation: cp-glitch .45s steps(2, jump-none) 1; }
-        & .connection-status:not(.connected)::before { animation: cp-blink 1s steps(2, jump-none) infinite; }
+        & .brand:hover > span:last-child { animation: theme-glitch .45s steps(2, jump-none) 1; }
+        & .connection-status:not(.connected)::before { animation: theme-blink 1s steps(2, jump-none) infinite; }
         & .tile .art, & .tile .art::after { transition: border-color .15s, box-shadow .15s; }
         /* Switching in: one scan line sweeps the screen. */
         &.theme-boot body::after {
             content: ""; position: fixed; inset: 0; z-index: 60; pointer-events: none;
             background: linear-gradient(transparent 44%, rgba(94, 246, 255, .14) 49%, rgba(252, 238, 10, .5) 50%, transparent 50.6%) 0 100% / 100% 200% no-repeat;
-            animation: cp-scan .6s cubic-bezier(.3, .6, .3, 1) forwards;
+            animation: theme-scan .6s cubic-bezier(.3, .6, .3, 1) forwards;
         }
     }
 }
 
-@keyframes cp-glitch {
+@keyframes theme-glitch {
     0% { text-shadow: 2px 0 var(--cp-red), -2px 0 var(--cp-cyan); }
     50% { text-shadow: -3px 0 var(--cp-red), 3px 0 var(--cp-cyan); }
     100% { text-shadow: none; }
 }
-@keyframes cp-blink { 50% { opacity: .2; } }
-@keyframes cp-scan {
+@keyframes theme-blink { 50% { opacity: .2; } }
+@keyframes theme-scan {
     to { background-position: 0 0; opacity: 0; }
-}
-
-@media (forced-colors: active) {
-    /* System colors replace the neon; keep the plain boxes and their outlines intact. */
-    :root[data-theme="cyberpunk"] * { clip-path: none !important; background-image: none !important; text-shadow: none !important; }
 }

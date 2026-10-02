@@ -48,6 +48,8 @@ import dev.andre.homecontrol.sources.youtube.YouTubeSettings;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupSection;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupService;
 import dev.andre.homecontrol.web.EventStream;
+import dev.andre.homecontrol.themes.ThemeCatalog;
+import dev.andre.homecontrol.themes.ThemeDescriptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -59,6 +61,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.net.URI;
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 
@@ -141,6 +144,8 @@ public abstract class WebSliceTest {
     protected SourcePreferencesService sourcePreferences;
     @MockitoBean
     protected StoredRailPreferences railPreferences;
+    @MockitoBean
+    protected ThemeCatalog themes;
 
     @Autowired
     protected StubPromptPairing promptPairing;
@@ -148,6 +153,12 @@ public abstract class WebSliceTest {
     /** Runs before each subclass's own {@code @BeforeEach}, whose stubs then win. */
     @BeforeEach
     protected void stubSafeDefaults() {
+        ThemeDescriptor defaultTheme = new ThemeDescriptor("default", "Default", "1", "Home Control", "", "MIT",
+                true, "test-default", "/themes/packages/default/test-default/theme.css", null, "#101917", List.of());
+        given(themes.themes()).willReturn(List.of(defaultTheme));
+        given(themes.require("default")).willReturn(defaultTheme);
+        given(themes.defaultColor()).willReturn("#101917");
+        given(themes.problems()).willReturn(List.of());
         given(bluetoothPairing.lastScan()).willReturn(BluetoothScan.NONE);
         given(sportsSettings.current()).willReturn(SportsSettings.empty());
         given(sportsZones.effective()).willReturn(ZoneId.of("Europe/Berlin"));

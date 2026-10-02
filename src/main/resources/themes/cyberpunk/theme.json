@@ -1,0 +1,10 @@
+{
+  "formatVersion": 1,
+  "themeApiVersion": 1,
+  "id": "cyberpunk",
+  "name": "Cyberpunk",
+  "version": "1.0.0",
+  "author": "Home Control contributors",
+  "description": "Neon cyan, red and yellow with chamfered panels and licensed Rajdhani typography.",
+  "license": "MIT AND OFL-1.1"
+}

@@ -8,12 +8,15 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.RequestLoginContext;
+import dev.andre.homecontrol.themes.ThemeCatalog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletRequest;
 
+import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -28,6 +31,9 @@ class LoginGatingE2eTest extends E2eApplicationTest {
 
     @Autowired
     private LoginService login;
+
+    @Autowired
+    private ThemeCatalog themes;
 
     @BeforeEach
     void storeASecretAndRequireLogin() {
@@ -84,12 +90,55 @@ class LoginGatingE2eTest extends E2eApplicationTest {
             assertThat(page.locator("body")).hasCSS("background-color", "rgb(7, 8, 13)");
             org.assertj.core.api.Assertions.assertThat(page.evaluate("""
                     async () => {
-                        await document.fonts.ready;
-                        return document.fonts.check('500 16px Rajdhani') && document.fonts.check('700 16px Rajdhani');
+                        const family = getComputedStyle(document.body).fontFamily.split(',')[0].trim().replaceAll('"', '');
+                        const weights = ['500', '700'];
+                        await Promise.all(weights.map(weight => document.fonts.load(`${weight} 16px "${family}"`)));
+                        return family.startsWith('theme-cyberpunk-') && weights.every(weight =>
+                            Array.from(document.fonts).some(face => face.family.replaceAll('"', '') === family
+                                && face.weight === weight && face.status === 'loaded'));
                     }
                     """)).as("The theme's fonts load before logging in").isEqualTo(true);
             page.screenshot(new Page.ScreenshotOptions().setPath(java.nio.file.Path.of(
                     System.getProperty("e2e.artifacts", "build/e2e-artifacts"), "ui-cyberpunk-login-" + browser + ".png")));
+        }
+    }
+
+    @BrowserTest
+    void recoveryLoginNeverLoadsTheSavedImportedStylesheetAndResetPersistsDefault(String browser) throws IOException {
+        themes.install(ThemePackageFixtures.derivative(themes.export("cyberpunk"), "recovery-test", "Recovery test", "#123456"), null);
+        try (BrowserSession session = open(browser)) {
+            session.context().addInitScript("""
+                    if (!localStorage.getItem('homecontrol.theme.v1')) {
+                        localStorage.setItem('homecontrol.theme.v1', 'recovery-test');
+                    }
+                    """);
+            Page page = session.page();
+            List<String> importedRequests = new ArrayList<>();
+            page.onRequest(request -> {
+                if (request.url().contains("/themes/packages/recovery-test/")) importedRequests.add(request.url());
+            });
+            page.navigate("/setup/appearance/recovery");
+            assertThat(page).hasURL(Pattern.compile(".*/login.*"));
+            assertThat(page.locator("html")).hasAttribute("data-theme", "default");
+            assertThat(page.locator("meta[name=theme-recovery]")).hasAttribute("content", "true");
+            org.assertj.core.api.Assertions.assertThat(page.evaluate("() => window.homeControlTheme.select('recovery-test')"))
+                    .isEqualTo(false);
+            page.locator("input[name=password]").fill("wrong");
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Log in")).click();
+            assertThat(page.locator(".error")).isVisible();
+            assertThat(page.locator("html")).hasAttribute("data-theme", "default");
+            page.locator("input[name=password]").fill(PASSWORD);
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Log in")).click();
+            assertThat(page).hasURL(Pattern.compile(".*/setup/appearance/recovery$"));
+            assertThat(page.locator("html")).hasAttribute("data-theme", "default");
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Reset to Default")).click();
+            org.assertj.core.api.Assertions.assertThat(page.evaluate("() => localStorage.getItem('homecontrol.theme.v1')"))
+                    .isEqualTo("default");
+            page.navigate("/setup");
+            assertThat(page.locator("html")).hasAttribute("data-theme", "default");
+            org.assertj.core.api.Assertions.assertThat(importedRequests).isEmpty();
+        } finally {
+            themes.remove("recovery-test");
         }
     }
 

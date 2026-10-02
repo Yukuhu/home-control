@@ -10,6 +10,10 @@ every page. Only the login page, the icons and stylesheets it needs, and `/healt
 it. Either way, do not expose this app to the internet without putting an authenticating reverse
 proxy in front of it.
 
+Theme names, author metadata and validated presentation assets are public so the login page can use the chosen
+theme. Importing, removing and exporting themes follows the normal login rules. Theme packages contain styling
+and local images/fonts; they cannot add scripts, replace pages or access device credentials.
+
 ## Secrets
 
 Secrets live in `/data/secrets.json`, encrypted at rest: the login password hash, the content

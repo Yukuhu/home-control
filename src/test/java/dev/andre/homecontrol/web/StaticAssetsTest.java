@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.testsupport.FullAppTest;
+import dev.andre.homecontrol.themes.ThemeCatalog;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
@@ -10,12 +11,16 @@ import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class StaticAssetsTest extends FullAppTest {
 
     @Autowired
     MockMvc mockMvc;
+
+    @Autowired
+    ThemeCatalog themes;
 
     @Test
     void servesTheEsModulesTheDashboardLoads() throws Exception {
@@ -59,24 +64,32 @@ class StaticAssetsTest extends FullAppTest {
     }
 
     @Test
-    void servesTheThemeSwitchTheCyberpunkThemeAndItsFonts() throws Exception {
+    void servesTheThemeCatalogAndItsImmutablePresentationAssets() throws Exception {
         mockMvc.perform(get("/js/theme.js")).andExpect(status().isOk())
-                .andExpect(content().string(allOf(containsString("homecontrol.theme.v1"),
-                        containsString("data-theme-toggle"), containsString("aria-pressed"))));
-        mockMvc.perform(get("/themes/cyberpunk.css")).andExpect(status().isOk())
-                .andExpect(content().string(allOf(containsString(":root[data-theme=\"cyberpunk\"]"),
-                        containsString("url(fonts/rajdhani-500.woff2)"), containsString("url(fonts/rajdhani-700.woff2)"))));
-        for (String font : new String[] {"/themes/fonts/rajdhani-500.woff2", "/themes/fonts/rajdhani-700.woff2"}) {
-            mockMvc.perform(get(font)).andExpect(status().isOk())
-                    .andExpect(header().string("Content-Type", "font/woff2"));
+                .andExpect(content().string(containsString("homecontrol.theme.v1")));
+        mockMvc.perform(get("/themes/catalog.json")).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-cache"))
+                .andExpect(jsonPath("$.defaultId").value("default"))
+                .andExpect(jsonPath("$.themes[0].stylesheet").value(themes.require("default").stylesheet()));
+        mockMvc.perform(get("/themes/catalog.js")).andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("text/javascript"))
+                .andExpect(header().string("Cache-Control", "no-cache"))
+                .andExpect(content().string(containsString("homeControlThemes")));
+        for (var theme : themes.themes()) {
+            for (String path : theme.assets()) {
+                var asset = themes.asset(path).orElseThrow();
+                mockMvc.perform(get(path)).andExpect(status().isOk())
+                        .andExpect(content().contentTypeCompatibleWith(asset.contentType()))
+                        .andExpect(content().bytes(asset.bytes()))
+                        .andExpect(header().string("Cache-Control", allOf(
+                                containsString("public"), containsString("max-age=31536000"), containsString("immutable"))));
+            }
         }
-        mockMvc.perform(get("/themes/fonts/OFL.txt")).andExpect(status().isOk())
-                .andExpect(content().string(containsString("SIL OPEN FONT LICENSE Version 1.1")));
     }
 
     @Test
     void browsersRevalidateStylesAndScriptsSoARedeployIsPickedUp() throws Exception {
-        for (String path : new String[] {"/app.css", "/themes/cyberpunk.css", "/js/app.js", "/js/theme.js"}) {
+        for (String path : new String[] {"/app.css", "/js/app.js", "/js/theme.js"}) {
             String lastModified = mockMvc.perform(get(path)).andExpect(status().isOk())
                     .andExpect(header().string("Cache-Control", "no-cache"))
                     .andReturn().getResponse().getHeader("Last-Modified");

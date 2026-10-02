@@ -45,11 +45,10 @@ installed app's own icon need HTTPS, typically through a reverse proxy.
 The **Setup** page groups devices, content connections, dashboard preferences, and app
 installation with section navigation. Forms stack on smaller screens and have visible labels.
 
-The **Cyberpunk** button in the header switches every page between the default look and a
-Cyberpunk theme inspired by the Cyberpunk 2077 game UI — neon red lines, cyan highlights and
-chamfered corners. It switches instantly without reloading, is remembered per browser, and
-other open tabs follow along. On phones the button is a chip icon, and on narrow ones the
-header shows only the house mark beside the navigation.
+The **Theme** selector in the header switches every page between Default, Cyberpunk and
+your installed themes. Your choice is remembered per browser, and other open tabs follow
+along. Default and Cyberpunk are always available. **Setup → Appearance** lets you export,
+install and remove custom themes; see [Themes](themes.md) for sharing and recovery.
 
 Keyboard shortcuts on a desktop browser work when no button or form field is focused: arrow keys and Enter drive the D-pad,
 Backspace is Back, Space is Play/Pause, `h` is Home and `m` toggles mute, aimed at whichever

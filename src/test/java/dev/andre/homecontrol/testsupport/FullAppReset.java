@@ -20,6 +20,7 @@ import dev.andre.homecontrol.sources.youtube.YouTubeSearch;
 import dev.andre.homecontrol.sources.youtube.YouTubeSetupService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
+import dev.andre.homecontrol.themes.ThemeCatalog;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.springframework.context.ApplicationContext;
@@ -47,6 +48,8 @@ public final class FullAppReset implements AfterAllCallback {
     }
 
     public static void reset(ApplicationContext app) {
+        ThemeCatalog themes = app.getBean(ThemeCatalog.class);
+        themes.themes().stream().filter(theme -> !theme.builtIn()).forEach(theme -> themes.remove(theme.id()));
         DeviceEnrollment enrollment = app.getBean(DeviceEnrollment.class);
         app.getBean(DeviceQueries.class).devices().forEach(device -> enrollment.forget(device.id()));
 

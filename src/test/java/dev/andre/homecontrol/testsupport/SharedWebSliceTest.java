@@ -32,6 +32,9 @@ import dev.andre.homecontrol.web.SetupController;
 import dev.andre.homecontrol.web.SourcesSetupAdvice;
 import dev.andre.homecontrol.web.SourcesSetupController;
 import dev.andre.homecontrol.web.EventStreamController;
+import dev.andre.homecontrol.web.ThemeController;
+import dev.andre.homecontrol.web.ThemeAssetsController;
+import dev.andre.homecontrol.web.ThemeViewAdvice;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -58,7 +61,8 @@ class SharedWebSliceTest extends WebSliceTest {
                 ContentPlayController.class, DashboardController.class, DeepLinkTestController.class,
                 DeviceController.class, IconController.class, LoginController.class, PwaController.class,
                 RailController.class, SearchController.class, SetupController.class, SourcesSetupAdvice.class,
-                SourcesSetupController.class, EventStreamController.class);
+                SourcesSetupController.class, EventStreamController.class,
+                ThemeController.class, ThemeAssetsController.class, ThemeViewAdvice.class);
 
         assertThat(webLayer).isNotEmpty().allSatisfy(type ->
                 assertThat(context.getBeanNamesForType(type)).as(type.getSimpleName()).hasSize(1));

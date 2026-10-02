@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.web;
 
+import dev.andre.homecontrol.themes.ThemeCatalog;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,11 @@ import java.util.Map;
 public class PwaController {
 
     private static final String IMAGE_PNG = "image/png";
+    private final ThemeCatalog themes;
+
+    public PwaController(ThemeCatalog themes) {
+        this.themes = themes;
+    }
 
     @GetMapping(path = "/manifest.webmanifest", produces = "application/manifest+json")
     public ResponseEntity<Map<String, Object>> manifest() {
@@ -25,8 +31,8 @@ public class PwaController {
         manifest.put("start_url", "/");
         manifest.put("scope", "/");
         manifest.put("display", "standalone");
-        manifest.put("background_color", "#101917");
-        manifest.put("theme_color", "#101917");
+        manifest.put("background_color", themes.defaultColor());
+        manifest.put("theme_color", themes.defaultColor());
         manifest.put("icons", List.of(
                 icon("/icons/icon.svg", "any", "image/svg+xml", "any"),
                 icon("/icons/icon-192.png", "192x192", IMAGE_PNG, "any"),

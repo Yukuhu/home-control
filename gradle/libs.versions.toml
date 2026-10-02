@@ -27,6 +27,8 @@ dbus-java = "5.2.2"
 playwright = "1.63.0"
 archunit = "1.5.1"
 
+ph-css = "8.2.2"
+
 [libraries]
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 jackson-bom = { module = "tools.jackson:jackson-bom", version.ref = "jackson" }
@@ -44,6 +46,8 @@ dbus-java-core = { module = "com.github.hypfvieh:dbus-java-core", version.ref = 
 dbus-java-unixsocket = { module = "com.github.hypfvieh:dbus-java-transport-native-unixsocket", version.ref = "dbus-java" }
 playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
 archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+ph-css = { module = "com.helger:ph-css", version.ref = "ph-css" }
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

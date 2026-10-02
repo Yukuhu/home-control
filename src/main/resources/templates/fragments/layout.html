@@ -4,7 +4,8 @@
     <meta name="viewport" th:content="${resizesContent}
             ? 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content'
             : 'width=device-width, initial-scale=1, viewport-fit=cover'">
-    <meta name="theme-color" content="#101917">
+    <meta name="theme-color" th:content="${themeDefault.themeColor()}">
+    <meta name="theme-recovery" content="true" th:if="${themeRecovery}">
     <!--/* The Content-Security-Policy forbids eval, and no htmx attribute here needs it. */-->
     <meta name="htmx-config" content='{"allowEval":false}'>
     <meta name="mobile-web-app-capable" content="yes">
@@ -15,7 +16,8 @@
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <link rel="stylesheet" th:href="@{/app.css}">
-    <link rel="stylesheet" th:href="@{/themes/cyberpunk.css}">
+    <link rel="stylesheet" data-theme-default th:href="${themeDefault.stylesheet()}">
+    <script th:src="@{/themes/catalog.js}"></script>
     <script th:src="@{/js/theme.js}"></script>
 </th:block>
 
@@ -29,7 +31,7 @@
         <a th:href="@{/setup}" th:attr="aria-current=${current == 'setup'} ? 'page' : null">Setup</a>
     </nav>
     <output id="connection-status" class="connection-status" th:if="${current == 'home'}">Connecting…</output>
-    <button th:replace="~{fragments/theme-toggle :: toggle}"></button>
+    <th:block th:replace="~{fragments/theme-toggle :: toggle}"></th:block>
 </header>
 
 <!--/*
@@ -48,4 +50,3 @@
                autocomplete="new-password" placeholder="Repeat login password">
     </label>
 </th:block>
-

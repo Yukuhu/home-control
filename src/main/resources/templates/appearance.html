@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en" data-theme="default">
+<head>
+    <th:block th:replace="~{fragments/layout :: pageHead(false)}"></th:block>
+    <title>Home Control · Appearance</title>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to appearance</a>
+<header th:replace="~{fragments/layout :: appHeader('setup')}"></header>
+<main class="setup" id="main-content">
+    <div class="page-heading">
+        <p class="eyebrow">MAKE IT YOURS</p>
+        <h1 th:text="${themeRecovery} ? 'Restore a familiar look.' : 'Choose your look.'">Choose your look.</h1>
+        <p>Choose a theme for this browser, or share one with your household.</p>
+    </div>
+    <p class="error" role="alert" th:if="${themeError}" th:text="${themeError}"></p>
+    <p role="status" th:if="${themeMessage}" th:text="${themeMessage}"></p>
+    <p role="status" data-theme-status></p>
+    <div class="setup-layout">
+        <nav class="setup-nav" aria-label="Appearance sections">
+            <a th:href="@{/setup}">Back to setup</a>
+            <a href="#theme-library">Your themes</a>
+            <a href="#theme-import" th:unless="${themeRecovery}">Import a theme</a>
+            <a th:href="@{/setup/appearance/recovery}" th:unless="${themeRecovery}">Recover appearance</a>
+            <a th:href="@{/setup/appearance}" th:if="${themeRecovery}">Back to appearance</a>
+        </nav>
+        <div class="setup-content">
+            <section th:if="${themeRecovery}">
+                <h2>Reset this browser</h2>
+                <p>This recovery page uses Default. Reset your saved choice or remove an imported theme below.</p>
+                <button type="button" class="primary" data-theme-reset>Reset to Default</button>
+            </section>
+            <section th:unless="${#lists.isEmpty(themeProblems)}" aria-label="Theme problems">
+                <h2>Some themes need attention</h2>
+                <p class="error" th:each="problem : ${themeProblems}" th:text="${problem}"></p>
+            </section>
+            <section id="theme-review" th:if="${importManifest != null}">
+                <h2 th:text="${previousTheme == null} ? 'Install this theme?' : 'Update this theme?'">Review theme</h2>
+                <h3 th:text="${importManifest.name()}">Theme name</h3>
+                <p th:text="${importManifest.description()}">Description</p>
+                <p class="meta"><span th:text="${importManifest.author()}">Author</span> ·
+                    <span th:text="${importManifest.version()}">Version</span> ·
+                    <span th:text="${importManifest.license()}">Licence</span></p>
+                <img class="theme-preview" th:if="${importPreview != null}" th:src="${importPreview}" alt="Theme preview">
+                <div class="theme-swatch" th:unless="${importPreview != null}" aria-hidden="true"
+                     th:style="|background-color: ${importColour}|"></div>
+                <p th:if="${previousTheme != null}" th:text="|Replaces ${previousTheme.name()} version ${previousTheme.version()} on this installation.|"></p>
+                <form method="post" th:action="@{/setup/appearance/install}">
+                    <input type="hidden" name="token" th:value="${importToken}">
+                    <button type="submit" class="primary" th:text="${previousTheme == null} ? 'Install theme' : 'Update theme'">Install theme</button>
+                    <a th:href="@{/setup/appearance}">Cancel</a>
+                </form>
+            </section>
+            <section id="theme-library">
+                <h2>Your themes</h2>
+                <p class="hint">Default and Cyberpunk are always available. Your selection is saved in this browser.</p>
+                <div class="theme-library">
+                    <article class="theme-card" th:each="theme : ${availableThemes}" th:attr="data-theme-id=${theme.id()}">
+                        <img class="theme-preview" th:if="${theme.preview() != null and !theme.preview().isEmpty()}"
+                             th:src="${theme.preview()}" alt="" loading="lazy">
+                        <div class="theme-swatch" th:unless="${theme.preview() != null and !theme.preview().isEmpty()}"
+                             aria-hidden="true" th:style="|background-color: ${theme.themeColor()}|"></div>
+                        <h3 th:text="${theme.name()}">Theme</h3>
+                        <p class="meta"><span th:text="${theme.author()}">Author</span> ·
+                            <span th:text="${theme.version()}">Version</span>
+                            <span th:if="${theme.builtIn()}"> · Built-in</span></p>
+                        <p th:text="${theme.description()}">Description</p>
+                        <div class="theme-actions">
+                            <button type="button" th:unless="${themeRecovery}" th:attr="data-theme-select=${theme.id()}">Use theme</button>
+                            <a class="button" th:href="@{/setup/appearance/{id}/export(id=${theme.id()})}">Export</a>
+                            <form method="post" th:unless="${theme.builtIn()}"
+                                  th:action="@{/setup/appearance/{id}/remove(id=${theme.id()})}">
+                                <input type="hidden" name="recovery" th:value="${themeRecovery}">
+                                <button type="submit" class="danger">Remove</button>
+                            </form>
+                        </div>
+                    </article>
+                </div>
+            </section>
+            <section id="theme-import" th:unless="${themeRecovery}">
+                <h2>Import a theme</h2>
+                <p>Export Default or Cyberpunk, edit its files with a new theme ID, then import the ZIP here.</p>
+                <form method="post" enctype="multipart/form-data" th:action="@{/setup/appearance/preview}">
+                    <label>Theme ZIP (up to 10 MiB)
+                        <input type="file" name="package" accept=".zip,application/zip" required>
+                    </label>
+                    <button type="submit" class="primary">Review theme</button>
+                </form>
+            </section>
+        </div>
+    </div>
+</main>
+</body>
+</html>
