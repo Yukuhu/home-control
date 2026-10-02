@@ -15,12 +15,14 @@ class FullAppResetStepsTest {
         List<String> ran = new ArrayList<>();
         IllegalStateException broken = new IllegalStateException("No bean of type PinnedShortcuts");
 
-        assertThatThrownBy(() -> FullAppReset.runEvery(List.of(
+        List<FullAppReset.Step> steps = List.of(
                 new FullAppReset.Step("themes", () -> ran.add("themes")),
                 new FullAppReset.Step("pins", () -> {
                     throw broken;
                 }),
-                new FullAppReset.Step("fakes", () -> ran.add("fakes")))))
+                new FullAppReset.Step("fakes", () -> ran.add("fakes")));
+
+        assertThatThrownBy(() -> FullAppReset.runEvery(steps))
                 .isInstanceOf(AssertionError.class)
                 .hasMessage("Resetting the shared application failed at: pins")
                 .satisfies(failure -> assertThat(failure.getSuppressed()).singleElement()
