@@ -13,10 +13,12 @@ home-control:
   ssdp:
     enabled: false
   security:
-    # Pinned so a shell that exports HOME_CONTROL_SECRET/_TRUSTED_ORIGINS for an IDE run never leaks into tests.
+    # Pinned so a shell that exports HOME_CONTROL_SECRET/_TRUSTED_ORIGINS/_RESET_LOGIN for an IDE run never leaks
+    # into tests.
     secret: ""
     trusted-origins: ""
     allowed-hosts: ""
+    reset-login: false
   tmdb:
     api-base-url: http://127.0.0.1:9/3
     connect-timeout: 1s
