@@ -16,11 +16,11 @@ import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapFault;
 import dev.andre.homecontrol.adapters.upnp.protocol.UpnpActions;
-import dev.andre.homecontrol.core.Hosts;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.ActionFailedException;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
+import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.GroupListing;
 import dev.andre.homecontrol.core.GroupMember;
@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.http.HttpClient;
 import java.time.Clock;
 import java.time.Duration;
@@ -229,7 +230,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
                     .flatMap(ZoneGroupState.Group::coordinatorMember)
                     .filter(member -> !member.uuid().equals(settings.uuid()));
             if (coordinator.isPresent()) {
-                return SonosEndpoints.endpoint(Hosts.authority(coordinator.get().host()), coordinator.get().port(), AV_TRANSPORT_PATH, AV_TRANSPORT);
+                return endpoint(coordinator.get().host(), coordinator.get().port(), AV_TRANSPORT_PATH, AV_TRANSPORT);
             }
         }
         return own(AV_TRANSPORT_PATH, AV_TRANSPORT);
@@ -240,7 +241,16 @@ public class SonosSession implements DeviceHandle, GroupListing {
     }
 
     private ServiceEndpoint own(String path, String serviceType) {
-        return SonosEndpoints.endpoint(Hosts.authority(device.host()), settings.port(), path, serviceType);
+        return endpoint(device.host(), settings.port(), path, serviceType);
+    }
+
+    /** A speaker at an address no URL can carry is one Home Control cannot reach, not an error of its own. */
+    private ServiceEndpoint endpoint(String host, int port, String path, String serviceType) {
+        try {
+            return SonosEndpoints.endpoint(host, port, path, serviceType);
+        } catch (MalformedURLException e) {
+            throw new DeviceOfflineException(device.name() + " could not be reached: " + e.getMessage());
+        }
     }
 
     private UnsupportedActionException unsupported(String what) {
