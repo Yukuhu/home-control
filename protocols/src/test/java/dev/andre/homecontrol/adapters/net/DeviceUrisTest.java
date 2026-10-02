@@ -22,6 +22,17 @@ class DeviceUrisTest {
     }
 
     @Test
+    void aLinkLocalAddressKeepsItsZoneInsideTheBrackets() throws MalformedURLException {
+        assertThat(DeviceUris.of("http", "fe80::1%eth0", 8080, "/x")).hasToString("http://[fe80::1%eth0]:8080/x");
+    }
+
+    @Test
+    void anIpv4MappedAddressGetsItsBrackets() throws MalformedURLException {
+        assertThat(DeviceUris.of("http", "::ffff:192.168.1.10", 8080, "/x"))
+                .isEqualTo(URI.create("http://[::ffff:192.168.1.10]:8080/x"));
+    }
+
+    @Test
     void anEncodedPathAndQueryStayAsGiven() throws MalformedURLException {
         String pathAndQuery = "/api/v2/channels/samsung.remote.control?name=SG9tZQ%3D%3D&token=a%2Bb";
 

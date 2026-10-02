@@ -7,14 +7,19 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.MEDIA;
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.PLATFORM_RECEIVER_ID;
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.RECEIVER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 class CastAppsTest {
 
@@ -110,7 +115,7 @@ class CastAppsTest {
 
         assertThatThrownBy(() -> apps.load(app, MEDIA_BODY))
                 .isInstanceOf(CastRefusedException.class)
-                .hasMessageContaining("LOAD_FAILED");
+                .hasMessage("LOAD_FAILED");
     }
 
     @Test
@@ -134,6 +139,27 @@ class CastAppsTest {
         ReceiverStatus.ReceiverApp app = apps.running(null, CUSTOM_APP);
 
         assertThat(apps.speaking(app, NS).speaks(NS)).isTrue();
+    }
+
+    /** A freshly launched custom receiver lists its namespace in a later status, not in the one first asked for. */
+    @Test
+    void anAppThatAnnouncesTheNamespaceLaterIsReturnedThen() throws Exception {
+        ReceiverStatus.ReceiverApp app = apps.running(null, CUSTOM_APP);
+        int askedBefore = receiver.received(RECEIVER, "GET_STATUS").size();
+        CompletableFuture<ReceiverStatus.ReceiverApp> speaking = CompletableFuture.supplyAsync(() -> {
+            try {
+                return apps.speaking(app, NS);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+        await().atMost(Duration.ofSeconds(2))
+                .until(() -> receiver.received(RECEIVER, "GET_STATUS").size() > askedBefore);
+
+        receiver.appSpeaks(CUSTOM_APP, NS);
+        receiver.pushReceiverStatus();
+
+        assertThat(speaking.get(2, TimeUnit.SECONDS).speaks(NS)).isTrue();
     }
 
     @Test
