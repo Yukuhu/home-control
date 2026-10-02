@@ -15,7 +15,8 @@ plugins {
     jacoco
     `jacoco-report-aggregation`
     alias(libs.plugins.spring.boot)
-    alias(libs.plugins.protobuf)
+    // Applied by protocols; declared here so that it loads with the build classpath's raised versions.
+    alias(libs.plugins.protobuf) apply false
     alias(libs.plugins.sonarqube)
     alias(libs.plugins.test.retry)
 }
@@ -120,14 +121,13 @@ dependencies {
         implementation(libs.tomcat.embed.websocket)
     }
     implementation(project(":core"))
+    implementation(project(":protocols"))
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.apache.httpcomponents.client5:httpclient5")
-    implementation(libs.protobuf.java)
     implementation(libs.jmdns)
-    implementation(libs.bouncycastle.bcpkix)
-    // Argon2id for the login hash and the HOME_CONTROL_SECRET key (already transitive via bcpkix; used directly now).
+    // Argon2id for the login hash and the HOME_CONTROL_SECRET key.
     implementation(libs.bouncycastle.bcprov)
     // Bluetooth speakers (optional module, off by default). Only adapters/bluetooth/bluez/DbusBluezClient imports these.
     implementation(libs.bluez.dbus)
@@ -136,6 +136,8 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-webmvc-test")
+    // The fakes and recordings the protocol tests share with the app's tests and browser tests.
+    testImplementation(testFixtures(project(":protocols")))
     // Package rules checked on every build (src/test/java/dev/andre/homecontrol/ArchitectureTest.java).
     testImplementation(libs.archunit.junit5)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -165,10 +167,6 @@ tasks.named<Test>("test") {
         "docs/user/bluetooth-speakers.md",
         "docs/bluetooth-speakers.md",
     ).withPropertyName("deploymentFiles").withPathSensitivity(PathSensitivity.RELATIVE)
-}
-
-protobuf {
-    protoc { artifact = libs.protoc.get().toString() }
 }
 
 // Browser tests (Playwright for Java) live in their own source set so `build` never resolves

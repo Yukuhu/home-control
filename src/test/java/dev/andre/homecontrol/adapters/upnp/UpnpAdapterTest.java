@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.upnp;
 
+import dev.andre.homecontrol.adapters.upnp.protocol.FakeUpnpRenderer;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;

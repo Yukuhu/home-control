@@ -1,6 +1,5 @@
-package dev.andre.homecontrol.discovery.ssdp;
+package dev.andre.homecontrol.discovery.ssdp.protocol;
 
-import dev.andre.homecontrol.discovery.ssdp.protocol.SsdpMessage;
 import dev.andre.homecontrol.testsupport.Fixtures;
 
 import java.io.IOException;

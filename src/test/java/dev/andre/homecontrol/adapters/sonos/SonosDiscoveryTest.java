@@ -3,7 +3,7 @@ package dev.andre.homecontrol.adapters.sonos;
 import dev.andre.homecontrol.adapters.sonos.protocol.ZoneGroupState;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DiscoveredDevice;
-import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
+import dev.andre.homecontrol.discovery.ssdp.protocol.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
 import dev.andre.homecontrol.discovery.ssdp.SsdpTimings;

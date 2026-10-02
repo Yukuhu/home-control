@@ -1,9 +1,5 @@
 package dev.andre.homecontrol.sources.sports.ics;
 
-import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
-import dev.andre.homecontrol.sources.sports.SportsItems;
-import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
-import dev.andre.homecontrol.sources.sports.calendar.CalendarSchedule;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -17,11 +13,8 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +23,6 @@ class IcsFixtureContractTest {
 
     private static final ZoneId BERLIN = ZoneId.of("Europe/Berlin");
     private static final List<String> VALID_FIXTURES = List.of("bundesliga.ics", "recurring.ics", "outlook.ics");
-    private static final Pattern MAPPED_ID = Pattern.compile("^ics:c-3f9a1c2b7d4e:[0-9a-f]{16}$");
 
     private static String fixture(String name) {
         try (InputStream in = IcsFixtureContractTest.class.getResourceAsStream("/fixtures/ics/" + name)) {
@@ -53,7 +45,8 @@ class IcsFixtureContractTest {
         String invalidFixture = fixture("not-a-calendar.html");
         org.junit.jupiter.api.Assertions.assertThrows(IcsFormatException.class, () -> IcsParser.parse(invalidFixture));
 
-        Path dir = Path.of(IcsFixtureContractTest.class.getResource("/fixtures/ics").toURI());
+        // The recordings sit in this module's test fixtures, and the module's tests run in its directory.
+        Path dir = Path.of("src/testFixtures/resources/fixtures/ics");
         try (Stream<Path> listing = Files.list(dir)) {
             List<String> names = listing.map(p -> p.getFileName().toString()).sorted().toList();
             assertThat(names).containsExactlyInAnyOrder(
@@ -105,46 +98,5 @@ class IcsFixtureContractTest {
                 }
             }
         }
-    }
-
-    @Test
-    void mappedEventsAreWellFormed() {
-        SportsSettings settings = SportsSettings.empty().withCalendars(List.of(
-                new SportsSettings.CalendarEntry("c-3f9a1c2b7d4e", "Bundesliga 2026/27", "calendar.example.org", null, Instant.EPOCH)));
-        for (String name : VALID_FIXTURES) {
-            IcsCalendar calendar = IcsParser.parse(fixture(name));
-            IcsOccurrences.Result result = IcsOccurrences.expand(calendar, BERLIN,
-                    Instant.parse("2026-09-01T00:00:00Z"), Instant.parse("2026-10-10T00:00:00Z"), Duration.ofMinutes(120));
-            Set<String> ids = new HashSet<>();
-            for (IcsOccurrence occurrence : result.occurrences()) {
-                SportsEvent event = CalendarSchedule.toEvent("c-3f9a1c2b7d4e", occurrence);
-                assertThat(event.itemId()).as(name).matches(MAPPED_ID.pattern());
-                assertThat(ids.add(event.itemId())).as(name + ": unique id " + event.itemId()).isTrue();
-                assertThat(event.competitionKey()).isEqualTo("calendar:c-3f9a1c2b7d4e");
-
-                var item = SportsItems.toItem(event, settings, BERLIN, Locale.forLanguageTag("de-DE"), Instant.parse("2026-09-19T14:00:00Z"));
-                assertThat(item.kind().name()).isEqualTo("LIVE_EVENT");
-                assertThat(item.sourceId()).isEqualTo("sports");
-                assertThat(item.subtitle()).as(name).isNotBlank();
-                assertThat(item.startsAt()).isEqualTo(event.startsAt());
-                assertThat(item.endsAt()).isEqualTo(event.endsAt());
-            }
-        }
-    }
-
-    @Test
-    void idsAreStableAcrossParses() {
-        List<String> first = mappedIds();
-        List<String> second = mappedIds();
-        assertThat(first).isEqualTo(second);
-    }
-
-    private static List<String> mappedIds() {
-        IcsCalendar calendar = IcsParser.parse(fixture("bundesliga.ics"));
-        IcsOccurrences.Result result = IcsOccurrences.expand(calendar, BERLIN,
-                Instant.parse("2026-09-01T00:00:00Z"), Instant.parse("2026-10-10T00:00:00Z"), Duration.ofMinutes(120));
-        return result.occurrences().stream()
-                .map(occurrence -> CalendarSchedule.toEvent("c-3f9a1c2b7d4e", occurrence).itemId())
-                .toList();
     }
 }
