@@ -211,7 +211,9 @@ val e2eTest by tasks.registering(Test::class) {
     systemProperty("e2e.coverage.dir", browserCoverageDirectory.get().asFile.absolutePath)
     if (browserCoverage.get()) {
         outputs.dir(browserCoverageDirectory)
-        doFirst { delete(browserCoverageDirectory) }
+        // The action holds the directory's file, not the build script, which the configuration cache cannot keep.
+        val rawCoverage = browserCoverageDirectory.get().asFile
+        doFirst { rawCoverage.deleteRecursively() }
     }
     maxParallelForks = 1
     // A browser test that fails is run once more, and passes the build if it then passes. The
