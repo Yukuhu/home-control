@@ -154,7 +154,7 @@ class TizenSessionTest {
     }
 
     @Test
-    void aKeyTheTvLacksIsNamedForPeople() throws Exception {
+    void aKeyTheTvLacksIsNamedForPeople() {
         start(PAIRED);
         connected();
         var next = new Action.PressKey(RemoteKey.MEDIA_NEXT);
@@ -250,7 +250,7 @@ class TizenSessionTest {
 
     /** Stop needs a cast to stop, which a Tizen TV does not offer; its stop key is a plain key press. */
     @Test
-    void stopIsRefused() throws Exception {
+    void stopIsRefused() {
         start(PAIRED);
         connected();
         var stop = new Action.Stop();
@@ -360,7 +360,7 @@ class TizenSessionTest {
     }
 
     @Test
-    void powerOnAClosedSessionWakesNothing() throws Exception {
+    void powerOnAClosedSessionWakesNothing() {
         start(PAIRED);
         connected();
         await().atMost(Duration.ofSeconds(5)).until(() -> stored("macAddress") != null);
