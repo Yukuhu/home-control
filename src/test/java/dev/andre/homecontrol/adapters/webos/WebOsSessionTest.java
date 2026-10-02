@@ -82,7 +82,7 @@ class WebOsSessionTest {
         receiver.close();
     }
 
-    /** Stands in for the device manager: merges what the session learned into the registry. */
+    /** Stands in for {@code AdapterSettingsStore}: merges what the session learned into the registry. */
     private LearnedSettings learned() {
         return updates -> registry.findById("lg").ifPresent(stored -> {
             Map<String, String> settings = new LinkedHashMap<>(stored.adapterSettings(WebOsAdapter.ADAPTER_ID));
@@ -137,7 +137,7 @@ class WebOsSessionTest {
         await().atMost(Duration.ofSeconds(5)).until(() -> session.state().status() == status);
     }
 
-    /** Settings as the device manager keeps them since 2B: the client key as a device secret, named by keyRef. */
+    /** Settings as the registry keeps them since 2B: the client key as a device secret, named by keyRef. */
     private Map<String, String> stored(Map<String, String> settings) {
         Map<String, String> stored = new LinkedHashMap<>(settings);
         String key = stored.remove("clientKey");

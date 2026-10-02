@@ -52,7 +52,7 @@ import static org.awaitility.Awaitility.await;
 /**
  * A Jellyfin track on a Bluetooth speaker through the real application: the speaker has no IP, so
  * rung 1 (open Jellyfin app) finds no session; it is neither a Cast receiver nor a media renderer,
- * so the stream is built from the server's own address and the local rung (LocalAudioSinkStrategy)
+ * so the stream is built from the server's own address and the local rung (RouteStrategies.localSink())
  * plays it — proving the key never reaches the browser, only the player's IPC loadfile command.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)

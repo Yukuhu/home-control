@@ -75,7 +75,7 @@ class TizenSessionTest {
         receiver.close();
     }
 
-    /** Stands in for the device manager: merges what the session learned into the registry. */
+    /** Stands in for {@code AdapterSettingsStore}: merges what the session learned into the registry. */
     private LearnedSettings learned() {
         return updates -> registry.findById("samsung").ifPresent(stored -> {
             Map<String, String> settings = new LinkedHashMap<>(stored.adapterSettings(TizenAdapter.ADAPTER_ID));
@@ -123,7 +123,7 @@ class TizenSessionTest {
         await().atMost(Duration.ofSeconds(5)).until(() -> session.state().currentApp() == null);
     }
 
-    /** Settings as the device manager keeps them since 2B: the token as a device secret, named by keyRef. */
+    /** Settings as the registry keeps them since 2B: the token as a device secret, named by keyRef. */
     private Map<String, String> stored(Map<String, String> settings) {
         Map<String, String> stored = new LinkedHashMap<>(settings);
         String token = stored.remove("token");

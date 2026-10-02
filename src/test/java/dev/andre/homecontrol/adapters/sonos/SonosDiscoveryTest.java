@@ -119,9 +119,9 @@ class SonosDiscoveryTest {
                 Duration.ofSeconds(0), Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1),
                 Duration.ofSeconds(2));
         Devices[] devices = new Devices[1];
-        List<Object> managerEvents = new CopyOnWriteArrayList<>();
+        List<Object> discoveryEvents = new CopyOnWriteArrayList<>();
         SonosDiscovery fed = new SonosDiscovery(ssdp, properties, event -> {
-            managerEvents.add(event);
+            discoveryEvents.add(event);
             if (event instanceof DeviceDiscoveredEvent discovered && devices[0] != null) {
                 devices[0].onDiscovered(discovered);
             }
@@ -129,7 +129,7 @@ class SonosDiscoveryTest {
         devices[0] = Devices.assemble(registry, List.of(new SonosAdapter(properties, fed)), event -> { });
         try {
             search();
-            await().atMost(Duration.ofSeconds(5)).until(() -> fed.devices().size() == 2 && !managerEvents.isEmpty());
+            await().atMost(Duration.ofSeconds(5)).until(() -> fed.devices().size() == 2 && !discoveryEvents.isEmpty());
             int searches = responder.searches();
             await().atMost(Duration.ofSeconds(10)).until(() -> responder.searches() >= searches + 3);
 

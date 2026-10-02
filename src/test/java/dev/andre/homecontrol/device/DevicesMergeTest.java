@@ -32,7 +32,7 @@ class DevicesMergeTest {
 
     private final List<Object> published = new CopyOnWriteArrayList<>();
     private final StubAdapter androidtv = new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, true,
-            Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.VOLUME);
+            Capability.REMOTE_KEYS, Capability.APP_LINK, Capability.ANDROID_APPS);
     private final StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false,
             Capability.CAST_RECEIVER, Capability.VOLUME);
     private DeviceRegistry registry;
@@ -352,11 +352,11 @@ class DevicesMergeTest {
         attachRegistry.save(new Device("tv", "Living Room TV", DeviceKind.CAST, "10.0.0.60",
                 Map.of("alpha", Map.of()), Instant.EPOCH));
 
-        try (Devices attachManager = Devices.assemble(attachRegistry, List.of(alpha, beta), published::add)) {
-            attachManager.start();
+        try (Devices attachDevices = Devices.assemble(attachRegistry, List.of(alpha, beta), published::add)) {
+            attachDevices.start();
             StubAdapter.StubHandle firstAlpha = alpha.handles.get("tv");
 
-            Device result = attachManager.enrollment().attach("10.0.0.60", "[LG] webOS TV", DeviceKind.WEBOS, "beta",
+            Device result = attachDevices.enrollment().attach("10.0.0.60", "[LG] webOS TV", DeviceKind.WEBOS, "beta",
                     Map.of("clientKey", "k"));
 
             assertThat(result.id()).isEqualTo("tv");
@@ -367,7 +367,7 @@ class DevicesMergeTest {
             assertThat(firstAlpha.closed).isTrue();
             assertThat(alpha.handles.get("tv")).isNotSameAs(firstAlpha);
             assertThat(beta.handles).containsKey("tv");
-            assertThat(attachManager.queries().capabilities("tv")).containsExactlyInAnyOrder(
+            assertThat(attachDevices.queries().capabilities("tv")).containsExactlyInAnyOrder(
                     Capability.VOLUME, Capability.REMOTE_KEYS, Capability.APP_LINK);
         }
     }
@@ -379,12 +379,12 @@ class DevicesMergeTest {
                 Capability.REMOTE_KEYS, Capability.APP_LINK);
         DeviceRegistry attachRegistry = new JsonFileDeviceRegistry(dir.resolve("attach-devices-2.json"));
 
-        try (Devices attachManager = Devices.assemble(attachRegistry, List.of(alpha, beta), published::add)) {
-            Device result = attachManager.enrollment().attach("10.0.0.61", "Samsung", DeviceKind.TIZEN, "beta", Map.of());
+        try (Devices attachDevices = Devices.assemble(attachRegistry, List.of(alpha, beta), published::add)) {
+            Device result = attachDevices.enrollment().attach("10.0.0.61", "Samsung", DeviceKind.TIZEN, "beta", Map.of());
 
             assertThat(result.id()).isEqualTo("beta-10-0-0-61");
             assertThat(result.kind()).isEqualTo(DeviceKind.TIZEN);
-            assertThat(attachManager.queries().states()).containsKey("beta-10-0-0-61");
+            assertThat(attachDevices.queries().states()).containsKey("beta-10-0-0-61");
         }
     }
 }
