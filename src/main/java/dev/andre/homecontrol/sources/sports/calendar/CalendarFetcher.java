@@ -3,6 +3,7 @@ package dev.andre.homecontrol.sources.sports.calendar;
 import dev.andre.homecontrol.core.content.ContentSourceException.Kind;
 import dev.andre.homecontrol.sources.http.GuardedHttpClient;
 import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
+import dev.andre.homecontrol.sources.http.OutboundFailure;
 import dev.andre.homecontrol.sources.http.OutboundRequest;
 import dev.andre.homecontrol.sources.http.OutboundResponse;
 import dev.andre.homecontrol.sources.http.Statuses;
@@ -32,7 +33,18 @@ public class CalendarFetcher implements AutoCloseable {
         http = new GuardedHttpClient(new GuardedHttpClient.Profile("the calendar", GuardedHttpClient.Redirects.CHECKED,
                 properties.maxRedirects(), properties.maxBytes(), properties.connectTimeout(),
                 properties.requestTimeout(), MAX_CONNECTIONS, CalendarLinks.RULES),
-                policy, failure -> new CalendarFetchException(failure.kind(), failure.describe("the calendar")));
+                policy, CalendarFetcher::failure);
+    }
+
+    /** People add calendars by hand, so a refused address says why, and which setting allows a calendar served here. */
+    private static CalendarFetchException failure(OutboundFailure failure) {
+        String message = failure.describe("the calendar");
+        if (failure.kind() == Kind.BLOCKED
+                && OutboundFailure.ADDRESS_NOT_ALLOWED.equals(failure.reason())) {
+            message += ": that address belongs to this machine or its network link. If the calendar is served on this"
+                    + " machine, set HOME_CONTROL_SPORTS_CALENDAR_ALLOW_LOOPBACK=true.";
+        }
+        return new CalendarFetchException(failure.kind(), message);
     }
 
     public String fetch(URI url) {

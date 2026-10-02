@@ -397,10 +397,11 @@ API, so Home Control never knows in advance what DAZN is showing — it only ope
 (the last is rewritten to `https://`). A calendar link can contain a private token, so it is
 stored as a secret; adding the first one sets the household login password if none exists yet.
 LAN calendar servers (Nextcloud, Radicale, a NAS) work over plain `http://`. Links to this
-machine (`localhost`, `127.0.0.1`) and to link-local/metadata addresses (`169.254.0.0/16`) are
-refused with a "belongs to this machine or its network link" message unless
-`HOME_CONTROL_SPORTS_CALENDAR_ALLOW_LOOPBACK=true` (only turn this on if the calendar really is
-served on this same box). Home Control reads each event's start, end and title; weekly and daily
+machine (`localhost`, `127.0.0.1`) are refused unless `HOME_CONTROL_SPORTS_CALENDAR_ALLOW_LOOPBACK=true`
+(only turn this on if the calendar really is served on this same box); link-local and metadata
+addresses (`169.254.0.0/16`) are always refused. The refusal reads "Home Control does not connect
+to 127.0.0.1 (address not allowed): that address belongs to this machine or its network link" and
+names that setting. Home Control reads each event's start, end and title; weekly and daily
 repeats are expanded, other repeat rules are shown once. Calendars refresh every 6 hours.
 
 **TheSportsDB.** Find a competition by country and sport, or enter its numeric id directly. The
