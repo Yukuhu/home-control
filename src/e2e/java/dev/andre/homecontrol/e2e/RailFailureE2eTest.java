@@ -34,8 +34,9 @@ class RailFailureE2eTest extends E2eApplicationTest {
      */
     private void refreshAndAwaitFlakyStatus(String railId, RailStatus status) {
         long before = rails.snapshot("e2e", railId).map(RailSnapshot::version).orElse(-1L);
-        rails.refresh("e2e", railId)
-                .orElseThrow(() -> new IllegalStateException("No e2e/" + railId + " rail entry"));
+        if (rails.refresh("e2e", railId).isEmpty()) {
+            throw new IllegalStateException("No e2e/" + railId + " rail entry");
+        }
         await().until(() -> rails.snapshot("e2e", railId)
                 .filter(s -> s.version() > before && !s.refreshing())
                 .map(s -> s.status() == status)
