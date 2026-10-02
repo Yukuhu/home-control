@@ -224,14 +224,15 @@ class WebOsSessionTest {
         assertThat(tv.nextRequest("ssap://audio/setMute").path("payload").path("mute").asBoolean(true)).isFalse();
     }
 
+    /** Stop needs a cast to stop, which a webOS TV does not offer; its stop button is a plain key press. */
     @Test
-    void stopUsesMediaControls() throws Exception {
+    void stopIsRefused() throws Exception {
         started();
         connected();
+        var stop = new Action.Stop();
 
-        session.execute(new Action.Stop());
-
-        assertThat(tv.nextRequest("ssap://media.controls/stop")).isNotNull();
+        assertThatThrownBy(() -> session.execute(stop))
+                .isInstanceOf(UnsupportedActionException.class).hasMessage("LG TV cannot stop a cast");
     }
 
     @Test

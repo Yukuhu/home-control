@@ -160,7 +160,8 @@ public class WebOsSession implements DeviceHandle, InputListing {
                     SsapMessages.empty().put("volume", Math.clamp(level, 0, 100)), "set the volume");
             case Action.Mute(var muted) -> call(SsapUris.SET_MUTE, SsapMessages.empty().put("mute", muted),
                     muted ? "mute" : "unmute");
-            case Action.Stop _ -> call(SsapUris.MEDIA_STOP, SsapMessages.empty(), "stop playback");
+            // Stop is for casts (Action.Stop requires a cast or renderer capability), which a webOS TV does not offer.
+            case Action.Stop _ -> throw new UnsupportedActionException(device.name() + " cannot stop a cast");
             case Action.CastLoad _ -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
             case Action.CastMessage _ -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
             case Action.PlayMedia _ -> throw new UnsupportedActionException(device.name() + " cannot play a direct stream");
