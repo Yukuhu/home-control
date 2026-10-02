@@ -107,6 +107,11 @@ sonar {
         property("sonar.gradle.scanAll", "true")
         property("sonar.javascript.lcov.reportPaths",
             "build/reports/browser-coverage/lcov.info,build/reports/pr-summary/lcov.info")
+        // The Dockerfile names each base image by tag and digest: the digest pins it, and the tag is how Dependabot
+        // knows which newer digest to propose. docker:S8431 asks for one of the two, which would stop the updates.
+        property("sonar.issue.ignore.multicriteria", "tagAndDigest")
+        property("sonar.issue.ignore.multicriteria.tagAndDigest.ruleKey", "docker:S8431")
+        property("sonar.issue.ignore.multicriteria.tagAndDigest.resourceKey", "**/Dockerfile")
     }
 }
 
