@@ -11,10 +11,11 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import java.io.ByteArrayInputStream;
 
-final class ThemeTestPackages {
+/** Theme packages for tests: a theme's files, zipped as an upload would be. */
+public final class ThemeTestPackages {
     private ThemeTestPackages() { }
 
-    static Map<String, byte[]> files(String id, String css) {
+    public static Map<String, byte[]> files(String id, String css) {
         Map<String, byte[]> files = new LinkedHashMap<>();
         files.put("theme.json", ("{\"formatVersion\":1,\"themeApiVersion\":1,\"id\":\"" + id
                 + "\",\"name\":\"Test theme\",\"version\":\"1\",\"author\":\"Author\",\"description\":\"Description\",\"license\":\"MIT\"}").getBytes(StandardCharsets.UTF_8));
@@ -24,7 +25,7 @@ final class ThemeTestPackages {
         return files;
     }
 
-    static byte[] zip(Map<String, byte[]> files) {
+    public static byte[] zip(Map<String, byte[]> files) {
         try {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             try (ZipOutputStream zip = new ZipOutputStream(output)) {

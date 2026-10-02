@@ -47,7 +47,7 @@ combination, such as sports on with TheSportsDB off, keeps a `@SpringBootTest` o
 
 A test of the whole application extends `testsupport.FullAppTest`: one context per test JVM with every module on, a
 real port and MockMvc. After every class, `FullAppReset` returns the application to a fresh install: no devices, no
-login or secrets, no sports settings, pins or workflows, an unused YouTube quota, no rate limit, no pending pairing,
+installed themes, no login or secrets, no sports settings, pins or workflows, an unused YouTube quota, no rate limit, no pending pairing,
 fresh rails and settings files, empty caches of TMDB, YouTube and TheSportsDB answers, and the shared web-API fakes
 (`SharedFakes`: TMDB, Google, TheSportsDB) reset.
 
