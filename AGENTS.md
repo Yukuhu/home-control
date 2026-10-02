@@ -40,14 +40,20 @@ Rules for everyone who changes this repository, people and coding agents alike. 
 
 ## Where things live
 
-- Modules: the root project is the app. `core/` holds the domain model (`dev.andre.homecontrol.core`), a Gradle
-  module that depends on the JDK alone; run its tests with `scripts/gradle.sh :core:test`. See
+- Modules: the root project is the app. `core/` holds the domain model (`dev.andre.homecontrol.core`), which depends
+  on the JDK alone. `protocols/` holds the Spring-free wire libraries: every `protocol` package, `adapters.net` and
+  `sources.sports.ics`. Run a module's tests with `scripts/gradle.sh :core:test` or `:protocols:test`. See
   [Modules](docs/dev/architecture.md#modules).
-- Device adapters: `src/main/java/dev/andre/homecontrol/adapters/<device>/`, with the wire protocol in `protocol/`.
+- Device adapters: `src/main/java/dev/andre/homecontrol/adapters/<device>/`, with the wire protocol in
+  `protocols/src/main/java/dev/andre/homecontrol/adapters/<device>/protocol/`.
 - Content sources: `src/main/java/dev/andre/homecontrol/sources/<source>/`.
-- Tests sit in the same package as the code they test. Fakes of devices and services are named `Fake…` and speak
-  the real protocol; recorded device and API responses are in `src/test/resources/fixtures/<device or source>/`.
-- Shared test helpers: `src/test/java/dev/andre/homecontrol/testsupport/`. Build a new web-API fake on
+- Tests sit in the same package as the code they test, in the code's module. Fakes of devices and services are named
+  `Fake…` and speak the real protocol. A fake the app's tests share with the protocol tests sits in `protocols`' test
+  fixtures (`protocols/src/testFixtures/java/`). Recorded device and API responses are in
+  `src/test/resources/fixtures/<device or source>/`, or in `protocols/src/testFixtures/resources/fixtures/<device>/`
+  for the protocols' own. Read a recording with `Fixtures.read`.
+- Shared test helpers: `src/test/java/dev/andre/homecontrol/testsupport/`, and `Fixtures`, `Request` and `TestTls`
+  in `protocols/src/testFixtures/java/dev/andre/homecontrol/testsupport/`. Build a new web-API fake on
   `FakeHttpServer` instead of opening a server of its own.
 - Test configuration: `src/test/resources/config/application.yaml` holds only overrides of the production
   `application.yaml`.

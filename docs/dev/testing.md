@@ -6,7 +6,7 @@ How the test suites are built and how to run them.
 
 | Layer | What it is | Where |
 | --- | --- | --- |
-| Unit tests | Plain JUnit 5 with AssertJ, Mockito and Awaitility. Most device and source tests drive the real client against an in-process fake that speaks the real protocol over a socket. | `src/test/java`, next to the code |
+| Unit tests | Plain JUnit 5 with AssertJ, Mockito and Awaitility (the modules' tests use no Mockito). Most device and source tests drive the real client against an in-process fake that speaks the real protocol over a socket. | `src/test/java` of the module that holds the code: `core/`, `protocols/` or the root |
 | Web slices | One shared `@WebMvcTest` context over every controller, with their collaborators mocked: test classes extend `WebSliceTest`. | `src/test/java/.../web`, and next to each content source's own controllers |
 | End to end | The whole application with fake devices or services, over MockMvc or real HTTP: one shared `FullAppTest` context, reset after every class; a few keep their own. | classes named `*EndToEndTest` |
 | Browser tests | Playwright driving the dashboard in Chromium, Firefox and WebKit. | `src/e2e/java`, see [Browser tests](#browser-tests) |
@@ -67,15 +67,18 @@ off Spring Framework 7's pausing, because `RailCache` cannot restart after a pau
 - Everything: `scripts/gradle.sh build`. It runs `./gradlew` in the `gradle:jdk25` Docker image, for machines without
   a JDK 25; with one, `./gradlew build` does the same.
 - One class of the app: `scripts/gradle.sh test --tests 'dev.andre.homecontrol.web.ErrorAdviceTest'`. One class of
-  `core`: `scripts/gradle.sh :core:test --tests 'dev.andre.homecontrol.core.ActionTest'`. `test --tests` runs its
-  filter in every module: a module without a match passes, and the app's `test` fails when nothing matches, so a
-  filter that matches no test anywhere fails the build. `:core:test --tests` fails when nothing in `core` matches.
-- A failure's details: `grep -A20 '<failure' build/test-results/test/*.xml core/build/test-results/test/*.xml`.
+  `core`: `scripts/gradle.sh :core:test --tests 'dev.andre.homecontrol.core.ActionTest'`. One class of `protocols`:
+  `scripts/gradle.sh :protocols:test --tests 'dev.andre.homecontrol.adapters.net.DeviceUrisTest'`. `test --tests`
+  runs its filter in every module: a module without a match passes, and the app's `test` fails when nothing matches,
+  so a filter that matches no test anywhere fails the build. A module's own test task (`:core:test --tests`,
+  `:protocols:test --tests`) fails when nothing in it matches.
+- A failure's details: `grep -A20 '<failure' build/test-results/test/*.xml core/build/test-results/test/*.xml
+  protocols/build/test-results/test/*.xml`.
 - The unit tests run in up to four JVMs at once, and Gradle reuses the results of tasks whose inputs did not change,
   so a test that passed and was not touched is not run again.
-- Every test and lifecycle method has a 60 s timeout (`junit-platform.properties` in `src/test/resources` and
-  `core/src/test/resources`), off while a debugger is attached. A test that needs longer declares `@Timeout` on the method, or on the class for its test
-  methods; a long `@BeforeAll` or `@BeforeEach` needs its own.
+- Every test and lifecycle method has a 60 s timeout (`junit-platform.properties` in the `src/test/resources` of the
+  root, `core/` and `protocols/`), off while a debugger is attached. A test that needs longer declares `@Timeout` on
+  the method, or on the class for its test methods; a long `@BeforeAll` or `@BeforeEach` needs its own.
 
 ## Dependency verification
 
@@ -141,17 +144,24 @@ against a previously reviewed value.
 
 - A fake of a device or a service is named `Fake…` and sits in the test package of the code it fakes, for example
   `FakeCastReceiver` or `FakeJellyfinServer`. It speaks the real protocol, so the production client runs unchanged.
+  A fake that the app's tests share with the protocol tests sits in `protocols`' test fixtures
+  (`protocols/src/testFixtures/java`), in its protocol's package. The app's tests and browser tests get the test
+  fixtures through `testImplementation(testFixtures(project(":protocols")))`.
 - Shared helpers live in `dev.andre.homecontrol.testsupport`: `FakeHttpServer` for any HTTP or HTTPS fake,
-  `TestTls` for a self-signed server certificate, `MutableClock`, `RecordingStateListener`, `EventStreamReader`,
-  `RailHtml` to read a rendered rail, and `FakeLoginContext` for a browser's login where `LoginService` is a mock
-  (with a real `LoginService`, wrap a `MockHttpServletRequest` in `RequestLoginContext`).
+  `TestTls` for a self-signed server certificate (with `Request` and `Fixtures`, in `protocols`' test fixtures),
+  `MutableClock`, `RecordingStateListener`, `EventStreamReader`, `RailHtml` to read a rendered rail, and
+  `FakeLoginContext` for a browser's login where `LoginService` is a mock (with a real `LoginService`, wrap a
+  `MockHttpServletRequest` in `RequestLoginContext`).
   A fake of a web API (Jellyfin, TMDB, Google, TheSportsDB, calendars, workflows) is a thin wrapper over
   `FakeHttpServer` that keeps the service's own vocabulary; a fake of a socket protocol (UPnP, Tizen, Cast, Android
   TV, mpv) stays protocol-specific. A test that needs a request to stay open until it has checked something holds
   the answer with `FakeHttpServer.hold` and a `CountDownLatch` (the calendar and TheSportsDB fakes wrap it); the
   request is recorded on arrival, so the test can wait for it.
-- Recorded device and API responses live in `src/test/resources/fixtures/<device or source>/`, for example
-  `fixtures/cast/` or `fixtures/jellyfin/`.
+- Recorded device and API responses live in `fixtures/<device or source>/` on the test classpath: the protocols'
+  own (`cast`, `ics`, `sonos`, `ssdp`, `tizen`, `upnp`, `webos`) in `protocols/src/testFixtures/resources/`, the
+  content sources' in `src/test/resources/`. Read one with `Fixtures.read("upnp/didl-track.xml")` or
+  `Fixtures.bytes(…)`: a module's tests run in the module's directory, so a path relative to it finds only that
+  module's files.
 - Waiting for something asynchronous uses Awaitility (`await().atMost(...)`), never `Thread.sleep`. A fake may
   sleep to model a slow peer, with `@SuppressWarnings("java:S2925")` and a one-line reason.
 - Device sessions take their waits as a `*Timings` record of `Duration`s (`CastTimings`, `TizenTimings`, …), built
