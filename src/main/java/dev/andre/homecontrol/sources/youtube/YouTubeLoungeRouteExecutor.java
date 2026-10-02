@@ -35,12 +35,14 @@ public class YouTubeLoungeRouteExecutor implements RouteExecutor {
 
     @Override
     public Set<String> keys() {
-        return Set.of("youtube-lounge");
+        return Set.of(YouTubeLoungeRoute.KEY);
     }
 
     @Override
     public void execute(DelegatedRoute route, Device device) {
-        YouTubeLoungeRoute play = (YouTubeLoungeRoute) route;
+        if (!(route instanceof YouTubeLoungeRoute(var videoId))) {
+            throw new IllegalArgumentException("Not a YouTube Lounge route");
+        }
         Map<String, Object> reply;
         try {
             reply = commands.query(device.id(), SESSION_STATUS);
@@ -54,7 +56,7 @@ public class YouTubeLoungeRouteExecutor implements RouteExecutor {
         try {
             String token = lounge.loungeToken(screenId);
             LoungeClient.LoungeSession session = lounge.bind(token, remoteId());
-            lounge.setPlaylist(token, session, play.videoId());
+            lounge.setPlaylist(token, session, videoId);
         } catch (LoungeException e) {
             throw failed(device, e.getMessage());
         }
