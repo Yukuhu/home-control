@@ -45,6 +45,16 @@ class DockerImageTest {
     }
 
     @Test
+    void theGradleTheWrapperDownloadsIsVerified() throws Exception {
+        // A build from source downloads Gradle inside the image build; the wrapper checks it against this checksum,
+        // as every other download of the build is checked (the base images by digest, the dependencies by
+        // gradle/verification-metadata.xml).
+        String properties = Files.readString(Path.of("gradle/wrapper/gradle-wrapper.properties"));
+
+        assertThat(properties).containsPattern("(?m)^distributionSha256Sum=[0-9a-f]{64}$");
+    }
+
+    @Test
     void theImageChecksItsHealth() throws Exception {
         String runtime = runtime(Files.readString(Path.of("Dockerfile")));
 
