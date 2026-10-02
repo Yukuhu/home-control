@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
 import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
+import dev.andre.homecontrol.sources.sports.feed.FeedFetchWaiters;
 import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
@@ -103,16 +104,11 @@ class CalendarScheduleConcurrencyTest {
         return pass;
     }
 
-    private static void awaitStillWaiting(Future<?> waiter) {
-        await().during(Duration.ofMillis(200)).atMost(Duration.ofSeconds(2)).until(() -> !waiter.isDone());
-    }
-
     @Test
     void aSecondPassJoinsTheRunningFetchInsteadOfSendingAnother() throws Exception {  // guard
         server.holdFixture(WEEKLY_PATH, "recurring.ics", release);
         Future<FeedResult> first = passHeldAt(WEEKLY_PATH, 1);
-        Future<FeedResult> second = pool.submit(schedule::events);
-        awaitStillWaiting(second);
+        Future<FeedResult> second = FeedFetchWaiters.submitWaiting(pool, schedule::events);
 
         release.countDown();
 
@@ -125,8 +121,7 @@ class CalendarScheduleConcurrencyTest {
     void aFirstLookupDuringTheFirstPassWaitsForIt() throws Exception {
         server.holdFixture(BUNDESLIGA_PATH, "bundesliga.ics", release);
         Future<FeedResult> pass = passHeldAt(BUNDESLIGA_PATH, 1);
-        Future<Optional<SportsEvent>> found = pool.submit(() -> schedule.find(BUNDESLIGA_ITEM));
-        awaitStillWaiting(found);
+        Future<Optional<SportsEvent>> found = FeedFetchWaiters.submitWaiting(pool, () -> schedule.find(BUNDESLIGA_ITEM));
 
         release.countDown();
 
@@ -141,11 +136,10 @@ class CalendarScheduleConcurrencyTest {
         Future<FeedResult> first = passHeldAt(BUNDESLIGA_PATH, 1);
         AtomicReference<FeedResult> secondResult = new AtomicReference<>();
         AtomicBoolean stillInterrupted = new AtomicBoolean();
-        Thread second = Thread.ofVirtual().start(() -> {
+        Thread second = FeedFetchWaiters.startWaiting(() -> {
             secondResult.set(schedule.events());
             stillInterrupted.set(Thread.currentThread().isInterrupted());
         });
-        await().during(Duration.ofMillis(200)).atMost(Duration.ofSeconds(2)).until(second::isAlive);
 
         second.interrupt();
 

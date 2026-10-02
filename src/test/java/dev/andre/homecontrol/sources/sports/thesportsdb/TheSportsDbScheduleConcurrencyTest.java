@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.thesportsdb;
 
+import dev.andre.homecontrol.sources.sports.feed.FeedFetchWaiters;
 import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.feed.FeedStatus;
 import dev.andre.homecontrol.sources.sports.feed.SportsEvent;
@@ -97,16 +98,11 @@ class TheSportsDbScheduleConcurrencyTest {
         return pass;
     }
 
-    private static void awaitStillWaiting(Future<?> waiter) {
-        await().during(Duration.ofMillis(200)).atMost(Duration.ofSeconds(2)).until(() -> !waiter.isDone());
-    }
-
     @Test
     void twoPassesAtOnceSendOneRequestPerDay() throws Exception {  // guard
         holdDay("2026-09-19", "4331", "eventsday-2026-09-19-4331.json");
         Future<FeedResult> first = passHeldAfter(2);
-        Future<FeedResult> second = pool.submit(schedule::events);
-        awaitStillWaiting(second);
+        Future<FeedResult> second = FeedFetchWaiters.submitWaiting(pool, schedule::events);
 
         release.countDown();
 
@@ -119,8 +115,7 @@ class TheSportsDbScheduleConcurrencyTest {
     void aFirstLookupDuringTheFirstPassWaitsForIt() throws Exception {
         holdDay("2026-09-19", "4331", "eventsday-2026-09-19-4331.json");
         Future<FeedResult> pass = passHeldAfter(2);
-        Future<Optional<SportsEvent>> found = pool.submit(() -> schedule.find(BUNDESLIGA_ITEM));
-        awaitStillWaiting(found);
+        Future<Optional<SportsEvent>> found = FeedFetchWaiters.submitWaiting(pool, () -> schedule.find(BUNDESLIGA_ITEM));
 
         release.countDown();
 
@@ -135,11 +130,10 @@ class TheSportsDbScheduleConcurrencyTest {
         Future<FeedResult> first = passHeldAfter(1);
         AtomicReference<FeedResult> secondResult = new AtomicReference<>();
         AtomicBoolean stillInterrupted = new AtomicBoolean();
-        Thread second = Thread.ofVirtual().start(() -> {
+        Thread second = FeedFetchWaiters.startWaiting(() -> {
             secondResult.set(schedule.events());
             stillInterrupted.set(Thread.currentThread().isInterrupted());
         });
-        await().during(Duration.ofMillis(200)).atMost(Duration.ofSeconds(2)).until(second::isAlive);
 
         second.interrupt();
 
@@ -170,9 +164,7 @@ class TheSportsDbScheduleConcurrencyTest {
     void aRateLimitMetByAJoinedDownloadStopsBothPasses() throws Exception {
         server.hold(EVENTS_DAY, Map.of("d", "2026-09-18", "l", "4331"), 429, "eventsday-empty.json", release);
         Future<FeedResult> first = passHeldAfter(1);
-        Thread second = Thread.ofVirtual().start(schedule::events);
-        // Parked on the running download, not merely not started yet.
-        await().until(() -> second.getState() == Thread.State.WAITING);
+        Thread second = FeedFetchWaiters.startWaiting(schedule::events);
 
         release.countDown();
         first.get(10, TimeUnit.SECONDS);
