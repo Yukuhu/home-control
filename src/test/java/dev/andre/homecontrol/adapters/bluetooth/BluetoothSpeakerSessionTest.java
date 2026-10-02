@@ -257,6 +257,21 @@ class BluetoothSpeakerSessionTest {
     }
 
     @Test
+    void aFailedStreamKeepsItsReasonWhenMpvIsSeenExitingFirst() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        launcher.options = launcher.options.failingFor("broken");
+        launcher.exitsBeforeItsLastEvents = true;
+        start();
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+
+        var brokenStream = new Action.PlayMedia(
+                URI.create("http://127.0.0.1:9/broken.mp3?ApiKey=secret-key"), "audio/mpeg", "X", null);
+        assertThatThrownBy(() -> session.execute(brokenStream))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessage("JBL Flip 5 could not play the stream: the stream could not be loaded (loading failed)");
+    }
+
+    @Test
     void mpvMissingIsExplained() {
         bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
         launcher.startFailure = new MpvNotInstalledException("mpv", new IOException("error=2"));

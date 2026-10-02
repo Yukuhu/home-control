@@ -72,6 +72,7 @@ public final class FakeMpv implements AutoCloseable {
     private final AtomicInteger dropNextGetProperty = new AtomicInteger();
     private final List<SocketChannel> clients = new CopyOnWriteArrayList<>();
     private final CountDownLatch quit = new CountDownLatch(1);
+    private volatile Runnable beforeLastEvents = () -> { };
 
     // playback state, guarded by this
     private String path;
@@ -179,6 +180,21 @@ public final class FakeMpv implements AutoCloseable {
         boolean quitAfter;
         synchronized (this) {
             quitAfter = end("eof", events);
+        }
+        sendEvents(events, quitAfter);
+    }
+
+    /**
+     * Runs {@code hook} once the player has decided to quit, before it sends that last step's events: what a client
+     * sees when it notices mpv's exit before it has read the events mpv sent just before quitting.
+     */
+    public void beforeLastEvents(Runnable hook) {
+        beforeLastEvents = hook;
+    }
+
+    private void sendEvents(List<ObjectNode> events, boolean quitAfter) {
+        if (quitAfter) {
+            beforeLastEvents.run();
         }
         events.forEach(this::broadcast);
         if (quitAfter) {
@@ -301,10 +317,7 @@ public final class FakeMpv implements AutoCloseable {
         }
         response.put("request_id", request.path("request_id").asLong(0));
         send(client, response);
-        events.forEach(this::broadcast);
-        if (quitAfter) {
-            close();
-        }
+        sendEvents(events, quitAfter);
     }
 
     private void getProperty(String name, ObjectNode response) {
