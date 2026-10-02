@@ -69,7 +69,8 @@ class ReconnectorTest {
         reconnector.start();
         await().atMost(Duration.ofSeconds(3)).until(() -> attempts.size() == 4);
 
-        reconnector.lost();
+        // On the loop, as sessions call it: it then runs after the fourth attempt has connected and reset the backoff.
+        loop.execute(reconnector::lost);
 
         await().atMost(Duration.ofMillis(600)).until(() -> attempts.size() == 5);
     }
