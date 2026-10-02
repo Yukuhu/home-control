@@ -10,14 +10,15 @@
 #        scripts/e2e.sh -Pe2eBrowsers=chromium --tests '*PlaySheet*'
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$ROOT/scripts/container-runtime.sh"
 VERSION="$(sed -n 's/^playwright = "\(.*\)"$/\1/p' "$ROOT/gradle/libs.versions.toml")"
 if [[ -z "$VERSION" ]]; then
   echo "playwright version not found in gradle/libs.versions.toml" >&2
   exit 1
 fi
 IMAGE="home-control-e2e:playwright-$VERSION"
-if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-  docker build -t "$IMAGE" --build-arg "PLAYWRIGHT_VERSION=$VERSION" \
+if ! "$HC_CONTAINER_ENGINE" image inspect "$IMAGE" >/dev/null 2>&1; then
+  "$HC_CONTAINER_ENGINE" build -t "$IMAGE" --build-arg "PLAYWRIGHT_VERSION=$VERSION" \
     -f "$ROOT/scripts/e2e.Dockerfile" "$ROOT/scripts"
 fi
 HC_GRADLE_IMAGE="$IMAGE" exec "$ROOT/scripts/gradle.sh" e2eTest "$@"

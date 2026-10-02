@@ -5,7 +5,7 @@ Rules for everyone who changes this repository, people and coding agents alike. 
 
 ## Build and test
 
-- There may be no local JDK. `scripts/gradle.sh <arguments>` runs `./gradlew` in the `gradle:jdk25` Docker image;
+- There may be no local JDK. `scripts/gradle.sh <arguments>` runs `./gradlew` in the `gradle:jdk25` image using Docker or Podman;
   use it wherever the documentation says `./gradlew`. See [Running tests](docs/dev/testing.md#running-tests).
 - A change is done when `scripts/gradle.sh build` is green.
 - Browser tests run with `scripts/e2e.sh`; see [Browser tests](docs/dev/testing.md#browser-tests).
