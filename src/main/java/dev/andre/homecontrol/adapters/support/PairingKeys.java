@@ -62,9 +62,10 @@ public final class PairingKeys {
     }
 
     /**
-     * Moves a key still stored under {@code legacyKey} in the entry into a device secret, under the entry's
-     * reference if an interrupted earlier run left one, else a new one. Idempotent: an entry without the legacy key
-     * comes back unchanged.
+     * Moves a key still stored under {@code legacyKey} in the entry into a device secret under a new reference, or
+     * under the entry's own reference if a hand edit left one next to the legacy key. Idempotent: an entry without the
+     * legacy key comes back unchanged. The secret is stored before the caller saves the entry, so a crash in between
+     * leaves that secret unused; the next start moves the key again under a new reference, and the pairing survives.
      */
     public Device migrate(Device device, String legacyKey) {
         Map<String, String> settings = device.adapterSettings(adapterId);

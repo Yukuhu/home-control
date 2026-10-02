@@ -76,7 +76,21 @@ class WebOsKeyMigrationTest {
     }
 
     @Test
-    void aMigrationThatCrashedBeforeTheRegistryWasSavedReusesItsReference() {
+    void aMigrationThatCrashedBeforeTheRegistryWasSavedMovesTheKeyAgainAndLeavesTheFirstSecretUnused() {
+        WebOsAdapter adapter = adapter();
+        Device saved = lg(Map.of("clientKey", "lg-client-key"));
+        adapter.migrate(saved); // its secret was stored, then the crash: the registry still holds the entry as it was
+
+        Device migrated = adapter.migrate(saved);
+
+        String keyRef = migrated.adapterSettings("webos").get("keyRef");
+        assertThat(secrets.deviceSecret(WebOsSettings.secretName(keyRef))).contains("lg-client-key");
+        assertThat(secrets.all()).hasSize(2);
+    }
+
+    /** Only a hand edit leaves a reference next to the legacy key: the key moves under that reference. */
+    @Test
+    void anEntryWithBothTheKeyAndAReferenceKeepsTheReference() {
         Device migrated = adapter().migrate(lg(Map.of("clientKey", "lg-client-key", "keyRef", REF)));
 
         assertThat(migrated.adapterSettings("webos")).containsEntry("keyRef", REF).doesNotContainKey("clientKey");
