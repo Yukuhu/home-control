@@ -1,3 +1,5 @@
+import net.ltgt.gradle.errorprone.errorprone
+
 // Raises commons-lang3 and Jackson on the build classpath above the versions the Spring Boot plugin
 // drags in; gradle/libs.versions.toml says why. A plugin's transitive dependencies can only be
 // constrained here.
@@ -19,10 +21,12 @@ plugins {
     alias(libs.plugins.protobuf) apply false
     alias(libs.plugins.sonarqube)
     alias(libs.plugins.test.retry)
+    alias(libs.plugins.errorprone)
 }
 
 // Read here, in the root project: inside allprojects {}, `libs` would be looked up on a module that has none yet.
 val jacocoVersion = libs.versions.jacoco.get()
+val errorproneCore = libs.errorprone.core
 
 // One coverage report for the whole build: the app's tests exercise the modules' code too, so a report per module
 // would count only each module's own tests. SonarCloud reads it for every module.
@@ -34,6 +38,7 @@ val combinedCoverageReport =
 allprojects {
     apply(plugin = "java")
     apply(plugin = "jacoco")
+    apply(plugin = "net.ltgt.errorprone")
 
     group = "dev.andre"
     // CI passes the version computed from conventional commits; local builds get an
@@ -48,6 +53,17 @@ allprojects {
 
     configure<JacocoPluginExtension> {
         toolVersion = jacocoVersion
+    }
+
+    // Error Prone checks the code as it compiles: a check at error level fails the build. Its warnings stay off for
+    // now; a check worth having can be raised to an error by name. Generated protobuf code is not ours to fix.
+    dependencies { "errorprone"(errorproneCore) }
+    tasks.withType<JavaCompile>().configureEach {
+        options.errorprone {
+            disableAllWarnings = true
+            disableWarningsInGeneratedCode = true
+            excludedPaths = ".*/build/generated/.*"
+        }
     }
 
     tasks.withType<JacocoReport>().configureEach {

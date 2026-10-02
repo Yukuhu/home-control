@@ -28,6 +28,8 @@ playwright = "1.63.0"
 archunit = "1.5.1"
 # The JaCoCo agent and report tools the build runs (build.gradle.kts, toolVersion).
 jacoco = "0.8.15"
+errorprone = "2.50.0"
+errorprone-plugin = "5.1.1"
 
 ph-css = "8.2.2"
 
@@ -51,6 +53,7 @@ archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref
 # Not a dependency of any project: Gradle's jacoco plugin fetches the agent itself. The entry is here so that Dependabot
 # proposes JaCoCo updates for the version above.
 jacoco-agent = { module = "org.jacoco:org.jacoco.agent", version.ref = "jacoco" }
+errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
 
 ph-css = { module = "com.helger:ph-css", version.ref = "ph-css" }
 
@@ -59,3 +62,4 @@ spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
 sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
 test-retry = { id = "org.gradle.test-retry", version.ref = "test-retry" }
+errorprone = { id = "net.ltgt.errorprone", version.ref = "errorprone-plugin" }
