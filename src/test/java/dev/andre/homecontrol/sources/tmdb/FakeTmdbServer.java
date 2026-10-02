@@ -88,6 +88,12 @@ public final class FakeTmdbServer implements AutoCloseable {
         return this;
     }
 
+    /** Answers {@code path} with a body marked as gzip-compressed, which the client refuses to read. */
+    public FakeTmdbServer respondGzipped(String path) {
+        server.respond("GET", path, Response.of(200, "application/json", "{}").withHeader("Content-Encoding", "gzip"));
+        return this;
+    }
+
     public FakeTmdbServer redirect(String path, String location) {
         server.respond("GET", path, Response.of(302, "text/plain", new byte[0]).withHeader("Location", location));
         return this;

@@ -207,7 +207,8 @@ class YouTubeHttpTest {
                     () -> http.get(URI.create(server.url("/secret-path/gzip") + query), bearer),
                     () -> http.get(URI.create(server.url("/secret-path/slow") + query), bearer),
                     () -> http.postForm(URI.create("http://127.0.0.1:" + closedPort + "/secret-path/token"),
-                            Map.of("client_secret", "secret-client"), Map.of())}) {
+                            Map.of("client_secret", "secret-client"), Map.of()),
+                    () -> http.get(URI.create("http://localhost:" + closedPort + "/secret-path/named" + query), bearer)}) {
                 YouTubeException failure = catchThrowableOfType(YouTubeException.class, call::run);
 
                 assertThat(failure).hasNoCause();

@@ -75,6 +75,12 @@ public final class FakeTheSportsDbServer implements AutoCloseable {
         return route(endpoint, query, json(status, json == null ? new byte[0] : json.getBytes(StandardCharsets.UTF_8)));
     }
 
+    /** Answers with a body marked as gzip-compressed, which the client refuses to read. */
+    public FakeTheSportsDbServer respondGzipped(String endpoint, Map<String, String> query) {
+        return route(endpoint, query, json(200, "{}".getBytes(StandardCharsets.UTF_8))
+                .withHeader("Content-Encoding", "gzip"));
+    }
+
     /** Like {@link #respond}, but the answer waits until {@code release} opens; the request is recorded on arrival. */
     public FakeTheSportsDbServer hold(String endpoint, Map<String, String> query, int status, String fixture,
                                       CountDownLatch release) {
