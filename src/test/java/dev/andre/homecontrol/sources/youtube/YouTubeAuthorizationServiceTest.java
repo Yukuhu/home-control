@@ -21,9 +21,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 class YouTubeAuthorizationServiceTest {
@@ -214,6 +217,25 @@ class YouTubeAuthorizationServiceTest {
         YouTubeAuthorizationService.Status status = authorization.status();
         assertThat(status.state()).isEqualTo(YouTubeAuthorizationService.State.PENDING);
         assertThat(status.message()).isEqualTo("Could not reach Google; still trying");
+    }
+
+    @Test
+    void aBusyConnectionKeepsPolling() {
+        GoogleOAuthClient oauth = spy(new GoogleOAuthClient(new YouTubeHttp(fake.properties()),
+                URI.create(fake.base() + "/oauth"), clock));
+        doThrow(new YouTubeException(ContentSourceException.Kind.RATE_LIMITED,
+                "Home Control is busy talking to Google; try again in a moment")).when(oauth).poll(any(), any(), any());
+        YouTubeAuthorizationService busy = new YouTubeAuthorizationService(oauth, secrets, tokens, sourceSettings,
+                clock, false);
+        busy.start();
+
+        clock.advance(Duration.ofSeconds(5));
+        boolean stillPending = busy.pollOnce();
+
+        assertThat(stillPending).isTrue();
+        YouTubeAuthorizationService.Status status = busy.status();
+        assertThat(status.state()).isEqualTo(YouTubeAuthorizationService.State.PENDING);
+        assertThat(status.message()).isEqualTo("Home Control is busy talking to Google; still trying");
     }
 
     @Test

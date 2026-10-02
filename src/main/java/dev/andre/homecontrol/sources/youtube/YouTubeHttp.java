@@ -27,7 +27,7 @@ public class YouTubeHttp implements AutoCloseable {
     // unbounded amount of it into heap.
     static final int MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
     /** Thumbnails are proxied for the dashboard, many at once. */
-    private static final int MAX_CONCURRENT = 16;
+    static final int MAX_CONCURRENT = 16;
     private static final HttpUrls.Rules GOOGLE_URLS = new HttpUrls.Rules(true, false, true, false, 0);
 
     private static final JsonMapper MAPPER = Json.MAPPER;
@@ -69,6 +69,8 @@ public class YouTubeHttp implements AutoCloseable {
     }
 
     private final GuardedHttpClient http;
+    /** Thumbnails have slots of their own: a dashboard full of them must not hold up sign-in and API calls. */
+    private final GuardedHttpClient thumbnails;
 
     public YouTubeHttp(YouTubeProperties properties) {
         // Every caller reads Google's error bodies (OAuth error codes, quota reasons), so every request asks for them.
@@ -76,10 +78,20 @@ public class YouTubeHttp implements AutoCloseable {
                 MAX_RESPONSE_BYTES, properties.connectTimeout(), properties.requestTimeout(), MAX_CONCURRENT,
                 GOOGLE_URLS), new OutboundAddressPolicy(properties.allowLoopback()),
                 failure -> new YouTubeException(failure.kind(), failure.describe("Google")));
+        this.thumbnails = new GuardedHttpClient(new GuardedHttpClient.Profile("Google",
+                GuardedHttpClient.Redirects.NONE, 0, MAX_RESPONSE_BYTES, properties.connectTimeout(),
+                properties.requestTimeout(), MAX_CONCURRENT, GOOGLE_URLS),
+                new OutboundAddressPolicy(properties.allowLoopback()),
+                failure -> new YouTubeException(failure.kind(), failure.describe("Google")));
     }
 
     public Response get(URI uri, Map<String, String> headers) {
         return send(withHeaders(OutboundRequest.get(uri), headers));
+    }
+
+    /** A video thumbnail, proxied for the dashboard. */
+    public Response thumbnail(URI uri) {
+        return send(thumbnails, withHeaders(OutboundRequest.get(uri), Map.of()));
     }
 
     public Response postForm(URI uri, Map<String, String> form, Map<String, String> headers) {
@@ -96,7 +108,11 @@ public class YouTubeHttp implements AutoCloseable {
     }
 
     private Response send(OutboundRequest request) {
-        OutboundResponse response = http.send(request);
+        return send(http, request);
+    }
+
+    private static Response send(GuardedHttpClient client, OutboundRequest request) {
+        OutboundResponse response = client.send(request);
         return new Response(response.status(), response.contentType() == null ? "" : response.contentType(),
                 response.body());
     }
@@ -104,6 +120,7 @@ public class YouTubeHttp implements AutoCloseable {
     @Override
     public void close() {
         http.close();
+        thumbnails.close();
     }
 
     /** {@code base + path + ?query}; null values are skipped; insertion order is kept. */

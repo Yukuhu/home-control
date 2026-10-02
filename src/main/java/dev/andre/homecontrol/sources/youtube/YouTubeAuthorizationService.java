@@ -182,10 +182,15 @@ public class YouTubeAuthorizationService implements AutoCloseable {
                 if (pending != code) {
                     return pending != null;
                 }
-                if (e.kind() == ContentSourceException.Kind.UNREACHABLE || e.kind() == ContentSourceException.Kind.SERVER_ERROR) {
+                // Trouble on the way to Google, or all of Home Control's connections to it in use: the code stays
+                // valid, so the next poll may well succeed.
+                if (e.kind() == ContentSourceException.Kind.UNREACHABLE || e.kind() == ContentSourceException.Kind.SERVER_ERROR
+                        || e.kind() == ContentSourceException.Kind.RATE_LIMITED) {
                     nextPollAt = clock.instant().plus(interval);
                     status = new Status(State.PENDING, code.userCode(), code.verificationUrl(), code.expiresAt(),
-                            "Could not reach Google; still trying");
+                            e.kind() == ContentSourceException.Kind.RATE_LIMITED
+                                    ? "Home Control is busy talking to Google; still trying"
+                                    : "Could not reach Google; still trying");
                     return true;
                 }
                 return finish(State.FAILED, e.getMessage());

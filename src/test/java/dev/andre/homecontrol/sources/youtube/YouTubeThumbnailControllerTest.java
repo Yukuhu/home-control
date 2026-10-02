@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.net.URI;
-import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -26,7 +25,7 @@ class YouTubeThumbnailControllerTest extends WebSliceTest {
 
     @Test
     void proxiesTheMediumThumbnail() throws Exception {
-        given(youTubeHttp.get(URI.create("http://thumbs.test/vi/aqz-KE-bpKQ/mqdefault.jpg"), Map.of()))
+        given(youTubeHttp.thumbnail(URI.create("http://thumbs.test/vi/aqz-KE-bpKQ/mqdefault.jpg")))
                 .willReturn(new YouTubeHttp.Response(200, "image/jpeg", JPEG));
 
         mockMvc.perform(get("/sources/youtube/thumbnails/aqz-KE-bpKQ"))
@@ -39,7 +38,7 @@ class YouTubeThumbnailControllerTest extends WebSliceTest {
 
     @Test
     void aNonImageUpstreamResponseIs502() throws Exception {
-        given(youTubeHttp.get(URI.create("http://thumbs.test/vi/aqz-KE-bpKQ/mqdefault.jpg"), Map.of()))
+        given(youTubeHttp.thumbnail(URI.create("http://thumbs.test/vi/aqz-KE-bpKQ/mqdefault.jpg")))
                 .willReturn(new YouTubeHttp.Response(200, "text/html; charset=UTF-8", "<html></html>".getBytes()));
 
         mockMvc.perform(get("/sources/youtube/thumbnails/aqz-KE-bpKQ"))
@@ -56,10 +55,10 @@ class YouTubeThumbnailControllerTest extends WebSliceTest {
 
     @Test
     void missingIs404AndFailuresAre502() throws Exception {
-        given(youTubeHttp.get(any(), any())).willReturn(new YouTubeHttp.Response(404, "text/plain", new byte[0]));
+        given(youTubeHttp.thumbnail(any())).willReturn(new YouTubeHttp.Response(404, "text/plain", new byte[0]));
         mockMvc.perform(get("/sources/youtube/thumbnails/aqz-KE-bpKQ")).andExpect(status().isNotFound());
 
-        given(youTubeHttp.get(any(), any())).willThrow(new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Could not reach thumbs.test"));
+        given(youTubeHttp.thumbnail(any())).willThrow(new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Could not reach thumbs.test"));
         mockMvc.perform(get("/sources/youtube/thumbnails/aqz-KE-bpKQ"))
                 .andExpect(status().isBadGateway())
                 .andExpect(content().string("Could not load the thumbnail"));
