@@ -91,11 +91,16 @@ Gradle verifies dependencies and build plugins against the SHA-256 checksums com
 `gradle/verification-metadata.xml`, including their POM and module metadata. A missing or mismatched checksum
 fails the build before the affected artifact is used.
 
-After adding or upgrading a dependency, generate the new entries:
+After adding or upgrading a dependency, generate the new entries with an empty Gradle home and project cache:
 
 ```bash
-scripts/gradle.sh --write-verification-metadata sha256 build e2eClasses
+rm -rf build/empty-gradle-home build/empty-project-cache
+scripts/gradle.sh -g build/empty-gradle-home --project-cache-dir build/empty-project-cache \
+  --write-verification-metadata sha256 build e2eClasses
 ```
+
+With a warm cache, generation has left out parent POMs that the cache already held, and CI, which starts with an
+empty cache, then failed on them.
 
 Review the diff and compare the new checksums with fresh artifacts from Maven Central or the Gradle Plugin
 Portal before committing them. Generation trusts the artifacts it finds, including the local cache; it does
