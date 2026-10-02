@@ -27,7 +27,7 @@ public class LoginGateFilter extends OncePerRequestFilter {
      * entry here, not a new prefix.
      */
     static final Set<String> OPEN_PATHS = Set.of(
-            "/login", "/app.css", "/manifest.webmanifest", "/offline.html",
+            "/login", "/health", "/app.css", "/manifest.webmanifest", "/offline.html",
             "/themes/cyberpunk.css", "/themes/fonts/rajdhani-500.woff2", "/themes/fonts/rajdhani-700.woff2",
             "/js/theme.js",
             "/icons/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png",

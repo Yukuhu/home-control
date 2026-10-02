@@ -222,6 +222,17 @@ class LoginGatingTest extends FullAppTest {
     }
 
     @Test
+    void healthAnswersWithoutALoginWhenOneIsRequired() throws Exception {
+        storeAFirstSecret();
+
+        // As the container's HEALTHCHECK asks: from inside the container, without a session.
+        mockMvc.perform(get("/health").header("Host", "127.0.0.1"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("ok"))
+                .andExpect(header().doesNotExist("Set-Cookie"));
+    }
+
+    @Test
     void manifestAndIconsStayOpenWhenALoginIsRequired() throws Exception {
         storeAFirstSecret();
 
