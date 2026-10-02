@@ -172,13 +172,19 @@ public class LoginService {
         return ACCOUNTS.getOrDefault(kind, kind);
     }
 
-    /** Sets the first login password and logs this browser in. The slow hash runs outside the lock. */
+    /**
+     * Sets the first login password and logs this browser in. The slow hash runs outside the lock, and only for a
+     * request that can succeed: a login already set is refused before hashing, and again under the lock.
+     */
     public void setPassword(String password, String confirmation, LoginContext context) {
         checkNewPassword(password, confirmation);
+        if (store.login().isPresent()) {
+            throw passwordAlreadySet();
+        }
         LoginCredential credential = newCredential(password);
         synchronized (this) {
             if (store.login().isPresent()) {
-                throw new PasswordRejectedException("A login password is already set; change it instead");
+                throw passwordAlreadySet();
             }
             store.setLogin(credential);
             context.startSession(credential.version());
@@ -290,6 +296,10 @@ public class LoginService {
             }
             throw new IllegalStateException(e.getCause());
         }
+    }
+
+    private static PasswordRejectedException passwordAlreadySet() {
+        return new PasswordRejectedException("A login password is already set; change it instead");
     }
 
     private LoginCredential newCredential(String password) {
