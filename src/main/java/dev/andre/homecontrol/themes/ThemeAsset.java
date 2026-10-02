@@ -8,8 +8,8 @@ public record ThemeAsset(String contentType, byte[] bytes) {
     @Override public byte[] bytes() { return bytes.clone(); }
 
     @Override public boolean equals(Object other) {
-        return other instanceof ThemeAsset asset
-                && Objects.equals(contentType, asset.contentType) && Arrays.equals(bytes, asset.bytes);
+        return other instanceof ThemeAsset(String otherType, byte[] otherBytes)
+                && Objects.equals(contentType, otherType) && Arrays.equals(bytes, otherBytes);
     }
 
     @Override public int hashCode() {

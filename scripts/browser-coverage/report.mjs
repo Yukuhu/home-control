@@ -25,15 +25,11 @@ async function convert(script, functions) {
     return converter.toIstanbul();
 }
 
-export async function convertCoverage({ root, rawDirectory, reportDirectory }) {
-    const scripts = await applicationScripts(root);
-    const merged = coverage.createCoverageMap({});
-    // Files that no test loaded must still count as uncovered.
-    for (const script of scripts.values()) {
-        const functions = [{ functionName: "", isBlockCoverage: true,
-            ranges: [{ startOffset: 0, endOffset: script.source.length, count: 0 }] }];
-        merged.merge(await convert(script, functions)); // NOSONAR: Convert one script at a time to bound converter memory.
-    }
+function executed(entry) {
+    return entry.functions.some(fn => fn.ranges.some(range => range.count > 0));
+}
+
+async function mergeCaptures(scripts, merged, rawDirectory) {
     let captured = 0;
     let workerCaptured = false;
     const files = (await readdir(rawDirectory)).filter((name) => name.endsWith(".json"));
@@ -45,10 +41,22 @@ export async function convertCoverage({ root, rawDirectory, reportDirectory }) {
             if (entry.source !== script.source) throw new Error(`Coverage source differs from ${script.file}`);
             merged.merge(await convert(script, entry.functions)); // NOSONAR: Bound converter memory and update the shared coverage map in order.
             captured++;
-            if (new URL(entry.url).pathname === "/sw.js"
-                    && entry.functions.some(fn => fn.ranges.some(range => range.count > 0))) workerCaptured = true;
+            if (new URL(entry.url).pathname === "/sw.js" && executed(entry)) workerCaptured = true;
         }
     }
+    return { captured, workerCaptured };
+}
+
+export async function convertCoverage({ root, rawDirectory, reportDirectory }) {
+    const scripts = await applicationScripts(root);
+    const merged = coverage.createCoverageMap({});
+    // Files that no test loaded must still count as uncovered.
+    for (const script of scripts.values()) {
+        const functions = [{ functionName: "", isBlockCoverage: true,
+            ranges: [{ startOffset: 0, endOffset: script.source.length, count: 0 }] }];
+        merged.merge(await convert(script, functions)); // NOSONAR: Convert one script at a time to bound converter memory.
+    }
+    const { captured, workerCaptured } = await mergeCaptures(scripts, merged, rawDirectory);
     if (captured === 0) throw new Error("No application JavaScript coverage was captured");
     if (scripts.has("/sw.js") && !workerCaptured) throw new Error("No service worker JavaScript coverage was captured");
     await mkdir(reportDirectory, { recursive: true });

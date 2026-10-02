@@ -8,8 +8,8 @@ class ThemeAssetTest {
     @Test void valueEqualityUsesContentRatherThanArrayIdentity() {
         ThemeAsset first = new ThemeAsset("text/css", new byte[] {1, 2});
         ThemeAsset same = new ThemeAsset("text/css", new byte[] {1, 2});
-        assertThat(first).isEqualTo(same).hasSameHashCodeAs(same).hasToString(same.toString());
-        assertThat(first).isNotEqualTo(new ThemeAsset("text/css", new byte[] {1, 3}))
+        assertThat(first).isEqualTo(same).hasSameHashCodeAs(same).hasToString(same.toString())
+                .isNotEqualTo(new ThemeAsset("text/css", new byte[] {1, 3}))
                 .isNotEqualTo(new ThemeAsset("image/png", new byte[] {1, 2}));
     }
 

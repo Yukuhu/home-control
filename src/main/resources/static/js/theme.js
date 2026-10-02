@@ -164,6 +164,19 @@
         finally { catalogRequest = undefined; }
     }
 
+    function needsSheet(theme) {
+        return theme.id !== "default" || Boolean(theme.stylesheet && theme.stylesheet !== defaultStylesheet);
+    }
+
+    function keep(theme, persist) {
+        if (persist) save(theme.id);
+        notice = "";
+        syncControls();
+        cacheCurrentTheme();
+        reveal?.();
+        return true;
+    }
+
     async function select(id, { persist = true, initial = false, refreshUnknown = true } = {}) {
         if (recovery && id !== "default") {
             syncControls();
@@ -178,18 +191,11 @@
         if (!catalog.has(desiredId) && authoritative && saved() === desiredId) save("default");
         const theme = catalog.get(desiredId) ?? catalog.get("default");
         desiredId = theme.id;
-        if (theme.id === current.id && theme.revision === current.revision) {
-            if (persist) save(theme.id);
-            notice = "";
-            syncControls();
-            cacheCurrentTheme();
-            reveal?.();
-            return true;
-        }
-        const needsSheet = theme.id !== "default" || (theme.stylesheet && theme.stylesheet !== defaultStylesheet);
-        const link = needsSheet ? await load(theme) : undefined;
+        if (theme.id === current.id && theme.revision === current.revision) return keep(theme, persist);
+        const sheet = needsSheet(theme);
+        const link = sheet ? await load(theme) : undefined;
         if (mine !== generation) { link?.remove(); return false; }
-        if (needsSheet && !link) {
+        if (sheet && !link) {
             desiredId = current.id;
             report(theme, starting);
             reveal?.();
