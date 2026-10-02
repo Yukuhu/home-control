@@ -23,7 +23,7 @@
     </details>
 
     <h3>Add a speaker</h3>
-    <p class="hint" th:text="|Put the speaker into pairing mode first. Scanning takes about ${bluetooth.scanSeconds()} seconds.|">
+    <p class="hint" th:text="|Put the speaker into pairing mode first. Scanning takes about ${bluetooth.scanTime()}.|">
         Put the speaker into pairing mode first.</p>
     <form method="post" th:action="@{/setup/bluetooth/scan}">
         <button type="submit" class="primary">Scan for speakers</button>

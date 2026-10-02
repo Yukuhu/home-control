@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.webos;
 
+import dev.andre.homecontrol.adapters.support.DurationText;
 import dev.andre.homecontrol.adapters.webos.protocol.SsapOptions;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -42,9 +43,9 @@ public record WebOsProperties(@DefaultValue("true") boolean enabled,
     public WebOsProperties {
         if (reconnectMaxDelay != null && reconnectInitialDelay != null
                 && reconnectMaxDelay.compareTo(reconnectInitialDelay) < 0) {
-            throw new IllegalArgumentException("home-control.webos.reconnect-max-delay (" + reconnectMaxDelay
-                    + ") must not be less than home-control.webos.reconnect-initial-delay ("
-                    + reconnectInitialDelay + ")");
+            throw new IllegalArgumentException("home-control.webos.reconnect-max-delay ("
+                    + DurationText.of(reconnectMaxDelay) + ") must not be less than"
+                    + " home-control.webos.reconnect-initial-delay (" + DurationText.of(reconnectInitialDelay) + ")");
         }
     }
 

@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.cast;
 
+import dev.andre.homecontrol.adapters.support.DurationText;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import org.hibernate.validator.constraints.time.DurationMin;
@@ -34,8 +35,9 @@ public record CastProperties(@DefaultValue("true") boolean enabled,
         // The stale timeout is the socket read timeout; a healthy receiver answers each ping, so
         // it must be longer than one heartbeat interval or every idle connection reads as stale.
         if (staleTimeout != null && heartbeatInterval != null && staleTimeout.compareTo(heartbeatInterval) <= 0) {
-            throw new IllegalArgumentException("home-control.cast.stale-timeout (" + staleTimeout
-                    + ") must be greater than home-control.cast.heartbeat-interval (" + heartbeatInterval + ")");
+            throw new IllegalArgumentException("home-control.cast.stale-timeout (" + DurationText.of(staleTimeout)
+                    + ") must be greater than home-control.cast.heartbeat-interval ("
+                    + DurationText.of(heartbeatInterval) + ")");
         }
     }
 }
