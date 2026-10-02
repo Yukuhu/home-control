@@ -9,9 +9,11 @@ import org.springframework.boot.context.properties.source.ConfigurationProperty;
 import org.springframework.boot.context.properties.source.ConfigurationPropertyName;
 import org.springframework.boot.context.properties.source.ConfigurationPropertySource;
 import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.boot.env.OriginTrackedMapPropertySource;
+import org.springframework.boot.origin.Origin;
+import org.springframework.boot.origin.OriginTrackedValue;
 import org.springframework.core.Ordered;
 import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.MutablePropertySources;
 import org.springframework.core.env.PropertySource;
 
@@ -146,16 +148,18 @@ public final class LegacyPropertyNames implements EnvironmentPostProcessor, Orde
                 log.warn(warning + " (ignored: " + rename.newName() + " is also set)");
             } else {
                 Object value = old.value();
+                // Keeps where the old key was set, so a bad value fails startup naming that file and line.
                 copies.computeIfAbsent(old.source().getName(), name -> new LinkedHashMap<>())
-                        .put(rename.newName(), rename.seconds() ? String.valueOf(value).strip() + "s" : value);
+                        .put(rename.newName(), OriginTrackedValue.of(
+                                rename.seconds() ? String.valueOf(value).strip() + "s" : value, old.origin()));
                 log.warn(warning);
             }
         }
         copies.forEach((sourceName, values) ->
-                sources.addAfter(sourceName, new MapPropertySource(SOURCE_PREFIX + sourceName, values)));
+                sources.addAfter(sourceName, new OriginTrackedMapPropertySource(SOURCE_PREFIX + sourceName, values)));
     }
 
-    private record Found(PropertySource<?> source, Object value) {
+    private record Found(PropertySource<?> source, Object value, Origin origin) {
     }
 
     /**
@@ -171,7 +175,7 @@ public final class LegacyPropertyNames implements EnvironmentPostProcessor, Orde
             ConfigurationPropertySource adapted = ConfigurationPropertySource.from(source);
             ConfigurationProperty property = adapted == null ? null : adapted.getConfigurationProperty(key);
             if (property != null) {
-                return new Found(source, property.getValue());
+                return new Found(source, property.getValue(), property.getOrigin());
             }
         }
         return null;
