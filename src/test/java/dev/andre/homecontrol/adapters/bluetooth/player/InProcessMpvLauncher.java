@@ -20,6 +20,8 @@ public final class InProcessMpvLauncher implements MpvLauncher {
     public volatile Duration startDelay = Duration.ZERO;
     public volatile String version = FakeMpv.VERSION;
     public volatile Consumer<FakeMpv> beforeServing = fake -> { };
+    /** The process is seen to exit before the client reads the events mpv sent just before quitting. */
+    public volatile boolean exitsBeforeItsLastEvents;
 
     public final List<List<String>> starts = new CopyOnWriteArrayList<>();
     public final List<List<String>> runs = new CopyOnWriteArrayList<>();
@@ -40,6 +42,7 @@ public final class InProcessMpvLauncher implements MpvLauncher {
         Duration delay = startDelay;
         FakeMpv.Options currentOptions = options;
         Consumer<FakeMpv> configure = beforeServing;
+        boolean exitFirst = exitsBeforeItsLastEvents;
         Thread.ofVirtual().name("in-process-mpv-" + process.pid()).start(() -> {
             try {
                 simulateLatency(delay);
@@ -55,6 +58,9 @@ public final class InProcessMpvLauncher implements MpvLauncher {
             try (FakeMpv fake = FakeMpv.serve(socket, currentOptions, volume, line -> { }, started -> {
                 process.attach(started);
                 players.add(started);
+                if (exitFirst) {
+                    started.beforeLastEvents(() -> process.exit.complete(0));
+                }
                 configure.accept(started);
             })) {
                 fake.awaitQuit();

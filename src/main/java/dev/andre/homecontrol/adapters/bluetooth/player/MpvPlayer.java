@@ -30,6 +30,11 @@ public final class MpvPlayer implements AutoCloseable {
 
     private static final String SET_PROPERTY = "set_property";
     private static final String GET_PROPERTY = "get_property";
+    /**
+     * mpv sends end-file, with why a load failed, just before it quits, and its exit can be noticed before that event
+     * is read. A reason that arrives this soon after the exit is reported instead of a bare "mpv exited".
+     */
+    private static final Duration EXIT_GRACE = Duration.ofMillis(250);
 
     private record Running(MpvProcess process, MpvIpc ipc, AtomicInteger consecutiveStatusFailures) {
         Running(MpvProcess process, MpvIpc ipc) {
@@ -125,7 +130,8 @@ public final class MpvPlayer implements AutoCloseable {
             throw withErrors(e, process);
         }
         running = new Running(process, ipc);
-        process.onExit().thenRun(() -> loaded.completeExceptionally(new IOException("mpv exited")));
+        process.onExit().thenRun(() -> CompletableFuture.delayedExecutor(EXIT_GRACE.toMillis(), TimeUnit.MILLISECONDS)
+                .execute(() -> loaded.completeExceptionally(new IOException("mpv exited"))));
         try {
             if (muted) {
                 ipc.command(commandTimeout, SET_PROPERTY, "mute", true);
