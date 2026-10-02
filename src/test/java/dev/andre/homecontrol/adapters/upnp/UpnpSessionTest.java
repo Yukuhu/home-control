@@ -470,9 +470,11 @@ class UpnpSessionTest {
     void aConnectThatFinishesAfterCloseNeitherPublishesNorTakesCommands() throws Exception {
         CountDownLatch resolving = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch resolved = new CountDownLatch(1);
         session = start(fake.device("kitchen"), udn -> {
             resolving.countDown();
             awaitIgnoringInterrupts(release);
+            resolved.countDown();
             return Optional.empty();
         });
         assertThat(resolving.await(5, TimeUnit.SECONDS)).isTrue();
@@ -481,6 +483,8 @@ class UpnpSessionTest {
         int publishedAtClose = states.all().size();
         release.countDown();
 
+        // The held lookup has returned: only then does "nothing published" say anything about it.
+        assertThat(resolved.await(5, TimeUnit.SECONDS)).isTrue();
         await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
                 .until(() -> states.all().size() == publishedAtClose);
         var pause = new Action.Pause();

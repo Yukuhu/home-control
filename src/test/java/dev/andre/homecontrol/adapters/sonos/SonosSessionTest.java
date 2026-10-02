@@ -287,6 +287,8 @@ class SonosSessionTest {
         int publishedAtClose = states.all().size();
         clock.release.countDown();
 
+        // The held connect has gone on: only then does "nothing published" say anything about it.
+        assertThat(clock.returned.await(5, TimeUnit.SECONDS)).isTrue();
         await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
                 .until(() -> states.all().size() == publishedAtClose);
         var pause = new Action.Pause();
@@ -298,6 +300,7 @@ class SonosSessionTest {
     private static final class HeldClock extends Clock {
         final CountDownLatch reading = new CountDownLatch(1);
         final CountDownLatch release = new CountDownLatch(1);
+        final CountDownLatch returned = new CountDownLatch(1);
 
         @Override
         public ZoneId getZone() {
@@ -316,6 +319,7 @@ class SonosSessionTest {
             while (true) {
                 try {
                     if (release.await(10, TimeUnit.SECONDS)) {
+                        returned.countDown();
                         return Instant.now();
                     }
                 } catch (InterruptedException _) {
