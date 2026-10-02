@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.discovery.ssdp;
 
 import com.sun.net.httpserver.HttpServer;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,8 +14,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -61,7 +60,7 @@ class SsdpDiscoveryTest {
 
     private void serve(com.sun.net.httpserver.HttpExchange exchange, String fixtureName) throws IOException {
         httpRequests.incrementAndGet();
-        byte[] body = Files.readAllBytes(Path.of("src/test/resources/fixtures/ssdp/" + fixtureName));
+        byte[] body = Fixtures.bytes("ssdp/" + fixtureName);
         exchange.getResponseHeaders().add("Content-Type", "text/xml");
         exchange.sendResponseHeaders(200, body.length);
         try (var out = exchange.getResponseBody()) {
@@ -76,7 +75,7 @@ class SsdpDiscoveryTest {
      */
     private void serveOversized(com.sun.net.httpserver.HttpExchange exchange) throws IOException {
         httpRequests.incrementAndGet();
-        String base = Files.readString(Path.of("src/test/resources/fixtures/ssdp/lg-description.xml"));
+        String base = Fixtures.read("ssdp/lg-description.xml");
         char[] padding = new char[70 * 1024];
         Arrays.fill(padding, 'a');
         String oversized = base.replace("</root>", "<!-- " + new String(padding) + " -->\n</root>");

@@ -5,11 +5,10 @@ import dev.andre.homecontrol.adapters.upnp.protocol.PositionInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.TransportInfo;
 import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,7 +19,7 @@ class NowPlayingsTest {
     private static Map<String, String> answer() throws IOException {
         Map<String, String> answer = new HashMap<>();
         answer.put("TrackURI", "http://nas/a.flac");
-        answer.put("TrackMetaData", Files.readString(Path.of("src/test/resources/fixtures/upnp/didl-track.xml")));
+        answer.put("TrackMetaData", Fixtures.read("upnp/didl-track.xml"));
         answer.put("RelTime", "0:00:42");
         answer.put("TrackDuration", "0:03:07");
         return answer;

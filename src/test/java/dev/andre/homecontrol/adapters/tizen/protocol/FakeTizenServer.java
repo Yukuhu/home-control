@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.tizen.protocol;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -13,8 +14,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -286,7 +285,7 @@ public class FakeTizenServer implements AutoCloseable {
 
     private static String fixture(String name) {
         try {
-            return Files.readString(Path.of("src/test/resources/fixtures/tizen/" + name));
+            return Fixtures.read("tizen/" + name);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

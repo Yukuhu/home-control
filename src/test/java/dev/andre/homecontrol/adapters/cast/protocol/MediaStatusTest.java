@@ -1,9 +1,8 @@
 package dev.andre.homecontrol.adapters.cast.protocol;
 
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -12,7 +11,7 @@ class MediaStatusTest {
 
     private static List<MediaStatus> fixture(String name) throws Exception {
         return MediaStatus.parse(CastPayloads.parse(
-                Files.readString(Path.of("src/test/resources/fixtures/cast/" + name))).path("status"));
+                Fixtures.read("cast/" + name)).path("status"));
     }
 
     @Test

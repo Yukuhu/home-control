@@ -1,9 +1,8 @@
 package dev.andre.homecontrol.adapters.cast.protocol;
 
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,7 +10,7 @@ class ReceiverStatusTest {
 
     private static ReceiverStatus fixture(String name) throws Exception {
         return ReceiverStatus.parse(CastPayloads.parse(
-                Files.readString(Path.of("src/test/resources/fixtures/cast/" + name))).path("status"));
+                Fixtures.read("cast/" + name)).path("status"));
     }
 
     @Test

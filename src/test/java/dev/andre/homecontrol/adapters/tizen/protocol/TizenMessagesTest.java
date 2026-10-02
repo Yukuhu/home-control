@@ -1,11 +1,10 @@
 package dev.andre.homecontrol.adapters.tizen.protocol;
 
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -65,7 +64,7 @@ class TizenMessagesTest {
 
     @Test
     void parsesTheInstalledAppsEvent() throws IOException {
-        String event = Files.readString(Path.of("src/test/resources/fixtures/tizen/installed-apps.json"));
+        String event = Fixtures.read("tizen/installed-apps.json");
 
         assertThat(TizenMessages.installedApps(TizenMessages.JSON.readTree(event))).containsExactly(
                 new TizenApp("111299001912", "YouTube", 2),

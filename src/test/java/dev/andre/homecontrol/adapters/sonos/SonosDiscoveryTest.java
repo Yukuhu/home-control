@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -24,6 +23,7 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.device.Devices;
 import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.io.TempDir;
 import java.time.Instant;
 
@@ -176,7 +176,7 @@ class SonosDiscoveryTest {
 
     @Test
     void hiddenMembersAreNotDevices() throws IOException {
-        ZoneGroupState state = ZoneGroupState.parse(Files.readString(Path.of("src/test/resources/fixtures/sonos/zone-group-state.xml")));
+        ZoneGroupState state = ZoneGroupState.parse(Fixtures.read("sonos/zone-group-state.xml"));
 
         assertThat(SonosDiscovery.toDevices(state))
                 .extracting(DiscoveredDevice::name, DiscoveredDevice::host, DiscoveredDevice::port)

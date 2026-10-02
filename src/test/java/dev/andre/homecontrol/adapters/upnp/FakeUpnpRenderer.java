@@ -6,6 +6,7 @@ import dev.andre.homecontrol.adapters.upnp.protocol.UpnpXml;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.w3c.dom.Element;
 
 import java.io.IOException;
@@ -13,8 +14,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -43,7 +42,7 @@ public class FakeUpnpRenderer implements AutoCloseable {
     public record Layout(String descriptionPath, String avTransportPath, String renderingControlPath,
                          String connectionManagerPath, String descriptionFixture) {
         public static final Layout GENERIC = new Layout("/description.xml", "/upnp/control/AVTransport1",
-                "/upnp/control/RenderingControl1", "/upnp/control/ConnectionManager1", "fixtures/upnp/renderer-description.xml");
+                "/upnp/control/RenderingControl1", "/upnp/control/ConnectionManager1", "upnp/renderer-description.xml");
     }
 
     /** {@code receivedNanos} is the {@link System#nanoTime()} at which the request arrived. */
@@ -260,7 +259,7 @@ public class FakeUpnpRenderer implements AutoCloseable {
             return resource(layout.descriptionFixture());
         }
         if (path.equals("/scpd/RenderingControl1.xml")) {
-            return resource("fixtures/upnp/rendering-control-scpd.xml").replace("{volumeMax}", String.valueOf(volumeMax));
+            return resource("upnp/rendering-control-scpd.xml").replace("{volumeMax}", String.valueOf(volumeMax));
         }
         return null;
     }
@@ -418,7 +417,7 @@ public class FakeUpnpRenderer implements AutoCloseable {
     }
 
     protected static String resource(String name) throws IOException {
-        return Files.readString(Path.of("src/test/resources/" + name));
+        return Fixtures.read(name);
     }
 
     @Override

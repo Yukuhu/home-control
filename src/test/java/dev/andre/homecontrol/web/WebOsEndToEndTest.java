@@ -13,6 +13,7 @@ import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,7 +60,7 @@ class WebOsEndToEndTest {
             WOL = new FakeWakeOnLanReceiver();
             DESCRIPTIONS = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
             DESCRIPTIONS.createContext("/lg/description.xml", exchange -> {
-                byte[] body = Files.readAllBytes(Path.of("src/test/resources/fixtures/ssdp/lg-description.xml"));
+                byte[] body = Fixtures.bytes("ssdp/lg-description.xml");
                 exchange.getResponseHeaders().add("Content-Type", "text/xml");
                 exchange.sendResponseHeaders(200, body.length);
                 try (var out = exchange.getResponseBody()) {

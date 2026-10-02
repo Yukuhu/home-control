@@ -18,6 +18,7 @@ import dev.andre.homecontrol.discovery.ssdp.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
 import dev.andre.homecontrol.discovery.ssdp.SsdpTimings;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,6 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -108,7 +108,7 @@ class TizenAdapterTest {
     void listsSamsungTvsTheSharedListenerFound() throws Exception {
         HttpServer http = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         http.createContext("/samsung/description.xml", exchange -> {
-            byte[] body = Files.readAllBytes(Path.of("src/test/resources/fixtures/ssdp/samsung-description.xml"));
+            byte[] body = Fixtures.bytes("ssdp/samsung-description.xml");
             exchange.sendResponseHeaders(200, body.length);
             try (var out = exchange.getResponseBody()) {
                 out.write(body);

@@ -1,18 +1,17 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class VolumeRangeTest {
 
     private static byte[] scpd(String max) throws IOException {
-        return Files.readString(Path.of("src/test/resources/fixtures/upnp/rendering-control-scpd.xml"))
+        return Fixtures.read("upnp/rendering-control-scpd.xml")
                 .replace("{volumeMax}", max).getBytes(StandardCharsets.UTF_8);
     }
 

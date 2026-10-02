@@ -1,11 +1,10 @@
 package dev.andre.homecontrol.discovery.ssdp.protocol;
 
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Random;
 
@@ -15,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SsdpMessageTest {
 
     private static String fixture(String name, String host, int port) throws IOException {
-        return Files.readString(Path.of("src/test/resources/fixtures/ssdp/" + name))
+        return Fixtures.read("ssdp/" + name)
                 .replace("{host}", host).replace("{port}", String.valueOf(port))
                 .replace("\r\n", "\n").replace("\n", "\r\n");
     }

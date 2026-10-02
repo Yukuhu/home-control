@@ -12,6 +12,7 @@ import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.UnsupportedActionException;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import dev.andre.homecontrol.testsupport.RecordingStateListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,8 +20,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -256,7 +255,7 @@ class UpnpSessionTest {
         startConnected();
 
         fake.playElsewhere("http://192.168.1.20:8096/Audio/c0ffee00c0ffee00c0ffee00c0ffee02/stream.flac?static=true&ApiKey=t",
-                Files.readString(Path.of("src/test/resources/fixtures/upnp/position-metadata.xml")));
+                Fixtures.read("upnp/position-metadata.xml"));
 
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().nowPlaying()).isNotNull()
                 .extracting(NowPlaying::title).isEqualTo("Carrot Waltz"));
@@ -323,7 +322,7 @@ class UpnpSessionTest {
 
     @Test
     void controlUrlsOnAnotherHostAreRefused() throws Exception {
-        fake.overrideDescription(Files.readString(Path.of("src/test/resources/fixtures/upnp/renderer-description.xml"))
+        fake.overrideDescription(Fixtures.read("upnp/renderer-description.xml")
                 .replace("<controlURL>/upnp/control/AVTransport1</controlURL>",
                         "<controlURL>http://192.0.2.1:1/upnp/control/AVTransport1</controlURL>"));
         session = start(fake.device("kitchen"), udn -> Optional.empty());
@@ -347,7 +346,7 @@ class UpnpSessionTest {
     }
 
     private static String description() throws IOException {
-        return Files.readString(Path.of("src/test/resources/fixtures/upnp/renderer-description.xml"));
+        return Fixtures.read("upnp/renderer-description.xml");
     }
 
     @Test
@@ -444,7 +443,7 @@ class UpnpSessionTest {
 
     @Test
     void aDescriptionOfAnotherDeviceIsRefused() throws Exception {
-        fake.overrideDescription(Files.readString(Path.of("src/test/resources/fixtures/upnp/renderer-description.xml"))
+        fake.overrideDescription(Fixtures.read("upnp/renderer-description.xml")
                 .replace(FakeUpnpRenderer.UDN, "uuid:00000000-0000-0000-0000-000000000bad"));
         session = start(fake.device("kitchen"), udn -> Optional.empty());
 

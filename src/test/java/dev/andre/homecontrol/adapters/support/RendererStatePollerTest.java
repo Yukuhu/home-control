@@ -9,14 +9,13 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -71,7 +70,7 @@ class RendererStatePollerTest {
 
     @Test
     void readsWhatPlaysFromTheRenderersMetadata() throws Exception {
-        fake.playElsewhere(STREAM, Files.readString(Path.of("src/test/resources/fixtures/upnp/position-metadata.xml")));
+        fake.playElsewhere(STREAM, Fixtures.read("upnp/position-metadata.xml"));
 
         poller.read(new RendererStatePoller.Endpoints(av, rc, 100, false));
 

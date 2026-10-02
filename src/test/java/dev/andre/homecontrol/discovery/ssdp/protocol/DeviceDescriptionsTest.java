@@ -1,12 +1,11 @@
 package dev.andre.homecontrol.discovery.ssdp.protocol;
 
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -14,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DeviceDescriptionsTest {
 
     private static byte[] fixture(String name) throws IOException {
-        return Files.readAllBytes(Path.of("src/test/resources/fixtures/ssdp/" + name));
+        return Fixtures.bytes("ssdp/" + name);
     }
 
     @Test
