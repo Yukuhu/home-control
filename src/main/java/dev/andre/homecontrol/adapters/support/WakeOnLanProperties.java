@@ -1,4 +1,4 @@
-package dev.andre.homecontrol.adapters.net;
+package dev.andre.homecontrol.adapters.support;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
