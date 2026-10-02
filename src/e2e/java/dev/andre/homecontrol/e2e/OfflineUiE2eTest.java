@@ -32,6 +32,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class OfflineUiE2eTest extends E2eApplicationTest {
 
+    private static final String REPORTING_WORKER = "/sw-reporting.js";
+
     @Autowired
     private ThemeCatalog themes;
 
@@ -60,12 +62,12 @@ class OfflineUiE2eTest extends E2eApplicationTest {
 
             // Localhost is a secure context; production registration deliberately requires HTTPS.
             page.evaluate("""
-                    async () => {
+                    async script => {
                         await caches.open('unrelated-application-cache');
-                        await navigator.serviceWorker.register('/sw.js');
+                        await navigator.serviceWorker.register(script);
                         await navigator.serviceWorker.ready;
                     }
-                    """);
+                    """, REPORTING_WORKER);
             page.waitForFunction("() => Boolean(navigator.serviceWorker.controller)");
             org.assertj.core.api.Assertions.assertThat(page.evaluate("() => caches.has('unrelated-application-cache')"))
                     .as("Activation leaves other applications' caches alone").isEqualTo(true);
@@ -79,6 +81,8 @@ class OfflineUiE2eTest extends E2eApplicationTest {
                 org.assertj.core.api.Assertions.assertThat(response).isNotNull();
                 org.assertj.core.api.Assertions.assertThat(response.fromServiceWorker())
                         .as("The worker answers navigation while the origin is unavailable").isTrue();
+                org.assertj.core.api.Assertions.assertThat(response.headerValue("content-security-policy"))
+                        .as("The offline page keeps the live Content-Security-Policy").isEqualTo(origin.shellPolicy());
                 assertThat(page).hasTitle("Home Control is offline");
                 Locator retry = page.getByRole(AriaRole.LINK,
                         new Page.GetByRoleOptions().setName(Pattern.compile("Try again")));
@@ -157,11 +161,11 @@ class OfflineUiE2eTest extends E2eApplicationTest {
             assumeTrue((Boolean) page.evaluate("() => 'serviceWorker' in navigator"),
                     "This browser does not expose service workers");
             page.evaluate("""
-                    async () => {
-                        await navigator.serviceWorker.register('/sw.js');
+                    async script => {
+                        await navigator.serviceWorker.register(script);
                         await navigator.serviceWorker.ready;
                     }
-                    """);
+                    """, REPORTING_WORKER);
             page.waitForFunction("() => Boolean(navigator.serviceWorker.controller)");
             page.evaluate("id => window.homeControlTheme.select(id)", ocean.id());
             waitForCompleteCustomCache(page, ocean);
@@ -371,7 +375,7 @@ class OfflineUiE2eTest extends E2eApplicationTest {
     }
 
     private static void registerWorker(Page page) {
-        registerWorker(page, "/sw.js");
+        registerWorker(page, REPORTING_WORKER);
     }
 
     private static void registerWorker(Page page, String script) {
@@ -403,18 +407,35 @@ class OfflineUiE2eTest extends E2eApplicationTest {
                 .setAnimations(ScreenshotAnimations.DISABLED));
     }
 
-    /** A stoppable origin snapshots the real server-rendered shell and exact public package resources. */
+    /**
+     * A stoppable origin snapshots the real server-rendered shell and exact public package resources, and serves each
+     * under the Content-Security-Policy the live server sent with it. The tests register {@link #REPORTING_WORKER},
+     * which imports the unchanged {@code /sw.js} (browser coverage compares it with the file) and reports what the
+     * policy blocks inside the worker to the session.
+     */
     private static final class OfflineOrigin implements AutoCloseable {
         private final FakeHttpServer server;
         private final String baseUrl;
+        private final String workerPolicy;
+        private final String shellPolicy;
 
         private OfflineOrigin(String liveOrigin, ThemeCatalog themes) throws IOException, InterruptedException {
             Map<String, Resource> resources = snapshot(liveOrigin, themes);
             server = FakeHttpServer.start();
             baseUrl = server.url().toString();
-            resources.forEach((path, resource) -> server.respond("GET", path,
+            workerPolicy = resources.get("/sw.js").policy();
+            shellPolicy = resources.get("/offline.html").policy();
+            resources.forEach(this::serve);
+            server.respond("GET", REPORTING_WORKER, dev.andre.homecontrol.testsupport.Response.of(200,
+                    "text/javascript", Browsers.reportingCspViolations("importScripts('/sw.js');\n"))
+                    .withHeader("Content-Security-Policy", workerPolicy));
+        }
+
+        private void serve(String path, Resource resource) {
+            server.respond("GET", path,
                     dev.andre.homecontrol.testsupport.Response.of(200, resource.type(), resource.bytes())
-                            .withHeader("Cache-Control", "no-store")));
+                            .withHeader("Cache-Control", "no-store")
+                            .withHeader("Content-Security-Policy", resource.policy()));
         }
 
         private static Map<String, Resource> snapshot(String origin, ThemeCatalog themes)
@@ -431,8 +452,10 @@ class OfflineUiE2eTest extends E2eApplicationTest {
                     var response = client.send(HttpRequest.newBuilder(URI.create(origin + path)).GET().build(),
                             HttpResponse.BodyHandlers.ofByteArray());
                     if (response.statusCode() != 200) throw new IOException("Cannot snapshot " + path + ": " + response.statusCode());
+                    String policy = response.headers().firstValue("content-security-policy")
+                            .orElseThrow(() -> new IOException(path + " came without a Content-Security-Policy"));
                     resources.put(path, new Resource(response.headers().firstValue("content-type")
-                            .orElse("application/octet-stream"), response.body()));
+                            .orElse("application/octet-stream"), response.body(), policy));
                 }
             }
             return resources;
@@ -440,7 +463,7 @@ class OfflineUiE2eTest extends E2eApplicationTest {
 
         private void installMessageProbe() {
             server.respond("GET", "/sw-message-probe.js", dev.andre.homecontrol.testsupport.Response.of(200,
-                    "text/javascript", """
+                    "text/javascript", Browsers.reportingCspViolations("""
                     importScripts('/sw.js');
                     self.addEventListener('message', event => {
                         if (!['test-foreign-message', 'test-cache-theme'].includes(event.data?.type)) return;
@@ -456,7 +479,7 @@ class OfflineUiE2eTest extends E2eApplicationTest {
                             event.ports[0].postMessage('complete');
                         })());
                     });
-                    """));
+                    """)).withHeader("Content-Security-Policy", workerPolicy));
         }
 
         private void requireProxyCookie() {
@@ -465,14 +488,7 @@ class OfflineUiE2eTest extends E2eApplicationTest {
         }
 
         private void refreshResources(String liveOrigin, ThemeCatalog themes) throws IOException, InterruptedException {
-            Map<String, Resource> resources = snapshot(liveOrigin, themes);
-            for (Map.Entry<String, Resource> entry : resources.entrySet()) {
-                String path = entry.getKey();
-                Resource resource = entry.getValue();
-                server.respond("GET", path,
-                        dev.andre.homecontrol.testsupport.Response.of(200, resource.type(), resource.bytes())
-                                .withHeader("Cache-Control", "no-store"));
-            }
+            snapshot(liveOrigin, themes).forEach(this::serve);
         }
 
         private void holdAsset(String path, CountDownLatch release) {
@@ -489,11 +505,13 @@ class OfflineUiE2eTest extends E2eApplicationTest {
 
         private String baseUrl() { return baseUrl; }
 
+        private String shellPolicy() { return shellPolicy; }
+
         private void disconnect() { server.close(); }
 
         @Override
         public void close() { disconnect(); }
 
-        private record Resource(String type, byte[] bytes) { }
+        private record Resource(String type, byte[] bytes, String policy) { }
     }
 }
