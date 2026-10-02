@@ -6,8 +6,9 @@
 #   git log --no-merges --format=%s BASE..HEAD | scripts/check-commits.sh
 set -euo pipefail
 
-# A type, an optional (scope), an optional ! for a breaking change, then ": " and a description.
-pattern='^(feat|fix|refactor|test|docs|build|ci|chore|revert)(\([^()]+\))?!?: [^[:space:]]'
+# A type, an optional (scope), an optional ! for a breaking change, then ": " and a description; or what GitHub's
+# Revert button writes, Revert "<the reverted subject>", which the changelog reads as a revert too.
+pattern='^(feat|fix|refactor|test|docs|build|ci|chore|revert)(\([^()]+\))?!?: [^[:space:]]|^Revert ".+"$'
 bad=0
 while IFS= read -r subject || [[ -n "$subject" ]]; do
   if [[ ! "$subject" =~ $pattern ]]; then
