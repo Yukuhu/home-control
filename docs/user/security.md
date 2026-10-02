@@ -5,7 +5,8 @@ What Home Control protects, and how.
 Without a login password, anyone who can reach the port can control the TV. This is deliberate
 for a LAN-only tool. Set a password in **Setup → Account**, or when you connect a content source
 (see [Content sources and login](sources.md#content-sources-and-login)); from then on it guards
-every page. It stays until you remove it there, which is possible once no connected source needs
+every page. Only the login page, the icons and stylesheets it needs, and `/health` stay open;
+`/health` answers just "ok", for the container's health check. The password stays until you remove it there, which is possible once no connected source needs
 it. Either way, do not expose this app to the internet without putting an authenticating reverse
 proxy in front of it.
 
