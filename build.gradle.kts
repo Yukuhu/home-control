@@ -137,6 +137,14 @@ spotless {
     }
 }
 
+// Spotless fetches its formatter, google-java-format, only when spotlessJava runs, and no configuration holds it. So
+// the checksum check runs that task too: it writes the tidied files under build/ and does not fail on what it tidies
+// (spotlessCheck does), so the check still fails on checksums alone.
+tasks.named("verifyDependencyChecksums") {
+    description = "Verifies dependency checksums across all configurations and Spotless's formatter without compiling."
+    dependsOn(tasks.named("spotlessJava"))
+}
+
 tasks.named("sonar") {
     dependsOn(tasks.named("testCodeCoverageReport"))
 }

@@ -118,8 +118,8 @@ Dependabot does not update Gradle verification metadata
 ([upstream request](https://github.com/dependabot/dependabot-core/issues/1996)). A dependency update therefore
 needs a maintainer to review and commit its new checksums before strict CI can pass.
 
-CI's `Verify dependency checksums` job resolves all dependency configurations before the jar, unit tests,
-source image and browser jobs start. It checks out the same merge revision those builds test. For Dependabot, it downloads
+CI's `Verify dependency checksums` job resolves all dependency configurations, and the formatter Spotless fetches
+when `spotlessJava` runs, before the jar, unit tests, source image and browser jobs start. It checks out the same merge revision those builds test. For Dependabot, it downloads
 into a fresh cache and, if verification fails, generates candidate metadata and uploads a patch and the head
 SHA as an artifact. It then reports that checksum review is required; the dependent builds stay skipped and
 `CI passed` stays blocked. There is one CI workflow, and candidate preparation does not run the test suite.
