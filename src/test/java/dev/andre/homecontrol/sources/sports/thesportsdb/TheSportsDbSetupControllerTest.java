@@ -131,6 +131,23 @@ class TheSportsDbSetupControllerTest extends WebSliceTest {
                 .contains("<option value=\"\" selected=\"selected\">Not set</option>");
     }
 
+    /** A personal key is an account credential: the first one sets the login password, so the form asks for it. */
+    @Test
+    void theKeyFormAsksForTheFirstPasswordOnlyWhileNoneIsSet() throws Exception {
+        assertThat(keyForm()).contains("name=\"loginPassword\"", "name=\"loginPasswordConfirmation\"");
+
+        given(login.loginRequired()).willReturn(true);
+
+        assertThat(keyForm()).contains("name=\"key\"").doesNotContain("loginPassword");
+    }
+
+    private String keyForm() throws Exception {
+        String page = mockMvc.perform(get("/setup")).andReturn().getResponse().getContentAsString();
+        int start = page.indexOf("action=\"/setup/sources/sports/thesportsdb/key\"");
+        assertThat(start).as("the key form").isPositive();
+        return page.substring(start, page.indexOf("</form>", start));
+    }
+
     @Test
     void storageFailuresShowOneMessageWithoutFileDetails() throws Exception {
         StorageException disk = new StorageException("Could not write /data/sports.json", new java.io.IOException("disk full"));
