@@ -27,7 +27,8 @@ class SetupSectionsTest extends WebSliceTest {
 
     @Test
     void theContentSourcesAreListedInOrderWithWorkflows() throws Exception {
-        String links = section(page(), "connections");
+        String connections = section(page(), "connections");
+        String links = connections.substring(0, connections.indexOf("</nav>"));
         Matcher href = Pattern.compile("href=\"#([a-z]+)\"").matcher(links);
         List<String> anchors = href.results().map(match -> match.group(1)).toList();
 
