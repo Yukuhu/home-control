@@ -3,6 +3,7 @@ package dev.andre.homecontrol.sources.sports;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
+import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.testsupport.FullAppTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,8 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The module is on but nothing is configured yet. The shared application may have written sports.json for an earlier
- * test class and reset it to empty since, so this checks the settings, not the file.
+ * The module is on but nothing is configured yet. The application starts without writing sports.json; an earlier test
+ * class may have written it since, so the rest checks the settings, not the file.
  */
 class SportsUnconfiguredTest extends FullAppTest {
 
@@ -28,5 +29,10 @@ class SportsUnconfiguredTest extends FullAppTest {
         assertThat(source.get().available()).isFalse();
 
         assertThat(settings.current()).isEqualTo(SportsSettings.empty());
+    }
+
+    @Test
+    void theApplicationStartsWithoutWritingTheSportsSettings() {
+        assertThat(filesAtStartup()).doesNotContain(DataDirectory.SPORTS);
     }
 }
