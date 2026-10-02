@@ -59,9 +59,6 @@ fresh rails and settings files, empty caches of TMDB, YouTube and TheSportsDB an
 - New state that outlives a test class needs a line in `FullAppReset`, using the bean's own operations; only where
   none exists does the bean get a small reset method, documented as existing for the shared test context.
 
-Cached contexts keep running while other test classes use other contexts: `src/test/resources/spring.properties` turns
-off Spring Framework 7's pausing, because `RailCache` cannot restart after a pause.
-
 ## Running tests
 
 - Everything: `scripts/gradle.sh build`. It runs `./gradlew` in the `gradle:jdk25` container image, using Docker or
