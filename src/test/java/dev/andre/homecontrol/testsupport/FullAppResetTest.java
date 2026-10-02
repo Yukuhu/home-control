@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.testsupport;
 
+import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
@@ -21,6 +22,9 @@ import dev.andre.homecontrol.device.Devices;
 import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
+import dev.andre.homecontrol.themes.ThemeCatalog;
+import dev.andre.homecontrol.themes.ThemeDescriptor;
+import dev.andre.homecontrol.themes.ThemeTestPackages;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -87,6 +91,12 @@ class FullAppResetTest extends FullAppTest {
             http.send(HttpRequest.newBuilder(SharedFakes.tmdb().url().resolve("/3/probe")).build(),
                     HttpResponse.BodyHandlers.discarding());
         }
+        ThemeCatalog themes = context.getBean(ThemeCatalog.class);
+        themes.install(ThemeTestPackages.zip(ThemeTestPackages.files("reset-probe", null)), null);
+        RailCache rails = context.getBean(RailCache.class);
+        rails.snapshots();
+        assertThat(themes.themes()).anyMatch(theme -> theme.id().equals("reset-probe"));
+        assertThat(rails.peek()).isNotEmpty();
         assertThat(login.loginRequired()).isTrue();
         assertThat(limiter.blockedFor("127.0.0.1")).isPresent();
         assertThat(dataDir().resolve("pinned.json")).exists();
@@ -107,6 +117,8 @@ class FullAppResetTest extends FullAppTest {
             assertThat(dataDir().resolve(file)).doesNotExist();
         }
         assertThat(SharedFakes.tmdb().requests()).isEmpty();
+        assertThat(themes.themes()).allMatch(ThemeDescriptor::builtIn);
+        assertThat(rails.peek()).isEmpty();
     }
 
     @Test
