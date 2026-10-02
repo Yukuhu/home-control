@@ -3,11 +3,16 @@ package dev.andre.homecontrol.adapters.androidtv;
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
 import dev.andre.homecontrol.storage.AtomicFiles;
 import dev.andre.homecontrol.storage.StorageException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
 import java.security.GeneralSecurityException;
 import java.security.Key;
 import java.security.KeyPair;
@@ -16,7 +21,9 @@ import java.security.PrivateKey;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -24,6 +31,8 @@ import java.util.function.Supplier;
  * first time the keystore is opened or written, so an install that never pairs an Android TV needs none.
  */
 public class CertificateStore {
+
+    private static final Logger log = LoggerFactory.getLogger(CertificateStore.class);
 
     private static final String KEYSTORE_TYPE = "PKCS12";
 
@@ -60,6 +69,27 @@ public class CertificateStore {
                     "Could not read keystore " + file
                             + "; check the keystore password and file permissions",
                     e);
+        }
+        restrictToOwner();
+    }
+
+    /**
+     * Versions before AtomicFiles wrote the keystore readable by everyone. Its keys are encrypted under the password,
+     * but the file is the owner's alone now. A file this process may not change (owned by someone else) stays as it is,
+     * with a warning, rather than stopping Android TV.
+     */
+    private void restrictToOwner() {
+        try {
+            if (!Files.getFileStore(file).supportsFileAttributeView(PosixFileAttributeView.class)) {
+                return;
+            }
+            Set<PosixFilePermission> ownerOnly =
+                    EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
+            if (!ownerOnly.containsAll(Files.getPosixFilePermissions(file))) {
+                Files.setPosixFilePermissions(file, ownerOnly);
+            }
+        } catch (IOException | UnsupportedOperationException | SecurityException e) {
+            log.warn("Could not make keystore {} readable by its owner only ({})", file, e.getClass().getSimpleName());
         }
     }
 

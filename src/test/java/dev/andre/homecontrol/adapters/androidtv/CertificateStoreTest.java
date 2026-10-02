@@ -108,4 +108,18 @@ class CertificateStoreTest {
         assertThat(java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(file)))
                 .isEqualTo("rw-------");
     }
+
+    /** Older versions wrote the keystore readable by everyone; it is made owner-only when it is first read. */
+    @Test
+    void aKeystoreOthersCanReadIsMadeOwnerOnlyWhenChecked() throws Exception {
+        org.assertj.core.api.Assumptions.assumeThat(dir.getFileSystem().supportedFileAttributeViews()).contains("posix");
+        Path file = dir.resolve("keystore.p12");
+        new CertificateStore(file, "secret".toCharArray()).save("living", TestCredentials.clientCertificate());
+        Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+
+        new CertificateStore(file, "secret".toCharArray()).verifyReadable();
+
+        assertThat(java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(file)))
+                .isEqualTo("rw-------");
+    }
 }
