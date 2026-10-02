@@ -21,9 +21,20 @@ final class InferredPlayback {
     /** Allowance for pauses, on top of the runtime, before media whose app stayed in front is dropped. */
     static final Duration EXPIRY_MARGIN = Duration.ofMinutes(30);
 
+    private final Duration appGrace;
+    private final Duration expiryMargin;
     private LaunchedMedia media;
     private Instant launchedAt;
     private boolean appSeen;
+
+    InferredPlayback() {
+        this(APP_GRACE, EXPIRY_MARGIN);
+    }
+
+    InferredPlayback(Duration appGrace, Duration expiryMargin) {
+        this.appGrace = appGrace;
+        this.expiryMargin = expiryMargin;
+    }
 
     void launched(LaunchedMedia launched, String currentApp, Instant now) {
         media = launched;
@@ -64,11 +75,11 @@ final class InferredPlayback {
             return Optional.empty();
         }
         if (!appSeen) {
-            return Optional.of(launchedAt.plus(APP_GRACE));
+            return Optional.of(launchedAt.plus(appGrace));
         }
         if (media.durationSeconds() == null) {
             return Optional.empty();
         }
-        return Optional.of(launchedAt.plusMillis(Math.round(media.durationSeconds() * 1000)).plus(EXPIRY_MARGIN));
+        return Optional.of(launchedAt.plusMillis(Math.round(media.durationSeconds() * 1000)).plus(expiryMargin));
     }
 }
