@@ -3,6 +3,7 @@ package dev.andre.homecontrol.web;
 import dev.andre.homecontrol.config.Json;
 import dev.andre.homecontrol.testsupport.FullAppReset;
 import dev.andre.homecontrol.testsupport.FullAppTest;
+import jakarta.servlet.MultipartConfigElement;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -120,6 +121,23 @@ class ThemePageTest extends FullAppTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(post("/setup/appearance/install").session(latest).param("token", latestToken))
                 .andExpect(status().is3xxRedirection());
+    }
+
+    @Test
+    void uploadsHaveFiniteDiskSpoolingAndRequestLimits() {
+        MultipartConfigElement limits = app.getBean(MultipartConfigElement.class);
+        assertThat(limits.getMaxFileSize()).isEqualTo(10L * 1024 * 1024);
+        assertThat(limits.getMaxRequestSize()).isEqualTo(11L * 1024 * 1024);
+        assertThat(limits.getFileSizeThreshold()).isZero();
+    }
+
+    @Test
+    void oversizedUploadIsRejectedBeforePackageParsing() throws Exception {
+        mvc.perform(multipart("/setup/appearance/preview")
+                        .file(new MockMultipartFile("package", "theme.zip", "application/zip",
+                                new byte[10 * 1024 * 1024 + 1])))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(content().string(containsString("Theme ZIP must be no larger than 10 MiB.")));
     }
 
     @Test

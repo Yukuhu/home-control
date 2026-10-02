@@ -5,6 +5,7 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Response;
 import com.microsoft.playwright.Route;
 import com.microsoft.playwright.options.AriaRole;
+import com.microsoft.playwright.options.Cookie;
 import com.microsoft.playwright.options.ScreenshotAnimations;
 import dev.andre.homecontrol.testsupport.FakeHttpServer;
 import dev.andre.homecontrol.themes.ThemeCatalog;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.concurrent.CountDownLatch;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -206,8 +208,181 @@ class OfflineUiE2eTest extends E2eApplicationTest {
         }
     }
 
+    @BrowserTest
+    void aCookieAuthenticatingProxyAllowsTheOfflineShellAndCustomTheme(String browser)
+            throws IOException, InterruptedException {
+        ThemeDescriptor ocean = themes.install(ThemePackageFixtures.derivative(themes.export("default"),
+                "ocean", "Ocean", "#123456"), null);
+        try (OfflineOrigin origin = new OfflineOrigin(baseUrl(), themes);
+             BrowserSession session = Browsers.open(browser, origin.baseUrl(), traceName)) {
+            origin.requireProxyCookie();
+            session.context().addCookies(List.of(new Cookie("proxy-session", "authenticated").setUrl(origin.baseUrl())));
+            Page page = session.page();
+            page.navigate("/offline.html");
+            registerWorker(page);
+            page.evaluate("id => window.homeControlTheme.select(id)", ocean.id());
+            waitForCompleteCustomCache(page, ocean);
+            origin.disconnect();
+            page.navigate("/offline-through-proxy");
+            assertThat(page.locator("html")).hasAttribute("data-theme", "ocean");
+            assertThat(page.locator("body")).hasCSS("background-color", "rgb(18, 52, 86)");
+        }
+    }
+
+    @BrowserTest
+    void aRemovedCustomThemeDoesNotReturnAfterTheServerGoesOffline(String browser)
+            throws IOException, InterruptedException {
+        ThemeDescriptor ocean = themes.install(ThemePackageFixtures.derivative(themes.export("default"),
+                "ocean", "Ocean", "#123456"), null);
+        try (OfflineOrigin origin = new OfflineOrigin(baseUrl(), themes);
+             BrowserSession session = Browsers.open(browser, origin.baseUrl(), traceName)) {
+            Page page = session.page();
+            page.navigate("/offline.html");
+            registerWorker(page);
+            page.evaluate("id => window.homeControlTheme.select(id)", ocean.id());
+            waitForCompleteCustomCache(page, ocean);
+            themes.remove(ocean.id());
+            origin.refreshResources(baseUrl(), themes);
+            page.reload();
+            assertThat(page.locator("html")).hasAttribute("data-theme", "default");
+            org.assertj.core.api.Assertions.assertThat(page.evaluate(
+                    "() => localStorage.getItem('homecontrol.theme.v1')")).isEqualTo("default");
+            page.waitForCondition(() -> Boolean.TRUE.equals(page.evaluate(
+                    "async () => !(await caches.keys()).some(key => key.startsWith('home-control-theme-'))")));
+            origin.disconnect();
+            // Even a stale tab restoring the old ID cannot advertise a revoked offline revision.
+            page.evaluate("id => localStorage.setItem('homecontrol.theme.v1', id)", ocean.id());
+            page.navigate("/offline-after-theme-removal");
+            assertThat(page.locator("html")).hasAttribute("data-theme", "default");
+            org.assertj.core.api.Assertions.assertThat(page.evaluate(
+                    "() => window.homeControlThemes.themes.map(theme => theme.id)"))
+                    .isEqualTo(List.of("default", "cyberpunk"));
+        }
+    }
+
+    @BrowserTest
+    void aTemporaryCatalogFailurePreservesTheCompleteCustomTheme(String browser)
+            throws IOException, InterruptedException {
+        ThemeDescriptor ocean = themes.install(ThemePackageFixtures.derivative(themes.export("default"),
+                "ocean", "Ocean", "#123456"), null);
+        try (OfflineOrigin origin = new OfflineOrigin(baseUrl(), themes);
+             BrowserSession session = Browsers.open(browser, origin.baseUrl(), traceName)) {
+            Page page = session.page();
+            page.navigate("/offline.html");
+            registerWorker(page);
+            page.evaluate("id => window.homeControlTheme.select(id)", ocean.id());
+            waitForCompleteCustomCache(page, ocean);
+            origin.failCatalog();
+            org.assertj.core.api.Assertions.assertThat(page.evaluate("() => window.homeControlTheme.refresh()"))
+                    .isEqualTo(false);
+            waitForCompleteCustomCache(page, ocean);
+            origin.disconnect();
+            page.navigate("/offline-after-catalog-failure");
+            assertThat(page.locator("html")).hasAttribute("data-theme", "ocean");
+        }
+    }
+
+    @BrowserTest
+    void aSlowThemeAssetDoesNotBlockOnlineCatalogRefresh(String browser) throws IOException, InterruptedException {
+        ThemeDescriptor ocean = themes.install(ThemePackageFixtures.derivative(themes.export("cyberpunk"),
+                "ocean", "Ocean", "#123456"), null);
+        CountDownLatch release = new CountDownLatch(1);
+        try (OfflineOrigin origin = new OfflineOrigin(baseUrl(), themes);
+             BrowserSession session = Browsers.open(browser, origin.baseUrl(), traceName)) {
+            Page page = session.page();
+            page.navigate("/offline.html");
+            registerWorker(page);
+            String font = ocean.assets().stream().filter(path -> path.endsWith(".woff2")).findFirst().orElseThrow();
+            origin.holdAsset(font, release);
+            page.evaluate("id => window.homeControlTheme.select(id)", ocean.id());
+            // Wait for the worker's fetch, regardless of which font weights this browser renders on the page.
+            page.waitForCondition(() -> origin.server.requests("GET", font).stream()
+                    .anyMatch(request -> "empty".equals(request.header("sec-fetch-dest"))));
+            org.assertj.core.api.Assertions.assertThat(page.evaluate("() => window.homeControlTheme.refresh()"))
+                    .as("Online catalog refresh completes while the separate offline asset fetch is pending")
+                    .isEqualTo(true);
+        } finally {
+            release.countDown();
+        }
+    }
+
+    @BrowserTest
+    void aFailedThemeUpdateKeepsItsPreviousCompleteRevisionOffline(String browser)
+            throws IOException, InterruptedException {
+        ThemeDescriptor ocean = themes.install(ThemePackageFixtures.derivative(themes.export("cyberpunk"),
+                "ocean", "Ocean", "#123456"), null);
+        try (OfflineOrigin origin = new OfflineOrigin(baseUrl(), themes);
+             BrowserSession session = Browsers.open(browser, origin.baseUrl(), traceName)) {
+            Page page = session.page();
+            page.navigate("/offline.html");
+            origin.installMessageProbe();
+            registerWorker(page, "/sw-message-probe.js");
+            page.evaluate("id => window.homeControlTheme.select(id)", ocean.id());
+            waitForCompleteCustomCache(page, ocean);
+            ThemeDescriptor updated = themes.install(ThemePackageFixtures.derivative(themes.export("ocean"),
+                    "ocean", "Ocean updated", "#234567"), ocean.revision());
+            origin.refreshResources(baseUrl(), themes);
+            origin.failAsset(updated.assets().stream().filter(path -> path.endsWith(".woff2")).findFirst().orElseThrow());
+            page.evaluate("() => window.homeControlTheme.refresh()");
+            page.evaluate("""
+                    ({id, revision}) => new Promise(resolve => {
+                        const channel = new MessageChannel();
+                        channel.port1.onmessage = () => { channel.port1.close(); resolve(); };
+                        navigator.serviceWorker.controller.postMessage({type: 'test-cache-theme', id, revision},
+                            [channel.port2]);
+                    })
+                    """, Map.of("id", updated.id(), "revision", updated.revision()));
+            waitForCompleteCustomCache(page, ocean);
+            origin.disconnect();
+            page.navigate("/offline-after-failed-theme-update");
+            assertThat(page.locator("html")).hasAttribute("data-theme", "ocean");
+            assertThat(page.locator("body")).hasCSS("background-color", "rgb(18, 52, 86)");
+        }
+    }
+
+    @BrowserTest
+    void foreignOriginMessagesCannotReplaceTheOfflineCustomTheme(String browser)
+            throws IOException, InterruptedException {
+        ThemeDescriptor ocean = themes.install(ThemePackageFixtures.derivative(themes.export("default"),
+                "ocean", "Ocean", "#123456"), null);
+        ThemeDescriptor forest = themes.install(ThemePackageFixtures.derivative(themes.export("default"),
+                "forest", "Forest", "#234567"), null);
+        try (OfflineOrigin origin = new OfflineOrigin(baseUrl(), themes);
+             BrowserSession session = Browsers.open(browser, origin.baseUrl(), traceName)) {
+            Page page = session.page();
+            page.navigate("/offline.html");
+            origin.installMessageProbe();
+            registerWorker(page, "/sw-message-probe.js");
+            page.evaluate("id => window.homeControlTheme.select(id)", ocean.id());
+            waitForCompleteCustomCache(page, ocean);
+            page.evaluate("""
+                    ({id, revision}) => new Promise(resolve => {
+                        const channel = new MessageChannel();
+                        channel.port1.onmessage = () => { channel.port1.close(); resolve(); };
+                        navigator.serviceWorker.controller.postMessage({type: 'test-foreign-message', id, revision},
+                            [channel.port2]);
+                    })
+                    """, Map.of("id", forest.id(), "revision", forest.revision()));
+            waitForCompleteCustomCache(page, ocean);
+            origin.disconnect();
+            page.navigate("/offline-after-foreign-message");
+            assertThat(page.locator("html")).hasAttribute("data-theme", "ocean");
+        }
+    }
+
+    private static void registerWorker(Page page) {
+        registerWorker(page, "/sw.js");
+    }
+
+    private static void registerWorker(Page page, String script) {
+        assumeTrue((Boolean) page.evaluate("() => 'serviceWorker' in navigator"),
+                "This browser does not expose service workers");
+        page.evaluate("script => navigator.serviceWorker.register(script)", script);
+        page.waitForFunction("() => Boolean(navigator.serviceWorker.controller)");
+    }
+
     private static void waitForCompleteCustomCache(Page page, ThemeDescriptor theme) {
-        page.waitForFunction("""
+        page.waitForCondition(() -> Boolean.TRUE.equals(page.evaluate("""
                 async ({id, revision, paths}) => {
                     const keys = (await caches.keys()).filter(key => key.startsWith('home-control-theme-'));
                     if (keys.length !== 1) return false;
@@ -218,7 +393,7 @@ class OfflineUiE2eTest extends E2eApplicationTest {
                     return metadata.theme.id === id && metadata.theme.revision === revision
                         && (await Promise.all(paths.map(path => cache.match(path)))).every(Boolean);
                 }
-                """, Map.of("id", theme.id(), "revision", theme.revision(), "paths", theme.assets()));
+                """, Map.of("id", theme.id(), "revision", theme.revision(), "paths", theme.assets()))));
     }
 
     private static void screenshot(Page page, String browser, int width, String prefix) {
@@ -261,6 +436,55 @@ class OfflineUiE2eTest extends E2eApplicationTest {
                 }
             }
             return resources;
+        }
+
+        private void installMessageProbe() {
+            server.respond("GET", "/sw-message-probe.js", dev.andre.homecontrol.testsupport.Response.of(200,
+                    "text/javascript", """
+                    importScripts('/sw.js');
+                    self.addEventListener('message', event => {
+                        if (!['test-foreign-message', 'test-cache-theme'].includes(event.data?.type)) return;
+                        event.waitUntil((async () => {
+                            const work = [];
+                            const message = new ExtendableMessageEvent('message', {
+                                origin: event.data.type === 'test-foreign-message' ? 'https://unrelated.example' : self.location.origin,
+                                data: {...event.data, type: 'homecontrol:cache-theme'}
+                            });
+                            Object.defineProperty(message, 'waitUntil', {value: promise => work.push(promise)});
+                            self.dispatchEvent(message);
+                            await Promise.all(work);
+                            event.ports[0].postMessage('complete');
+                        })());
+                    });
+                    """));
+        }
+
+        private void requireProxyCookie() {
+            server.respond("GET", "/**", request -> !"proxy-session=authenticated".equals(request.header("cookie")),
+                    dev.andre.homecontrol.testsupport.Response.empty(401));
+        }
+
+        private void refreshResources(String liveOrigin, ThemeCatalog themes) throws IOException, InterruptedException {
+            Map<String, Resource> resources = snapshot(liveOrigin, themes);
+            for (Map.Entry<String, Resource> entry : resources.entrySet()) {
+                String path = entry.getKey();
+                Resource resource = entry.getValue();
+                server.respond("GET", path,
+                        dev.andre.homecontrol.testsupport.Response.of(200, resource.type(), resource.bytes())
+                                .withHeader("Cache-Control", "no-store"));
+            }
+        }
+
+        private void holdAsset(String path, CountDownLatch release) {
+            server.hold("GET", path, release, dev.andre.homecontrol.testsupport.Response.empty(503));
+        }
+
+        private void failAsset(String path) {
+            server.respond("GET", path, dev.andre.homecontrol.testsupport.Response.empty(503));
+        }
+
+        private void failCatalog() {
+            server.respond("GET", "/themes/catalog.json", dev.andre.homecontrol.testsupport.Response.empty(503));
         }
 
         private String baseUrl() { return baseUrl; }

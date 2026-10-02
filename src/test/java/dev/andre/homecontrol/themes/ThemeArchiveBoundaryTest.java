@@ -42,8 +42,46 @@ class ThemeArchiveBoundaryTest {
         files.put("assets/one.png", new byte[15 * 1024 * 1024]);
         files.put("assets/two.png", new byte[15 * 1024 * 1024]);
         byte[] bomb = zip(files);
-        assertThat(bomb.length).isLessThan(100_000);
+        assertThat(bomb).hasSizeLessThan(100_000);
         assertThatThrownBy(() -> ThemeArchive.read(bomb)).isInstanceOf(ThemeException.class)
                 .satisfies(error -> assertThat(((ThemeException) error).status()).isEqualTo(413));
     }
+    @Test void rejectsLongPathsWithoutOverflowingTheStack() {
+        String longPath = "assets/" + "a/".repeat(20_000) + "image.png";
+        assertThatThrownBy(() -> ThemeArchive.path(longPath, false)).isInstanceOf(ThemeException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"assets", "assets/images", "assets/images.photo/inside"})
+    void acceptsOnlyCanonicalDirectories(String path) {
+        String directory = path + "/";
+        if (path.contains(".")) {
+            assertThatThrownBy(() -> ThemeArchive.path(directory, true)).isInstanceOf(ThemeException.class);
+        } else {
+            assertThatCode(() -> ThemeArchive.path(directory, true)).doesNotThrowAnyException();
+        }
+    }
+
+    @Test void acceptsEmptyDirectoriesButRejectsDirectoryContent() {
+        var files = files("custom", null);
+        files.put("assets/", new byte[0]);
+        files.put("assets/images/", new byte[0]);
+        byte[] archive = zip(files);
+        assertThat(ThemeArchive.read(archive)).containsOnlyKeys("theme.json", "tokens.json", "LICENSE");
+        files.put("assets/images/", new byte[] {1});
+        byte[] nonemptyDirectory = zip(files);
+        assertThatThrownBy(() -> ThemeArchive.read(nonemptyDirectory)).isInstanceOf(ThemeException.class)
+                .hasMessageContaining("directories must be empty");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"theme.json", "tokens.json", "LICENSE"})
+    void requiresEachSourceDocument(String required) {
+        var files = files("custom", null);
+        files.remove(required);
+        byte[] archive = zip(files);
+        assertThatThrownBy(() -> ThemeArchive.read(archive)).isInstanceOf(ThemeException.class)
+                .hasMessageContaining(required);
+    }
+
 }

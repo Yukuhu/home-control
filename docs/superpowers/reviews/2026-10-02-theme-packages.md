@@ -41,8 +41,9 @@ public revisions. An upgrade recompiles verified source without invalidating its
   the original deep-nesting, JSON and namespace failures before their fixes.
 - The first full application run completed 3,206 tests with one failure in a new layout test: a fresh installation
   correctly redirected Home to Setup. The test now registers a device before checking the dashboard's head.
-- Final `scripts/gradle.sh build`: passed under Podman. Application: 3,217 tests, zero failures/errors and one
-  skipped local-network mDNS test; core: 223 tests, zero failures/errors/skips.
+- After integrating the `protocols` module from `main`, `scripts/gradle.sh build e2eClasses` passed under Podman.
+  Application: 2,911 tests, zero failures/errors and one skipped local-network mDNS test; core: 223 tests;
+  protocols: 314 tests. Both library modules had zero failures/errors/skips.
 - Final `scripts/e2e.sh --tests '*ThemeE2eTest' --tests '*OfflineUiE2eTest' --tests '*LoginGatingE2eTest'
   --tests '*InterfaceE2eTest'`: 105 tests passed across Chromium, Firefox and WebKit, with zero failures or skips.
 - Executable JAR smoke test: started with temporary data and all device/content modules disabled, served both
@@ -62,3 +63,31 @@ Podman; `HC_CONTAINER_RUNTIME=podman` explicitly selects Podman.
 PNG/JPEG content is decoded with ImageIO. Static WebP uses RIFF/frame-header and dimension checks; WOFF2 uses
 signature and bounded header validation. Both formats are decoded by the browser when used. Animated WebP is
 outside the version 1 contract.
+
+## Pull request analysis follow-up
+
+CodeQL's cleanup-path findings led to explicit normalized containment checks, ID/revision validation at the
+storage boundary, and rejection of symlink ancestors during reclamation. A regression reproduced removal
+following a substituted package-directory symlink before the fix and now verifies the unrelated files survive.
+
+Sonar's reliability findings led to content-based asset value equality and an identity-based private pending
+review class. Long ZIP paths now fail before regex evaluation; the regression reproduced a stack overflow in
+the earlier validator. Parser helpers retain the original validation vocabulary and depth bounds, with tests for
+manifest/ZIP metadata, image/font headers, selectors, namespaces and each token type. No architecture rules were
+weakened. The documented 10 MiB upload contract has one method-level `java:S5693` exception, with explicit disk,
+request and retained-review bounds verified by web tests.
+
+Browser review also covers authenticated reverse-proxy cookies, removal of cached themes, failed downloads of
+updated revisions, and message-origin checks. Coverage now collects the service worker's separate V8 isolate;
+the report rejects a run that captures pages but no worker execution. The converter's five tests pass and retain
+unexecuted worker lines as uncovered. An existing cache test used an asynchronous Playwright polling predicate
+that could return before publication; it now waits for the evaluated boolean result.
+
+After the backend corrections, `scripts/gradle.sh build` passed under Podman: 3,161 application tests (one existing
+local-network skip), 223 core tests and 314 protocol tests, with zero failures or errors.
+
+The selected theme, offline, login and interface browser suites passed all 123 distinct cases across Chromium,
+Firefox and WebKit with coverage enabled. A slow-font test needed one Firefox retry because it assumed both the
+page and worker would request the same font weight; its waiter now observes the worker request directly. That
+corrected test passed in all three browsers with no retries or skips. The exact-source-checked LCOV report records
+300/300 service-worker lines and 133/175 branches, replacing the earlier missing-worker coverage.

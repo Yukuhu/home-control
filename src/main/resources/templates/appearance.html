@@ -14,8 +14,8 @@
         <p>Choose a theme for this browser, or share one with your household.</p>
     </div>
     <p class="error" role="alert" th:if="${themeError}" th:text="${themeError}"></p>
-    <p role="status" th:if="${themeMessage}" th:text="${themeMessage}"></p>
-    <p role="status" data-theme-status></p>
+    <p th:if="${themeMessage}"><output th:text="${themeMessage}"></output></p>
+    <p><output data-theme-status></output></p>
     <div class="setup-layout">
         <nav class="setup-nav" aria-label="Appearance sections">
             <a th:href="@{/setup}">Back to setup</a>

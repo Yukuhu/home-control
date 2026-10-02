@@ -5,6 +5,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.themes.ThemeCatalog;
+import dev.andre.homecontrol.themes.ThemeDescriptor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -78,7 +79,7 @@ class LayoutFragmentsTest extends FullAppTest {
             assertThat(picker.find()).isTrue();
             assertThat(Pattern.compile("<option[^>]*value=\"([^\"]+)\"").matcher(picker.group(1))
                     .results().map(option -> option.group(1)).toList())
-                    .containsExactlyElementsOf(themes.themes().stream().map(theme -> theme.id()).toList());
+                    .containsExactlyElementsOf(themes.themes().stream().map(ThemeDescriptor::id).toList());
         }
     }
 

@@ -33,7 +33,9 @@ class ThemeArchiveTest {
     void rejectsNoncanonicalAndUnsupportedArchivePaths(String path) {
         var files = files("custom", null);
         files.put(path, new byte[] {1, 2, 3});
-        assertThatThrownBy(() -> new ThemeCatalog(new DataDirectory(data)).inspect(zip(files))).isInstanceOf(ThemeException.class);
+        ThemeCatalog catalog = new ThemeCatalog(new DataDirectory(data));
+        byte[] archive = zip(files);
+        assertThatThrownBy(() -> catalog.inspect(archive)).isInstanceOf(ThemeException.class);
         assertThat(data.resolve("outside")).doesNotExist();
     }
 
@@ -45,7 +47,7 @@ class ThemeArchiveTest {
         var first = catalog.inspect(zip(files));
         assertThat(catalog.inspect(zip(reversed)).revision()).isEqualTo(first.revision());
         catalog.install(zip(files), null);
-        assertThat(unzip(catalog.export("custom")).get("theme.css")).isEqualTo(files.get("theme.css"));
+        assertThat(unzip(catalog.export("custom"))).containsEntry("theme.css", files.get("theme.css"));
         assertThat(new String(catalog.export("custom"), StandardCharsets.ISO_8859_1)).doesNotContain("/data/");
     }
 
@@ -54,13 +56,16 @@ class ThemeArchiveTest {
     void rejectsMalformedOrUnsafeTokens(String json) {
         var files = files("custom", null);
         files.put("tokens.json", json.getBytes(StandardCharsets.UTF_8));
-        assertThatThrownBy(() -> new ThemeCatalog(new DataDirectory(data)).inspect(zip(files))).isInstanceOf(ThemeException.class);
+        ThemeCatalog catalog = new ThemeCatalog(new DataDirectory(data));
+        byte[] archive = zip(files);
+        assertThatThrownBy(() -> catalog.inspect(archive)).isInstanceOf(ThemeException.class);
     }
 
     @Test void enforcesDocumentAndEntryLimits() {
         ThemeCatalog catalog = new ThemeCatalog(new DataDirectory(data));
         var oversized = files("custom", " ".repeat(256 * 1024 + 1));
-        assertThatThrownBy(() -> catalog.inspect(zip(oversized))).isInstanceOf(ThemeException.class)
+        byte[] oversizedArchive = zip(oversized);
+        assertThatThrownBy(() -> catalog.inspect(oversizedArchive)).isInstanceOf(ThemeException.class)
                 .satisfies(e -> assertThat(((ThemeException) e).status()).isEqualTo(413));
         var files = files("custom", null);
         for (int i = 0; i < 256; i++) files.put("assets/license-" + i + ".txt", new byte[0]);
@@ -72,12 +77,14 @@ class ThemeArchiveTest {
         for (String json : new String[] {"{\"bg\":\"red\",\"bg\":\"blue\"}", "{} {}"}) {
             var files = files("custom", null);
             files.put("tokens.json", json.getBytes(StandardCharsets.UTF_8));
-            assertThatThrownBy(() -> catalog.inspect(zip(files))).isInstanceOf(ThemeException.class);
+            byte[] archive = zip(files);
+            assertThatThrownBy(() -> catalog.inspect(archive)).isInstanceOf(ThemeException.class);
         }
         var files = files("custom", null);
         files.put("theme.json", new String(files.get("theme.json"), StandardCharsets.UTF_8)
                 .replace("\"formatVersion\":1", "\"formatVersion\":4294967297").getBytes(StandardCharsets.UTF_8));
-        assertThatThrownBy(() -> catalog.inspect(zip(files))).isInstanceOf(ThemeException.class);
+        byte[] archive = zip(files);
+        assertThatThrownBy(() -> catalog.inspect(archive)).isInstanceOf(ThemeException.class);
     }
 
     @Test void rewritesLocalImagesAndRejectsDisguisedOrUnusedBinaryAssets() throws Exception {
@@ -92,10 +99,12 @@ class ThemeArchiveTest {
         assertThat(css).contains("/themes/packages/custom/" + installed.revision() + "/assets/picture.png");
         assertThat(installed.assets()).hasSize(2);
         files.remove("theme.css");
-        assertThatThrownBy(() -> catalog.inspect(zip(files))).isInstanceOf(ThemeException.class).hasMessageContaining("not referenced");
+        byte[] unreferencedArchive = zip(files);
+        assertThatThrownBy(() -> catalog.inspect(unreferencedArchive)).isInstanceOf(ThemeException.class).hasMessageContaining("not referenced");
         files.put("theme.css", ":root { background: url(assets/picture.png); }".getBytes(StandardCharsets.UTF_8));
         files.put("assets/picture.png", "<svg/>".getBytes(StandardCharsets.UTF_8));
-        assertThatThrownBy(() -> catalog.inspect(zip(files))).isInstanceOf(ThemeException.class);
+        byte[] disguisedArchive = zip(files);
+        assertThatThrownBy(() -> catalog.inspect(disguisedArchive)).isInstanceOf(ThemeException.class);
     }
 
     @Test void rejectsImagesExceedingDecodedDimensionsAndMalformedWoff2() throws Exception {
@@ -105,11 +114,13 @@ class ThemeArchiveTest {
         var files = files("custom", null);
         files.put("preview.png", bytes.toByteArray());
         ThemeCatalog catalog = new ThemeCatalog(new DataDirectory(data));
-        assertThatThrownBy(() -> catalog.inspect(zip(files))).isInstanceOf(ThemeException.class).hasMessageContaining("4096");
+        byte[] oversizedArchive = zip(files);
+        assertThatThrownBy(() -> catalog.inspect(oversizedArchive)).isInstanceOf(ThemeException.class).hasMessageContaining("4096");
         files.remove("preview.png");
         files.put("theme.css", "@font-face { font-family: theme-test; src: url(assets/font.woff2); }".getBytes(StandardCharsets.UTF_8));
         files.put("assets/font.woff2", new byte[] {'w', 'O', 'F', '2'});
-        assertThatThrownBy(() -> catalog.inspect(zip(files))).isInstanceOf(ThemeException.class).hasMessageContaining("WOFF2");
+        byte[] invalidFontArchive = zip(files);
+        assertThatThrownBy(() -> catalog.inspect(invalidFontArchive)).isInstanceOf(ThemeException.class).hasMessageContaining("WOFF2");
     }
 
 }

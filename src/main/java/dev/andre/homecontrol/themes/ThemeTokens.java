@@ -9,7 +9,7 @@ import java.util.Set;
 import com.helger.css.decl.*;
 
 final class ThemeTokens {
-    private static final String NUMBER = "[+-]?(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)";
+    private static final String NUMBER = "[+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)";
     private static final Set<String> COLOR_NAMES = Set.of("transparent", "currentColor", "black", "white", "red", "green", "blue", "yellow", "gray", "grey", "orange", "purple", "cyan", "magenta", "pink", "lime", "navy", "teal", "silver", "maroon", "olive", "aqua", "fuchsia", "rebeccapurple");
     private final Map<String, String> schema;
     private final Map<String, String> defaults;
@@ -18,7 +18,7 @@ final class ThemeTokens {
         schema = strings(resource("/themes/token-schema.json"));
         defaults = strings(resource("/themes/default/tokens.json"));
         if (!schema.keySet().equals(defaults.keySet())) throw new IllegalStateException("Bundled token schema and Default must agree.");
-        defaults.forEach((name, value) -> validate(name, value));
+        defaults.forEach(this::validate);
     }
 
     Map<String, String> read(byte[] bytes) {
@@ -35,23 +35,55 @@ final class ThemeTokens {
         if (value.isBlank() || value.length() > 2048 || value.indexOf(';') >= 0 || value.indexOf('{') >= 0 || value.indexOf('}') >= 0) throw ThemeException.invalid("Invalid token value: " + name);
         ThemeCss.validateTokenValue(value);
         CSSExpression expression = ThemeCss.parseValue(value);
-        boolean valid = switch (kind) {
+        boolean valid = validType(kind, value, expression);
+        if (name.equals("theme-color")) valid &= value.matches("#[0-9a-fA-F]{6}");
+        if (!valid) throw ThemeException.invalid("Token " + name + " must be a " + kind + " value.");
+    }
+
+    private static boolean validType(String kind, String value, CSSExpression expression) {
+        return switch (kind) {
             case "color" -> isColor(expression);
             case "length" -> isLength(expression);
             case "number" -> value.matches(NUMBER) && Double.isFinite(Double.parseDouble(value));
             case "font" -> expression.getAllMembers().stream().allMatch(m -> m instanceof CSSExpressionMemberTermSimple
                     || m == ECSSExpressionOperator.COMMA);
-            case "text" -> value.matches("[a-z][a-z-]*(?: [a-z][a-z-]*)*");
-            case "paint" -> expression.getAllMembers().stream().allMatch(m -> m == ECSSExpressionOperator.COMMA
-                    || (m instanceof CSSExpressionMemberTermSimple s && (COLOR_NAMES.contains(s.getValue()) || s.getValue().matches("#[0-9a-fA-F]{3,8}")))
-                    || (m instanceof CSSExpressionMemberFunction f && (f.getFunctionName().endsWith("gradient") || f.getFunctionName().equals("var") || colorFunction(f))));
-            case "shadow" -> expression.getAllMembers().stream().allMatch(m -> m == ECSSExpressionOperator.COMMA
-                    || (m instanceof CSSExpressionMemberTermSimple s && (s.getValue().matches(NUMBER + "(?:px|rem|em|%)?") || s.getValue().matches("#[0-9a-fA-F]{3,8}") || COLOR_NAMES.contains(s.getValue()) || Set.of("none", "inset").contains(s.getValue())))
-                    || (m instanceof CSSExpressionMemberFunction f && (colorFunction(f) || f.getFunctionName().equals("var"))));
+            case "text" -> isText(value);
+            case "paint" -> expression.getAllMembers().stream().allMatch(ThemeTokens::isPaintMember);
+            case "shadow" -> expression.getAllMembers().stream().allMatch(ThemeTokens::isShadowMember);
             default -> false;
         };
-        if (name.equals("theme-color")) valid &= value.matches("#[0-9a-fA-F]{6}");
-        if (!valid) throw ThemeException.invalid("Token " + name + " must be a " + kind + " value.");
+    }
+
+    private static boolean isText(String value) {
+        for (String word : value.split(" ", -1)) {
+            if (!word.matches("[a-z][a-z-]*")) return false;
+        }
+        return true;
+    }
+
+    private static boolean isPaintMember(ICSSExpressionMember member) {
+        return switch (member) {
+            case CSSExpressionMemberTermSimple simple -> isPaintColor(simple.getValue());
+            case CSSExpressionMemberFunction function -> function.getFunctionName().endsWith("gradient")
+                    || function.getFunctionName().equals("var") || colorFunction(function);
+            default -> member == ECSSExpressionOperator.COMMA;
+        };
+    }
+
+    private static boolean isPaintColor(String value) {
+        return COLOR_NAMES.contains(value) || value.matches("#[0-9a-fA-F]{3,8}");
+    }
+
+    private static boolean isShadowMember(ICSSExpressionMember member) {
+        return switch (member) {
+            case CSSExpressionMemberTermSimple simple -> isShadowLiteral(simple.getValue());
+            case CSSExpressionMemberFunction function -> colorFunction(function) || function.getFunctionName().equals("var");
+            default -> member == ECSSExpressionOperator.COMMA;
+        };
+    }
+
+    private static boolean isShadowLiteral(String value) {
+        return value.matches(NUMBER + "(?:px|rem|em|%)?") || isPaintColor(value) || Set.of("none", "inset").contains(value);
     }
 
     private static boolean isColor(CSSExpression value) {

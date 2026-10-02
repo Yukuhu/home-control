@@ -66,3 +66,25 @@ test("fails when no application coverage was captured", async (t) => {
     await writeFile(path.join(options.rawDirectory, "empty.json"), "[]");
     await assert.rejects(convertCoverage(options), /No application JavaScript coverage/);
 });
+
+test("requires service worker execution when the application has a worker", async (t) => {
+    const options = await fixture(t);
+    await writeFile(path.join(options.root, "src/main/resources/static/sw.js"), source);
+    await writeFile(path.join(options.rawDirectory, "page.json"), JSON.stringify([entry('  return "no";')]));
+    await assert.rejects(convertCoverage(options), /No service worker JavaScript coverage/);
+});
+
+test("merges service worker execution with page coverage and retains unexecuted worker lines", async (t) => {
+    const options = await fixture(t);
+    await writeFile(path.join(options.root, "src/main/resources/static/sw.js"), source);
+    await writeFile(path.join(options.rawDirectory, "both.json"), JSON.stringify([
+        entry('  return "no";'),
+        { ...entry('  return "no";'), url: "http://localhost:1234/sw.js" },
+    ]));
+    await convertCoverage(options);
+    const lcov = await readFile(path.join(options.reportDirectory, "lcov.info"), "utf8");
+    const worker = lcov.split("end_of_record").find((record) => record.includes("/sw.js"));
+    assert.match(worker, /DA:2,[1-9]\d*/);
+    assert.match(worker, /DA:3,0/);
+    assert.match(lcov, /SF:src\/main\/resources\/static\/js\/choice\.js/);
+});

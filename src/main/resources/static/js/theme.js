@@ -11,6 +11,7 @@
         || (location.pathname === "/login" && new URLSearchParams(location.search).get("next") === recoveryPath);
     const fallback = { id: "default", name: "Default", builtIn: true, themeColor: "#101917", assets: [] };
     let catalog = readDescriptors(window.homeControlThemes);
+    let authoritative = Array.isArray(window.homeControlThemes?.themes) && !window.homeControlThemes.offline;
     let current = catalog.get("default");
     let desiredId = "default";
     let activeLink;
@@ -68,12 +69,13 @@
         if (document.body) {
             let status = document.querySelector("[data-theme-status]");
             if (!status && notice) {
-                status = document.createElement("p");
+                status = document.createElement("output");
                 status.dataset.themeStatus = "";
                 status.className = "notice";
-                status.setAttribute("role", "status");
                 status.setAttribute("aria-live", "polite");
-                document.body.prepend(status);
+                const paragraph = document.createElement("p");
+                paragraph.append(status);
+                document.body.prepend(paragraph);
             }
             if (status) {
                 status.textContent = notice;
@@ -151,6 +153,7 @@
                 const data = await response.json();
                 if (!Array.isArray(data.themes)) return false;
                 catalog = readDescriptors(data);
+                authoritative = !data.offline;
                 window.homeControlThemes = data;
                 syncControls();
                 return true;
@@ -172,6 +175,7 @@
         desiredId = typeof id === "string" ? id : "default";
         if (!catalog.has(desiredId) && refreshUnknown && !initial) await fetchCatalog();
         if (mine !== generation) return false;
+        if (!catalog.has(desiredId) && authoritative && saved() === desiredId) save("default");
         const theme = catalog.get(desiredId) ?? catalog.get("default");
         desiredId = theme.id;
         if (theme.id === current.id && theme.revision === current.revision) {
@@ -202,7 +206,7 @@
         const refreshed = await fetchCatalog();
         if (refreshed && before === generation) {
             const requested = catalog.get(desiredId);
-            if (pendingLoad && pendingLoad.theme.id === requested?.id
+            if (requested && pendingLoad?.theme.id === requested.id
                     && pendingLoad.theme.revision === requested.revision) return true;
             return select(desiredId, { persist: false, refreshUnknown: false });
         }

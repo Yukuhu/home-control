@@ -16,13 +16,14 @@ class ThemeCatalogTest {
         ThemeCatalog catalog = catalog();
         byte[] original = zip(files("custom", ":root { color: #123; }"));
         var first = catalog.install(original, null);
+        String firstRevision = first.revision();
         assertThat(catalog().require("custom").revision()).isEqualTo(first.revision());
-        assertThatThrownBy(() -> catalog.install(original, first.revision())).hasMessageContaining("already installed");
+        assertThatThrownBy(() -> catalog.install(original, firstRevision)).hasMessageContaining("already installed");
         byte[] update = zip(files("custom", ":root { color: #234; }"));
         assertThatThrownBy(() -> catalog.install(update, null)).isInstanceOf(ThemeException.class);
         var second = catalog.install(update, first.revision());
         assertThat(catalog.asset(first.stylesheet())).isPresent();
-        assertThatThrownBy(() -> catalog.install(original, first.revision())).isInstanceOf(ThemeException.class);
+        assertThatThrownBy(() -> catalog.install(original, firstRevision)).isInstanceOf(ThemeException.class);
         var third = catalog.install(zip(files("custom", ":root { color: #345; }")), second.revision());
         assertThat(catalog.asset(first.stylesheet())).isEmpty();
         assertThat(catalog().asset(second.stylesheet())).isPresent();
@@ -45,6 +46,23 @@ class ThemeCatalogTest {
         }
     }
 
+    @Test void removalNeverFollowsAReplacedPackageDirectoryOutsideThemeStorage() throws Exception {
+        ThemeCatalog catalog = catalog();
+        byte[] archive = zip(files("custom", null));
+        catalog.install(archive, null);
+        Path packageDirectory = data.resolve("themes/packages/custom");
+        Path outside = data.resolve("unrelated");
+        Files.move(packageDirectory, outside);
+        Files.createSymbolicLink(packageDirectory, outside);
+
+        catalog.remove("custom");
+
+        try (var paths = Files.walk(outside)) {
+            assertThat(paths.filter(path -> path.getFileName().toString().equals("theme.json"))).hasSize(1);
+        }
+        assertThat(catalog.problems()).anyMatch(problem -> problem.contains("could not be reclaimed"));
+    }
+
     @Test void damagedCatalogKeepsBuiltinsAndRefusesMutationWithoutOverwriting() throws Exception {
         Files.createDirectories(data.resolve("themes"));
         Path registry = data.resolve("themes/catalog.json");
@@ -52,7 +70,8 @@ class ThemeCatalogTest {
         ThemeCatalog catalog = catalog();
         assertThat(catalog.themes()).hasSize(2);
         assertThat(catalog.problems()).isNotEmpty();
-        assertThatThrownBy(() -> catalog.install(zip(files("custom", null)), null)).isInstanceOf(ThemeException.class);
+        byte[] candidate = zip(files("custom", null));
+        assertThatThrownBy(() -> catalog.install(candidate, null)).isInstanceOf(ThemeException.class);
         assertThat(Files.readString(registry)).isEqualTo("broken original");
     }
 
@@ -64,7 +83,8 @@ class ThemeCatalogTest {
         Files.createDirectory(registry);
         byte[] candidate = zip(files("custom", ":root { color: #234; }"));
         var reviewed = catalog.inspect(candidate);
-        assertThatThrownBy(() -> catalog.install(candidate, original.revision())).isInstanceOf(ThemeException.class);
+        String originalRevision = original.revision();
+        assertThatThrownBy(() -> catalog.install(candidate, originalRevision)).isInstanceOf(ThemeException.class);
         assertThat(catalog.require("custom").revision()).isEqualTo(original.revision());
         assertThat(catalog.asset(reviewed.descriptor(false).stylesheet())).isEmpty();
         assertThat(catalog.asset(original.stylesheet())).isPresent();
@@ -73,7 +93,8 @@ class ThemeCatalogTest {
     @Test void capsImportedThemeCount() {
         ThemeCatalog catalog = catalog();
         for (int i = 0; i < 32; i++) catalog.install(zip(files("custom-" + i, null)), null);
-        assertThatThrownBy(() -> catalog.install(zip(files("custom-extra", null)), null)).isInstanceOf(ThemeException.class)
+        byte[] extra = zip(files("custom-extra", null));
+        assertThatThrownBy(() -> catalog.install(extra, null)).isInstanceOf(ThemeException.class)
                 .satisfies(e -> assertThat(((ThemeException) e).status()).isEqualTo(507));
         assertThat(catalog.themes()).hasSize(34);
     }
@@ -82,7 +103,8 @@ class ThemeCatalogTest {
         Path orphan = data.resolve("themes/uncommitted.bin");
         Files.createDirectories(orphan.getParent());
         try (var file = new java.io.RandomAccessFile(orphan.toFile(), "rw")) { file.setLength(256L * 1024 * 1024); }
-        assertThatThrownBy(() -> catalog.install(zip(files("custom", null)), null)).isInstanceOf(ThemeException.class)
+        byte[] candidate = zip(files("custom", null));
+        assertThatThrownBy(() -> catalog.install(candidate, null)).isInstanceOf(ThemeException.class)
                 .satisfies(e -> assertThat(((ThemeException) e).status()).isEqualTo(507));
         assertThat(catalog.themes()).hasSize(2);
     }
