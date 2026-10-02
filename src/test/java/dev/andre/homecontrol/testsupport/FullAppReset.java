@@ -26,6 +26,9 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Brings the shared full application back to a fresh install after each test class, with the application's own
  * operations and the reset methods that exist for this, never by deleting files behind the stores, which cache what
@@ -48,32 +51,68 @@ public final class FullAppReset implements AfterAllCallback {
     }
 
     public static void reset(ApplicationContext app) {
-        ThemeCatalog themes = app.getBean(ThemeCatalog.class);
-        themes.themes().stream().filter(theme -> !theme.builtIn()).forEach(theme -> themes.remove(theme.id()));
-        DeviceEnrollment enrollment = app.getBean(DeviceEnrollment.class);
-        app.getBean(DeviceQueries.class).devices().forEach(device -> enrollment.forget(device.id()));
+        runEvery(List.of(
+                new Step("themes", () -> {
+                    ThemeCatalog themes = app.getBean(ThemeCatalog.class);
+                    themes.themes().stream().filter(theme -> !theme.builtIn())
+                            .forEach(theme -> themes.remove(theme.id()));
+                }),
+                new Step("devices", () -> {
+                    DeviceEnrollment enrollment = app.getBean(DeviceEnrollment.class);
+                    app.getBean(DeviceQueries.class).devices().forEach(device -> enrollment.forget(device.id()));
+                }),
+                new Step("account credentials and login", () -> {
+                    SecretStore secrets = app.getBean(SecretStore.class);
+                    app.getBean(LoginService.class).removeSecrets(secrets.accountCredentialNames());
+                    secrets.removeLogin();
+                }),
+                new Step("YouTube connection", () -> app.getBean(YouTubeSetupService.class).disconnect()),
+                new Step("workflows", () -> app.getBean(WorkflowStore.class).reload()),
+                new Step("sports settings",
+                        () -> app.getBean(SportsSettingsService.class).update(current -> SportsSettings.empty())),
+                new Step("pins", () -> {
+                    PinnedShortcuts pins = app.getBean(PinnedShortcuts.class);
+                    pins.all().forEach(pin -> pins.remove(pin.id()));
+                }),
+                new Step("YouTube quota", () -> app.getBean(QuotaLedger.class).reset()),
+                new Step("YouTube searches", () -> app.getBean(YouTubeSearch.class).reset()),
+                new Step("known YouTube videos", () -> app.getBean(KnownVideos.class).reset()),
+                new Step("TMDB watch providers", () -> app.getBean(TmdbWatchProviders.class).reset()),
+                new Step("TMDB images", () -> app.getBean(TmdbImages.class).reset()),
+                new Step("TheSportsDB fixtures", () -> app.getBean(TheSportsDbSchedule.class).clear()),
+                new Step("Android TV pairing", () -> app.getBean(PairingService.class).cancel()),
+                new Step("login rate limit", () -> app.getBean(LoginRateLimiter.class).reset()),
+                new Step("source settings", () -> app.getBean(JsonFileSourceSettings.class).reset()),
+                new Step("rails", () -> {
+                    RailCache rails = app.getBean(RailCache.class);
+                    app.getBean(ContentSources.class).all().forEach(source -> rails.invalidateSource(source.id()));
+                }),
+                new Step("fakes", SharedFakes::resetAll)));
+    }
 
-        SecretStore secrets = app.getBean(SecretStore.class);
-        app.getBean(LoginService.class).removeSecrets(secrets.accountCredentialNames());
-        secrets.removeLogin();
-        app.getBean(YouTubeSetupService.class).disconnect();
-        app.getBean(WorkflowStore.class).reload();
-        app.getBean(SportsSettingsService.class).update(current -> SportsSettings.empty());
-        PinnedShortcuts pins = app.getBean(PinnedShortcuts.class);
-        pins.all().forEach(pin -> pins.remove(pin.id()));
-        app.getBean(QuotaLedger.class).reset();
-        app.getBean(YouTubeSearch.class).reset();
-        app.getBean(KnownVideos.class).reset();
-        app.getBean(TmdbWatchProviders.class).reset();
-        app.getBean(TmdbImages.class).reset();
-        app.getBean(TheSportsDbSchedule.class).clear();
-        app.getBean(PairingService.class).cancel();
-        app.getBean(LoginRateLimiter.class).reset();
-        app.getBean(JsonFileSourceSettings.class).reset();
-        RailCache rails = app.getBean(RailCache.class);
-        app.getBean(ContentSources.class).all().forEach(source -> rails.invalidateSource(source.id()));
+    /** One part of the reset, named in the failure if it throws. */
+    record Step(String name, Runnable action) {
+    }
 
-        SharedFakes.resetAll();
+    /**
+     * Runs every step, also after one failed, so a broken step does not leave the later ones' state behind for every
+     * class that shares the application; then fails once, naming each step that failed, with its exception attached.
+     */
+    static void runEvery(List<Step> steps) {
+        List<AssertionError> failures = new ArrayList<>();
+        for (Step step : steps) {
+            try {
+                step.action().run();
+            } catch (RuntimeException | AssertionError e) {
+                failures.add(new AssertionError(step.name(), e));
+            }
+        }
+        if (!failures.isEmpty()) {
+            AssertionError failed = new AssertionError("Resetting the shared application failed at: "
+                    + String.join(", ", failures.stream().map(Throwable::getMessage).toList()));
+            failures.forEach(failed::addSuppressed);
+            throw failed;
+        }
     }
 
 }
