@@ -233,7 +233,10 @@ class BluetoothSpeakerSessionTest {
     void aNewPlayReplacesThePlayer() {
         bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
         start();
-        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+        // It timed out once under load without saying where; the player's own waits name themselves in their
+        // messages, so this one does too.
+        await("the speaker to connect").atMost(WAIT)
+                .untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
 
         session.execute(PLAY);
         session.execute(new Action.PlayMedia(URI.create("http://127.0.0.1:9/music/other.mp3"), "audio/mpeg", "B", null));
