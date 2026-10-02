@@ -68,6 +68,9 @@ off Spring Framework 7's pausing, because `RailCache` cannot restart after a pau
   Podman, for machines without a JDK 25; with one, `./gradlew build` does the same. Both build helpers choose Docker
   when available, then Podman; set `HC_CONTAINER_RUNTIME=podman` to select Podman explicitly. Rootless Podman keeps
   the host user identity for bind mounts and disables container SELinux labels without relabelling the checkout.
+- Two checks run with the build. Error Prone runs as the code compiles, and one of its errors fails compilation; its
+  warnings are off. `spotlessCheck` fails on trailing whitespace or a missing final newline in any source, text or
+  build file, and on a leading tab or an unused import in Java; `scripts/gradle.sh spotlessApply` fixes what it finds.
 - One class of the app: `scripts/gradle.sh test --tests 'dev.andre.homecontrol.web.ErrorAdviceTest'`. One class of
   `core`: `scripts/gradle.sh :core:test --tests 'dev.andre.homecontrol.core.ActionTest'`. One class of `protocols`:
   `scripts/gradle.sh :protocols:test --tests 'dev.andre.homecontrol.adapters.net.DeviceUrisTest'`. `test --tests`
