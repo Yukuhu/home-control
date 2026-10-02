@@ -48,6 +48,11 @@ public final class SessionLoop implements AutoCloseable {
         return pending.schedule(task, delay);
     }
 
+    /** The name its thread and its log lines carry, such as {@code shield-session-<device id>}. */
+    public String name() {
+        return name;
+    }
+
     /** Drops the loop's pending task if it has not started. */
     public void cancelPending() {
         pending.cancel();

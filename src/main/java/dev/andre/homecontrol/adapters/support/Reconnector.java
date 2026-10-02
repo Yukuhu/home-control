@@ -27,6 +27,8 @@ public final class Reconnector {
     private final Backoff backoff;
     private final Supplier<Outcome> connect;
     private volatile Phase phase = Phase.TRYING;
+    /** The {@link System#nanoTime()} {@link #retryIn} asked to wait until; in the past when nothing was asked. */
+    private volatile long waitUntil = System.nanoTime();
 
     public Reconnector(SessionLoop loop, Backoff backoff, Supplier<Outcome> connect) {
         this.loop = loop;
@@ -81,6 +83,7 @@ public final class Reconnector {
             return;
         }
         backoff.reset();
+        waitUntil = System.nanoTime() + wait.toNanos();
         loop.schedule(this::attempt, wait);
     }
 
@@ -96,7 +99,7 @@ public final class Reconnector {
         try {
             outcome = connect.get();
         } catch (RuntimeException e) {
-            log.warn("A connection attempt failed unexpectedly", e);
+            log.warn("{}: a connection attempt failed unexpectedly", loop.name(), e);
             outcome = Outcome.RETRY;
         }
         if (phase == Phase.STOPPED) {
@@ -108,7 +111,11 @@ public final class Reconnector {
                 backoff.reset();
             }
             case PENDING -> phase = Phase.WAITING;
-            case RETRY -> loop.schedule(this::attempt, backoff.next());
+            case RETRY -> {
+                // A wait asked for while this attempt ran (a TV just woken) still stands, and the backoff stays fresh.
+                long asked = waitUntil - System.nanoTime();
+                loop.schedule(this::attempt, asked > 0 ? Duration.ofNanos(asked) : backoff.next());
+            }
             case STOP -> phase = Phase.STOPPED;
         }
     }
