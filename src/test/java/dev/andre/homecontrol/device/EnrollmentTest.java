@@ -258,6 +258,24 @@ class EnrollmentTest {
     }
 
     @Test
+    void forgettingAnUnknownDeviceChangesNothing() {
+        StubAdapter stub = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false);
+        FullDisk disk = new FullDisk(new JsonFileDeviceRegistry(dir.resolve("devices.json")));
+        Wiring wiring = wire(disk, HostAddresses::lookup, stub);
+        wiring.enrollment().adopt(device("tv", "stub", "10.0.0.5"));
+        published.clear();
+        disk.full = true; // a write would throw
+
+        wiring.enrollment().forget("unknown");
+
+        assertThat(wiring.registry().findAll()).extracting(Device::id).containsExactly("tv");
+        assertThat(stub.forgotten).isEmpty();
+        assertThat(wiring.connections().handles("tv")).containsValue(stub.handles.get("tv"));
+        assertThat(stub.handles.get("tv").closed).isFalse();
+        assertThat(published).isEmpty();
+    }
+
+    @Test
     void aForgetThatFailsLeavesTheDeviceConnected() {
         StubAdapter stub = new StubAdapter("stub", DeviceKind.ANDROID_TV, false, false) {
             @Override
