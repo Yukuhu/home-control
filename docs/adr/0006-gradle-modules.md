@@ -29,5 +29,5 @@
 - `test --tests` runs its filter in every module. A module without a match passes, and the app's `test` fails when
   nothing matches, so a filter for a class of `core` runs with `:core:test --tests`, which fails when nothing
   matches.
-- Whether to split the app further is decided from the build times measured before and after each pull request
-  (`docs/dev/architecture.md`, "Progress measures").
+- Whether to split the app further is decided from CI's "Build and test" job time (`docs/dev/architecture.md`,
+  "Progress measures"), not from timings on one developer's machine.
