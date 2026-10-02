@@ -248,14 +248,15 @@ class TizenSessionTest {
                 .isInstanceOf(UnsupportedActionException.class);
     }
 
+    /** Stop needs a cast to stop, which a Tizen TV does not offer; its stop key is a plain key press. */
     @Test
-    void stopSendsTheStopKey() throws Exception {
+    void stopIsRefused() throws Exception {
         start(PAIRED);
         connected();
+        var stop = new Action.Stop();
 
-        session.execute(new Action.Stop());
-
-        assertThat(tv.nextKey()).isEqualTo("KEY_STOP");
+        assertThatThrownBy(() -> session.execute(stop))
+                .isInstanceOf(UnsupportedActionException.class).hasMessage("Samsung TV cannot stop a cast");
     }
 
     @Test

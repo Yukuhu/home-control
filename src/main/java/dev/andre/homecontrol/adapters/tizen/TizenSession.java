@@ -132,7 +132,8 @@ public class TizenSession implements DeviceHandle {
                     device.name() + " does not list its inputs; use the Source button of the TV remote");
             case Action.SetVolume _ -> throw volumeKeysOnly();
             case Action.Mute _ -> throw volumeKeysOnly();
-            case Action.Stop _ -> sendKey("KEY_STOP", "stop");
+            // Stop is for casts (Action.Stop requires a cast or renderer capability), which a Tizen TV does not offer.
+            case Action.Stop _ -> throw new UnsupportedActionException(device.name() + " cannot stop a cast");
             case Action.CastLoad _ -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
             case Action.CastMessage _ -> throw new UnsupportedActionException(device.name() + " is not a Cast receiver");
             case Action.PlayMedia _ -> throw new UnsupportedActionException(device.name() + " cannot play a direct stream");
