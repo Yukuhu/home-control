@@ -2,6 +2,7 @@ package dev.andre.homecontrol.adapters.upnp.protocol;
 
 import com.sun.net.httpserver.HttpServer;
 import dev.andre.homecontrol.adapters.net.DeviceTimeoutException;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,8 +13,6 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -90,7 +89,7 @@ class SoapClientTest {
     }
 
     private static String fixture(String name) throws IOException {
-        return Files.readString(Path.of("src/test/resources/fixtures/upnp/" + name)).strip();
+        return Fixtures.read("upnp/" + name).strip();
     }
 
     @Test

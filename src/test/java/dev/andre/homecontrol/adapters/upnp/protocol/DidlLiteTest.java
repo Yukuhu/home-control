@@ -1,11 +1,10 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -14,7 +13,7 @@ class DidlLiteTest {
     @Test
     void describesAnAudioTrackForDlnaRenderers() throws IOException {
         assertThat(DidlLite.item(URI.create(SoapClientTest.URL), "audio/flac", "Bunny Song", "The Rabbits", DidlLite.DLNA_STREAMING))
-                .isEqualTo(Files.readString(Path.of("src/test/resources/fixtures/upnp/didl-track.xml")).strip());
+                .isEqualTo(Fixtures.read("upnp/didl-track.xml").strip());
     }
 
     @Test
@@ -38,9 +37,9 @@ class DidlLiteTest {
 
     @Test
     void readsTheTitleFromMetadata() throws IOException {
-        assertThat(DidlLite.title(Files.readString(Path.of("src/test/resources/fixtures/upnp/position-metadata.xml"))))
+        assertThat(DidlLite.title(Fixtures.read("upnp/position-metadata.xml")))
                 .contains("Carrot Waltz");
-        assertThat(DidlLite.title(Files.readString(Path.of("src/test/resources/fixtures/upnp/didl-track.xml")))).contains("Bunny Song");
+        assertThat(DidlLite.title(Fixtures.read("upnp/didl-track.xml"))).contains("Bunny Song");
         assertThat(DidlLite.title("NOT_IMPLEMENTED")).isEmpty();
         assertThat(DidlLite.title("")).isEmpty();
         assertThat(DidlLite.title(null)).isEmpty();

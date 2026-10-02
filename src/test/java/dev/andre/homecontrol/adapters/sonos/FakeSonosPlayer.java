@@ -3,6 +3,7 @@ package dev.andre.homecontrol.adapters.sonos;
 import dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.testsupport.Fixtures;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -14,7 +15,7 @@ public class FakeSonosPlayer extends FakeUpnpRenderer {
 
     static final Layout SONOS = new Layout("/xml/device_description.xml", "/MediaRenderer/AVTransport/Control",
             "/MediaRenderer/RenderingControl/Control", "/MediaRenderer/ConnectionManager/Control",
-            "fixtures/ssdp/sonos-description.xml");
+            "ssdp/sonos-description.xml");
     static final String ZONE_GROUP_TOPOLOGY = "urn:schemas-upnp-org:service:ZoneGroupTopology:1";
     private static final Set<String> COORDINATOR_ONLY = Set.of("SetAVTransportURI", "Play", "Pause", "Stop");
 

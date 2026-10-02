@@ -3,19 +3,18 @@ package dev.andre.homecontrol.adapters.webos;
 import dev.andre.homecontrol.adapters.webos.protocol.SsapMessages;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.TvInput;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WebOsPayloadsTest {
 
     private static JsonNode fixture(String name) throws IOException {
-        return SsapMessages.JSON.readTree(Files.readString(Path.of("src/test/resources/fixtures/webos/" + name)));
+        return SsapMessages.JSON.readTree(Fixtures.read("webos/" + name));
     }
 
     private static JsonNode json(String text) {

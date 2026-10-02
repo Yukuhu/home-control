@@ -1,13 +1,12 @@
 package dev.andre.homecontrol.adapters.webos.protocol;
 
 import dev.andre.homecontrol.adapters.net.FakeWebSocketServer;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -254,7 +253,7 @@ public class FakeSsapServer implements AutoCloseable {
 
     private static String fixture(String name) {
         try {
-            return Files.readString(Path.of("src/test/resources/fixtures/webos/" + name));
+            return Fixtures.read("webos/" + name);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

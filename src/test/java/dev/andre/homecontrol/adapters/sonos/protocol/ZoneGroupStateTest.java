@@ -1,10 +1,9 @@
 package dev.andre.homecontrol.adapters.sonos.protocol;
 
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -12,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ZoneGroupStateTest {
 
     static String fixture(String name) throws IOException {
-        return Files.readString(Path.of("src/test/resources/fixtures/sonos/" + name)).strip();
+        return Fixtures.read("sonos/" + name).strip();
     }
 
     @Test

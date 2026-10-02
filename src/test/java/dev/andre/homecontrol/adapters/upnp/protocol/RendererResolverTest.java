@@ -1,13 +1,12 @@
 package dev.andre.homecontrol.adapters.upnp.protocol;
 
 import dev.andre.homecontrol.adapters.upnp.FakeUpnpRenderer;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +29,7 @@ class RendererResolverTest {
     }
 
     private static String description() throws IOException {
-        return Files.readString(Path.of("src/test/resources/fixtures/upnp/renderer-description.xml"));
+        return Fixtures.read("upnp/renderer-description.xml");
     }
 
     private RendererResolver.Renderer resolve() throws IOException {

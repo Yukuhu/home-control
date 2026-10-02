@@ -3,14 +3,13 @@ package dev.andre.homecontrol.adapters.tizen;
 import dev.andre.homecontrol.adapters.tizen.protocol.TizenApp;
 import dev.andre.homecontrol.adapters.tizen.protocol.TizenMessages;
 import dev.andre.homecontrol.core.playback.ServiceLinks;
+import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,7 +19,7 @@ class TizenLaunchesTest {
 
     private static Optional<List<TizenApp>> installed() throws IOException {
         return Optional.of(TizenMessages.installedApps(TizenMessages.JSON.readTree(
-                Files.readString(Path.of("src/test/resources/fixtures/tizen/installed-apps.json")))));
+                Fixtures.read("tizen/installed-apps.json"))));
     }
 
     @ParameterizedTest

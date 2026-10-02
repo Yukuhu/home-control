@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.discovery.ssdp;
 
 import dev.andre.homecontrol.discovery.ssdp.protocol.SsdpMessage;
+import dev.andre.homecontrol.testsupport.Fixtures;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -8,8 +9,6 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -63,7 +62,7 @@ public class FakeSsdpResponder implements AutoCloseable {
 
     /** Loads a fixture, fills in {@code {host}} / {@code {port}}, and normalises to CRLF. */
     public static String fixture(String name, String host, int port) throws IOException {
-        return Files.readString(Path.of("src/test/resources/fixtures/ssdp/" + name))
+        return Fixtures.read("ssdp/" + name)
                 .replace("{host}", host).replace("{port}", String.valueOf(port))
                 .replace("\r\n", "\n").replace("\n", "\r\n");
     }
