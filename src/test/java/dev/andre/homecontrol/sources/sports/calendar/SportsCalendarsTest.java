@@ -1,8 +1,11 @@
 package dev.andre.homecontrol.sources.sports.calendar;
 
 import dev.andre.homecontrol.core.content.ContentChangedEvent;
+import dev.andre.homecontrol.security.Argon2PasswordHasher;
+import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.security.PasswordRejectedException;
+import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.sources.sports.feed.FeedResult;
 import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
@@ -10,6 +13,7 @@ import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
 import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
+import dev.andre.homecontrol.storage.SecretKeySource;
 import dev.andre.homecontrol.storage.SecretStore;
 import dev.andre.homecontrol.testsupport.FakeLoginContext;
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.io.IOException;
 import java.net.URI;
@@ -145,6 +150,29 @@ class SportsCalendarsTest {
         });
         assertThat(server.count("/private/token-abc123/bl.ics")).as("only the download that checked the link")
                 .isEqualTo(1);
+    }
+
+    /** A real login, as the app has it: no password yet, so the first one must be strong enough. */
+    private LoginService realLogin() {
+        SecureRandom random = new SecureRandom();
+        SecretStore secrets = new SecretStore(dir.resolve("secrets.json"),
+                new SecretKeySource(null, dir.resolve("secret.key"), random), random);
+        return new LoginService(secrets, new Argon2PasswordHasher(random), random);
+    }
+
+    @Test
+    void aWeakFirstPasswordIsRefusedBeforeTheCalendarIsFetched() {
+        LoginService household = realLogin();
+        SportsCalendars guarded = new SportsCalendars(settingsService, fetcher, schedule, secrets, household,
+                properties,
+                Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC), random);
+        var weak = new SportsCalendars.AddCalendar(server.url("/private/token-abc123/bl.ics").toString(), "", "short",
+                "short");
+        LoginContext browser = new RequestLoginContext(new MockHttpServletRequest(), household);
+
+        assertThatThrownBy(() -> guarded.add(weak, browser)).isInstanceOf(PasswordRejectedException.class);
+        assertThat(server.count("/private/token-abc123/bl.ics")).isZero();
+        assertThat(settingsService.current().calendars()).isEmpty();
     }
 
     @Test
