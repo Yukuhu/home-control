@@ -334,11 +334,15 @@ class TizenSessionTest {
     void powerWhileOnSendsTheKey() throws Exception {
         start(PAIRED);
         connected();
+        // Only what the session publishes from here on counts: the fake TV stays on, so a poll may report it on
+        // again right after the session has published "off".
+        await().atMost(Duration.ofSeconds(5)).until(() -> !states.all().isEmpty() && states.last().powerOn());
+        states.clear();
 
         session.execute(new Action.PressKey(RemoteKey.POWER));
 
         assertThat(tv.nextKey()).isEqualTo("KEY_POWER");
-        assertThat(states.last().powerOn()).isFalse();
+        await().atMost(Duration.ofSeconds(5)).until(() -> states.all().stream().anyMatch(state -> !state.powerOn()));
     }
 
     @Test
