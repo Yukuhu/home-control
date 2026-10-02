@@ -235,7 +235,8 @@ class FakeHttpServerTest {
             assertThat(body.read()).isEqualTo(' ');
         }
 
-        assertThat(server.bytesTrickled()).isGreaterThan(1);
+        // The server counts a byte after flushing it, so the second count can trail the read.
+        await().atMost(Duration.ofSeconds(5)).until(() -> server.bytesTrickled() > 1);
         await().atMost(Duration.ofSeconds(5)).until(() -> server.openTrickles() == 0);
     }
 
