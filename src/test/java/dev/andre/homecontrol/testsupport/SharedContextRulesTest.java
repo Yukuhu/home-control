@@ -12,6 +12,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.BeanOverride;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -21,6 +22,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Keeps every test that extends a shared-context base ({@link WebSliceTest}, {@link ModulesOffTest},
@@ -93,6 +95,18 @@ class SharedContextRulesTest {
                 .orShould().beAssignableTo(ModulesOffTest.class)
                 .orShould(be(LISTED_WITH_A_CONTEXT_OF_ITS_OWN))
                 .check(TESTS);
+    }
+
+    /** OWN_CONTEXT lists simple names: each must be one @SpringBootTest, so a stale or doubled name fails here. */
+    @Test
+    void eachListedNameIsExactlyOneSpringBootTest() {
+        for (String name : OWN_CONTEXT) {
+            List<JavaClass> listed = TESTS.stream()
+                    .filter(type -> type.getSimpleName().equals(name))
+                    .filter(A_SPRING_BOOT_TEST)
+                    .toList();
+            assertThat(listed).as(name).hasSize(1);
+        }
     }
 
     @Test
