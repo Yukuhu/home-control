@@ -1,9 +1,11 @@
 package dev.andre.homecontrol.testsupport;
 
 import dev.andre.homecontrol.sources.workflows.WorkflowHttpClient;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -11,6 +13,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The one full-application context the end-to-end tests share: every module on, a real port, MockMvc, a data
@@ -25,6 +30,8 @@ import java.nio.file.Path;
 public abstract class FullAppTest {
 
     private static Path dataDir;
+    private static ApplicationContext started;
+    private static Set<String> filesAtStartup;
 
     /** A spy calls the real client; {@code WorkflowSetupAuthenticationTest} checks it was never used. */
     @MockitoSpyBean
@@ -49,8 +56,24 @@ public abstract class FullAppTest {
         registry.add("home-control.youtube.thumbnail-base-url", () -> SharedFakes.google().base() + "/thumbs");
     }
 
+    /** Before the first test class that uses a newly started context: its data directory's files, as startup left them. */
+    @BeforeAll
+    static void noteTheFilesAtStartup(ApplicationContext context) throws IOException {
+        if (context != started) {
+            started = context;
+            try (Stream<Path> files = Files.list(dataDir)) {
+                filesAtStartup = files.map(file -> file.getFileName().toString()).collect(Collectors.toUnmodifiableSet());
+            }
+        }
+    }
+
     /** This context's data directory. */
     protected static Path dataDir() {
         return dataDir;
+    }
+
+    /** The names of the files in this context's data directory once the application had started. */
+    protected static Set<String> filesAtStartup() {
+        return filesAtStartup;
     }
 }

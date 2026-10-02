@@ -47,13 +47,15 @@ combination, such as sports on with TheSportsDB off, keeps a `@SpringBootTest` o
 
 A test of the whole application extends `testsupport.FullAppTest`: one context per test JVM with every module on, a
 real port and MockMvc. After every class, `FullAppReset` returns the application to a fresh install: no devices, no
-installed themes, no login or secrets, no sports settings, pins or workflows, an unused YouTube quota, no rate limit, no pending pairing,
-fresh rails and settings files, empty caches of TMDB, YouTube and TheSportsDB answers, and the shared web-API fakes
-(`SharedFakes`: TMDB, Google, TheSportsDB) reset.
+installed themes, no login or secrets, no sports settings, pins or workflows, an unused YouTube quota, no rate
+limit, no pending pairing, fresh rails and settings files, empty caches of TMDB, YouTube and TheSportsDB answers, and
+the shared web-API fakes (`SharedFakes`: TMDB, Google, TheSportsDB) reset.
 
 - A test that sets up state it cannot leave for the next class relies on that reset; a test class that needs a fresh
   install after every test calls `FullAppReset.reset(context)` in `@AfterEach`, as `LoginGatingTest` does.
 - A shared fake's routes go in `@BeforeAll` or the test, never a static initializer, and a test never closes it.
+- Only the first class to use a context sees it start. `filesAtStartup()` names the files in the data directory once
+  the application had started, for a test of what startup writes, as `SportsUnconfiguredTest` has.
 - A test that needs other beans or properties keeps a `@SpringBootTest` of its own and is named in
   `SharedContextRulesTest.OWN_CONTEXT`, with the reason.
 - New state that outlives a test class needs a line in `FullAppReset`, using the bean's own operations; only where
