@@ -39,9 +39,9 @@ class RailCacheLifecycleTest {
     private RailCache cache;
 
     @AfterEach
-    void stop() {
+    void close() {
         if (cache != null) {
-            cache.stop();
+            cache.close();
         } else {
             fetches.shutdownNow();
         }
@@ -144,14 +144,50 @@ class RailCacheLifecycleTest {
     }
 
     @Test
-    void stoppingInterruptsAnActiveFetch() {
+    void aStoppedCacheStartsAgainAndRefreshesRails() {
+        createCache(true);
+        cache.start();
+        await().atMost(TIMEOUT).untilAsserted(() ->
+                assertThat(cache.peek()).singleElement()
+                        .satisfies(snapshot -> assertThat(snapshot.status()).isEqualTo(RailStatus.READY)));
+
+        cache.stop();
+        cache.start();
+        clock.advance(Duration.ofMinutes(10));
+
+        assertThat(cache.isRunning()).isTrue();
+        await().atMost(TIMEOUT).untilAsserted(() ->
+                assertThat(cache.peek()).singleElement().satisfies(snapshot ->
+                        assertThat(snapshot.items()).extracting(ContentItem::id).containsExactly("item-2")));
+    }
+
+    @Test
+    void stoppingLetsARunningLoadFinish() {
         source.fetchGate = new CountDownLatch(1);
         createCache(true);
         cache.start();
         await().atMost(TIMEOUT).until(() -> source.fetchStarted.getCount() == 0);
 
         cache.stop();
+        source.fetchGate.countDown();
 
+        await().atMost(TIMEOUT).untilAsserted(() ->
+                assertThat(cache.peek()).singleElement().satisfies(snapshot -> {
+                    assertThat(snapshot.status()).isEqualTo(RailStatus.READY);
+                    assertThat(snapshot.items()).extracting(ContentItem::id).containsExactly("item-1");
+                }));
+    }
+
+    @Test
+    void closingInterruptsAnActiveFetch() {
+        source.fetchGate = new CountDownLatch(1);
+        createCache(true);
+        cache.start();
+        await().atMost(TIMEOUT).until(() -> source.fetchStarted.getCount() == 0);
+
+        cache.close();
+
+        assertThat(cache.isRunning()).isFalse();
         await().atMost(TIMEOUT).untilAsserted(() -> {
             assertThat(cache.peek()).singleElement().satisfies(snapshot -> {
                 assertThat(snapshot.status()).isEqualTo(RailStatus.FAILED);

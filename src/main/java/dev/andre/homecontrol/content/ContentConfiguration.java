@@ -25,7 +25,8 @@ public class ContentConfiguration {
         return new StoredRailPreferences(preferences, properties);
     }
 
-    @Bean
+    // Its fetch executor lives inside RailCache, which closes it with the application, not on a lifecycle stop.
+    @Bean(destroyMethod = "close")
     public RailCache railCache(ContentSources sources, RailPreferences preferences,
                                ApplicationEventPublisher events, ContentProperties properties) {
         return new RailCache(sources, preferences, events, Clock.systemUTC(), properties,
