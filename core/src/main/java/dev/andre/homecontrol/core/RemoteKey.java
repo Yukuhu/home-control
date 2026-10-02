@@ -26,6 +26,34 @@ public enum RemoteKey {
     SETTINGS,
     GUIDE;
 
+    /** The key as people call it, for messages: "Kitchen TV has no next track key", "… asked to press home". */
+    public String label() {
+        return switch (this) {
+            case DPAD_UP -> "up";
+            case DPAD_DOWN -> "down";
+            case DPAD_LEFT -> "left";
+            case DPAD_RIGHT -> "right";
+            case DPAD_CENTER -> "OK";
+            case BACK -> "back";
+            case HOME -> "home";
+            case MENU -> "menu";
+            case POWER -> "power";
+            case WAKEUP -> "wake up";
+            case VOLUME_UP -> "volume up";
+            case VOLUME_DOWN -> "volume down";
+            case VOLUME_MUTE -> "mute";
+            case PLAY_PAUSE -> "play/pause";
+            case MEDIA_NEXT -> "next track";
+            case MEDIA_PREVIOUS -> "previous track";
+            case MEDIA_STOP -> "stop";
+            case REWIND -> "rewind";
+            case FAST_FORWARD -> "fast forward";
+            case INFO -> "info";
+            case SETTINGS -> "settings";
+            case GUIDE -> "guide";
+        };
+    }
+
     /** Whether this key accepts a start/end long press instead of just a short tap. */
     public boolean supportsLongPress() {
         return switch (this) {
