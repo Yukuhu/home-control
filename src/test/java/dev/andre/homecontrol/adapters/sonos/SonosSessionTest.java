@@ -84,6 +84,19 @@ class SonosSessionTest {
         assertThat(session.state().volumeLevel()).isEqualTo(20);
     }
 
+    /** A speaker that refuses one state read is still there: the session stays connected and keeps polling. */
+    @Test
+    void aRefusedPollKeepsTheSpeakerConnectedAndPolling() {
+        connected(kitchen);
+        int before = kitchen.calls("GetTransportInfo").size();
+        states.clear();
+
+        kitchen.fail("GetTransportInfo", 501, "Action Failed", 3);
+
+        await().atMost(WAIT).until(() -> kitchen.calls("GetTransportInfo").size() >= before + 4);
+        assertThat(states.all()).extracting(DeviceState::status).doesNotContain(DeviceStatus.DISCONNECTED);
+    }
+
     @Test
     void aFailingStateListenerDoesNotStopPolling() {
         SonosSession session = connected(kitchen, state -> {
