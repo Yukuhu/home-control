@@ -176,6 +176,31 @@ class TmdbTrendingRailTest {
     }
 
     @Test
+    void aRateLimitStopsTheLookupsAndFailsTheRail() {
+        providersConfigured = List.of("netflix", "primevideo");
+        fake.respondJson("GET", "/3/tv/66732/watch/providers", 429, "{}");
+
+        var trendingSource = source();
+        assertThatThrownBy(() -> trendingSource.rail("trending"))
+                .isInstanceOf(ContentSourceException.class)
+                .extracting(e -> ((ContentSourceException) e).kind())
+                .isEqualTo(ContentSourceException.Kind.RATE_LIMITED);
+        assertThat(fake.count("GET", "/3/movie/603/watch/providers"))
+                .as("asking on would only extend the limit").isZero();
+    }
+
+    @Test
+    void aRateLimitAfterSomeLookupsKeepsWhatWasFound() {
+        providersConfigured = List.of("netflix", "primevideo");
+        fake.respondJson("GET", "/3/tv/76479/watch/providers", 429, "{}");
+
+        var rail = source().rail("trending");
+
+        assertThat(rail.items()).extracting(ContentItem::title).containsExactly("Stranger Things");
+        assertThat(fake.count("GET", "/3/movie/550/watch/providers")).isZero();
+    }
+
+    @Test
     void allLookupsFailingFailsTheRail() {
         providersConfigured = List.of("netflix", "primevideo", "wowtv");
         fake.respondJson("GET", "/3/tv/66732/watch/providers", 500, "{}");
