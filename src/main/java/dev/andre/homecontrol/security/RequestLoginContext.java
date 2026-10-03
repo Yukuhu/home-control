@@ -88,10 +88,8 @@ public final class RequestLoginContext implements LoginContext {
 
     /** Forgets the token first: a request arriving meanwhile must not resume the login that is ending. */
     @Override
-    public void endSession() {
-        if (remembers()) {
-            token().ifPresent(remembered::forget);
-        }
+    public boolean endSession() {
+        boolean stored = !remembers() || token().map(remembered::forget).orElse(true);
         HttpSession session = request.getSession(false);
         if (session != null) {
             try {
@@ -103,6 +101,7 @@ public final class RequestLoginContext implements LoginContext {
         if (remembers()) {
             setCookie(remembered.expiredCookie(request.isSecure()));
         }
+        return stored;
     }
 
     @Override

@@ -30,8 +30,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Logins that outlive the server's sessions, which live in memory and end with every restart. A browser that logs in
- * also gets a {@value #COOKIE_NAME} cookie with a random token; logins.json keeps only the token's SHA-256 hash, the version
- * of the password it logged in with, and when it expires. A token is never rotated: after a restart a page's requests
+ * also gets a {@value #COOKIE_NAME} cookie with a random token; logins.json keeps only the token's SHA-256 hash, the
+ * version of the password it logged in with, and when it expires. A token is never rotated: after a restart a page's requests
  * arrive together, each with the same token, and each is let in. The file holds nothing a browser could log in with,
  * and losing it only logs every browser out, so a damaged file remembers nobody and the next login replaces it.
  */
@@ -112,19 +112,24 @@ public class RememberedLogins {
                 .findFirst();
     }
 
-    /** A browser logged out: its token logs nobody in any more, even if the file cannot be written. */
-    public synchronized void forget(String token) {
+    /**
+     * A browser logged out: its token logs nobody in any more, even if the file cannot be written. False when it could
+     * not be removed from the file: it then stays forgotten only until the server restarts.
+     */
+    public synchronized boolean forget(String token) {
         String hash = hash(token);
         forgotten.add(hash);
         List<Login> remembered = current();
         if (remembered.stream().noneMatch(login -> login.hash().equals(hash))) {
-            return;
+            return true;
         }
         try {
             file.write(remembered.stream().filter(login -> !login.hash().equals(hash)).toList());
+            return true;
         } catch (StorageException e) {
             log.warn("Could not forget a remembered login on disk; it stays forgotten until the server restarts."
                     + " Change the login password once /data can be written, to end it for good", e);
+            return false;
         }
     }
 

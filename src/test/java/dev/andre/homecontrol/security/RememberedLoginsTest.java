@@ -65,7 +65,7 @@ class RememberedLoginsTest {
         String phone = logins.remember("v1").orElseThrow();
         String tablet = logins.remember("v1").orElseThrow();
 
-        logins.forget(phone);
+        assertThat(logins.forget(phone)).as("stored").isTrue();
 
         assertThat(logins().versionOf(phone)).isEmpty();
         assertThat(logins().versionOf(tablet)).contains("v1");
@@ -78,7 +78,7 @@ class RememberedLoginsTest {
         String token = logins.remember("v1").orElseThrow();
         Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("r-xr-xr-x"));
         try {
-            logins.forget(token);
+            assertThat(logins.forget(token)).as("stored").isFalse();
 
             assertThat(logins.versionOf(token)).isEmpty();
             assertThat(logins.remembers(token)).isFalse();

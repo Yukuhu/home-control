@@ -9,13 +9,16 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.function.BooleanSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /** The login of the browser behind a request, kept in its HTTP session as it always was. */
 class RequestLoginContextTest {
@@ -195,6 +198,27 @@ class RequestLoginContextTest {
 
         assertThat(second.loggedIn()).isFalse();
         assertThat(secondStream.getAsBoolean()).isFalse();
+    }
+
+    @Test
+    void aLogoutThatCannotBeSavedSaysSoAndStillLogsThisBrowserOut() throws Exception {
+        assumeFalse("root".equals(System.getProperty("user.name")), "root may write everywhere");
+        passwordSet();
+        MockHttpServletResponse loggedIn = new MockHttpServletResponse();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        login.authenticate(PASSWORD, remembering(request, loggedIn));
+        request.setCookies(new Cookie(RememberedLogins.COOKIE_NAME, rememberedToken(loggedIn)));
+        LoginContext context = remembering(request, new MockHttpServletResponse());
+        Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            assertThat(login.logout(context)).isFalse();
+
+            assertThat(context.loggedIn()).isFalse();
+        } finally {
+            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
+        }
+        assertThat(login.logout(remembering(new MockHttpServletRequest(), new MockHttpServletResponse())))
+                .as("a browser without a remembered login").isTrue();
     }
 
     @Test

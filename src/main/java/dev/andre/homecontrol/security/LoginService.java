@@ -137,9 +137,11 @@ public class LoginService {
         return true;
     }
 
-    public void logout(LoginContext context) {
-        context.endSession();
+    /** False when the logout could not be stored: a copy of this browser's login would work after a restart. */
+    public boolean logout(LoginContext context) {
+        boolean stored = context.endSession();
         changed();
+        return stored;
     }
 
     public void checkNewPassword(String password, String confirmation) {

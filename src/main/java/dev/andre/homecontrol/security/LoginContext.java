@@ -29,8 +29,11 @@ public interface LoginContext {
     /** Logs this browser in with the given credential version under a new session id. For {@link LoginService}. */
     void startSession(String version);
 
-    /** Ends this browser's session. For {@link LoginService}. */
-    void endSession();
+    /**
+     * Ends this browser's session. False when the end of its remembered login could not be stored, so that a copy of
+     * its cookie would log in again after a restart. For {@link LoginService}.
+     */
+    boolean endSession();
 
     /** The password version of the login this browser is remembered by, if any (see {@link RememberedLogins}). */
     Optional<String> rememberedVersion();

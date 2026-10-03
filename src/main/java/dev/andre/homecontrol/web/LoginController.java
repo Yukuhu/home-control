@@ -85,9 +85,14 @@ public class LoginController {
         return "redirect:" + safeNext(next);
     }
 
+    /** A logout that could not be stored still logs this browser out, and says what is left to do. */
     @PostMapping("/logout")
-    public String logout(LoginContext context) {
-        loginService.logout(context);
+    public String logout(LoginContext context, RedirectAttributes redirect) {
+        if (!loginService.logout(context)) {
+            redirect.addFlashAttribute(ERROR, "Logged out on this browser, but the logout could not be saved to /data:"
+                    + " a copy of this login would work again after a restart. Change the password once /data can be"
+                    + " written.");
+        }
         return loginService.loginRequired() ? "redirect:/login" : HOME_REDIRECT;
     }
 
