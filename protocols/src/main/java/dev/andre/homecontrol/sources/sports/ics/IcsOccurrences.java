@@ -34,9 +34,13 @@ public final class IcsOccurrences {
     private IcsOccurrences() {
     }
 
-    public static Result expand(IcsCalendar calendar, ZoneId fallback, Instant windowStart, Instant windowEnd,
+    /**
+     * {@code household}: the zone "today" is judged in. All-day dates are placed in it, since a date is the same
+     * date wherever the calendar was kept, and it is the calendar's zone when the calendar names none.
+     */
+    public static Result expand(IcsCalendar calendar, ZoneId household, Instant windowStart, Instant windowEnd,
                                 Duration defaultDuration) {
-        Zones zones = new Zones(IcsZones.resolve(calendar.timeZone()).orElse(fallback));
+        Zones zones = new Zones(IcsZones.resolve(calendar.timeZone()).orElse(household), household);
         Map<String, Set<Instant>> overridden = overriddenStarts(calendar, zones);
         Pass pass = new Pass(new Window(windowStart, windowEnd));
         int unsupported = 0;
@@ -104,16 +108,18 @@ public final class IcsOccurrences {
     private static final class Zones {
 
         private final ZoneId calendarZone;
+        private final ZoneId household;
         private final Set<String> unknown = new HashSet<>();
 
-        Zones(ZoneId calendarZone) {
+        Zones(ZoneId calendarZone, ZoneId household) {
             this.calendarZone = calendarZone;
+            this.household = household;
         }
 
         ZoneId zoneOf(IcsTime time) {
             return switch (time) {
                 case IcsTime.Utc _ -> ZoneOffset.UTC;
-                case IcsTime.Date _ -> calendarZone;
+                case IcsTime.Date _ -> household;
                 case IcsTime.Local(_, var tzid) -> {
                     if (tzid == null) {
                         yield calendarZone;

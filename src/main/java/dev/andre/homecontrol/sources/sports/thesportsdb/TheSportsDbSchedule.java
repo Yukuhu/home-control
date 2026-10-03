@@ -44,7 +44,8 @@ public class TheSportsDbSchedule implements SportsFeed {
     private static final Logger log = LoggerFactory.getLogger(TheSportsDbSchedule.class);
     private static final String LIMITED = "TheSportsDB is limiting requests; try again in a minute";
 
-    private record Entry(List<SportsEvent> events, Instant fetchedAt) {
+    /** {@code zone}: the household zone the day's all-day events were placed in. */
+    private record Entry(List<SportsEvent> events, Instant fetchedAt, ZoneId zone) {
     }
 
     /** A day's last failed download: when, whether TheSportsDB was limiting requests, and under which generation. */
@@ -194,7 +195,7 @@ public class TheSportsDbSchedule implements SportsFeed {
     private void refreshIfDue(SportsSettings.CompetitionEntry competition, LocalDate date, Round round) {
         String cacheKey = cacheKey(competition.leagueId(), date);
         Entry entry = cache.get(cacheKey);
-        if (fresh(entry, round.now)) {
+        if (fresh(entry, round)) {
             return;
         }
         boolean limited = limited(round);
@@ -225,8 +226,10 @@ public class TheSportsDbSchedule implements SportsFeed {
         return round.rateLimited && generation.get() == round.limitedUnder;
     }
 
-    private boolean fresh(Entry entry, Instant now) {
-        return entry != null && entry.fetchedAt().plus(properties.theSportsDb().fixturesTtl()).isAfter(now);
+    /** Fetched within the TTL, for the zone the household uses now: after a zone change its all-day days move. */
+    private boolean fresh(Entry entry, Round round) {
+        return entry != null && entry.zone().equals(round.zone)
+                && entry.fetchedAt().plus(properties.theSportsDb().fixturesTtl()).isAfter(round.now);
     }
 
     private boolean failedRecently(String cacheKey, Instant now) {
@@ -244,7 +247,7 @@ public class TheSportsDbSchedule implements SportsFeed {
                                  Round round) {
         long started = generation.get();
         if (settingsService.current().competition(competition.leagueId()).isEmpty()
-                || fresh(cache.get(cacheKey), round.now) || failedRecently(cacheKey, round.now)) {
+                || fresh(cache.get(cacheKey), round) || failedRecently(cacheKey, round.now)) {
             return;
         }
         try {
@@ -257,7 +260,7 @@ public class TheSportsDbSchedule implements SportsFeed {
             }
             synchronized (lock) {
                 if (wanted(competition, started)) {
-                    cache.put(cacheKey, new Entry(mapped, round.now));
+                    cache.put(cacheKey, new Entry(mapped, round.now, round.zone));
                     lastFailure.remove(cacheKey);
                     errors.remove(competition.leagueId());
                 }

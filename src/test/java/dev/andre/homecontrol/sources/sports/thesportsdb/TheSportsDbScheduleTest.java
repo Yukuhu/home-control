@@ -35,6 +35,8 @@ class TheSportsDbScheduleTest {
     private MutableClock clock;
     private TheSportsDbSchedule schedule;
 
+    private SportsTimeZones zones;
+
     @BeforeEach
     void setUp() throws IOException {
         server = new FakeTheSportsDbServer().withStandardResponses();
@@ -46,7 +48,7 @@ class TheSportsDbScheduleTest {
                 new SportsSettings.CompetitionEntry("4331", "German Bundesliga", "Soccer", "Germany", null, null, Instant.EPOCH),
                 new SportsSettings.CompetitionEntry("4328", "English Premier League", "Soccer", "England", null, null, Instant.EPOCH))));
 
-        SportsTimeZones zones = mock(SportsTimeZones.class);
+        zones = mock(SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
 
         SportsProperties properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
@@ -89,6 +91,18 @@ class TheSportsDbScheduleTest {
 
         schedule.events();
         assertThat(server.count("eventsday.php")).isEqualTo(4);
+    }
+
+    @Test
+    void aTimeZoneChangeFetchesTheDaysAgainForTheNewZone() {
+        schedule.events();
+        int fetched = server.count("eventsday.php");
+
+        // London's day covers the same UTC dates: only the zone the days were placed in differs.
+        given(zones.effective()).willReturn(ZoneId.of("Europe/London"));
+        schedule.events();
+
+        assertThat(server.count("eventsday.php")).isEqualTo(2 * fetched);
     }
 
     @Test
