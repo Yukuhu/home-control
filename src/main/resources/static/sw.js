@@ -7,6 +7,8 @@ const THEME_METADATA = "/__home-control-theme/descriptor.json";
 const OFFLINE = "/offline.html";
 const SHELL_ASSETS = new Set([OFFLINE, "/app.css", "/js/theme.js", "/icons/icon.svg"]);
 const CATALOG_PATHS = new Set(["/themes/catalog.js", "/themes/catalog.json"]);
+// What a reverse proxy answers while the server is down or restarting; the worker only exists behind one.
+const SERVER_UNREACHABLE = new Set([502, 503, 504]);
 let shellName;
 let themeGeneration = 0;
 let themeQueue = Promise.resolve();
@@ -279,16 +281,20 @@ self.addEventListener("message", (event) => {
     event.waitUntil(themeQueue.catch(() => { /* Theme selection also works without offline storage. */ }));
 });
 
+async function offlinePage(otherwise) {
+    const shell = await currentShell();
+    return await shell?.cache.match(OFFLINE) ?? otherwise;
+}
+
 self.addEventListener("fetch", (event) => {
     const request = event.request;
     if (request.method !== "GET") return;
     const url = new URL(request.url);
     if (url.origin !== self.location.origin) return;
     if (request.mode === "navigate") {
-        event.respondWith(fetch(request).catch(async () => {
-            const shell = await currentShell();
-            return await shell?.cache.match(OFFLINE) ?? Response.error();
-        }));
+        event.respondWith(fetch(request)
+            .then((response) => SERVER_UNREACHABLE.has(response.status) ? offlinePage(response) : response)
+            .catch(() => offlinePage(Response.error())));
         return;
     }
     if (url.search || url.hash) return;
