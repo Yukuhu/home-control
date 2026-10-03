@@ -235,11 +235,11 @@ public final class IcsOccurrences {
         private void byWeekDays() {
             DayOfWeek firstDay = rule.weekStart();
             LocalDate weekStart = first.toLocalDate().with(TemporalAdjusters.previousOrSame(firstDay));
-            List<DayOfWeek> days = rule.byDay().stream()
+            List<DayOfWeek> weekDays = rule.byDay().stream()
                     .sorted(Comparator.comparingLong(day -> daysInto(firstDay, day))).toList();
             int steps = 0;
             for (long week = 0; ; week += rule.interval()) {
-                for (DayOfWeek day : days) {
+                for (DayOfWeek day : weekDays) {
                     if (++steps > MAX_STEPS || !pass.step()) {
                         return;
                     }

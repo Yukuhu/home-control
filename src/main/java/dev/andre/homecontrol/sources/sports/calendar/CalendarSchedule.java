@@ -31,7 +31,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -322,14 +321,13 @@ public class CalendarSchedule implements SportsFeed {
 
     /** UIDs that more than one event uses for itself, rather than to move one occurrence of a series. */
     private static Set<String> reusedUids(IcsCalendar calendar) {
-        Set<String> seen = new HashSet<>();
-        Set<String> reused = new HashSet<>();
-        for (IcsEvent event : calendar.events()) {
-            if (event.uid() != null && event.recurrenceId() == null && !seen.add(event.uid())) {
-                reused.add(event.uid());
-            }
-        }
-        return reused;
+        return calendar.events().stream()
+                .filter(event -> event.uid() != null && event.recurrenceId() == null)
+                .collect(Collectors.groupingBy(IcsEvent::uid, Collectors.counting()))
+                .entrySet().stream()
+                .filter(uses -> uses.getValue() > 1)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
     }
 
     /** An event of a calendar whose UIDs are its own, with its former id made from its start. */
