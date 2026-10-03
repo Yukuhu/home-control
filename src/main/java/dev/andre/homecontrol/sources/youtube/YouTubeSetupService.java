@@ -44,7 +44,7 @@ public class YouTubeSetupService {
     private final GoogleOAuthClient oauth;
     private final GoogleTokens tokens;
     private final YouTubeAuthorizationService authorization;
-    /** Serializes connecting and disconnecting; not the authorization's monitor, which the status must never wait on. */
+    /** Serializes connecting, signing in and disconnecting; not the authorization's monitor: status() never waits. */
     private final Object changes = new Object();
     private final ObjectProvider<YouTubeAccount> account;
     private final QuotaLedger ledger;
@@ -111,7 +111,9 @@ public class YouTubeSetupService {
     /** The sign-in is bound to this browser session, so only the browser that started it can complete it. */
     public URI authorizeBrowser(URI callback, LoginContext context) {
         YouTubeOAuthCallback.requireSupported(callback);
-        return authorization.startBrowser(callback, context.sessionKey());
+        synchronized (changes) {
+            return authorization.startBrowser(callback, context.sessionKey());
+        }
     }
 
     /** A browser without a session gets a fresh key, which matches no sign-in it started, and is refused. */
@@ -150,7 +152,9 @@ public class YouTubeSetupService {
     }
 
     public YouTubeAuthorizationService.Status authorize() {
-        return authorization.start();
+        synchronized (changes) {
+            return authorization.start();
+        }
     }
 
     public YouTubeAuthorizationService.Status authorizationStatus() {

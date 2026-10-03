@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -187,12 +188,13 @@ class YouTubeBrowserAuthorizationTest {
         var service = new YouTubeSetupService(secrets, login, settings, oauth, tokens, authorization,
                 mock(ObjectProvider.class), mock(QuotaLedger.class), mock(ObjectProvider.class),
                 mock(ObjectProvider.class), mock(ObjectProvider.class));
-        var disconnect = java.util.concurrent.CompletableFuture.runAsync(service::disconnect);
+        var disconnect = CompletableFuture.runAsync(service::disconnect);
         assertThat(revoking.await(5, TimeUnit.SECONDS)).isTrue();
 
         try {
-            assertThat(java.util.concurrent.CompletableFuture.supplyAsync(service::authorizationStatus)
+            assertThat(CompletableFuture.supplyAsync(service::authorizationStatus)
                     .get(2, TimeUnit.SECONDS).state()).isEqualTo(YouTubeAuthorizationService.State.IDLE);
+            assertThat(tokens.hasRefreshToken()).as("forgotten here before Google is asked").isFalse();
         } finally {
             finishRevoke.countDown();
         }
@@ -206,12 +208,12 @@ class YouTubeBrowserAuthorizationTest {
         google.holdWhen("POST", "/oauth/token", request -> true, release,
                 FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
         String state = start();
-        var completing = java.util.concurrent.CompletableFuture.runAsync(
+        var completing = CompletableFuture.runAsync(
                 () -> authorization.completeBrowser("browser-session", state, "code", null));
         await().until(() -> google.count("/oauth/token") == 1);
 
         try {
-            java.util.concurrent.CompletableFuture.runAsync(authorization::cancel).get(2, TimeUnit.SECONDS);
+            CompletableFuture.runAsync(authorization::cancel).get(2, TimeUnit.SECONDS);
         } finally {
             release.countDown();
         }
