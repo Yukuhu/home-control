@@ -2,6 +2,7 @@ package dev.andre.homecontrol.testsupport;
 
 import dev.andre.homecontrol.security.LoginContext;
 
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
 /** A browser's login without HTTP: logged in or not, and whether {@code LoginService} started a session. */
@@ -46,6 +47,16 @@ public final class FakeLoginContext implements LoginContext {
     @Override
     public void endSession() {
         loggedIn = false;
+    }
+
+    @Override
+    public Optional<String> rememberedVersion() {
+        return Optional.empty();
+    }
+
+    @Override
+    public void resumeSession(String version) {
+        startSession(version);
     }
 
     public boolean sessionStarted() {

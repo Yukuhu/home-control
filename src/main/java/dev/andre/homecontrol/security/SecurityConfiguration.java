@@ -8,6 +8,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 
 import java.security.SecureRandom;
@@ -41,6 +42,13 @@ public class SecurityConfiguration {
         return new LoginService(store, hasher, random);
     }
 
+    /** The cookie is Secure exactly when the session cookie is ({@code HOME_CONTROL_SECURE_COOKIE}). */
+    @Bean
+    public RememberedLogins rememberedLogins(DataDirectory data, SecureRandom random,
+                                             @Value("${server.servlet.session.cookie.secure:false}") boolean secure) {
+        return new RememberedLogins(data.resolve(DataDirectory.LOGINS), Clock.systemUTC(), random, secure);
+    }
+
     @Bean
     public LoginRateLimiter loginRateLimiter(SecurityProperties security) {
         return new LoginRateLimiter(Clock.systemUTC(), security.loginAttemptsPerAddress(),
@@ -59,10 +67,11 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public FilterRegistrationBean<LoginGateFilter> loginGateFilter(LoginService login,
+    public FilterRegistrationBean<LoginGateFilter> loginGateFilter(LoginService login, RememberedLogins remembered,
                                                                   ObjectProvider<PublicAssetPaths> assets) {
         FilterRegistrationBean<LoginGateFilter> registration = new FilterRegistrationBean<>(
-                new LoginGateFilter(login, path -> assets.stream().anyMatch(paths -> paths.contains(path))));
+                new LoginGateFilter(login, path -> assets.stream().anyMatch(paths -> paths.contains(path)),
+                        new LoginContextResolver(login, remembered)::contextOf));
         registration.addUrlPatterns("/*");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
         return registration;

@@ -7,9 +7,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
 /**
@@ -36,14 +39,14 @@ public class LoginGateFilter extends OncePerRequestFilter {
 
     private final LoginService login;
     private final Predicate<String> publicAssets;
+    private final BiFunction<HttpServletRequest, HttpServletResponse, LoginContext> contexts;
 
-    public LoginGateFilter(LoginService login) {
-        this(login, _ -> false);
-    }
-
-    public LoginGateFilter(LoginService login, Predicate<String> publicAssets) {
+    /** {@code contexts} gives the login of a request's browser, from which a restarted server resumes its login. */
+    public LoginGateFilter(LoginService login, Predicate<String> publicAssets,
+                           BiFunction<HttpServletRequest, HttpServletResponse, LoginContext> contexts) {
         this.login = login;
         this.publicAssets = publicAssets;
+        this.contexts = contexts;
     }
 
     @Override
@@ -54,7 +57,10 @@ public class LoginGateFilter extends OncePerRequestFilter {
             return;
         }
         String path = path(request);
-        if (OPEN_PATHS.contains(path) || publicAssets.test(path) || login.isAuthenticated(request)) {
+        // A browser the server lost the session of (a restart) is let in by its remembered login, before any
+        // controller runs, so that an event stream opened now is bound to a logged-in session.
+        if (OPEN_PATHS.contains(path) || publicAssets.test(path) || login.isAuthenticated(request)
+                || login.resume(contexts.apply(request, response))) {
             chain.doFilter(request, response);
             return;
         }
@@ -63,9 +69,36 @@ public class LoginGateFilter extends OncePerRequestFilter {
             plain(response, HttpServletResponse.SC_UNAUTHORIZED, "Log in first");
         } else if ("GET".equals(request.getMethod()) && accepts(request, "text/html")) {
             String target = path + (request.getQueryString() == null ? "" : "?" + request.getQueryString());
-            response.sendRedirect("/login?next=" + URLEncoder.encode(target, StandardCharsets.UTF_8));
+            response.sendRedirect(loginPage(target));
+        } else if (accepts(request, "text/html")) {
+            // A form posted after the login ended: back to its page once logged in, not a bare text answer.
+            response.setStatus(HttpServletResponse.SC_SEE_OTHER);
+            response.setHeader("Location", loginPage(sameSiteReferer(request)));
         } else {
             plain(response, HttpServletResponse.SC_UNAUTHORIZED, "Log in first");
+        }
+    }
+
+    private static String loginPage(String next) {
+        return "/login?next=" + URLEncoder.encode(next, StandardCharsets.UTF_8);
+    }
+
+    /** The page a form was posted from, when the browser names one on this server; else the dashboard. */
+    private static String sameSiteReferer(HttpServletRequest request) {
+        String referer = request.getHeader("Referer");
+        String host = request.getHeader("Host");
+        if (referer == null || host == null) {
+            return "/";
+        }
+        try {
+            URI page = new URI(referer);
+            if (!host.equalsIgnoreCase(page.getRawAuthority()) || page.getRawPath() == null
+                    || !page.getRawPath().startsWith("/")) {
+                return "/";
+            }
+            return page.getRawPath() + (page.getRawQuery() == null ? "" : "?" + page.getRawQuery());
+        } catch (URISyntaxException _) {
+            return "/";
         }
     }
 

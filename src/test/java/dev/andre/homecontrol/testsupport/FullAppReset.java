@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.DeviceEnrollment;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.security.LoginRateLimiter;
+import dev.andre.homecontrol.security.RememberedLogins;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.sources.pinned.PinnedShortcuts;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
@@ -83,6 +84,7 @@ public final class FullAppReset implements AfterAllCallback {
                 new Step("TheSportsDB fixtures", () -> app.getBean(TheSportsDbSchedule.class).clear()),
                 new Step("Android TV pairing", () -> app.getBean(PairingService.class).cancel()),
                 new Step("login rate limit", () -> app.getBean(LoginRateLimiter.class).reset()),
+                new Step("remembered logins", () -> app.getBean(RememberedLogins.class).clear()),
                 new Step("source settings", () -> app.getBean(JsonFileSourceSettings.class).reset()),
                 new Step("rails", () -> {
                     RailCache rails = app.getBean(RailCache.class);

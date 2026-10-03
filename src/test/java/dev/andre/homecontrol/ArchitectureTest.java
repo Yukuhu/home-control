@@ -217,17 +217,17 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule onlyTheLoginServiceStartsAndEndsSessions = noClasses()
             .that().doNotBelongToAnyOf(LoginService.class)
-            .should().callMethodWhere(target(nameMatching("startSession|endSession"))
+            .should().callMethodWhere(target(nameMatching("startSession|endSession|resumeSession"))
                     .and(target(owner(assignableTo(LoginContext.class)))))
-            .because("a session starts only after LoginService has checked the password, and ends with its listeners "
-                    + "told");
+            .because("a session starts only after LoginService has checked the password or the remembered login, "
+                    + "and ends with its listeners told");
 
     @ArchTest
     static final ArchRule onlyTheResolverBindsALoginToARequest = noClasses()
             .that().doNotHaveFullyQualifiedName("dev.andre.homecontrol.security.LoginContextResolver")
             .should().callConstructorWhere(target(owner(assignableTo(RequestLoginContext.class))))
-            .because("a controller receives the login of its own request as an argument, and a login context lives "
-                    + "only as long as that request");
+            .because("a controller receives the login of its own request as an argument, the login gate asks the "
+                    + "resolver too, and a login context lives only as long as that request");
 
     @ArchTest
     static final ArchRule onlyTheGateAndTheContextAskWhetherABrowserIsLoggedIn = noClasses()

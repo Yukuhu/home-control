@@ -103,6 +103,23 @@ public class LoginService {
         return true;
     }
 
+    /**
+     * Logs a browser back in whose session the server no longer has (it restarted) but that still has a login
+     * remembered with the current password. False, and nothing changes, otherwise.
+     */
+    public boolean resume(LoginContext context) {
+        Optional<LoginCredential> login = store.login();
+        if (login.isEmpty()) {
+            return false;
+        }
+        String version = login.get().version();
+        if (!context.rememberedVersion().map(version::equals).orElse(false)) {
+            return false;
+        }
+        context.resumeSession(version);
+        return true;
+    }
+
     public void logout(LoginContext context) {
         context.endSession();
         changed();

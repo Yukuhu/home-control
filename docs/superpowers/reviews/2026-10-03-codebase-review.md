@@ -554,8 +554,11 @@ lists "device-identity improvements that survive DHCP address changes" as future
   own PR (R7).
 - **TV5 — TLS first, with fallback.** webOS connects to `wss://host:3001` first and falls back to `ws://host:3000` only
   when the TLS port refuses. The fallback stays for old firmware. This goes in R4.
-- **WS2 — yes.** Logins survive restarts: persistent sessions with their store under `/data`, owner-only. Restarts
-  and the 303-to-login fix for plain form posts go in R2.
+- **WS2 — yes, with an own store.** Logins survive restarts. The browser gets a random login token in a cookie of its
+  own, and `/data/logins.json` keeps only the token's hash with the password version and an expiry, so nothing on
+  disk logs anyone in and a crash loses nothing. (Hashing the session id instead, as first proposed, broke the
+  parallel requests of a page loaded right after a restart: the first one would use up the entry.) This and the
+  303-to-login fix for plain form posts go in R2.
 - **SP4 — yes.** A sports item id is derived from the UID (plus `RECURRENCE-ID` for overrides), not the start time.
   Pins made under the old ids keep working (migration or fallback lookup). This goes in R5.
 - **WS4 — yes.** Each event-stream subscriber gets its own bounded queue and sender. A subscriber whose queue

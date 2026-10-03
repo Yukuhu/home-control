@@ -158,8 +158,9 @@ class DataDirectoryTest {
         assertThat(data.resolve(DataDirectory.SECRETS)).isEqualTo(dir.resolve("secrets.json"));
         assertThat(List.of(DataDirectory.KEYSTORE, DataDirectory.DEVICES, DataDirectory.SECRETS,
                 DataDirectory.SECRET_KEY, DataDirectory.SOURCES, DataDirectory.SPORTS, DataDirectory.PINNED,
-                DataDirectory.YOUTUBE_QUOTA)).containsExactly("keystore.p12", "devices.json", "secrets.json",
-                "secret.key", "sources.json", "sports.json", "pinned.json", "youtube-quota.json");
+                DataDirectory.YOUTUBE_QUOTA, DataDirectory.LOGINS)).containsExactly("keystore.p12", "devices.json",
+                "secrets.json", "secret.key", "sources.json", "sports.json", "pinned.json", "youtube-quota.json",
+                "logins.json");
     }
 
     private static boolean runsAsRoot() {
