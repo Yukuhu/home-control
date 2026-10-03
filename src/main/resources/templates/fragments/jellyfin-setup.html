@@ -45,8 +45,7 @@
         <h3>Jellyfin apps</h3>
         <p class="hint">Home Control finds the Jellyfin app on a device by its network address. Link it
             here when Jellyfin sees a different address (for example behind Docker networking).</p>
-        <div id="jellyfin-sessions" th:attr="hx-get=@{/setup/sources/jellyfin/sessions}" hx-trigger="load"
-             hx-swap="outerHTML">
+        <div th:attr="hx-get=@{/setup/sources/jellyfin/sessions}" hx-trigger="load" hx-swap="outerHTML">
             <p class="hint">Asking Jellyfin which apps are open…</p>
         </div>
     </th:block>
