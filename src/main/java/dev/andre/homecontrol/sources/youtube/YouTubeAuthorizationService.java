@@ -23,7 +23,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/** One pending authorization at a time; device codes and browser PKCE verifiers stay in memory. */
+/**
+ * One pending authorization at a time; device codes and browser PKCE verifiers stay in memory. The monitor guards that
+ * state alone: calls to Google and the connect hook run outside it, so {@link #status()}, which every setup render
+ * asks, never waits for them. A grant is kept only while no start, sign-in or cancel came after the request it
+ * answers ({@code generation}).
+ */
 public class YouTubeAuthorizationService implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(YouTubeAuthorizationService.class);
@@ -55,6 +60,7 @@ public class YouTubeAuthorizationService implements AutoCloseable {
     private Duration interval;
     private Instant nextPollAt;
     private Status status = Status.of(State.IDLE, null);
+    private long generation;
 
     public YouTubeAuthorizationService(GoogleOAuthClient oauth, SecretStore secrets, GoogleTokens tokens,
                                        JsonFileSourceSettings settings, Clock clock, boolean backgroundPolling) {
@@ -76,13 +82,21 @@ public class YouTubeAuthorizationService implements AutoCloseable {
         connectedListeners.add(listener);
     }
 
-    public synchronized Status start() {
+    public Status start() {
         String clientId = secrets.secret(YouTubeSettings.CLIENT_ID).orElse(null);
         if (clientId == null || secrets.secret(YouTubeSettings.CLIENT_SECRET).isEmpty()) {
             throw new YouTubeException(ContentSourceException.Kind.NOT_CONFIGURED, "Save the OAuth client ID and secret first");
         }
+        long requested;
+        synchronized (this) {
+            requested = generation;
+        }
         GoogleOAuthClient.DeviceCode code = oauth.requestDeviceCode(clientId);
         synchronized (this) {
+            if (generation != requested) {
+                return status; // cancelled, or another sign-in started, while Google answered
+            }
+            generation++;
             browser = null;
             pending = code;
             interval = code.interval();
@@ -106,6 +120,7 @@ public class YouTubeAuthorizationService implements AutoCloseable {
         }
         String state = randomToken();
         String verifier = randomToken();
+        generation++;
         browser = new BrowserRequest(sessionId, state, verifier, redirectUri, clock.instant().plusSeconds(600));
         pending = null;
         status = Status.of(State.BROWSER_PENDING, "Complete sign-in on Google, or start again below.");
@@ -118,31 +133,49 @@ public class YouTubeAuthorizationService implements AutoCloseable {
         }
     }
 
-    public synchronized void completeBrowser(String sessionId, String state, String code, String error) {
-        BrowserRequest request = browser;
-        if (request == null || sessionId == null || !request.sessionId().equals(sessionId) || state == null
-                || !MessageDigest.isEqual(request.state().getBytes(StandardCharsets.UTF_8), state.getBytes(StandardCharsets.UTF_8))) {
-            throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT,
-                    "This sign-in request is no longer valid. Start again from Setup in the same browser.");
-        }
-        browser = null; // single use, including failed exchanges and denied consent
-        if (!clock.instant().isBefore(request.expiresAt())) {
-            finish(State.EXPIRED, "Sign-in expired. Start again.");
-        } else if (error != null) {
-            finish("access_denied".equals(error) ? State.DENIED : State.FAILED,
-                    "access_denied".equals(error) ? "Access was denied on the Google page. Start again to retry."
-                            : "Google could not complete sign-in. Check your OAuth client settings and try again.");
-        } else if (code == null || code.isBlank() || code.length() > 4096) {
-            finish(State.FAILED, "Google did not return an authorization code. Start again.");
-        } else {
-            try {
-                var granted = oauth.exchangeCode(secrets.secret(YouTubeSettings.CLIENT_ID).orElseThrow(),
-                        secrets.secret(YouTubeSettings.CLIENT_SECRET).orElseThrow(), code, request.redirectUri(), request.verifier());
-                storeGrant(granted.accessToken(), granted.refreshToken());
-            } catch (YouTubeException e) {
-                finish(State.FAILED, e.getMessage());
+    public void completeBrowser(String sessionId, String state, String code, String error) {
+        BrowserRequest request;
+        long current;
+        String clientId;
+        String clientSecret;
+        synchronized (this) {
+            request = browser;
+            if (request == null || sessionId == null || !request.sessionId().equals(sessionId) || state == null
+                    || !MessageDigest.isEqual(request.state().getBytes(StandardCharsets.UTF_8), state.getBytes(StandardCharsets.UTF_8))) {
+                throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT,
+                        "This sign-in request is no longer valid. Start again from Setup in the same browser.");
             }
+            browser = null; // single use, including failed exchanges and denied consent
+            if (!clock.instant().isBefore(request.expiresAt())) {
+                finish(State.EXPIRED, "Sign-in expired. Start again.");
+                return;
+            }
+            if (error != null) {
+                finish("access_denied".equals(error) ? State.DENIED : State.FAILED,
+                        "access_denied".equals(error) ? "Access was denied on the Google page. Start again to retry."
+                                : "Google could not complete sign-in. Check your OAuth client settings and try again.");
+                return;
+            }
+            if (code == null || code.isBlank() || code.length() > 4096) {
+                finish(State.FAILED, "Google did not return an authorization code. Start again.");
+                return;
+            }
+            current = generation;
+            clientId = secrets.secret(YouTubeSettings.CLIENT_ID).orElseThrow();
+            clientSecret = secrets.secret(YouTubeSettings.CLIENT_SECRET).orElseThrow();
         }
+        GoogleOAuthClient.TokenPoll.Granted granted;
+        try {
+            granted = oauth.exchangeCode(clientId, clientSecret, code, request.redirectUri(), request.verifier());
+        } catch (YouTubeException e) {
+            synchronized (this) {
+                if (generation == current) {
+                    finish(State.FAILED, e.getMessage());
+                }
+            }
+            return;
+        }
+        storeGrant(current, granted.accessToken(), granted.refreshToken());
     }
 
     private String randomToken() {
@@ -152,6 +185,7 @@ public class YouTubeAuthorizationService implements AutoCloseable {
     }
 
     public synchronized void cancel() {
+        generation++;
         pending = null;
         browser = null;
         status = Status.of(State.IDLE, null);
@@ -205,6 +239,8 @@ public class YouTubeAuthorizationService implements AutoCloseable {
                 return finish(State.FAILED, e.getMessage());
             }
         }
+        GoogleOAuthClient.TokenPoll.Granted granted;
+        long current;
         synchronized (this) {
             if (pending != code) {
                 return pending != null; // cancelled or restarted meanwhile
@@ -229,28 +265,42 @@ public class YouTubeAuthorizationService implements AutoCloseable {
                     return finish(State.FAILED, "Google refused the authorization (" + error
                             + (description.isBlank() ? "" : ": " + description) + ")");
                 }
-                case GoogleOAuthClient.TokenPoll.Granted(var accessToken, var refreshToken) ->
-                        storeGrant(accessToken, refreshToken);
+                case GoogleOAuthClient.TokenPoll.Granted grant -> {
+                    pending = null; // used up: no later tick polls it again
+                    granted = grant;
+                    current = generation;
+                }
             }
         }
+        storeGrant(current, granted.accessToken(), granted.refreshToken());
         return false;
     }
 
-    private void storeGrant(GoogleOAuthClient.AccessToken accessToken, String refreshToken) {
-        secrets.putSecrets(Map.of(YouTubeSettings.REFRESH_TOKEN, refreshToken));
-        tokens.reset();
-        tokens.prime(accessToken);
-        YouTubeSettings current = YouTubeSettings.read(settings);
-        settings.put(YouTubeSettings.SOURCE_ID,
-                current.withoutAccount().withConnection(clock.instant(), null, null));
-        finish(State.CONNECTED, "YouTube connected");
+    /** Keeps the grant unless {@code expected} is no longer the current generation; the hook runs outside the monitor. */
+    private void storeGrant(long expected, GoogleOAuthClient.AccessToken accessToken, String refreshToken) {
+        YouTubeSettings previous;
+        synchronized (this) {
+            if (generation != expected) {
+                return; // cancelled, restarted or disconnected while Google answered: the grant is not kept
+            }
+            secrets.putSecrets(Map.of(YouTubeSettings.REFRESH_TOKEN, refreshToken));
+            tokens.reset();
+            tokens.prime(accessToken);
+            previous = YouTubeSettings.read(settings);
+            settings.put(YouTubeSettings.SOURCE_ID,
+                    previous.withoutAccount().withConnection(clock.instant(), null, null));
+            finish(State.CONNECTED, "YouTube connected");
+        }
         notifyConnected();
         // Restore rail choices only after Google confirms this is still the same channel.
         // Failed channel lookups leave an empty library instead of showing another account's data.
-        YouTubeSettings resolved = YouTubeSettings.read(settings);
-        if (current.channelId() != null && current.channelId().equals(resolved.channelId())) {
-            settings.put(YouTubeSettings.SOURCE_ID,
-                    resolved.withPlaylists(current.playlists()).withWatchLater(current.watchLater()));
+        synchronized (this) {
+            YouTubeSettings resolved = YouTubeSettings.read(settings);
+            if (generation == expected && previous.channelId() != null
+                    && previous.channelId().equals(resolved.channelId())) {
+                settings.put(YouTubeSettings.SOURCE_ID,
+                        resolved.withPlaylists(previous.playlists()).withWatchLater(previous.watchLater()));
+            }
         }
     }
 

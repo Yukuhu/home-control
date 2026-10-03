@@ -17,10 +17,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
@@ -72,6 +76,52 @@ class YouTubeAuthorizationServiceTest {
         assertThat(status.verificationUrl()).isEqualTo(URI.create("https://www.google.com/device"));
         assertThat(status.expiresAt()).isEqualTo(Instant.parse("2026-09-16T10:30:00Z"));
         assertThat(authorization.status().toString()).doesNotContain("AH-1Ng2m");
+    }
+
+    @Test
+    void theStatusAnswersWhileACodeIsRequested() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        fake.holdWhen("POST", "/oauth/device/code", request -> true, release,
+                FakeGoogleServer.Canned.fixture(200, "oauth-device-code.json"));
+        CompletableFuture<YouTubeAuthorizationService.Status> starting = CompletableFuture.supplyAsync(authorization::start);
+        await().until(() -> fake.count("/oauth/device/code") == 1);
+
+        try {
+            // Every setup render asks for the status; Google may take its time.
+            assertThat(CompletableFuture.supplyAsync(authorization::status).get(2, TimeUnit.SECONDS).state())
+                    .isEqualTo(YouTubeAuthorizationService.State.IDLE);
+        } finally {
+            release.countDown();
+        }
+        assertThat(starting.get(5, TimeUnit.SECONDS).state()).isEqualTo(YouTubeAuthorizationService.State.PENDING);
+    }
+
+    @Test
+    void theStatusAnswersWhileTheConnectHookRuns() throws Exception {
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
+        CountDownLatch hookRuns = new CountDownLatch(1);
+        CountDownLatch hookMayEnd = new CountDownLatch(1);
+        // The real hook clears the feeds and looks up the channel: calls to Google of their own.
+        authorization.onConnected(() -> {
+            hookRuns.countDown();
+            try {
+                hookMayEnd.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        authorization.start();
+        clock.advance(Duration.ofSeconds(5));
+        CompletableFuture<Boolean> polling = CompletableFuture.supplyAsync(authorization::pollOnce);
+        assertThat(hookRuns.await(5, TimeUnit.SECONDS)).isTrue();
+
+        try {
+            assertThat(CompletableFuture.supplyAsync(authorization::status).get(2, TimeUnit.SECONDS).state())
+                    .isEqualTo(YouTubeAuthorizationService.State.CONNECTED);
+        } finally {
+            hookMayEnd.countDown();
+        }
+        assertThat(polling.get(5, TimeUnit.SECONDS)).isFalse();
     }
 
     @Test
