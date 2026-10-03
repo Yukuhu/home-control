@@ -39,6 +39,7 @@ public class BluetoothPairingService {
     private final DeviceQueries devices;
     private final DeviceEnrollment enrollment;
     private final BluetoothProperties properties;
+    private final BluetoothSpeakerAdapter speakers;
     private final Clock clock;
 
     // Immutable record replaced wholesale by scan(); concurrent scans just race to publish a complete result.
@@ -46,16 +47,17 @@ public class BluetoothPairingService {
     private volatile BluetoothScan lastScan = BluetoothScan.NONE;
 
     public BluetoothPairingService(BluezClient bluez, DeviceQueries devices, DeviceEnrollment enrollment,
-                                   BluetoothProperties properties) {
-        this(bluez, devices, enrollment, properties, Clock.systemUTC());
+                                   BluetoothProperties properties, BluetoothSpeakerAdapter speakers) {
+        this(bluez, devices, enrollment, properties, speakers, Clock.systemUTC());
     }
 
     public BluetoothPairingService(BluezClient bluez, DeviceQueries devices, DeviceEnrollment enrollment,
-                                   BluetoothProperties properties, Clock clock) {
+                                   BluetoothProperties properties, BluetoothSpeakerAdapter speakers, Clock clock) {
         this.bluez = bluez;
         this.devices = devices;
         this.enrollment = enrollment;
         this.properties = properties;
+        this.speakers = speakers;
         this.clock = clock;
     }
 
@@ -142,19 +144,30 @@ public class BluetoothPairingService {
             bluez.connect(settings.adapter(), settings.address());
         } catch (BluezException e) {
             throw new BluetoothSetupException(e.getMessage());
+        } finally {
+            pollNow(deviceId);
         }
         return device;
     }
 
+    /** Stops playback first: a stream that outlived the link would move to the host's own output until the next poll. */
     public Device disconnect(String deviceId) throws BluetoothSetupException {
         Device device = registeredSpeaker(deviceId);
         BluetoothSettings settings = BluetoothSettings.of(device);
+        speakers.session(deviceId).ifPresent(BluetoothSpeakerSession::stopPlayback);
         try {
             bluez.disconnect(settings.adapter(), settings.address());
         } catch (BluezException e) {
             throw new BluetoothSetupException(e.getMessage());
+        } finally {
+            pollNow(deviceId);
         }
         return device;
+    }
+
+    /** The speaker's tile shows what a setup action changed now, not at the next poll. */
+    private void pollNow(String deviceId) {
+        speakers.session(deviceId).ifPresent(BluetoothSpeakerSession::pollNow);
     }
 
     public Device setAudioDevice(String deviceId, String audioDevice) throws BluetoothSetupException {

@@ -2,12 +2,13 @@ package dev.andre.homecontrol.adapters.support;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-/** An adapter's open sessions by device id, for finding the ones a discovery announcement is about. */
+/** An adapter's open sessions by device id, for finding the ones a discovery announcement or a setup action is about. */
 public final class SessionRegistry<S> {
 
     private final Map<String, S> sessions = new ConcurrentHashMap<>();
@@ -22,6 +23,10 @@ public final class SessionRegistry<S> {
         self.set(session);
         sessions.put(deviceId, session);
         return session;
+    }
+
+    public Optional<S> get(String deviceId) {
+        return Optional.ofNullable(sessions.get(deviceId));
     }
 
     public List<S> matching(Predicate<S> matches) {

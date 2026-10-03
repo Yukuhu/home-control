@@ -1,22 +1,33 @@
 package dev.andre.homecontrol.adapters.bluetooth;
 
+import dev.andre.homecontrol.adapters.bluetooth.player.FakeMpv;
+import dev.andre.homecontrol.adapters.bluetooth.player.InProcessMpvLauncher;
+import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.DeviceEnrollment;
+import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceQueries;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.BluetoothDeviceInfo;
 import dev.andre.homecontrol.adapters.bluetooth.bluez.FakeBluezClient;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceNotFoundException;
+import dev.andre.homecontrol.core.DeviceStatus;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
+import java.net.URI;
+import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluetoothDeviceInfo.A2DP_SINK;
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.ACCESS_DENIED;
@@ -26,6 +37,7 @@ import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.PAIRIN
 import static dev.andre.homecontrol.adapters.bluetooth.bluez.BluezFailure.UNREACHABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -38,15 +50,32 @@ class BluetoothPairingServiceTest {
     private static final Instant NOW = Instant.parse("2026-09-16T10:00:00Z");
     private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
+    private static final Duration WAIT = Duration.ofSeconds(5);
+
+    @TempDir
+    Path runtime;
+
     private final FakeBluezClient bluez = new FakeBluezClient();
     private final DeviceQueries devices = mock(DeviceQueries.class);
     private final DeviceEnrollment enrollment = mock(DeviceEnrollment.class);
     private final BluetoothProperties properties = BluetoothProperties.defaults();
-    private final BluetoothPairingService service = new BluetoothPairingService(bluez, devices, enrollment, properties, CLOCK);
+    private final InProcessMpvLauncher launcher = new InProcessMpvLauncher();
+    private final BluetoothSpeakerAdapter speakers = new BluetoothSpeakerAdapter(properties, bluez, launcher);
+    private final BluetoothPairingService service = new BluetoothPairingService(bluez, devices, enrollment, properties,
+            speakers, CLOCK);
+    private DeviceHandle session;
 
     @BeforeEach
     void setUp() {
         when(devices.device(anyString())).thenReturn(Optional.empty());
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (session != null) {
+            session.close();
+        }
+        launcher.close();
     }
 
     @Test
@@ -82,12 +111,12 @@ class BluetoothPairingServiceTest {
     void aConfiguredAdapterIsUsed() {
         bluez.addAdapter("hci1", "00:1A:7D:DA:71:99", true);
         BluetoothPairingService withAdapter = new BluetoothPairingService(bluez, devices, enrollment,
-                properties.withAdapter("hci1"), CLOCK);
+                properties.withAdapter("hci1"), speakers, CLOCK);
         withAdapter.scan();
         assertThat(bluez.calls()).contains("discover 00:1A:7D:DA:71:99 10s");
 
         BluetoothPairingService missing = new BluetoothPairingService(bluez, devices, enrollment,
-                properties.withAdapter("hci7"), CLOCK);
+                properties.withAdapter("hci7"), speakers, CLOCK);
         BluetoothScan scan = missing.scan();
         assertThat(scan.error()).contains("Adapter hci7 not found").contains("hci0 (00:1A:7D:DA:71:13)");
     }
@@ -217,6 +246,39 @@ class BluetoothPairingServiceTest {
     }
 
     @Test
+    void disconnectingStopsThePlayerBeforeTheSpeakerGoes() throws Exception {
+        Device registered = registeredSpeaker();
+        when(devices.device(registered.id())).thenReturn(Optional.of(registered));
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(A2DP_SINK);
+        launcher.options = FakeMpv.Options.defaults().withAudioDevices("pulse/bluez_output.AA_BB_CC_DD_EE_FF.1=JBL Flip 5");
+        BluetoothSpeakerAdapter pollingRarely = speakersPollingRarely();
+        session = pollingRarely.connect(registered, state -> { });
+        session.execute(new Action.PlayMedia(URI.create("http://127.0.0.1:9/radio.mp3"), "audio/mpeg", "Radio", null));
+        // Playback that outlives the link moves to the host's own output until a poll notices.
+        AtomicBoolean stoppedFirst = new AtomicBoolean();
+        bluez.whenCalled("disconnect", () -> stoppedFirst.set(launcher.latest().hasQuit()));
+
+        pairingWith(pollingRarely).disconnect(registered.id());
+
+        assertThat(stoppedFirst).isTrue();
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED));
+    }
+
+    @Test
+    void aConnectedSpeakerShowsAsConnectedAtOnce() throws Exception {
+        Device registered = registeredSpeaker();
+        when(devices.device(registered.id())).thenReturn(Optional.of(registered));
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(false).uuids(A2DP_SINK);
+        BluetoothSpeakerAdapter pollingRarely = speakersPollingRarely();
+        session = pollingRarely.connect(registered, state -> { });
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED));
+
+        pairingWith(pollingRarely).connect(registered.id());
+
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+    }
+
+    @Test
     void aBluezFailureDuringConnectIsExplained() {
         Device registered = registeredSpeaker();
         when(devices.device("bluetooth-aa-bb-cc-dd-ee-ff")).thenReturn(Optional.of(registered));
@@ -280,6 +342,17 @@ class BluetoothPairingServiceTest {
 
         assertThatThrownBy(() -> service.pair("AA:BB:CC:DD:EE:FF"))
                 .isInstanceOf(BluetoothSetupException.class).hasMessageContaining("refused this container");
+    }
+
+    /** Polls once a minute: whatever the test sees sooner, the setup action asked for. */
+    private BluetoothSpeakerAdapter speakersPollingRarely() {
+        return new BluetoothSpeakerAdapter(properties.withRuntimeDir(runtime).withAutoConnect(false)
+                .withTimings(Duration.ofMinutes(1), Duration.ofMinutes(1), Duration.ofSeconds(5), Duration.ofSeconds(5),
+                        Duration.ofSeconds(2)), bluez, launcher);
+    }
+
+    private BluetoothPairingService pairingWith(BluetoothSpeakerAdapter speakers) {
+        return new BluetoothPairingService(bluez, devices, enrollment, properties, speakers, CLOCK);
     }
 
     private Device registeredSpeaker() {

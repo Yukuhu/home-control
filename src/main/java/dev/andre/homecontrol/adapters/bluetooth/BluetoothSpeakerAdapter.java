@@ -5,6 +5,7 @@ import dev.andre.homecontrol.adapters.bluetooth.bluez.BluezException;
 import dev.andre.homecontrol.adapters.bluetooth.player.AudioDeviceResolver;
 import dev.andre.homecontrol.adapters.bluetooth.player.MpvLauncher;
 import dev.andre.homecontrol.adapters.bluetooth.player.MpvPlayer;
+import dev.andre.homecontrol.adapters.support.SessionRegistry;
 import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -29,6 +31,7 @@ public class BluetoothSpeakerAdapter implements DeviceAdapter, AdapterDiscovery 
     private final BluetoothProperties properties;
     private final BluezClient bluez;
     private final MpvLauncher launcher;
+    private final SessionRegistry<BluetoothSpeakerSession> sessions = new SessionRegistry<>();
 
     public BluetoothSpeakerAdapter(BluetoothProperties properties, BluezClient bluez, MpvLauncher launcher) {
         this.properties = properties;
@@ -58,9 +61,15 @@ public class BluetoothSpeakerAdapter implements DeviceAdapter, AdapterDiscovery 
                 properties.commandTimeout());
         AudioDeviceResolver audioDevices = new AudioDeviceResolver(launcher, properties.audioDeviceTemplate(),
                 properties.playerStartTimeout());
-        BluetoothSpeakerSession session = new BluetoothSpeakerSession(device, properties, bluez, player, audioDevices, onChange);
+        BluetoothSpeakerSession session = sessions.open(device.id(), onClose ->
+                new BluetoothSpeakerSession(device, properties, bluez, player, audioDevices, onChange, onClose));
         session.start();
         return session;
+    }
+
+    /** A speaker's open session, for the setup page's actions on it. */
+    Optional<BluetoothSpeakerSession> session(String deviceId) {
+        return sessions.get(deviceId);
     }
 
     @Override
