@@ -1,14 +1,21 @@
 package dev.andre.homecontrol.adapters.tizen.protocol;
 
 import dev.andre.homecontrol.adapters.net.DeviceUris;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceFetch;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-/** DIAL application launch (DIAL 2.x §6.1): {@code POST http://host:8080/ws/apps/<app>} with the app's arguments. */
+/**
+ * DIAL application launch (DIAL 2.x §6.1): {@code POST http://host:8080/ws/apps/<app>} with the app's arguments. The
+ * request timeout bounds the whole answer, so a TV that stalls mid-body cannot hold the caller.
+ */
 public final class DialClient {
+
+    /** A launch answers with no body; anything past this is refused unread. */
+    static final int MAX_ANSWER_BYTES = 16 * 1024;
 
     private final HttpClient http;
     private final TizenOptions options;
@@ -24,9 +31,9 @@ public final class DialClient {
                 .header("Content-Type", "text/plain; charset=utf-8")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
-        HttpResponse<Void> response;
+        HttpResponse<byte[]> response;
         try {
-            response = http.send(request, HttpResponse.BodyHandlers.discarding());
+            response = DeviceFetch.send(http, request, MAX_ANSWER_BYTES, options.requestTimeout());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while starting " + app, e);

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class TizenRestTest {
 
@@ -58,6 +59,16 @@ class TizenRestTest {
         fake.setRestAvailable(false);
 
         assertThat(rest.deviceInfo("127.0.0.1")).isEmpty();
+    }
+
+    @Test
+    void aTvThatStallsItsAnswerHasNoInfoOnceTheWaitIsOver() {
+        fake.stallAnswers();
+        TizenRest impatient = new TizenRest(InsecureTls.httpClient(Duration.ofSeconds(2)),
+                new TizenOptions(fake.port(), fake.httpPort(), fake.httpPort(), "Home Control", Duration.ofSeconds(2),
+                        Duration.ofMillis(500)));
+
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> assertThat(impatient.deviceInfo("127.0.0.1")).isEmpty());
     }
 
     @Test

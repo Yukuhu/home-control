@@ -11,6 +11,7 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class DialClientTest {
 
@@ -27,9 +28,13 @@ class DialClientTest {
     }
 
     private DialClient dial(int dialPort) {
+        return dial(dialPort, Duration.ofSeconds(2));
+    }
+
+    private DialClient dial(int dialPort, Duration requestTimeout) {
         return new DialClient(InsecureTls.httpClient(Duration.ofSeconds(2)),
                 new TizenOptions(fake.port(), fake.httpPort(), dialPort, "Home Control", Duration.ofSeconds(2),
-                        Duration.ofSeconds(2)));
+                        requestTimeout));
     }
 
     @Test
@@ -46,6 +51,17 @@ class DialClientTest {
         assertThatThrownBy(() -> dial(fake.httpPort()).launch("127.0.0.1", "YouTube", "v=aqz-KE-bpKQ"))
                 .isInstanceOf(DialException.class)
                 .hasMessage("YouTube is not available over DIAL on this TV");
+    }
+
+    @Test
+    void aTvThatStallsItsAnswerFailsOnceTheWaitIsOver() {
+        fake.stallAnswers();
+        DialClient impatient = dial(fake.httpPort(), Duration.ofMillis(500));
+
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () ->
+                assertThatThrownBy(() -> impatient.launch("127.0.0.1", "YouTube", "v=aqz-KE-bpKQ"))
+                        .isInstanceOf(IOException.class)
+                        .isNotInstanceOf(DialException.class));
     }
 
     @Test
