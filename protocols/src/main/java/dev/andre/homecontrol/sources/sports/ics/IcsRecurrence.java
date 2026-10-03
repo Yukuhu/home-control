@@ -9,8 +9,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The RRULE subset Home Control expands (see the plan's ICS subset rule 12). {@code weekStart} is the day weeks begin on
- * when a weekly rule with an interval counts them (WKST, Monday unless given).
+ * The RRULE subset Home Control expands (see the plan's ICS subset rule 12). {@code weekStart} is the day weeks begin
+ * on when a weekly rule with an interval counts them (WKST, Monday unless given).
  */
 public record IcsRecurrence(Frequency frequency, int interval, Integer count, IcsTime until, List<DayOfWeek> byDay,
                             DayOfWeek weekStart) {
