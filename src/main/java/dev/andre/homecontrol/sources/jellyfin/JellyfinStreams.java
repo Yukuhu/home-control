@@ -79,12 +79,23 @@ public class JellyfinStreams {
             Optional<String> container = directContainer(source, types);
             if (container.isPresent()) {
                 String mediaSourceId = source.path("Id").asString("");
-                String url = deviceServerUrl + (audio ? "/Audio/" : "/Videos/") + itemId + "/stream." + container.get()
-                        + "?static=true&mediaSourceId=" + encode(mediaSourceId) + "&ApiKey=" + encode(token);
-                return Optional.of(new PlayableRef.StreamUrl(URI.create(url), types.get(container.get())));
+                return Optional.of(new PlayableRef.StreamUrl(
+                        staticStream(deviceServerUrl, audio, itemId, "." + container.get(), mediaSourceId, token),
+                        types.get(container.get())));
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * The original file of one media source, as a player on the LAN fetches it. {@code extension} names the container
+     * the player should expect, or is empty to leave it to the player. The token goes in {@code ApiKey}: newer servers
+     * refuse the legacy {@code api_key}.
+     */
+    public static URI staticStream(URI deviceServerUrl, boolean audio, String itemId, String extension,
+                                   String mediaSourceId, String token) {
+        return URI.create(deviceServerUrl + (audio ? "/Audio/" : "/Videos/") + itemId + "/stream" + extension
+                + "?static=true&mediaSourceId=" + encode(mediaSourceId) + "&ApiKey=" + encode(token));
     }
 
     /** The first container of {@code types} a source can be played in as is; empty when it cannot be direct-played. */

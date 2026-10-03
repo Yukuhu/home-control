@@ -208,7 +208,7 @@ class JellyfinEndToEndTest extends FullAppTest {
                 shieldRemote.pushPower(true);
                 String vlcLink = shieldRemote.nextAppLink();
                 assertThat(vlcLink).startsWith("vlc://" + jellyfin.url() + "/Videos/" + EPISODE + "/stream?")
-                        .contains("static=true", "mediaSourceId=" + EPISODE, "api_key=" + ACCESS_TOKEN);
+                        .contains("static=true", "mediaSourceId=" + EPISODE, "ApiKey=" + ACCESS_TOKEN);
                 assertThat(vlcStarting.get(5, TimeUnit.SECONDS).body()).contains("jellyfin-vlc", "\"optimistic\":true");
                 assertThat(jellyfin.requests("POST", "/Sessions/" + SHIELD_SESSION + "/Playing")).hasSize(1);
 

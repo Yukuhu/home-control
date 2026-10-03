@@ -19,8 +19,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
@@ -124,8 +122,8 @@ public class JellyfinVlcExecutor implements RouteExecutor {
                     || source.path("RequiresClosing").asBoolean(false)
                     || source.path("IsInfiniteStream").asBoolean(false)) continue;
             // VLC, unlike the Cast renderer, can fetch the original container (including MKV).
-            String stream = settings.deviceServerUrl() + ("Audio".equals(type) ? "/Audio/" : "/Videos/")
-                    + id + "/stream?static=true&mediaSourceId=" + encode(sourceId) + "&api_key=" + encode(connection.token());
+            URI stream = JellyfinStreams.staticStream(settings.deviceServerUrl(), "Audio".equals(type), id, "",
+                    sourceId, connection.token());
             // VLC's MediaWrapper.manageVLCMrl removes precisely this prefix.
             return new Launch(URI.create("vlc://" + stream), media(item));
         }
@@ -165,9 +163,5 @@ public class JellyfinVlcExecutor implements RouteExecutor {
     private static void checkDeadline(long deadline) throws InterruptedException {
         if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
         if (System.nanoTime() >= deadline) throw new ActionFailedException("The device did not become ready to open VLC in time");
-    }
-
-    private static String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }
