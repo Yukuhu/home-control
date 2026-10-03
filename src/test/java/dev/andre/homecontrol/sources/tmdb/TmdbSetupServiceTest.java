@@ -131,6 +131,7 @@ class TmdbSetupServiceTest {
                 .isInstanceOf(PasswordRejectedException.class);
 
         assertThat(secretStore.hasSecrets()).isFalse();
+        assertThat(fake.requests()).as("the password is checked before TMDB is asked").isEmpty();
     }
 
     @Test
@@ -140,8 +141,10 @@ class TmdbSetupServiceTest {
 
         var reconnect = new TmdbSetupService.ConnectRequest(FakeTmdbServer.API_KEY, null, null);
         var anonymous = new RequestLoginContext(new MockHttpServletRequest(), loginService);
+        int asked = fake.requests().size();
         assertThatThrownBy(() -> setup.connect(reconnect, anonymous))
                 .isInstanceOf(LoginRequiredException.class);
+        assertThat(fake.requests()).as("the login is checked before TMDB is asked").hasSize(asked);
     }
 
     @Test

@@ -60,6 +60,7 @@ public class TmdbSetupService {
         } catch (IllegalArgumentException e) {
             throw new TmdbException(ContentSourceException.Kind.INVALID_INPUT, e.getMessage());
         }
+        login.permitSecrets(context, request.loginPassword(), request.loginPasswordConfirmation());
         validate(credential);
         login.storeSecrets(Map.of(TmdbSettings.CREDENTIAL_SECRET, credential.value()),
                 request.loginPassword(), request.loginPasswordConfirmation(), context);
