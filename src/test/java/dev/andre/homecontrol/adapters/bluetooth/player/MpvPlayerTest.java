@@ -61,6 +61,15 @@ class MpvPlayerTest {
     }
 
     @Test
+    void aClosedPlayerStartsNoMpv() {
+        player.close();
+
+        assertThatThrownBy(() -> player.play(URI.create("http://nas/a.mp3"), "pulse/x", 40, false))
+                .isInstanceOf(IOException.class).hasMessage("the player is closed");
+        assertThat(launcher.starts).isEmpty();
+    }
+
+    @Test
     void playsAfterTheFileLoaded() throws Exception {
         player.play(URI.create("http://nas/a.mp3?ApiKey=secret"), "pulse/bluez_output.AA_BB_CC_DD_EE_FF.1", 40, false);
 

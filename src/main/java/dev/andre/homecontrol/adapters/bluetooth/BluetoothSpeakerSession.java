@@ -129,7 +129,7 @@ public class BluetoothSpeakerSession implements DeviceHandle {
         closed = true;
         publisher.close();
         loop.close();
-        player.stop();
+        player.close();
     }
 
     /** Forces an immediate re-check instead of waiting for the next scheduled poll (setup page actions). */
@@ -159,6 +159,9 @@ public class BluetoothSpeakerSession implements DeviceHandle {
         } catch (IllegalArgumentException _) {
             throw new ActionFailedException(device.name() + ": the audio output id is not usable; fix it on the setup page");
         } catch (IOException | MpvException e) {
+            if (closed) {
+                throw new DeviceOfflineException(device.name() + " is not connected");
+            }
             throw new ActionFailedException(device.name() + " could not play the stream: " + StreamRedaction.redact(e.getMessage()));
         }
     }

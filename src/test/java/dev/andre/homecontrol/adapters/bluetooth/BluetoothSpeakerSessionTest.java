@@ -489,6 +489,18 @@ class BluetoothSpeakerSessionTest {
     }
 
     @Test
+    void aPlayThatOutlivesItsSessionStartsNoPlayer() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(false).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        start(properties.withAutoConnect(false));
+        // The audio output changes, or the speaker is forgotten, while the play still connects it.
+        bluez.whenCalled("connect", session::close);
+
+        assertThatThrownBy(() -> session.execute(PLAY)).isInstanceOf(DeviceOfflineException.class)
+                .hasMessage("JBL Flip 5 is not connected");
+        assertThat(launcher.starts).isEmpty();
+    }
+
+    @Test
     void aCommandThatRacesCloseStillAnswers() {
         bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
         SessionLoop loop = new SessionLoop("bluetooth-race");
