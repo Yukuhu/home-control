@@ -321,7 +321,7 @@ class EventStreamTest {
     }
 
     @Test
-    void theHeartbeatStopsWhenTheApplicationCloses() throws InterruptedException {
+    void theHeartbeatStopsWhenTheApplicationCloses() {
         AtomicInteger beats = new AtomicInteger();
         CountDownLatch slowTab = new CountDownLatch(1);
         EventStream stream = new EventStream(new EventStreamProperties(Duration.ofMillis(50))) {
@@ -352,10 +352,13 @@ class EventStreamTest {
     @Test
     void aTabThatSubscribesAfterTheApplicationStartedClosingIsEndedAtOnce() {
         broadcaster.onContextClosed();
+        AtomicInteger snapshots = new AtomicInteger();
 
-        CountingEmitter late = (CountingEmitter) broadcaster.register(new CountingEmitter());
+        CountingEmitter late = (CountingEmitter) broadcaster.register(new CountingEmitter(), () -> true,
+                _ -> snapshots.incrementAndGet());
 
         await().atMost(Duration.ofSeconds(2)).until(late::completed);
+        assertThat(snapshots).as("ended before its sender started").hasValue(0);
     }
 
     private static void awaitQuietly(CountDownLatch latch) {

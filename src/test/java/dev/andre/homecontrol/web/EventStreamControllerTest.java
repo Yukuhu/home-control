@@ -70,9 +70,9 @@ class EventStreamControllerTest extends WebSliceTest {
 
         String body = result.getResponse().getContentAsString();
         assertThat(body.indexOf("event:state")).isLessThan(body.indexOf("event:rail"));
-        assertThat(body).contains("\"railId\":\"a\"").doesNotContain("Big Buck Bunny");
         // A tab that missed a rail appearing or going while it was away learns of it from the list.
-        assertThat(body).contains("event:rails").contains("{\"rails\":[\"jellyfin/a\"]}");
+        assertThat(body).contains("\"railId\":\"a\"").doesNotContain("Big Buck Bunny")
+                .contains("event:rails").contains("{\"rails\":[\"jellyfin/a\"]}");
     }
 
     /** The stream sends a new tab's snapshot from that tab's own queue; here it runs at once, as on an idle stream. */

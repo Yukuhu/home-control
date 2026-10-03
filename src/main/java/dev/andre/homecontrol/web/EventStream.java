@@ -21,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -90,11 +91,12 @@ public class EventStream {
         emitter.onTimeout(subscriber::end);
         emitter.onError(_ -> subscriber.end());
         subscribers.add(subscriber);
-        Thread.ofVirtual().name("home-control-sse-tab").start(subscriber);
         if (closed) {
-            // Subscribed once closing had begun: graceful shutdown would otherwise wait for this tab.
+            // Subscribed once closing had begun: ended before its sender starts, so it sends nothing, not even its
+            // snapshot, and graceful shutdown does not wait for it.
             subscriber.end();
         }
+        Thread.ofVirtual().name("home-control-sse-tab").start(subscriber);
         return emitter;
     }
 
@@ -186,7 +188,7 @@ public class EventStream {
         private final BooleanSupplier stillAllowed;
         private final BlockingQueue<Send> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         private volatile boolean ended;
-        private volatile Exception failure;
+        private final AtomicReference<Exception> failure = new AtomicReference<>();
 
         Subscriber(SseEmitter emitter, BooleanSupplier stillAllowed) {
             this.emitter = emitter;
@@ -216,11 +218,14 @@ public class EventStream {
             ended = true;
             subscribers.remove(this);
             queue.clear();
-            queue.offer(STOP);
+            if (!queue.offer(STOP)) {
+                // Sends offered meanwhile filled it again; the sender sees that the tab ended after its next take.
+                log.trace("An ended SSE subscriber's queue filled up again before it could be stopped");
+            }
         }
 
         private void fail(Exception cause) {
-            failure = cause;
+            failure.compareAndSet(null, cause);
             end();
         }
 
@@ -236,14 +241,7 @@ public class EventStream {
                         end();
                         return;
                     }
-                    try {
-                        send.to(emitter);
-                    } catch (IOException | RuntimeException e) {
-                        // Not just IOException: send throws an unchecked IllegalStateException when the emitter
-                        // completed meanwhile, which happens routinely on tab close. Either way this tab is finished.
-                        log.debug("Dropping an SSE subscriber after a failed send", e);
-                        fail(e);
-                    }
+                    deliver(send);
                 }
             } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
@@ -254,10 +252,22 @@ public class EventStream {
             }
         }
 
-        private void complete() {
+        private void deliver(Send send) {
             try {
-                if (failure != null) {
-                    emitter.completeWithError(failure);
+                send.to(emitter);
+            } catch (IOException | RuntimeException e) {
+                // Not just IOException: send throws an unchecked IllegalStateException when the emitter completed
+                // meanwhile, which happens routinely on tab close. Either way this tab is finished.
+                log.debug("Dropping an SSE subscriber after a failed send", e);
+                fail(e);
+            }
+        }
+
+        private void complete() {
+            Exception cause = failure.get();
+            try {
+                if (cause != null) {
+                    emitter.completeWithError(cause);
                 } else {
                     emitter.complete();
                 }
