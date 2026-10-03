@@ -89,15 +89,17 @@ public class YouTubeAuthorizationService implements AutoCloseable {
         }
         long requested;
         synchronized (this) {
-            requested = generation;
+            // The sign-in this one replaces ends now, not once Google answers: its code can no longer be granted.
+            requested = ++generation;
+            pending = null;
+            browser = null;
+            status = Status.of(State.IDLE, null);
         }
         GoogleOAuthClient.DeviceCode code = oauth.requestDeviceCode(clientId);
         synchronized (this) {
             if (generation != requested) {
                 return status; // cancelled, or another sign-in started, while Google answered
             }
-            generation++;
-            browser = null;
             pending = code;
             interval = code.interval();
             nextPollAt = clock.instant().plus(interval);

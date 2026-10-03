@@ -30,6 +30,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
@@ -125,6 +126,29 @@ class YouTubeAuthorizationServiceTest {
         }
         assertThat(polling.get(5, TimeUnit.SECONDS)).isFalse();
         assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.CONNECTED);
+    }
+
+    @Test
+    void aCodeReplacedWhileGoogleAnswersIsNotGranted() throws Exception {
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
+        authorization.start();
+        clock.advance(Duration.ofSeconds(5));
+        CountDownLatch release = new CountDownLatch(1);
+        fake.holdWhen("POST", "/oauth/device/code", request -> true, release,
+                FakeGoogleServer.Canned.fixture(200, "oauth-device-code.json"));
+        CompletableFuture<YouTubeAuthorizationService.Status> replacing =
+                CompletableFuture.supplyAsync(authorization::start);
+        await().until(() -> fake.count("/oauth/device/code") == 2);
+
+        // The background poll comes due while the new code is requested: the old code is no longer the user's.
+        try {
+            authorization.pollOnce();
+        } finally {
+            release.countDown();
+        }
+
+        assertThat(replacing.get(5, TimeUnit.SECONDS).state()).isEqualTo(YouTubeAuthorizationService.State.PENDING);
+        verify(secrets, never()).putSecrets(any());
     }
 
     @Test
