@@ -112,29 +112,7 @@ public final class MpvPlayer implements AutoCloseable {
         CompletableFuture<Void> loaded = new CompletableFuture<>();
         MpvIpc ipc;
         try {
-            ipc = MpvIpc.connect(socket, startTimeout, process::alive, new MpvIpc.EventListener() {
-                @Override
-                public void onEvent(JsonNode event) {
-                    switch (event.path("event").asString("")) {
-                        case "file-loaded" -> loaded.complete(null);
-                        // A playlist (M3U, PLS) ends with "redirect" once mpv has read it; its first entry loads next.
-                        case "end-file" -> {
-                            if (!"redirect".equals(event.path("reason").asString(""))) {
-                                loaded.completeExceptionally(MpvException.loadFailed(
-                                        event.path("file_error").asString(event.path("reason").asString("stopped"))));
-                            }
-                        }
-                        default -> {
-                            // Other mpv events do not affect the pending file load.
-                        }
-                    }
-                }
-
-                @Override
-                public void onClosed() {
-                    loaded.completeExceptionally(new IOException("mpv closed its control socket"));
-                }
-            });
+            ipc = MpvIpc.connect(socket, startTimeout, process::alive, loadListener(loaded));
         } catch (IOException e) {
             process.terminate(Duration.ofSeconds(1));
             throw withErrors(e, process);
@@ -165,6 +143,33 @@ public final class MpvPlayer implements AutoCloseable {
             stop();
             throw new InterruptedIOException("interrupted while starting playback");
         }
+    }
+
+    /** Completes {@code loaded} once mpv has loaded the file, or with why it could not. */
+    private static MpvIpc.EventListener loadListener(CompletableFuture<Void> loaded) {
+        return new MpvIpc.EventListener() {
+            @Override
+            public void onEvent(JsonNode event) {
+                switch (event.path("event").asString("")) {
+                    case "file-loaded" -> loaded.complete(null);
+                    // A playlist (M3U, PLS) ends with "redirect" once mpv has read it; its first entry loads next.
+                    case "end-file" -> {
+                        if (!"redirect".equals(event.path("reason").asString(""))) {
+                            loaded.completeExceptionally(MpvException.loadFailed(
+                                    event.path("file_error").asString(event.path("reason").asString("stopped"))));
+                        }
+                    }
+                    default -> {
+                        // Other mpv events do not affect the pending file load.
+                    }
+                }
+            }
+
+            @Override
+            public void onClosed() {
+                loaded.completeExceptionally(new IOException("mpv closed its control socket"));
+            }
+        };
     }
 
     public boolean active() {
