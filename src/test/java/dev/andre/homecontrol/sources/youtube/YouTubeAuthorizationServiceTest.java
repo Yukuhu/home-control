@@ -83,7 +83,8 @@ class YouTubeAuthorizationServiceTest {
         CountDownLatch release = new CountDownLatch(1);
         fake.holdWhen("POST", "/oauth/device/code", request -> true, release,
                 FakeGoogleServer.Canned.fixture(200, "oauth-device-code.json"));
-        CompletableFuture<YouTubeAuthorizationService.Status> starting = CompletableFuture.supplyAsync(authorization::start);
+        CompletableFuture<YouTubeAuthorizationService.Status> starting =
+                CompletableFuture.supplyAsync(authorization::start);
         await().until(() -> fake.count("/oauth/device/code") == 1);
 
         try {
@@ -116,12 +117,43 @@ class YouTubeAuthorizationServiceTest {
         assertThat(hookRuns.await(5, TimeUnit.SECONDS)).isTrue();
 
         try {
+            // Not CONNECTED yet: the setup page reloads on that, and should then show the channel.
             assertThat(CompletableFuture.supplyAsync(authorization::status).get(2, TimeUnit.SECONDS).state())
-                    .isEqualTo(YouTubeAuthorizationService.State.CONNECTED);
+                    .isEqualTo(YouTubeAuthorizationService.State.PENDING);
         } finally {
             hookMayEnd.countDown();
         }
         assertThat(polling.get(5, TimeUnit.SECONDS)).isFalse();
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.CONNECTED);
+    }
+
+    @Test
+    void aGrantThatCannotBeKeptEndsAsFailed() {
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
+        doThrow(new IllegalStateException("the data directory is read-only")).when(secrets).putSecrets(any());
+        authorization.start();
+        clock.advance(Duration.ofSeconds(5));
+
+        assertThat(authorization.pollOnce()).isFalse();
+
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.FAILED);
+        assertThat(authorization.status().message()).contains("the data directory is read-only");
+    }
+
+    @Test
+    void aStartCancelledWhileGoogleAnswersShowsNoCode() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        fake.holdWhen("POST", "/oauth/device/code", request -> true, release,
+                FakeGoogleServer.Canned.fixture(200, "oauth-device-code.json"));
+        CompletableFuture<YouTubeAuthorizationService.Status> starting =
+                CompletableFuture.supplyAsync(authorization::start);
+        await().until(() -> fake.count("/oauth/device/code") == 1);
+
+        authorization.cancel();
+        release.countDown();
+
+        assertThat(starting.get(5, TimeUnit.SECONDS).state()).isEqualTo(YouTubeAuthorizationService.State.IDLE);
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.IDLE);
     }
 
     @Test

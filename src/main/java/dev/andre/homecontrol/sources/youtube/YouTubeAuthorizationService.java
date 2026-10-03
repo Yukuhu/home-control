@@ -141,7 +141,8 @@ public class YouTubeAuthorizationService implements AutoCloseable {
         synchronized (this) {
             request = browser;
             if (request == null || sessionId == null || !request.sessionId().equals(sessionId) || state == null
-                    || !MessageDigest.isEqual(request.state().getBytes(StandardCharsets.UTF_8), state.getBytes(StandardCharsets.UTF_8))) {
+                    || !MessageDigest.isEqual(request.state().getBytes(StandardCharsets.UTF_8),
+                            state.getBytes(StandardCharsets.UTF_8))) {
                 throw new YouTubeException(ContentSourceException.Kind.INVALID_INPUT,
                         "This sign-in request is no longer valid. Start again from Setup in the same browser.");
             }
@@ -161,8 +162,12 @@ public class YouTubeAuthorizationService implements AutoCloseable {
                 return;
             }
             current = generation;
-            clientId = secrets.secret(YouTubeSettings.CLIENT_ID).orElseThrow();
-            clientSecret = secrets.secret(YouTubeSettings.CLIENT_SECRET).orElseThrow();
+            clientId = secrets.secret(YouTubeSettings.CLIENT_ID).orElse(null);
+            clientSecret = secrets.secret(YouTubeSettings.CLIENT_SECRET).orElse(null);
+            if (clientId == null || clientSecret == null) {
+                finish(State.FAILED, "The OAuth client was removed meanwhile. Save it again and start again.");
+                return;
+            }
         }
         GoogleOAuthClient.TokenPoll.Granted granted;
         try {
@@ -276,31 +281,42 @@ public class YouTubeAuthorizationService implements AutoCloseable {
         return false;
     }
 
-    /** Keeps the grant unless {@code expected} is no longer the current generation; the hook runs outside the monitor. */
+    /**
+     * Keeps the grant unless {@code expected} is no longer the current generation. The hook runs outside the monitor;
+     * the status says CONNECTED only after it, so the page that reloads on that shows the channel.
+     */
     private void storeGrant(long expected, GoogleOAuthClient.AccessToken accessToken, String refreshToken) {
         YouTubeSettings previous;
         synchronized (this) {
             if (generation != expected) {
                 return; // cancelled, restarted or disconnected while Google answered: the grant is not kept
             }
-            secrets.putSecrets(Map.of(YouTubeSettings.REFRESH_TOKEN, refreshToken));
-            tokens.reset();
-            tokens.prime(accessToken);
-            previous = YouTubeSettings.read(settings);
-            settings.put(YouTubeSettings.SOURCE_ID,
-                    previous.withoutAccount().withConnection(clock.instant(), null, null));
-            finish(State.CONNECTED, "YouTube connected");
+            try {
+                secrets.putSecrets(Map.of(YouTubeSettings.REFRESH_TOKEN, refreshToken));
+                tokens.reset();
+                tokens.prime(accessToken);
+                previous = YouTubeSettings.read(settings);
+                settings.put(YouTubeSettings.SOURCE_ID,
+                        previous.withoutAccount().withConnection(clock.instant(), null, null));
+            } catch (RuntimeException e) {
+                log.warn("Could not keep the YouTube authorization: {}", e.getMessage());
+                finish(State.FAILED, "Home Control could not keep the authorization: " + e.getMessage());
+                return;
+            }
         }
         notifyConnected();
         // Restore rail choices only after Google confirms this is still the same channel.
         // Failed channel lookups leave an empty library instead of showing another account's data.
         synchronized (this) {
+            if (generation != expected) {
+                return;
+            }
             YouTubeSettings resolved = YouTubeSettings.read(settings);
-            if (generation == expected && previous.channelId() != null
-                    && previous.channelId().equals(resolved.channelId())) {
+            if (previous.channelId() != null && previous.channelId().equals(resolved.channelId())) {
                 settings.put(YouTubeSettings.SOURCE_ID,
                         resolved.withPlaylists(previous.playlists()).withWatchLater(previous.watchLater()));
             }
+            finish(State.CONNECTED, "YouTube connected");
         }
     }
 
