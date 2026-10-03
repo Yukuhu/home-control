@@ -30,12 +30,9 @@ public class YouTubeAccount {
         if (id.isBlank() || title.isBlank()) {
             throw new YouTubeException(ContentSourceException.Kind.BAD_RESPONSE, "YouTube did not return your channel");
         }
-        if (!setup.connected()) {
-            return title; // disconnected while Google answered: nothing of the account is kept
-        }
-        YouTubeSettings current = setup.settings();
-        Instant connectedAt = current.connectedAt() != null ? current.connectedAt() : Instant.now();
-        setup.save(current.withConnection(connectedAt, id, title));
+        // Disconnected while Google answered: nothing of the account is kept.
+        setup.saveIfConnected(current -> current.withConnection(
+                current.connectedAt() != null ? current.connectedAt() : Instant.now(), id, title));
         return title;
     }
 }

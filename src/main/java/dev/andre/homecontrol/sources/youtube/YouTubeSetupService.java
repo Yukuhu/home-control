@@ -17,6 +17,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 
 /** Connects, checks and disconnects the Google account; the only writer of YouTube's settings and secrets. */
@@ -74,6 +75,20 @@ public class YouTubeSetupService {
 
     public YouTubeSettings settings() {
         return YouTubeSettings.read(sourceSettings);
+    }
+
+    /**
+     * Applies {@code change} to the settings while the account is still connected; true when it did. Under the lock
+     * disconnect takes, so a lookup that ends during a disconnect cannot write its account back.
+     */
+    public boolean saveIfConnected(UnaryOperator<YouTubeSettings> change) {
+        synchronized (changes) {
+            if (!connected()) {
+                return false;
+            }
+            save(change.apply(settings()));
+            return true;
+        }
     }
 
     public void save(YouTubeSettings settings) {
