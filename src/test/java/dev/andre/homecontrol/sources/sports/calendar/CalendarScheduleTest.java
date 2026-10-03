@@ -10,6 +10,7 @@ import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettingsService;
 import dev.andre.homecontrol.sources.sports.settings.SportsTimeZones;
 import dev.andre.homecontrol.sources.sports.ics.IcsCalendar;
+import dev.andre.homecontrol.sources.sports.ics.IcsOccurrence;
 import dev.andre.homecontrol.sources.sports.ics.IcsParser;
 import dev.andre.homecontrol.storage.SecretStore;
 import dev.andre.homecontrol.testsupport.MutableClock;
@@ -88,7 +89,8 @@ class CalendarScheduleTest {
 
         assertThat(result.succeeded()).isEqualTo(2);
         assertThat(result.errors()).isEmpty();
-        assertThat(result.events()).anyMatch(e -> e.itemId().equals("ics:c-3f9a1c2b7d4e:069e696917c4a665"));
+        // The id older versions gave the event, from its UID and its start; pins made then are under it.
+        assertThat(result.events()).anyMatch(e -> e.formerItemId().equals("ics:c-3f9a1c2b7d4e:069e696917c4a665"));
         assertThat(result.events()).anyMatch(e -> e.competitionKey().equals("calendar:c-3f9a1c2b7d4e"));
 
         schedule.events();
@@ -157,7 +159,48 @@ class CalendarScheduleTest {
     }
 
     @Test
+    void aMovedKickOffKeepsItsId() {
+        IcsOccurrence planned = new IcsOccurrence("bl-1@fixtures.example", "A – B",
+                Instant.parse("2026-09-19T13:30:00Z"), Instant.parse("2026-09-19T15:30:00Z"), null, null);
+        IcsOccurrence moved = new IcsOccurrence("bl-1@fixtures.example", "A – B",
+                Instant.parse("2026-09-19T16:30:00Z"), Instant.parse("2026-09-19T18:30:00Z"), null, null);
+
+        assertThat(CalendarSchedule.toEvent("c-1", moved).itemId())
+                .isEqualTo(CalendarSchedule.toEvent("c-1", planned).itemId());
+    }
+
+    @Test
+    void eachOccurrenceOfASeriesHasItsOwnIdWhichAnOverrideKeeps() {
+        Instant firstDue = Instant.parse("2026-09-20T13:00:00Z");
+        Instant secondDue = Instant.parse("2026-09-27T13:00:00Z");
+        IcsOccurrence first = new IcsOccurrence("series@fixtures.example", "Series", firstDue,
+                firstDue.plus(Duration.ofHours(2)), null, firstDue);
+        IcsOccurrence second = new IcsOccurrence("series@fixtures.example", "Series", secondDue,
+                secondDue.plus(Duration.ofHours(2)), null, secondDue);
+        IcsOccurrence secondMoved = new IcsOccurrence("series@fixtures.example", "Series moved",
+                secondDue.plus(Duration.ofHours(3)), secondDue.plus(Duration.ofHours(5)), null, secondDue);
+
+        assertThat(CalendarSchedule.toEvent("c-1", first).itemId())
+                .isNotEqualTo(CalendarSchedule.toEvent("c-1", second).itemId());
+        assertThat(CalendarSchedule.toEvent("c-1", secondMoved).itemId())
+                .isEqualTo(CalendarSchedule.toEvent("c-1", second).itemId());
+    }
+
+    @Test
+    void eventsThatShareAUidKeepApartIds() {
+        // A feed that reuses a UID for different matches, against the RFC: each still gets an id of its own.
+        Instant one = Instant.parse("2026-09-19T13:30:00Z");
+        Instant two = Instant.parse("2026-09-26T13:30:00Z");
+        List<SportsEvent> events = CalendarSchedule.toEvents("c-1", List.of(
+                new IcsOccurrence("reused@fixtures.example", "A – B", one, one.plus(Duration.ofHours(2)), null, null),
+                new IcsOccurrence("reused@fixtures.example", "C – D", two, two.plus(Duration.ofHours(2)), null, null)));
+
+        assertThat(events).extracting(SportsEvent::itemId).doesNotHaveDuplicates();
+    }
+
+    @Test
     void findsItemsAndStatuses() {
+        // Under the id older versions gave it: a pin made then still finds its event.
         Optional<SportsEvent> found = schedule.find("ics:c-3f9a1c2b7d4e:069e696917c4a665");
         assertThat(found).isPresent();
         assertThat(schedule.find("ics:nope")).isEmpty();

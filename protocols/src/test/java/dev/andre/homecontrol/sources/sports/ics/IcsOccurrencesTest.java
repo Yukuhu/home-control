@@ -28,6 +28,41 @@ class IcsOccurrencesTest {
     }
 
     @Test
+    void eachOccurrenceKnowsItsPlaceInItsSeries() {
+        IcsCalendar calendar = IcsParser.parse("""
+                BEGIN:VCALENDAR
+                BEGIN:VEVENT
+                UID:single@fixtures.example
+                DTSTART:20260919T130000Z
+                SUMMARY:Single
+                END:VEVENT
+                BEGIN:VEVENT
+                UID:series@fixtures.example
+                DTSTART:20260920T130000Z
+                RRULE:FREQ=WEEKLY;COUNT=3
+                SUMMARY:Series
+                END:VEVENT
+                BEGIN:VEVENT
+                UID:series@fixtures.example
+                RECURRENCE-ID:20260927T130000Z
+                DTSTART:20260927T160000Z
+                SUMMARY:Series moved
+                END:VEVENT
+                END:VCALENDAR
+                """);
+
+        List<IcsOccurrence> occurrences = IcsOccurrences.expand(calendar, BERLIN, Instant.parse("2026-09-18T00:00:00Z"),
+                Instant.parse("2026-10-10T00:00:00Z"), DEFAULT_DURATION).occurrences();
+
+        assertThat(occurrences).extracting(IcsOccurrence::summary, IcsOccurrence::recurrenceId).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("Single", null),
+                org.assertj.core.groups.Tuple.tuple("Series", Instant.parse("2026-09-20T13:00:00Z")),
+                // Moved by three hours: still the occurrence that was due at 13:00.
+                org.assertj.core.groups.Tuple.tuple("Series moved", Instant.parse("2026-09-27T13:00:00Z")),
+                org.assertj.core.groups.Tuple.tuple("Series", Instant.parse("2026-10-04T13:00:00Z")));
+    }
+
+    @Test
     void expandsTheBundesligaFixture() {
         IcsCalendar calendar = IcsParser.parse(fixture("bundesliga.ics"));
         IcsOccurrences.Result result = IcsOccurrences.expand(calendar, BERLIN,

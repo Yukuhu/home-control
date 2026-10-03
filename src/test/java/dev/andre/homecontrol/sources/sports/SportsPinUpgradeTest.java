@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.content.PinOffers;
 import dev.andre.homecontrol.core.content.PinnedLinks;
 import dev.andre.homecontrol.core.content.SourcePreferences;
 import dev.andre.homecontrol.core.playback.ContentItem;
+import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.sources.pinned.JsonFilePinStore;
 import dev.andre.homecontrol.sources.pinned.Pin;
@@ -62,6 +63,7 @@ class SportsPinUpgradeTest {
     @TempDir
     Path dir;
 
+    private JsonFilePinStore pinStore;
     private PinnedShortcuts pinnedShortcuts;
     private List<Object> published;
     private SportsSettingsService settingsService;
@@ -112,6 +114,9 @@ class SportsPinUpgradeTest {
         given(schedule.events()).willReturn(events);
         for (SportsEvent event : events) {
             given(schedule.find(event.itemId())).willReturn(Optional.of(event));
+            if (event.formerItemId() != null) {
+                given(schedule.find(event.formerItemId())).willReturn(Optional.of(event)); // as CalendarSchedule does
+            }
         }
 
         settingsService = mock(SportsSettingsService.class);
@@ -129,11 +134,12 @@ class SportsPinUpgradeTest {
         published = new ArrayList<>();
         ApplicationEventPublisher publisher = published::add;
 
-        JsonFilePinStore store = new JsonFilePinStore(dir.resolve("pinned.json"));
+        pinStore = new JsonFilePinStore(dir.resolve("pinned.json"));
         PinnedProperties pinnedProperties = new PinnedProperties(true, 200);
 
         ObjectProvider<ContentSources> sourcesProvider = mock(ObjectProvider.class);
-        pinnedShortcuts = new PinnedShortcuts(store, pinnedProperties, publisher, CLOCK, new SecureRandom(), sourcesProvider);
+        pinnedShortcuts = new PinnedShortcuts(pinStore, pinnedProperties, publisher, CLOCK, new SecureRandom(),
+                sourcesProvider);
 
         ObjectProvider<PinnedLinks> pinnedLinksProvider = mock(ObjectProvider.class);
         given(pinnedLinksProvider.getIfAvailable()).willReturn(pinnedShortcuts);
@@ -187,11 +193,24 @@ class SportsPinUpgradeTest {
 
     @Test
     void icsEventIdsWork() {
-        Pin pin = pinnedShortcuts.addUpgrade(DAZN_EVENT_LINK, "sports/ics:c-3f9a1c2b7d4e:069e696917c4a665");
+        Pin pin = pinnedShortcuts.addUpgrade(DAZN_EVENT_LINK, "sports/ics:c-3f9a1c2b7d4e:f62bf256356fa991");
 
-        assertThat(pin.upgradeOf()).isEqualTo("sports/ics:c-3f9a1c2b7d4e:069e696917c4a665");
-        ContentItem item = source.item("ics:c-3f9a1c2b7d4e:069e696917c4a665").orElseThrow();
+        assertThat(pin.upgradeOf()).isEqualTo("sports/ics:c-3f9a1c2b7d4e:f62bf256356fa991");
+        ContentItem item = source.item("ics:c-3f9a1c2b7d4e:f62bf256356fa991").orElseThrow();
         assertThat(item.playables()).containsExactly(new PlayableRef.AppLink(URI.create(DAZN_EVENT_LINK), "dazn"));
+    }
+
+    @Test
+    void aPinAnOlderVersionMadeUnderAnIcsEventsFormerIdStillUpgradesIt() {
+        // Stored by a version whose ids came from the UID and the start.
+        pinStore.save(List.of(new Pin("p-3f9a1c2b7d4e", URI.create(DAZN_EVENT_LINK), "dazn",
+                "FC Bayern München – 1. FC Union Berlin", "DAZN", null, ContentKind.LIVE_EVENT,
+                "sports/ics:c-3f9a1c2b7d4e:069e696917c4a665", Instant.EPOCH)));
+
+        ContentItem item = source.item("ics:c-3f9a1c2b7d4e:f62bf256356fa991").orElseThrow();
+        assertThat(item.playables()).containsExactly(new PlayableRef.AppLink(URI.create(DAZN_EVENT_LINK), "dazn"));
+        assertThat(source.item("ics:c-3f9a1c2b7d4e:069e696917c4a665")).as("a link made under the former id")
+                .get().extracting(ContentItem::id).isEqualTo("ics:c-3f9a1c2b7d4e:f62bf256356fa991");
     }
 
     @Test

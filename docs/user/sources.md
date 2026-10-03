@@ -424,7 +424,8 @@ offers to pin the actual link ("Paste the DAZN link for this event to open it di
 competition with no mapped service, the play sheet instead says "Home Control cannot open this
 event directly. Paste a link to it (for example the event's page on your streaming service) to
 pin it." Either way, the pasted link also appears under Pinned links so it can be reused or
-removed later.
+removed later. A calendar event keeps its pinned link when its kick-off moves: the link belongs to
+the event (its calendar UID), not to its start time.
 
 **Time zone.** Setup → Sports lets you choose the time zone kick-off times are shown in; it
 defaults to the container's `TZ`. Set `TZ` in your Compose file, or choose a zone in setup if you
