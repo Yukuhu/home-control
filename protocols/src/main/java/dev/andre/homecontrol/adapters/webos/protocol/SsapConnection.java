@@ -44,8 +44,6 @@ public final class SsapConnection implements AutoCloseable {
     private final HttpClient http;
     private final String host;
     private final SsapOptions options;
-    private final Duration connectTimeout;
-    private final Duration requestTimeout;
     private final Map<String, CompletableFuture<JsonNode>> pending = new ConcurrentHashMap<>();
     private final Map<String, Consumer<JsonNode>> subscriptions = new ConcurrentHashMap<>();
     private final BlockingQueue<JsonNode> registration = new LinkedBlockingQueue<>();
@@ -60,13 +58,12 @@ public final class SsapConnection implements AutoCloseable {
         this.http = http;
         this.host = host;
         this.options = options;
-        this.connectTimeout = options.connectTimeout();
-        this.requestTimeout = options.requestTimeout();
     }
 
     /**
-     * wss://host:securePort first, so the client key in the registration never crosses the LAN in clear; then
-     * ws://host:port, for older firmware without the TLS port.
+     * wss://host:securePort first, so the client key in the registration crosses the LAN encrypted to a TV that
+     * answers there; ws://host:port only when that fails, as on older firmware without the TLS port. A TLS port that
+     * drops packets instead of refusing costs up to twice the connect timeout before the plain one is tried.
      */
     public static SsapConnection open(HttpClient http, String host, SsapOptions options, Consumer<String> onClosed)
             throws IOException {
@@ -85,11 +82,11 @@ public final class SsapConnection implements AutoCloseable {
         };
         try {
             connection.socket = TextWebSocket.connect(http, DeviceUris.of("wss", host, options.securePort(), ""),
-                    connection.connectTimeout, listener);
+                    options.connectTimeout(), listener);
         } catch (IOException secureFailed) {
             try {
                 connection.socket = TextWebSocket.connect(http, DeviceUris.of("ws", host, options.port(), ""),
-                        connection.connectTimeout, listener);
+                        options.connectTimeout(), listener);
             } catch (IOException plainFailed) {
                 plainFailed.addSuppressed(secureFailed);
                 throw plainFailed;
@@ -107,9 +104,10 @@ public final class SsapConnection implements AutoCloseable {
     public String register(String clientKey, Duration promptTimeout) throws IOException {
         registration.clear();
         socket.send(SsapMessages.register(clientKey));
-        JsonNode answer = awaitRegistration(requestTimeout);
+        JsonNode answer = awaitRegistration(options.requestTimeout());
         if (answer == null) {
-            throw new IOException("The TV did not answer the registration within " + requestTimeout.toSeconds() + " seconds");
+            throw new IOException("The TV did not answer the registration within "
+                    + options.requestTimeout().toSeconds() + " seconds");
         }
         if (type(answer).equals("response") && answer.path(PAYLOAD_FIELD).path("pairingType").asString("").equals("PROMPT")) {
             if (clientKey != null) {
@@ -165,7 +163,8 @@ public final class SsapConnection implements AutoCloseable {
             if (path.isEmpty()) {
                 throw new SsapException("The TV did not offer a pointer input socket");
             }
-            pointer = TextWebSocket.connect(http, pointerSocket(path), connectTimeout, new TextWebSocket.Listener() {
+            URI address = pointerSocket(path);
+            pointer = TextWebSocket.connect(http, address, options.connectTimeout(), new TextWebSocket.Listener() {
                 @Override
                 public void onText(String text) {
                     // Pointer input is a write-only channel; incoming text has no protocol meaning.
@@ -223,9 +222,10 @@ public final class SsapConnection implements AutoCloseable {
         pending.put(id, answer);
         try {
             socket.send(SsapMessages.command(id, type, uri, payload));
-            return answer.get(requestTimeout.toMillis(), TimeUnit.MILLISECONDS);
+            return answer.get(options.requestTimeout().toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException _) {
-            throw new DeviceTimeoutException("No answer from the TV to " + uri + " within " + requestTimeout.toSeconds() + " seconds");
+            throw new DeviceTimeoutException("No answer from the TV to " + uri + " within "
+                    + options.requestTimeout().toSeconds() + " seconds");
         } catch (ExecutionException e) {
             throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause());
         } catch (InterruptedException e) {

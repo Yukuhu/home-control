@@ -25,7 +25,8 @@ import java.util.regex.Pattern;
 /**
  * The only way device-announced XML (descriptions, SCPDs) is fetched: from an address the device
  * announced itself from, over plain HTTP, with a hard size cap. Shared by {@link SsdpDiscovery}
- * and every adapter that re-reads a description on its own (UPnP renderers, Sonos).
+ * and every adapter that re-reads a description on its own (UPnP renderers, Sonos). Its
+ * {@link #send} also bounds other device APIs' answers in size and time (Samsung's REST and DIAL).
  */
 public final class DeviceFetch {
 
