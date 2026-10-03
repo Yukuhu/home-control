@@ -17,7 +17,8 @@ public class PinnedSetupSection extends SetupSection {
     }
 
     /** What the setup page shows about pinned shortcuts. */
-    public record View(List<PinView> pins, int maxPins) {
+    /** {@code problem}: why the pins cannot be read, or null. */
+    public record View(List<PinView> pins, int maxPins, String problem) {
     }
 
     private final ObjectProvider<PinnedShortcuts> shortcuts;
@@ -43,6 +44,6 @@ public class PinnedSetupSection extends SetupSection {
             views.add(new PinView(pin.id(), pin.title(), pin.subtitle(), pin.url().toString(),
                     i == 0, i == all.size() - 1));
         }
-        return new View(List.copyOf(views), props.maxPins());
+        return new View(List.copyOf(views), props.maxPins(), service.problem().orElse(null));
     }
 }

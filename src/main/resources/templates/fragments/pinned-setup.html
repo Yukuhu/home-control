@@ -3,6 +3,7 @@
     <h2>Pinned links</h2>
     <p class="error" role="alert" th:if="${pinnedError}" th:text="${pinnedError}">Could not pin that link</p>
     <p class="hint" th:if="${pinnedMessage}" th:text="${pinnedMessage}">Pinned</p>
+    <p class="error" role="alert" th:if="${pinned.problem()}" th:text="${pinned.problem()}">Could not read the pins</p>
 
     <p>Save a favorite film, show, or web link to your dashboard. Select it at home to open it on your TV.</p>
 
@@ -17,7 +18,7 @@
         <button type="submit" class="primary">Pin link</button>
     </form>
 
-    <p th:if="${#lists.isEmpty(pinned.pins())}">No pinned links yet.</p>
+    <p th:if="${#lists.isEmpty(pinned.pins()) and pinned.problem() == null}">No pinned links yet.</p>
     <ol class="pinned-list" th:unless="${#lists.isEmpty(pinned.pins())}">
         <li th:each="pin : ${pinned.pins()}">
             <span th:text="${pin.title()}">Stranger Things</span>
