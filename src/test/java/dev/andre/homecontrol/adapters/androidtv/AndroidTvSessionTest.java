@@ -285,6 +285,23 @@ class AndroidTvSessionTest {
     }
 
     @Test
+    void anUnpairedDeviceSaysItMustBePairedAgain() {
+        Device impostor = AndroidTvSettings.device("shield-2", "Impostor", "127.0.0.1", fakeDevice.port(),
+                "0000000000000000000000000000000000000000000000000000000000000000", Instant.now());
+
+        try (AndroidTvSession pinned = new AndroidTvSession(impostor,
+                ClientCertificate.generate("shield-remote"), TIMINGS, state -> {
+        }, null)) {
+            pinned.start();
+            await().until(() -> pinned.state().status() == DeviceStatus.UNPAIRED);
+
+            assertThatThrownBy(() -> pinned.execute(new Action.PressKey(RemoteKey.HOME)))
+                    .isInstanceOf(DeviceOfflineException.class)
+                    .hasMessage("Impostor must be paired again before it can be controlled");
+        }
+    }
+
+    @Test
     void reconnectsAfterTheDeviceHangsUp() throws Exception {
         session.start();
         await().until(() -> session.state().status() == DeviceStatus.CONNECTED);
