@@ -44,6 +44,8 @@ public class YouTubeSetupService {
     private final GoogleOAuthClient oauth;
     private final GoogleTokens tokens;
     private final YouTubeAuthorizationService authorization;
+    /** Serializes connecting and disconnecting; not the authorization's monitor, which the status must never wait on. */
+    private final Object changes = new Object();
     private final ObjectProvider<YouTubeAccount> account;
     private final QuotaLedger ledger;
     private final ObjectProvider<YouTubeContentSource> source;
@@ -91,7 +93,7 @@ public class YouTubeSetupService {
     }
 
     public YouTubeAuthorizationService.Status connect(ConnectRequest request, LoginContext context) {
-        synchronized (authorization) {
+        synchronized (changes) {
             saveClient(request, context);
             return authorization.start();
         }
@@ -100,7 +102,7 @@ public class YouTubeSetupService {
     /** {@code callback} is this server's sign-in callback as the browser reaches it. */
     public URI connectBrowser(ConnectRequest request, URI callback, LoginContext context) {
         YouTubeOAuthCallback.requireSupported(callback);
-        synchronized (authorization) {
+        synchronized (changes) {
             saveClient(request, context);
             return authorizeBrowser(callback, context);
         }
@@ -224,20 +226,18 @@ public class YouTubeSetupService {
     }
 
     public void disconnect() {
-        synchronized (authorization) {
+        synchronized (changes) {
             disconnectAccount();
         }
     }
 
+    /**
+     * Forgets the account here first, so a sign-in started meanwhile finds no client and a grant in flight is dropped;
+     * then asks Google to revoke the token, which may take its time.
+     */
     private void disconnectAccount() {
         authorization.cancel();
-        secrets.secret(YouTubeSettings.REFRESH_TOKEN).ifPresent(token -> {
-            try {
-                oauth.revoke(token);
-            } catch (YouTubeException e) {
-                log.info("Could not revoke the YouTube authorization at Google: {}", e.getMessage());
-            }
-        });
+        Optional<String> refreshToken = secrets.secret(YouTubeSettings.REFRESH_TOKEN);
         login.removeSecrets(List.of(YouTubeSettings.CLIENT_ID, YouTubeSettings.CLIENT_SECRET, YouTubeSettings.REFRESH_TOKEN));
         save(settings().withoutAccount());
         tokens.reset();
@@ -245,5 +245,12 @@ public class YouTubeSetupService {
         if (contentSource != null) {
             contentSource.forgetAccount();
         }
+        refreshToken.ifPresent(token -> {
+            try {
+                oauth.revoke(token);
+            } catch (YouTubeException e) {
+                log.info("Could not revoke the YouTube authorization at Google: {}", e.getMessage());
+            }
+        });
     }
 }

@@ -172,6 +172,35 @@ class YouTubeBrowserAuthorizationTest {
     }
 
     @Test
+    void theStatusAnswersWhileGoogleRevokesADisconnectedAccount() throws Exception {
+        secrets.putSecrets(Map.of(YouTubeSettings.REFRESH_TOKEN, "refresh-token"));
+        var revoking = new CountDownLatch(1);
+        var finishRevoke = new CountDownLatch(1);
+        var oauth = mock(GoogleOAuthClient.class);
+        doAnswer(call -> {
+            revoking.countDown();
+            assertThat(finishRevoke.await(5, TimeUnit.SECONDS)).isTrue();
+            return null;
+        }).when(oauth).revoke(anyString());
+        var random = new SecureRandom();
+        var login = new LoginService(secrets, new Argon2PasswordHasher(random), random);
+        var service = new YouTubeSetupService(secrets, login, settings, oauth, tokens, authorization,
+                mock(ObjectProvider.class), mock(QuotaLedger.class), mock(ObjectProvider.class),
+                mock(ObjectProvider.class), mock(ObjectProvider.class));
+        var disconnect = java.util.concurrent.CompletableFuture.runAsync(service::disconnect);
+        assertThat(revoking.await(5, TimeUnit.SECONDS)).isTrue();
+
+        try {
+            assertThat(java.util.concurrent.CompletableFuture.supplyAsync(service::authorizationStatus)
+                    .get(2, TimeUnit.SECONDS).state()).isEqualTo(YouTubeAuthorizationService.State.IDLE);
+        } finally {
+            finishRevoke.countDown();
+        }
+        disconnect.get(5, TimeUnit.SECONDS);
+        assertThat(tokens.hasRefreshToken()).isFalse();
+    }
+
+    @Test
     void aSignInCancelledWhileItsCodeIsExchangedStoresNothing() throws Exception {
         var release = new CountDownLatch(1);
         google.holdWhen("POST", "/oauth/token", request -> true, release,
