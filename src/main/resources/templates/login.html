@@ -19,8 +19,10 @@
     </form>
     <details class="auth-help">
         <summary>Forgot your password?</summary>
-        <p class="hint">Stop Home Control and delete <code>secrets.json</code> in its data folder to reset access.
-            This also removes saved content-source credentials, so you will need to reconnect your sources.</p>
+        <p class="hint">Start Home Control once with <code>HOME_CONTROL_RESET_LOGIN=true</code>. That start removes the
+            password and the content sources' credentials; the TV pairings stay. Then remove the setting again, set a
+            new password in Setup → Account and reconnect your sources. docs/user/security.md in the repository has
+            the details.</p>
     </details>
     <p class="auth-footer">Made for the place you call home.</p>
 </main>
