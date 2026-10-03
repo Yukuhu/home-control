@@ -1,8 +1,11 @@
 package dev.andre.homecontrol.security;
 
 import org.apache.catalina.valves.RemoteIpValve;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+import org.springframework.core.env.PropertyResolver;
 
 import java.net.InetAddress;
 import java.util.List;
@@ -16,21 +19,47 @@ import java.util.stream.Collectors;
  * {@code -Host}, {@code -Port}); nobody else may. Tomcat's {@link RemoteIpValve} then gives a forwarded request the
  * browser's address and the address the browser used, as the YouTube sign-in's callback needs, and a request
  * straight from the network keeps its own. The {@code Host} header itself, which the origin checks read, is left
- * as it came. Spring's own forwarded-header support trusts these headers from
- * any client, so the two cannot be combined.
+ * as it came. Spring Boot's own forwarded-header support believes these headers from every private address, so the
+ * two cannot be combined.
  */
 final class TrustedProxies implements WebServerFactoryCustomizer<TomcatServletWebServerFactory> {
 
+    private static final Logger log = LoggerFactory.getLogger(TrustedProxies.class);
+
     private final List<String> addresses;
 
-    TrustedProxies(List<String> proxies, String forwardHeadersStrategy) {
+    /**
+     * Refuses to start beside Spring Boot's own forwarded-header support, which believes these headers from every
+     * private address: its strategy setting, or Tomcat's remote-IP headers, which add Boot's valve as well.
+     */
+    TrustedProxies(List<String> proxies, PropertyResolver settings) {
         this.addresses = proxies == null ? List.of() : List.copyOf(proxies);
-        if (!addresses.isEmpty() && forwardHeadersStrategy != null && !forwardHeadersStrategy.isBlank()
-                && !"none".equalsIgnoreCase(forwardHeadersStrategy.strip())) {
-            throw new IllegalStateException("home-control.security.trusted-proxies (HOME_CONTROL_TRUSTED_PROXIES)"
-                    + " replaces server.forward-headers-strategy (SERVER_FORWARD_HEADERS_STRATEGY), which trusts"
-                    + " forwarded headers from every client; remove that setting");
+        String strategy = settings.getProperty("server.forward-headers-strategy", "none").strip();
+        boolean springForwards = !strategy.isEmpty() && !"none".equalsIgnoreCase(strategy);
+        if (addresses.isEmpty()) {
+            if (springForwards) {
+                log.warn("SERVER_FORWARD_HEADERS_STRATEGY={} believes X-Forwarded headers from every client, who can"
+                        + " so pick its own login limit; name the reverse proxy in HOME_CONTROL_TRUSTED_PROXIES and"
+                        + " remove that setting", strategy);
+            }
+            return;
         }
+        if (springForwards) {
+            throw refusal("server.forward-headers-strategy (SERVER_FORWARD_HEADERS_STRATEGY)");
+        }
+        for (String header : List.of("server.tomcat.remoteip.remote-ip-header",
+                "server.tomcat.remoteip.protocol-header")) {
+            String value = settings.getProperty(header);
+            if (value != null && !value.isBlank()) {
+                throw refusal(header);
+            }
+        }
+    }
+
+    private static IllegalStateException refusal(String setting) {
+        return new IllegalStateException("home-control.security.trusted-proxies (HOME_CONTROL_TRUSTED_PROXIES)"
+                + " replaces " + setting + ", which believes forwarded headers from every private address;"
+                + " remove that setting");
     }
 
     /** Exactly these addresses, as Tomcat reports a peer's address: {@code ::1} is {@code 0:0:0:0:0:0:0:1}. */

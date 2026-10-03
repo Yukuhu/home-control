@@ -98,7 +98,8 @@ class RememberedLoginsTest {
         assertThat(logins.versionOf(old)).isEmpty();
 
         logins.remember("v1");
-        assertThat(Files.readString(file)).as("an expired login is dropped at the next write").doesNotContain(sha256(old));
+        assertThat(Files.readString(file)).as("an expired login is dropped at the next write")
+                .doesNotContain(sha256(old));
     }
 
     @Test
