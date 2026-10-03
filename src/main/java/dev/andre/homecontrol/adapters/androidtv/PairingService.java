@@ -116,6 +116,9 @@ public class PairingService implements CodePairing {
             current.outcome().completeExceptionally(e);
             throw e;
         } finally {
+            // Whatever ended the check, a second submit waiting for its answer must not wait for good.
+            current.outcome().completeExceptionally(
+                    new IllegalStateException("The pairing check ended without an answer"));
             // The device shows a brand new code next time whatever happened here, so the
             // attempt is over either way. In a finally because an exception out of adopt()
             // would otherwise strand inProgress() at true forever, leaving the setup page

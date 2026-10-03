@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** A pairing code is good for one try: the form sends it once, however often its button is pressed. */
+/** A pairing code is good for one try: once the form is sent, its button is disabled. */
 class PairingCodeE2eTest extends E2eApplicationTest {
 
     @Autowired
@@ -33,7 +33,7 @@ class PairingCodeE2eTest extends E2eApplicationTest {
             assertThat(page).hasURL(Pattern.compile(".*/$"));
             assertThat(codePairing.submits()).isEqualTo(1);
         } finally {
-            codePairing.answer();
+            codePairing.reset();
         }
     }
 }

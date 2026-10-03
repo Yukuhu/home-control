@@ -29,6 +29,12 @@ public class FakeCodePairing implements CodePairing {
         answer.countDown();
     }
 
+    /** No pairing waits any more, so a test that failed half way leaves no code form behind. */
+    public void reset() {
+        inProgress = false;
+        answer.countDown();
+    }
+
     public int submits() {
         return submits.get();
     }
