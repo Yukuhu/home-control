@@ -130,7 +130,7 @@ public class TheSportsDbSchedule implements SportsFeed {
         refreshDue(settings.competitions(), dates, new Round(now, zone));
         // A key change clears what this pass fetched, and the refresh it asks for is skipped while this one runs: a
         // pass that a key change overtook starts over with the new key instead of publishing.
-        return publish(dates, started).orElseGet(this::pass);
+        return publish(dates, zone, started).orElseGet(this::pass);
     }
 
     /**
@@ -291,7 +291,7 @@ public class TheSportsDbSchedule implements SportsFeed {
      * The result for the competitions configured now, from the cache; empty when a key change came since
      * {@code started}.
      */
-    private Optional<FeedResult> publish(Set<LocalDate> dates, long started) {
+    private Optional<FeedResult> publish(Set<LocalDate> dates, ZoneId zone, long started) {
         synchronized (lock) {
             // Checked in the same step as the cache is read, so a key change either waits for this or is seen here.
             if (generation.get() != started) {
@@ -304,7 +304,7 @@ public class TheSportsDbSchedule implements SportsFeed {
             for (SportsSettings.CompetitionEntry competition : settings.competitions()) {
                 boolean hasEntry = false;
                 for (LocalDate date : dates) {
-                    Entry entry = cache.get(cacheKey(competition.leagueId(), date));
+                    Entry entry = inZone(cacheKey(competition.leagueId(), date), zone);
                     if (entry != null) {
                         hasEntry = true;
                         allEvents.addAll(entry.events());
@@ -327,14 +327,20 @@ public class TheSportsDbSchedule implements SportsFeed {
         if (!ranOnce) {
             events();
         }
-        for (Entry entry : cache.values()) {
-            for (SportsEvent event : entry.events()) {
-                if (event.itemId().equals(itemId)) {
-                    return Optional.of(event);
-                }
-            }
-        }
-        return Optional.empty();
+        ZoneId zone = zones.effective();
+        return cache.values().stream().filter(entry -> entry.zone().equals(zone))
+                .flatMap(entry -> entry.events().stream())
+                .filter(event -> event.itemId().equals(itemId))
+                .findFirst();
+    }
+
+    /**
+     * A cached day, unless its all-day events were placed in a zone the household no longer uses: a fetch after a
+     * zone change that fails leaves the day empty rather than on the wrong local day.
+     */
+    private Entry inZone(String cacheKey, ZoneId zone) {
+        Entry entry = cache.get(cacheKey);
+        return entry != null && entry.zone().equals(zone) ? entry : null;
     }
 
     public Optional<FeedStatus> status(String leagueId) {
@@ -345,11 +351,12 @@ public class TheSportsDbSchedule implements SportsFeed {
             return Optional.empty();
         }
         Instant now = clock.instant();
-        Set<LocalDate> dates = utcDates(now, zones.effective());
+        ZoneId zone = zones.effective();
+        Set<LocalDate> dates = utcDates(now, zone);
         Instant latest = null;
         int events = 0;
         for (LocalDate date : dates) {
-            Entry entry = cache.get(cacheKey(leagueId, date));
+            Entry entry = inZone(cacheKey(leagueId, date), zone);
             if (entry != null) {
                 events += entry.events().size();
                 if (latest == null || entry.fetchedAt().isAfter(latest)) {
