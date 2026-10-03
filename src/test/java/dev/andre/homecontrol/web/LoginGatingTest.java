@@ -267,6 +267,17 @@ class LoginGatingTest extends FullAppTest {
                 .andExpect(redirectedUrl("/login?next=%2F"));
     }
 
+    /** What a page asks when its live updates stopped: is the login gone, or only the server? */
+    @Test
+    void theSessionAnswersWhetherThisBrowserMayStillSeeTheApp() throws Exception {
+        mockMvc.perform(get("/session")).andExpect(status().isNoContent());
+
+        storeAFirstSecret();
+        mockMvc.perform(get("/session")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/session").session(loggedIn())).andExpect(status().isNoContent());
+        mockMvc.perform(get("/session").cookie(rememberedLogin())).andExpect(status().isNoContent());
+    }
+
     @Test
     void theLoginPageLetsARememberedBrowserStraightThrough() throws Exception {
         storeAFirstSecret();

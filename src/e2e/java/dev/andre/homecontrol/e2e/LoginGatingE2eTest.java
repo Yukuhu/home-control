@@ -3,6 +3,8 @@ package dev.andre.homecontrol.e2e;
 import com.microsoft.playwright.APIRequestContext;
 import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Route;
+import com.microsoft.playwright.assertions.PageAssertions;
 import com.microsoft.playwright.options.AriaRole;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
@@ -19,6 +21,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
@@ -159,6 +162,58 @@ class LoginGatingE2eTest extends E2eApplicationTest {
             org.assertj.core.api.Assertions.assertThat(api.get(baseUrl() + "/rails").status()).isEqualTo(401);
             org.assertj.core.api.Assertions.assertThat(
                     api.get(baseUrl() + "/devices/living/route-preview?source=e2e&item=clip-1").status()).isEqualTo(401);
+        }
+    }
+
+    private static void logIn(Page page) {
+        page.navigate("/?device=living");
+        page.locator("input[name=password]").fill(PASSWORD);
+        page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Log in")).click();
+        assertThat(page).hasURL(Pattern.compile(".*device=living.*"));
+    }
+
+    /**
+     * A reverse proxy answers 502 while the server restarts. The browser gives that stream up for good, so the page
+     * opens a new one, and live updates come back without a reload.
+     */
+    @BrowserTest
+    void aStreamAnsweredWithAnErrorStatusIsOpenedAgain(String browser) {
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+            AtomicInteger refused = new AtomicInteger();
+            page.route("**/events", route -> {
+                if (refused.getAndIncrement() == 0) {
+                    route.fulfill(new Route.FulfillOptions().setStatus(502).setBody("Bad Gateway"));
+                } else {
+                    route.resume();
+                }
+            });
+            logIn(page);
+
+            assertThat(page.locator("#connection-status")).hasText("Live updates");
+            org.assertj.core.api.Assertions.assertThat(refused.get()).as("the stream that got a 502, and the new one")
+                    .isGreaterThanOrEqualTo(2);
+            fakeDevices.push("living", new DeviceState(DeviceStatus.CONNECTED, true, "com.example.launcher",
+                    0, 0, false, Instant.now()));
+            assertThat(page.locator("#status-living")).hasText("CONNECTED");
+        }
+    }
+
+    /** A new password ends this browser's login: its stream is closed, and the page goes to the login page. */
+    @BrowserTest
+    void aPageWhoseLoginEndedGoesToTheLoginPage(String browser) {
+        String next = "another household password";
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+            logIn(page);
+            assertThat(page.locator("#connection-status")).hasText("Live updates");
+
+            login.changePassword(PASSWORD, next, next, new RequestLoginContext(new MockHttpServletRequest(), login));
+
+            assertThat(page).hasURL(Pattern.compile(".*/login\\?next=%2F%3Fdevice%3Dliving$"),
+                    new PageAssertions.HasURLOptions().setTimeout(10_000));
+        } finally {
+            login.changePassword(next, PASSWORD, PASSWORD, new RequestLoginContext(new MockHttpServletRequest(), login));
         }
     }
 
