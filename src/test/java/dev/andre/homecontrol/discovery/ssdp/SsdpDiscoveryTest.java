@@ -182,6 +182,37 @@ class SsdpDiscoveryTest {
                         .containsExactly("uuid:after-garbage::" + LG_TARGET));
     }
 
+    /** One datagram, from any host on the LAN, must never end discovery until the next restart. */
+    @Test
+    void noDatagramAndNoListenerEndsTheReceiving() throws IOException {
+        discovery.addListener("urn:x:1", new SsdpListener() {
+            @Override
+            public void alive(SsdpService service) {
+                if (service.usn().startsWith("uuid:breaks-the-listener")) {
+                    throw new IllegalStateException("a listener with a bug");
+                }
+            }
+
+            @Override
+            public void byebye(SsdpService service) {
+                // not needed here
+            }
+        });
+        String alive = "NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\n"
+                + "USN: %s::urn:x:1\r\nCACHE-CONTROL: max-age=%s\r\n\r\n";
+
+        sendUdp(alive.formatted("uuid:lives-for-ever", "99999999999999999999"));
+        sendUdp(alive.formatted("uuid:breaks-the-listener", "120"));
+        sendUdp(alive.formatted("uuid:after-both", "120"));
+
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                assertThat(discovery.services("urn:x:1")).extracting(SsdpService::usn)
+                        .contains("uuid:lives-for-ever::urn:x:1", "uuid:after-both::urn:x:1"));
+        clock.advance(Duration.ofDays(1));
+        assertThat(discovery.services("urn:x:1")).extracting(SsdpService::usn)
+                .doesNotContain("uuid:lives-for-ever::urn:x:1");
+    }
+
     @Test
     void expiresAServiceAfterItsMaxAge() throws IOException {
         responder.answer(LG_TARGET, FakeSsdpResponder.fixture("lg-search-response.txt", "127.0.0.1", httpPort()));
