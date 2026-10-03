@@ -82,7 +82,9 @@ public final class SecretKeySource {
             case SOURCE_KEY_FILE -> {
                 if (!Files.exists(keyFile)) {
                     throw new StorageException("secrets.json is encrypted with " + keyFile + ", which is missing;"
-                            + " restore that file, or delete secrets.json and reconnect your content sources", null);
+                            + " restore that file from a backup. Without it every stored secret is lost, the TV"
+                            + " pairings and the keystore's password included: to start over, delete secrets.json and"
+                            + " keystore.p12, then pair the TVs again and reconnect your content sources", null);
                 }
                 yield readKeyFile();
             }
