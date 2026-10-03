@@ -110,6 +110,26 @@ class TheSportsDbScheduleTest {
     }
 
     @Test
+    void aTimeZoneChangeWhoseFetchesFailKeepsNoDaysPlacedInTheOldZone() {
+        schedule.events();
+        assertThat(schedule.find("tsdb:2508360")).isPresent();
+
+        given(zones.effective()).willReturn(ZoneId.of("Europe/London"));
+        for (String league : List.of("4331", "4328")) {
+            for (String day : List.of("2026-09-18", "2026-09-19")) {
+                server.respondJson("eventsday.php", java.util.Map.of("d", day, "l", league), 500, "{}");
+            }
+        }
+        FeedResult result = schedule.events();
+
+        // An all-day fixture placed in Berlin would be judged against London's today.
+        assertThat(result.events()).isEmpty();
+        assertThat(result.errors()).hasSize(2);
+        assertThat(schedule.find("tsdb:2508360")).isEmpty();
+        assertThat(schedule.status("4331")).hasValueSatisfying(status -> assertThat(status.events()).isZero());
+    }
+
+    @Test
     void anUnexpectedFailureFailsOnlyItsCompetition() {
         TheSportsDbClient failing = mock(TheSportsDbClient.class);
         given(failing.eventsDay(any(), any(), eq("4331"))).willThrow(new IllegalStateException("an unexpected answer"));
