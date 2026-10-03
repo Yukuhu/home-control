@@ -283,7 +283,9 @@ mirror if that matters to you. No screen shows a personalised Netflix, Prime Vid
 the trending rail is always labelled as coming from TMDB, and the TMDB credential never reaches
 the browser, a log line, or `sources.json` (it lives only in encrypted `secrets.json`, the same
 as other content sources' secrets). Pinned links are stored, unencrypted (they are not secret),
-in `/data/pinned.json`.
+in `/data/pinned.json`. If that file is damaged, or was written by a newer Home Control, the
+Pinned rail and **Setup → Pinned links** say so, and pinning is refused until it is fixed or
+deleted; the rest of the dashboard keeps working.
 
 *This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability
 data by JustWatch.*

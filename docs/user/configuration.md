@@ -21,6 +21,8 @@ Every setting, as a Spring property or an environment variable.
 | `home-control.tizen.client-name` | `Home Control` | Name shown in the Samsung Allow prompt |
 | `home-control.tizen.poll-interval` | `5s` | How often Samsung state is polled |
 | `home-control.wake-on-lan.broadcast-address` | `255.255.255.255` | Use the subnet broadcast on multi-homed hosts |
+| `HOME_CONTROL_LOCALE` | `de-DE` | Language of content titles until one is chosen under **Setup → Dashboard**: a language tag written exactly as `de-DE` or `en-US` (not `en-us` or `en_US`); any other value stops the app at startup with a message naming it |
+| `HOME_CONTROL_REGION` | `DE` | Country for streaming availability until one is chosen under **Setup → Dashboard**: two capital letters such as `DE` or `US`; any other value stops the app at startup |
 | `home-control.events.heartbeat-interval` | `25s` | How often the dashboard's live updates send a keep-alive, so a reverse proxy does not close them; at least `1s`, and it cannot be switched off |
 | `home-control.deep-link-test.youtube-url` | Big Buck Bunny on YouTube | Video the test button opens |
 | `home-control.deep-link-test.timeout` | `10s` | How long the test button watches for the app to change (the setup page says so) |
