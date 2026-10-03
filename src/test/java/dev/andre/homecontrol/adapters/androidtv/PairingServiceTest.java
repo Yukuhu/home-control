@@ -16,6 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -23,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -177,6 +179,7 @@ class PairingServiceTest {
 
         // A double click: the same form again while the first is still being checked.
         CompletableFuture<CodePairingOutcome> second = CompletableFuture.supplyAsync(() -> service.submit(code));
+        await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2)).until(() -> !second.isDone());
         release.countDown();
 
         assertThat(first.get(5, TimeUnit.SECONDS)).isInstanceOf(CodePairingOutcome.Paired.class);
@@ -194,7 +197,8 @@ class PairingServiceTest {
         verify(enrollment, times(1)).adopt(any());
         assertThat(service.submit("A1B2C3"))
                 .as("another code is not this attempt's")
-                .isEqualTo(new CodePairingOutcome.Failed("No pairing is in progress; start again from the device list"));
+                .isEqualTo(new CodePairingOutcome.Failed(
+                        "No pairing is in progress; start again from the device list"));
     }
 
     @Test

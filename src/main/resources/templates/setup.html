@@ -80,7 +80,8 @@
         <ul>
             <li th:each="device : ${discovered}">
                 <form method="post"
-                      th:action="${promptAdapterIds.contains(device.adapterId())} ? @{/setup/prompt-pair} : @{/setup/pair}">
+                      th:action="${promptAdapterIds.contains(device.adapterId())} ? @{/setup/prompt-pair} : @{/setup/pair}"
+                      data-submit-once>
                     <input type="hidden" name="adapter" th:value="${device.adapterId()}">
                     <input type="hidden" name="host" th:value="${device.host()}">
                     <input type="hidden" name="name" th:value="${device.name()}">
@@ -111,7 +112,7 @@
         <details class="manual-device" th:if="${codePairing}">
         <summary>Add an Android TV by address</summary>
         <p class="hint">Find the IP address in your TV's network settings.</p>
-        <form method="post" th:action="@{/setup/pair}">
+        <form method="post" th:action="@{/setup/pair}" data-submit-once>
             <label>IP address
                 <input name="host" placeholder="192.168.1.50" autocomplete="off" spellcheck="false" required>
             </label>
@@ -125,7 +126,7 @@
         <th:block th:if="${!#lists.isEmpty(promptPairings)}">
             <details class="manual-device">
             <summary>Add another smart TV by address</summary>
-            <form method="post" th:action="@{/setup/prompt-pair}">
+            <form method="post" th:action="@{/setup/prompt-pair}" data-submit-once>
                 <label>TV type
                     <select name="adapter" aria-label="TV type">
                         <option th:each="pairing : ${promptPairings}" th:value="${pairing.adapterId()}"

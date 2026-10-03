@@ -6,7 +6,10 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
-/** Adds the fake device adapter and content source the browser tests drive to the real application context. */
+/**
+ * Adds the fake device adapter, content source and code pairing the browser tests drive to the real application
+ * context.
+ */
 @TestConfiguration
 public class E2eFakesConfiguration {
 

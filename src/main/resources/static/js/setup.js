@@ -4,14 +4,25 @@ import { initPwa } from "./pwa.js";
 
 initPwa();
 
-// A pairing code is good for one try: a second click would send it again while the TV still checks the first.
-for (const form of document.querySelectorAll("form[data-submit-once]")) {
-    form.addEventListener("submit", () => {
-        for (const button of form.querySelectorAll("button[type='submit']")) {
-            button.disabled = true;
-        }
-    });
+// Pairing forms send once: a second click would start the pairing again, or send the code again, while the TV
+// still answers the first.
+const sendOnce = document.querySelectorAll("form[data-submit-once]");
+
+function setSubmitButtons(form, disabled) {
+    for (const button of form.querySelectorAll("button[type='submit']")) {
+        button.disabled = disabled;
+    }
 }
+
+for (const form of sendOnce) {
+    form.addEventListener("submit", () => setSubmitButtons(form, true));
+}
+// A page the browser brings back from its cache, after Back, can be sent again.
+window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+        sendOnce.forEach((form) => setSubmitButtons(form, false));
+    }
+});
 
 function showUnderTheButton(event, text) {
     const button = event.detail.elt;
