@@ -43,10 +43,11 @@ import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.RECEIV
 /**
  * One Cast receiver's live connection. Connection, receiver and media state change only on the session's loop, and
  * the {@link Reconnector} retries with a growing backoff. A connection counts once the receiver has answered: until
- * its first RECEIVER_STATUS the attempt stays pending, so a receiver that hangs up at once backs off like one that
- * cannot be reached. Commands run on the caller's thread and fail at once when
- * they cannot be sent (nothing is queued). The session follows the media channel of whichever app is in front, so
- * casts started from a phone show up as now playing too. Cast has no pairing, so there is no UNPAIRED state.
+ * its first RECEIVER_STATUS, which must come within the command timeout, the attempt stays pending, so a receiver
+ * that hangs up at once backs off like one that cannot be reached. Commands run on the caller's thread and fail at
+ * once when they cannot be sent (nothing is queued). The session follows the media channel of whichever app is in
+ * front, so casts started from a phone show up as now playing too. Cast has no pairing, so there is no UNPAIRED
+ * state.
  */
 public class CastSession implements DeviceHandle, ReceiverApps {
 
@@ -62,6 +63,8 @@ public class CastSession implements DeviceHandle, ReceiverApps {
     private final SessionLoop loop;
     private final Reconnector reconnector;
     private final ConnectionSlot<CastConnection> connection;
+    /** Ends a connection whose receiver has not answered in time; its own slot, as the Reconnector owns the loop's. */
+    private final SessionLoop.Timer firstAnswer;
     private final Runnable onClosed;
 
     // Immutable record replaced wholesale on the loop; command threads only read it.
@@ -89,6 +92,7 @@ public class CastSession implements DeviceHandle, ReceiverApps {
         this.reconnector = new Reconnector(loop, new Backoff(timings.reconnectInitialDelay(),
                 timings.reconnectMaxDelay()), this::connect);
         this.connection = new ConnectionSlot<>("cast-session-" + device.id());
+        this.firstAnswer = loop.timer();
         this.onClosed = onClosed;
     }
 
@@ -216,13 +220,13 @@ public class CastSession implements DeviceHandle, ReceiverApps {
                     timings.heartbeatInterval(),
                     timings.staleTimeout(),
                     link);
-            opened.send(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus()); // the reply arrives via Link
+            opened.send(RECEIVER, PLATFORM_RECEIVER_ID, getStatus(opened)); // the reply arrives via Link
             link.own = opened;
             if (!connection.set(opened)) {
                 return Reconnector.Outcome.STOP; // closed meanwhile; the slot closed the connection
             }
+            firstAnswer.schedule(link::unanswered, timings.commandTimeout());
             return Reconnector.Outcome.PENDING; // connected once the receiver answers
-
         } catch (IOException e) {
             if (opened != null) {
                 opened.close();
@@ -248,11 +252,16 @@ public class CastSession implements DeviceHandle, ReceiverApps {
         }
     }
 
-    /** The reply arrives via Link like any other status; the id only keeps strict receivers happy. */
+    /** The reply arrives via Link like any other status. */
     private static void sendMediaGetStatus(CastConnection current, String transportId) throws IOException {
+        current.send(MEDIA, transportId, getStatus(current));
+    }
+
+    /** The id only keeps strict receivers happy: the answer is matched by its type. */
+    private static ObjectNode getStatus(CastConnection current) {
         ObjectNode getStatus = CastPayloads.getStatus();
         getStatus.put("requestId", current.nextRequestId());
-        current.send(MEDIA, transportId, getStatus);
+        return getStatus;
     }
 
     @Override
@@ -291,6 +300,7 @@ public class CastSession implements DeviceHandle, ReceiverApps {
         private void onReceiverStatus(ReceiverStatus status) {
             receiver = status;
             if (publisher.current().status() == DeviceStatus.CONNECTING) {
+                firstAnswer.cancel();
                 reconnector.connected();
             }
             Optional<ReceiverStatus.ReceiverApp> foreground = status.foregroundApp();
@@ -340,6 +350,18 @@ public class CastSession implements DeviceHandle, ReceiverApps {
                 case IDLE -> PlaybackState.IDLE;
                 case BUFFERING -> PlaybackState.BUFFERING;
             };
+        }
+
+        /** The receiver took the connection but never said what it runs: drop it, and back off as after any loss. */
+        private void unanswered() {
+            if (!current() || publisher.current().status() != DeviceStatus.CONNECTING) {
+                return;
+            }
+            log.debug("Cast receiver {} did not answer its status request; reconnecting", device.id());
+            connection.takeIf(own);
+            own.close();
+            publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED));
+            reconnector.lost();
         }
 
         private void handleDisconnect(CastDisconnectCause cause) {

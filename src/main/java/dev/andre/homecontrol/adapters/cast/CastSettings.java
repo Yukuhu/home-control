@@ -38,7 +38,7 @@ public record CastSettings(int port, String castId, String model, String host) {
         return device.adapterSettings(ADAPTER_ID).getOrDefault(HOST_KEY, device.host());
     }
 
-    /** Whether {@code found} is the receiver: by its mDNS {@code id}, which survives an address change, else by address. */
+    /** Whether {@code found} is the receiver: by mDNS {@code id}, which survives an address change, else by address. */
     static boolean isReceiver(String castId, String host, DiscoveredDevice found) {
         return (castId != null && castId.equals(found.attributes().get("id"))) || host.equalsIgnoreCase(found.host());
     }
