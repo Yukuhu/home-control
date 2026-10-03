@@ -19,7 +19,7 @@ generated with it and kept encrypted in `data/secrets.json`, unless you set
 directory mounted persistently. LG and Samsung TVs' pairing keys are kept in `data/secrets.json`
 too.
 
-A Shield that was switched off or lost the network is reconnected as soon as it announces
+An Android TV that was switched off or lost the network is reconnected as soon as it announces
 itself over mDNS again, instead of at the next retry, which can be up to a minute away.
 
 Each device's current foreground package is shown on its chip in the device strip as
@@ -142,8 +142,9 @@ plays, so always check the screen.
 
 **Networking.** Discovery uses SSDP (UDP 1900 multicast) and Wake-on-LAN uses UDP broadcasts;
 both need `network_mode: host`. On bridge networking pair by address; switching the TV on may
-not work. An LG TV is reached over TLS on port 3001, so its pairing key never crosses the
-network in clear; older firmware without that port is reached on port 3000.
+not work. An LG TV is reached over TLS on port 3001, so its pairing key crosses the network
+encrypted to a TV that answers there; only when that fails, as on older firmware without the
+port, is it reached on the plain port 3000.
 
 Switch a module off with `HOME_CONTROL_WEBOS_ENABLED=false` or `HOME_CONTROL_TIZEN_ENABLED=false`.
 An LG TV that forgot this server (factory reset, stored key rejected) shows **UNPAIRED**; pair it
