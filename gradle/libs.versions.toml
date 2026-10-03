@@ -13,7 +13,7 @@ jackson = "3.2.3"
 # it, but the dependency graph reports it, so Dependabot alerts on it and then fails trying to
 # update a version that no build file declares. Remove this once the plugin's commons-compress
 # depends on commons-lang3 3.18.0 or later.
-commons-lang3 = "3.20.0"
+commons-lang3 = "3.21.0"
 # protobuf-java and the protoc compiler must match: generated code targets its runtime.
 protobuf = "4.36.2"
 protobuf-plugin = "0.10.0"
