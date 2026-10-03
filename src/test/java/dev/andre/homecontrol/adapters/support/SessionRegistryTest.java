@@ -24,12 +24,21 @@ class SessionRegistryTest {
     }
 
     @Test
+    void anOpenSessionIsFoundByItsDevice() {
+        Session kitchen = sessions.open("tv-1", onClose -> new Session("192.0.2.10", onClose));
+
+        assertThat(sessions.get("tv-1")).contains(kitchen);
+        assertThat(sessions.get("tv-2")).isEmpty();
+    }
+
+    @Test
     void aClosedSessionIsGone() {
         Session session = sessions.open("tv-1", onClose -> new Session("192.0.2.10", onClose));
 
         session.close();
 
         assertThat(sessions.matching(any -> true)).isEmpty();
+        assertThat(sessions.get("tv-1")).isEmpty();
     }
 
     @Test

@@ -44,8 +44,9 @@ public class BluetoothConfiguration {
     @Bean
     public BluetoothPairingService bluetoothPairingService(BluezClient bluez, DeviceQueries devices,
                                                            DeviceEnrollment enrollment,
-                                                           BluetoothProperties properties) {
-        return new BluetoothPairingService(bluez, devices, enrollment, properties);
+                                                           BluetoothProperties properties,
+                                                           BluetoothSpeakerAdapter speakers) {
+        return new BluetoothPairingService(bluez, devices, enrollment, properties, speakers);
     }
 
     @Bean

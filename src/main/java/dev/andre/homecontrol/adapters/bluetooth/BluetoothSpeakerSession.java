@@ -48,6 +48,7 @@ public class BluetoothSpeakerSession implements DeviceHandle {
     private final AudioDeviceResolver audioDevices;
     private final StatePublisher publisher;
     private final SessionLoop loop;
+    private final Runnable onClosed;
     private final Object commands = new Object();
 
     private volatile int volume;
@@ -57,20 +58,23 @@ public class BluetoothSpeakerSession implements DeviceHandle {
     private boolean lookedOnce;                // loop thread only
 
     public BluetoothSpeakerSession(Device device, BluetoothProperties properties, BluezClient bluez, MpvPlayer player,
-                                   AudioDeviceResolver audioDevices, Consumer<DeviceState> onChange) {
-        this(device, properties, BluetoothTimings.from(properties), bluez, player, audioDevices, onChange);
+                                   AudioDeviceResolver audioDevices, Consumer<DeviceState> onChange, Runnable onClosed) {
+        this(device, properties, BluetoothTimings.from(properties), bluez, player, audioDevices, onChange,
+                new SessionLoop("bluetooth-" + device.id()), onClosed);
     }
 
     BluetoothSpeakerSession(Device device, BluetoothProperties properties, BluetoothTimings timings, BluezClient bluez,
                             MpvPlayer player, AudioDeviceResolver audioDevices, Consumer<DeviceState> onChange) {
-        this(device, properties, timings, bluez, player, audioDevices, onChange, new SessionLoop("bluetooth-" + device.id()));
+        this(device, properties, timings, bluez, player, audioDevices, onChange, new SessionLoop("bluetooth-" + device.id()),
+                () -> { });
     }
 
-    // The collaborators of BluetoothSpeakerAdapter.connect(), plus the loop, injectable so a test can close it under a command.
+    // The collaborators of BluetoothSpeakerAdapter.connect() and the callback it hands over, plus the loop, injectable
+    // so a test can close it under a command.
     @SuppressWarnings("java:S107")
     BluetoothSpeakerSession(Device device, BluetoothProperties properties, BluetoothTimings timings, BluezClient bluez,
                             MpvPlayer player, AudioDeviceResolver audioDevices, Consumer<DeviceState> onChange,
-                            SessionLoop loop) {
+                            SessionLoop loop, Runnable onClosed) {
         this.device = device;
         this.settings = BluetoothSettings.of(device);
         this.properties = properties;
@@ -81,6 +85,7 @@ public class BluetoothSpeakerSession implements DeviceHandle {
         this.publisher = new StatePublisher(device.id(), DeviceState.initial(), onChange);
         this.volume = properties.defaultVolume();
         this.loop = loop;
+        this.onClosed = onClosed;
     }
 
     public void start() {
@@ -103,10 +108,7 @@ public class BluetoothSpeakerSession implements DeviceHandle {
                 case Action.PlayMedia play -> play(play);
                 case Action.Pause _ -> pause(true);
                 case Action.Resume _ -> pause(false);
-                case Action.Stop _ -> {
-                    player.stop();
-                    title = null;
-                }
+                case Action.Stop _ -> stopPlayback();
                 case Action.SetVolume(var level) -> {
                     volume = level;
                     whilePlaying("change the volume", () -> player.volume(level));
@@ -130,6 +132,15 @@ public class BluetoothSpeakerSession implements DeviceHandle {
         publisher.close();
         loop.close();
         player.close();
+        onClosed.run();
+    }
+
+    /** What Stop does; the setup page's Disconnect does it first, so the stream cannot move to the host's own output. */
+    void stopPlayback() {
+        synchronized (commands) {
+            player.stop();
+            title = null;
+        }
     }
 
     /** Forces an immediate re-check instead of waiting for the next scheduled poll (setup page actions). */

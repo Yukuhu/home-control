@@ -508,7 +508,7 @@ class BluetoothSpeakerSessionTest {
                 properties.playerStartTimeout(), properties.loadTimeout(), properties.commandTimeout());
         AudioDeviceResolver resolver = new AudioDeviceResolver(launcher, properties.audioDeviceTemplate(),
                 properties.playerStartTimeout());
-        session = new BluetoothSpeakerSession(device, properties, TIMINGS, bluez, player, resolver, states, loop);
+        session = new BluetoothSpeakerSession(device, properties, TIMINGS, bluez, player, resolver, states, loop, () -> { });
         session.start();
         await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
 
