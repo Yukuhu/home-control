@@ -187,6 +187,29 @@ class SubscriptionsFeedTest {
     }
 
     @Test
+    void aFailedChannelLookupIsAskedAgainNotForgotten() {
+        // Right after connecting: the subscriptions arrive, then looking up their uploads fails once.
+        fake.respondWhen("GET", "/youtube/v3/channels", r -> "contentDetails".equals(r.query().get("part")),
+                FakeGoogleServer.Canned.json(500, "{}"), FakeGoogleServer.Canned.fixture(200, "channels-uploads.json"));
+        SubscriptionsFeed feed = feed(api());
+        assertThatThrownBy(feed::refresh).isInstanceOf(YouTubeException.class);
+
+        clock.advance(Duration.ofMinutes(15));
+
+        assertThat(feed.refresh()).isNotEmpty();
+        assertThat(fake.requests("/youtube/v3/channels").stream()
+                .filter(r -> "contentDetails".equals(r.query().get("part")))).hasSize(2);
+    }
+
+    @Test
+    void nothingPolledIsAFailureNotAQuietWeek() {
+        fake.respondWhen("GET", "/youtube/v3/playlistItems", r -> true, FakeGoogleServer.Canned.json(500, "{}"));
+        SubscriptionsFeed feed = feed(api());
+
+        assertThatThrownBy(feed::refresh).isInstanceOf(YouTubeException.class);
+    }
+
+    @Test
     void aChannelWithoutUploadsIsEmptyNotAnError() {
         fake.respondWhen("GET", "/youtube/v3/playlistItems", r -> "UULA_DiR1FfKNvjuUpBHmylQ".equals(r.query().get("playlistId")),
                 FakeGoogleServer.Canned.fixture(404, "error-playlist-not-found.json"));
