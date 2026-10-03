@@ -275,6 +275,15 @@ public class TheSportsDbSchedule implements SportsFeed {
             }
             log.warn("TheSportsDB fixtures for competition {} on {} failed ({})",
                     competition.leagueId(), date, e.kind());
+        } catch (RuntimeException e) {
+            // Not one of TheSportsDB's own failures: it fails this competition's day, not every sports rail.
+            synchronized (lock) {
+                if (wanted(competition, started)) {
+                    lastFailure.put(cacheKey, new Failure(round.now, false, started));
+                    errors.put(competition.leagueId(), "TheSportsDB's fixtures could not be read");
+                }
+            }
+            log.warn("Reading TheSportsDB fixtures for competition {} on {} failed", competition.leagueId(), date, e);
         }
     }
 

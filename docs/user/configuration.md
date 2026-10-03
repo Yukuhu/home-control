@@ -63,13 +63,13 @@ Every setting, as a Spring property or an environment variable.
 | `HOME_CONTROL_SPORTS_RAIL_SIZE` | `30` | Items kept in the "Live now / Today" rail |
 | `HOME_CONTROL_SPORTS_MAX_CALENDARS` | `10` | Calendars a household can add |
 | `HOME_CONTROL_SPORTS_MAX_COMPETITIONS` | `10` | TheSportsDB competitions a household can add |
-| `HOME_CONTROL_SPORTS_DEFAULT_EVENT_DURATION` | `120m` | Assumed length when a calendar event has no end time or duration |
-| `HOME_CONTROL_SPORTS_CALENDAR_REFRESH` | `6h` | How often each calendar is refetched |
+| `HOME_CONTROL_SPORTS_DEFAULT_EVENT_DURATION` | `120m` | Assumed length when a calendar event has no end time or duration; a bare number is minutes |
+| `HOME_CONTROL_SPORTS_CALENDAR_REFRESH` | `6h` | How often each calendar is refetched; a bare number is hours |
 | `HOME_CONTROL_SPORTS_CALENDAR_ALLOW_LOOPBACK` | `false` | Allow calendar links that resolve to this machine's own address (only if a calendar is served here) |
 | `HOME_CONTROL_SPORTS_THESPORTSDB_ENABLED` | `true` | Turn TheSportsDB fixtures off; calendars keep working |
 | `HOME_CONTROL_SPORTS_THESPORTSDB_API_BASE_URL` | `https://www.thesportsdb.com/api/v1/json` | TheSportsDB API base URL |
 | `HOME_CONTROL_SPORTS_THESPORTSDB_ALLOW_LOOPBACK` | `false` | Allow TheSportsDB to reach this machine's own address, for an API mirror served here |
-| `HOME_CONTROL_SPORTS_THESPORTSDB_FIXTURES_TTL` | `24h` | How long a competition's daily fixtures are cached |
+| `HOME_CONTROL_SPORTS_THESPORTSDB_FIXTURES_TTL` | `24h` | How long a competition's daily fixtures are cached; a bare number is hours |
 | `home-control.bluetooth.enabled` | `false` | Bluetooth speaker module |
 | `home-control.bluetooth.dbus-address` | `unix:path=/run/dbus/system_bus_socket` | Host D-Bus system bus |
 | `home-control.bluetooth.adapter` | *(first powered)* | Adapter MAC or id such as `hci0` |
@@ -77,6 +77,10 @@ Every setting, as a Spring property or an environment variable.
 | `home-control.bluetooth.mpv-path` | `mpv` | Player executable |
 | `home-control.bluetooth.audio-device-template` | *(blank: find the speaker's sink)* | e.g. `alsa/bluealsa:DEV={mac},PROFILE=a2dp` |
 | `home-control.bluetooth.default-volume` | `50` | Player volume until changed |
+
+Sports durations must be at least a minute, or the server does not start and names the setting. The per-sport
+lengths under `home-control.sports.the-sports-db.sport-durations` need a unit (`90m`): a bare number there is
+milliseconds.
 
 Durations take a unit (`10s`, `2m`, `6h`); a bare number of a key that was once `…-seconds` still means seconds.
 
