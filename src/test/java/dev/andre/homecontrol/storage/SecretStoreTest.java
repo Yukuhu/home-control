@@ -217,8 +217,10 @@ class SecretStoreTest {
                 .hasMessageContaining("HOME_CONTROL_SECRET, which is not set");
 
         copyFixture("secrets-keyfile-v1.json", "secrets.json");
+        // Without the key the keystore's password and the TV pairing keys are lost too, not only the sources.
         assertThatThrownBy(() -> store(null)).isInstanceOf(StorageException.class)
-                .hasMessageContaining("secret.key").hasMessageContaining("missing");
+                .hasMessageContaining("secret.key").hasMessageContaining("missing")
+                .hasMessageContaining("delete secrets.json and keystore.p12").hasMessageContaining("pair the TVs again");
     }
 
     @Test
