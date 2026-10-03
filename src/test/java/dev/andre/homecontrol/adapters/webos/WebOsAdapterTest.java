@@ -17,6 +17,7 @@ import dev.andre.homecontrol.device.JsonFileDeviceRegistry;
 import dev.andre.homecontrol.discovery.ssdp.protocol.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
+import dev.andre.homecontrol.discovery.ssdp.SsdpService;
 import dev.andre.homecontrol.discovery.ssdp.SsdpTimings;
 import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.AfterEach;
@@ -166,6 +167,15 @@ class WebOsAdapterTest {
             await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> assertThat(adapter.discovered())
                     .containsExactly(new DiscoveredDevice("webos", "[LG] webOS TV OLED55C9PLA", "127.0.0.1", tv.port())));
         }
+    }
+
+    /** Real LG sets escape the name; anything on the LAN can announce a bad escape, which is shown as it came. */
+    @Test
+    void aBadlyEscapedLgHeaderNamesTheTvAsItCame() {
+        SsdpService announced = new SsdpService("uuid:x", WebOsAdapter.SEARCH_TARGET, "10.0.0.5", null,
+                Map.of("DLNADeviceName.lge.com", "Living%zzRoom"), Instant.MAX, null);
+
+        assertThat(WebOsAdapter.name(announced)).isEqualTo("Living%zzRoom");
     }
 
     @Test

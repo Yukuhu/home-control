@@ -209,8 +209,18 @@ final class Enrollment implements DeviceEnrollment {
         return adopted;
     }
 
+    /** What every adapter found; one whose discovery fails hides only its own devices, not the setup page. */
     List<DiscoveredDevice> discovered() {
-        return discoveries.values().stream().flatMap(discovery -> discovery.discovered().stream()).toList();
+        List<DiscoveredDevice> found = new ArrayList<>();
+        discoveries.forEach((adapterId, discovery) -> {
+            try {
+                found.addAll(discovery.discovered());
+            } catch (RuntimeException e) {
+                log.warn("Leaving out what the {} adapter discovered: {}", adapterId, e.toString());
+                log.debug("The {} adapter's discovery failure", adapterId, e);
+            }
+        });
+        return List.copyOf(found);
     }
 
     /** Discovered devices that need the pairing flow. */

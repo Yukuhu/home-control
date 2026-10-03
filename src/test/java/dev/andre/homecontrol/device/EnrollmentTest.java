@@ -184,6 +184,27 @@ class EnrollmentTest {
         assertThat(wiring.registry().findById("a").orElseThrow().hasAdapter("cast")).isFalse();
     }
 
+    /** One adapter's discovery failing must not take the setup page and every pairing down with it. */
+    @Test
+    void anAdapterWhoseDiscoveryFailsHidesOnlyItsOwnDevices() {
+        StubAdapter broken = new StubAdapter("webos", DeviceKind.WEBOS, false, true) {
+            @Override
+            public List<DiscoveredDevice> discovered() {
+                throw new IllegalArgumentException("URLDecoder: Illegal hex characters in escape (%) pattern");
+            }
+        };
+        StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false);
+        Wiring wiring = wire(HostAddresses::lookup, broken, cast);
+        DiscoveredDevice receiver = new DiscoveredDevice("cast", "Kitchen", "10.0.0.9", 8009, Map.of());
+        cast.visible.add(receiver);
+
+        assertThat(wiring.enrollment().discovered()).containsExactly(receiver);
+        assertThat(wiring.enrollment().addable()).containsExactly(receiver);
+        assertThat(wiring.enrollment().pairable()).isEmpty();
+        assertThat(wiring.enrollment().attach("10.0.0.20", "Bedroom TV", DeviceKind.WEBOS, "webos", Map.of()).host())
+                .isEqualTo("10.0.0.20");
+    }
+
     @Test
     void anAdapterWithoutDiscoveryAddsNothingAndStillConnects() {
         DeviceAdapter plain = new DeviceAdapter() {
