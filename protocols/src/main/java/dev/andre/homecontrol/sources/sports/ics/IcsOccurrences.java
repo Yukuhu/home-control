@@ -190,15 +190,19 @@ public final class IcsOccurrences {
             }
         }
 
+        /** Weeks begin on the rule's WKST: with an interval, it decides which weeks are skipped. */
         private void byWeekDays() {
-            LocalDate weekStart = first.toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            DayOfWeek firstDay = rule.weekStart();
+            LocalDate weekStart = first.toLocalDate().with(TemporalAdjusters.previousOrSame(firstDay));
+            List<DayOfWeek> days = rule.byDay().stream()
+                    .sorted(Comparator.comparingLong(day -> daysInto(firstDay, day))).toList();
             int steps = 0;
             for (long week = 0; ; week += rule.interval()) {
-                for (DayOfWeek day : rule.byDay()) {
+                for (DayOfWeek day : days) {
                     if (++steps > MAX_STEPS) {
                         return;
                     }
-                    LocalDateTime candidate = weekStart.plusWeeks(week).plusDays(day.getValue() - 1L)
+                    LocalDateTime candidate = weekStart.plusWeeks(week).plusDays(daysInto(firstDay, day))
                             .atTime(first.toLocalTime());
                     if (!candidate.isAfter(first)) {
                         continue;
@@ -208,6 +212,11 @@ public final class IcsOccurrences {
                     }
                 }
             }
+        }
+
+        /** How many days {@code day} lies after the week's first day. */
+        private static long daysInto(DayOfWeek firstDay, DayOfWeek day) {
+            return (day.getValue() - firstDay.getValue() + 7L) % 7;
         }
 
         private void byFixedSteps() {
