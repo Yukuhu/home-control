@@ -98,6 +98,41 @@ class WorkflowModuleSwitchTest {
         });
     }
 
+    @Test void aChangeToOneWorkflowKeepsTheOthersTilesAndRail() {
+        var changed = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, WorkflowIntegrationFixture.ID, 1,
+                WorkflowFixtures.generated());
+        var other = new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, "w-ba9876543210", 1,
+                WorkflowFixtures.generated());
+        when(secrets.names()).thenReturn(Set.of("workflow." + changed.id(), "workflow." + other.id()));
+        when(secrets.secret("workflow." + changed.id())).thenReturn(Optional.of(new WorkflowCodec().encode(changed)));
+        when(secrets.secret("workflow." + other.id())).thenReturn(Optional.of(new WorkflowCodec().encode(other)));
+        when(preferences.sourceEnabled("workflows")).thenReturn(true);
+        when(preferences.rails(any())).thenAnswer(call -> call.<List<ContentSource>>getArgument(0).stream()
+                .flatMap(source -> source.rails().stream()).toList());
+        when(preferences.refreshInterval(any())).thenReturn(Duration.ofMinutes(15));
+        context.withUserConfiguration(CacheConfiguration.class).run(app -> {
+            var catalogs = app.getBean(WorkflowCatalogs.class);
+            var cache = app.getBean(RailCache.class);
+            app.getBean(ChangeObserver.class).assertInvalidated = () -> { };
+            String changedItem = changed.id() + "." + "a".repeat(64);
+            String otherItem = other.id() + "." + "b".repeat(64);
+            assertThat(catalogs.publish(changed, catalogs.begin(changed.id()),
+                    List.of(new WorkflowRunner.CatalogEntry("a".repeat(64), "Changed", null, null)))).isTrue();
+            assertThat(catalogs.publish(other, catalogs.begin(other.id()),
+                    List.of(new WorkflowRunner.CatalogEntry("b".repeat(64), "Other", null, null)))).isTrue();
+            cache.reconcile();
+            Map<String, Long> versions = new java.util.HashMap<>();
+            cache.peek().forEach(row -> versions.put(row.railId(), row.version()));
+
+            app.publishEvent(new ContentChangedEvent("workflows", changed.id()));
+
+            assertThat(catalogs.find(changedItem)).isEmpty();
+            assertThat(catalogs.find(otherItem)).isPresent();
+            assertThat(cache.peek()).filteredOn(row -> row.railId().equals(other.id()))
+                    .singleElement().extracting(row -> row.version()).isEqualTo(versions.get(other.id()));
+        });
+    }
+
     @Configuration(proxyBeanMethods = false)
     static class CacheConfiguration {
         @Bean ContentSources sources(List<ContentSource> sources) { return new ContentSources(sources); }

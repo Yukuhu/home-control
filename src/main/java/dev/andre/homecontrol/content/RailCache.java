@@ -27,6 +27,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
 
 /**
  * Per-rail cache in front of every content source (spec §7): page loads read snapshots, a
@@ -109,9 +110,18 @@ public class RailCache implements SmartLifecycle {
 
     /** An account changed: discard its snapshots, including results from fetches already in flight. */
     public void invalidateSource(String sourceId) {
+        invalidate(descriptor -> descriptor.sourceId().equals(sourceId));
+    }
+
+    /** Like {@link #invalidateSource}, for one rail: the source's other rails keep their last good items. */
+    public void invalidateRail(String sourceId, String railId) {
+        invalidate(descriptor -> descriptor.sourceId().equals(sourceId) && descriptor.id().equals(railId));
+    }
+
+    private void invalidate(Predicate<RailDescriptor> dropped) {
         List<String> keys;
         synchronized (this) {
-            if (!entries.values().removeIf(entry -> entry.descriptor.sourceId().equals(sourceId))) return;
+            if (!entries.values().removeIf(entry -> dropped.test(entry.descriptor))) return;
             keys = List.copyOf(entries.keySet());
         }
         events.publishEvent(new RailsChangedEvent(keys));
@@ -201,12 +211,13 @@ public class RailCache implements SmartLifecycle {
         reschedule();
     }
 
-    /** A source said its rails changed (e.g. a new pin): pick up new rails and refetch that source now. */
+    /** A source said its rails changed (e.g. a new pin): pick up new rails and refetch that source, or that rail, now. */
     @EventListener
     public void onContentChanged(ContentChangedEvent event) {
         reconcile();
         for (RailSnapshot snapshot : peek()) {
-            if (snapshot.sourceId().equals(event.sourceId())) {
+            if (snapshot.sourceId().equals(event.sourceId())
+                    && (event.railId() == null || snapshot.railId().equals(event.railId()))) {
                 refresh(snapshot.sourceId(), snapshot.railId());
             }
         }

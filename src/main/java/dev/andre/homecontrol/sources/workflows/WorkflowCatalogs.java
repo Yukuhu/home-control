@@ -63,6 +63,12 @@ public final class WorkflowCatalogs {
         // Keep sequence monotonic: tokens issued before invalidation must never become current again.
     }
 
+    /** Like {@link #invalidate()}, for one workflow: the others keep their tiles and Play targets. */
+    public synchronized void invalidate(String workflowId) {
+        generations.remove(workflowId);
+        snapshots.remove(workflowId);
+    }
+
     static List<ContentItem> items(WorkflowDefinition definition, List<WorkflowRunner.CatalogEntry> entries) {
         return entries.stream().map(entry -> new ContentItem(
                 definition.draft().mode() == WorkflowDraft.Mode.SINGLE ? definition.id() : definition.id() + "." + entry.key(),

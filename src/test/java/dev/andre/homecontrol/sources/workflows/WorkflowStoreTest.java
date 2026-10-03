@@ -71,7 +71,7 @@ class WorkflowStoreTest {
         assertThat(saved.revision()).isEqualTo(1);
         assertThat(request.loggedIn()).isTrue();
         assertThat(workflows.all()).containsExactly(saved);
-        assertThat(events).containsExactly(new ContentChangedEvent("workflows"));
+        assertThat(events).containsExactly(new ContentChangedEvent("workflows", saved.id()));
         String file = Files.readString(dir.resolve("secrets.json"));
         assertThat(file).doesNotContain("api.example", "private-marker", "secret-value", "saved-secret", "media.example");
     }
@@ -159,7 +159,7 @@ class WorkflowStoreTest {
         assertThat(secrets.secret(key)).isEmpty();
         assertThat(secrets.secret("jellyfin.token")).contains("keep-me");
         assertThat(workflows.problems()).isEmpty();
-        assertThat(events).containsExactly(new ContentChangedEvent("workflows"));
+        assertThat(events).containsExactly(new ContentChangedEvent("workflows", "damaged-record"));
     }
 
     @Test void deletingTheLastWorkflowKeepsOtherSourcesAndLogin() {

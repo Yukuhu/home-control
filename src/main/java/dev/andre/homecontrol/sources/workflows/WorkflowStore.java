@@ -96,7 +96,7 @@ public final class WorkflowStore {
         } finally {
             writes.unlock();
         }
-        changed();
+        changed(created.id());
         return created;
     }
 
@@ -122,7 +122,7 @@ public final class WorkflowStore {
         } finally {
             stripe.unlock();
         }
-        changed();
+        changed(id);
         return updated;
     }
 
@@ -148,7 +148,7 @@ public final class WorkflowStore {
         } finally {
             stripe.unlock();
         }
-        changed();
+        changed(id);
     }
 
     public void remove(String id, long expectedRevision, LoginContext context) {
@@ -169,7 +169,7 @@ public final class WorkflowStore {
         } finally {
             stripe.unlock();
         }
-        changed();
+        changed(id);
     }
 
     /** Removes only a key displayed by problems(), without interpreting its damaged value. */
@@ -192,7 +192,7 @@ public final class WorkflowStore {
         } finally {
             stripe.unlock();
         }
-        changed();
+        changed(id);
     }
 
     /**
@@ -276,6 +276,11 @@ public final class WorkflowStore {
 
     private void changed() {
         events.publishEvent(new ContentChangedEvent("workflows"));
+    }
+
+    /** Only {@code workflowId}'s rail is refetched: the other workflows keep their last good tiles. */
+    private void changed(String workflowId) {
+        events.publishEvent(new ContentChangedEvent("workflows", workflowId));
     }
 
     private record Snapshot(Map<String, WorkflowDefinition> definitions, Map<String, String> problems,
