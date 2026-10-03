@@ -162,6 +162,42 @@ class PairingServiceTest {
     }
 
     @Test
+    void aCodeSubmittedTwiceAtOnceIsCheckedOnceAndBothGetItsAnswer() throws Exception {
+        CountDownLatch adopting = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(_ -> {
+            adopting.countDown();
+            assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+            return null;
+        }).when(enrollment).adopt(any());
+        service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
+        String code = fakeDevice.awaitDisplayedCode();
+        CompletableFuture<CodePairingOutcome> first = CompletableFuture.supplyAsync(() -> service.submit(code));
+        assertThat(adopting.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // A double click: the same form again while the first is still being checked.
+        CompletableFuture<CodePairingOutcome> second = CompletableFuture.supplyAsync(() -> service.submit(code));
+        release.countDown();
+
+        assertThat(first.get(5, TimeUnit.SECONDS)).isInstanceOf(CodePairingOutcome.Paired.class);
+        assertThat(second.get(5, TimeUnit.SECONDS)).isInstanceOf(CodePairingOutcome.Paired.class);
+        verify(enrollment, times(1)).adopt(any());
+    }
+
+    @Test
+    void aCodeSubmittedAgainAfterItsAnswerGetsTheSameAnswer() throws Exception {
+        service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
+        String code = fakeDevice.awaitDisplayedCode();
+        assertThat(service.submit(code)).isInstanceOf(CodePairingOutcome.Paired.class);
+
+        assertThat(service.submit(code)).isInstanceOf(CodePairingOutcome.Paired.class);
+        verify(enrollment, times(1)).adopt(any());
+        assertThat(service.submit("A1B2C3"))
+                .as("another code is not this attempt's")
+                .isEqualTo(new CodePairingOutcome.Failed("No pairing is in progress; start again from the device list"));
+    }
+
+    @Test
     void closesThePairingSocketWhenTheHandshakeFails() throws Exception {
         try (RefusingPairingServer rudeDevice = new RefusingPairingServer()) {
             assertThatThrownBy(() -> service.begin("127.0.0.1", rudeDevice.port(), "Rude Shield"))
