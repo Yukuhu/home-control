@@ -122,7 +122,12 @@ class CastSessionTest {
     @Test
     void aReceiverIsConnectedOnlyOnceItHasAnswered() throws Exception {
         receiver.ignore("GET_STATUS");
-        start(receiver.port());
+        // A 5 s command timeout: the receiver has that long to answer before the connection counts as lost.
+        CastTimings patient = new CastTimings(Duration.ofMillis(200), Duration.ofSeconds(1), Duration.ofMillis(50),
+                Duration.ofMillis(100), Duration.ofSeconds(5), Duration.ofSeconds(5), Duration.ofMillis(100),
+                Duration.ofMillis(200));
+        session = new CastSession(device(receiver.port()), patient, seen);
+        session.start();
         await().until(() -> !receiver.received(RECEIVER, "GET_STATUS").isEmpty());
 
         await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
@@ -133,6 +138,19 @@ class CastSessionTest {
 
         receiver.pushReceiverStatus();
         await().until(() -> session.state().connected());
+    }
+
+    @Test
+    void aReceiverThatNeverAnswersIsDroppedAndTriedAgain() {
+        // It answers every heartbeat, so only the wait for its first status can end the connection.
+        receiver.ignore("GET_STATUS");
+
+        start(receiver.port());
+
+        seen.awaitStatus(DeviceStatus.DISCONNECTED);
+        await().until(() -> receiver.connections() >= 2);
+        assertThat(receiver.received(RECEIVER, "GET_STATUS"))
+                .allMatch(request -> request.payload().has("requestId"));
     }
 
     @Test

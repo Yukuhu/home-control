@@ -58,7 +58,8 @@ public class CastAdapter implements DeviceAdapter, AdapterDiscovery {
 
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
-        CastSession session = sessions.open(device.id(), onClose -> new CastSession(device, properties, onChange, onClose));
+        CastSession session = sessions.open(device.id(),
+                onClose -> new CastSession(device, properties, onChange, onClose));
         session.start();
         return session;
     }
