@@ -41,7 +41,8 @@ public class SourcesSetupAdvice {
         List<ContentSource> all = contentSources.all();
 
         List<SourcesSetupView.SourceRow> sourceRows = all.stream()
-                .map(source -> new SourcesSetupView.SourceRow(source.id(), source.displayName(), source.available(),
+                .map(source -> new SourcesSetupView.SourceRow(source.id(), source.displayName(),
+                        ContentSources.available(source),
                         !current.disabledSources().contains(source.id()), source.searchable(),
                         current.refreshMinutes().get(source.id()),
                         railPreferences.defaultRefreshInterval(source).toMinutes()))

@@ -23,6 +23,8 @@ class StoredRailPreferencesTest {
         final List<RailDescriptor> allRails;
         final Duration defaultInterval;
         boolean available = true;
+        /** A source with a bug, or whose store cannot be read, whatever it is asked. */
+        boolean broken;
 
         StubSource(String id, List<RailDescriptor> allRails, Duration defaultInterval) {
             this.id = id;
@@ -32,8 +34,15 @@ class StoredRailPreferencesTest {
 
         @Override public String id() { return id; }
         @Override public String displayName() { return id; }
-        @Override public boolean available() { return available; }
-        @Override public List<RailDescriptor> rails() { return available ? allRails : List.of(); }
+        @Override public boolean available() { return breakIfBroken() && available; }
+        @Override public List<RailDescriptor> rails() { return breakIfBroken() && available ? allRails : List.of(); }
+
+        private boolean breakIfBroken() {
+            if (broken) {
+                throw new IllegalStateException(id + " has a bug");
+            }
+            return true;
+        }
         @Override public Rail rail(String railId) { throw new UnsupportedOperationException(); }
         @Override public Optional<ContentItem> item(String itemId) { return Optional.empty(); }
         @Override public Duration defaultRefreshInterval() { return defaultInterval; }
@@ -61,6 +70,15 @@ class StoredRailPreferencesTest {
 
     private StoredRailPreferences preferences() {
         return new StoredRailPreferences(service(dir.resolve("sources.json"), properties), properties);
+    }
+
+    /** One source failing must not take the dashboard and the setup page down with it. */
+    @Test
+    void aSourceThatFailsLeavesTheOtherSourcesRails() {
+        jellyfin.broken = true;
+
+        assertThat(preferences().rails(sources)).containsExactly(SUBS);
+        assertThat(preferences().allRailsInOrder(sources)).containsExactly(SUBS);
     }
 
     @Test
