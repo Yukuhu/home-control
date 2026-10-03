@@ -64,6 +64,7 @@ public class AndroidTvSession implements DeviceHandle {
     private final SessionLoop.Timer playbackExpiry;
     private final Reconnector reconnector;
     private final ConnectionSlot<RemoteConnection> connection;
+    private final Runnable onClosed;
 
     /** Loop thread only. */
     private int consecutiveUnpaired;
@@ -71,8 +72,8 @@ public class AndroidTvSession implements DeviceHandle {
     private final InferredPlayback playback;
 
     public AndroidTvSession(Device device, ClientCertificate credential,
-                         AndroidTvProperties properties, Consumer<DeviceState> onChange) {
-        this(device, credential, AndroidTvTimings.from(properties), onChange, null);
+                         AndroidTvProperties properties, Consumer<DeviceState> onChange, Runnable onClosed) {
+        this(device, credential, AndroidTvTimings.from(properties), onChange, null, onClosed);
     }
 
     @FunctionalInterface
@@ -83,6 +84,12 @@ public class AndroidTvSession implements DeviceHandle {
     AndroidTvSession(Device device, ClientCertificate credential,
                      AndroidTvTimings timings, Consumer<DeviceState> onChange,
                      ConnectionOpener opener) {
+        this(device, credential, timings, onChange, opener, () -> { });
+    }
+
+    AndroidTvSession(Device device, ClientCertificate credential,
+                     AndroidTvTimings timings, Consumer<DeviceState> onChange,
+                     ConnectionOpener opener, Runnable onClosed) {
         this.device = device;
         AndroidTvSettings settings = AndroidTvSettings.of(device);
         this.opener = opener == null
@@ -96,10 +103,28 @@ public class AndroidTvSession implements DeviceHandle {
         this.reconnector = new Reconnector(loop, new Backoff(timings.reconnectInitialDelay(),
                 timings.reconnectMaxDelay()), this::connect);
         this.connection = new ConnectionSlot<>("shield-session-" + device.id());
+        this.onClosed = onClosed;
     }
 
     public void start() {
         reconnector.start();
+    }
+
+    public String host() {
+        return device.host();
+    }
+
+    /**
+     * The device announced itself, so it may be back: try now instead of waiting out the backoff. Not while ambiguous
+     * UNPAIRED verdicts count towards the latch: a booting device announces itself before it takes the certificate,
+     * and each early attempt would count one more.
+     */
+    public void reconnectNow() {
+        loop.execute(() -> {
+            if (consecutiveUnpaired == 0) {
+                reconnector.reconnectNow();
+            }
+        });
     }
 
     public DeviceState state() {
@@ -253,6 +278,7 @@ public class AndroidTvSession implements DeviceHandle {
         publisher.close();
         loop.close();
         connection.close();
+        onClosed.run();
     }
 
     /**

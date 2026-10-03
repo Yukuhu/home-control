@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 /**
  * Finds Android TV devices advertising the remote service, through the shared
@@ -25,6 +27,7 @@ public class MdnsDiscovery implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(MdnsDiscovery.class);
 
     private final Map<String, DiscoveredDevice> found = new ConcurrentHashMap<>();
+    private final List<Consumer<DiscoveredDevice>> announcements = new CopyOnWriteArrayList<>();
     private final MdnsBrowser browser;
     /** True only when this instance built its own browser (outside Spring), so it must close it. */
     private final boolean ownsBrowser;
@@ -45,11 +48,7 @@ public class MdnsDiscovery implements AutoCloseable {
         browser.browse(SERVICE_TYPE, new MdnsBrowser.Listener() {
             @Override
             public void resolved(MdnsBrowser.MdnsService service) {
-                toDevice(service.name(), service.addresses().toArray(InetAddress[]::new), service.port())
-                        .ifPresent(device -> {
-                            found.put(service.name(), device);
-                            log.info("Discovered {} at {}:{}", device.name(), device.host(), device.port());
-                        });
+                MdnsDiscovery.this.resolved(service);
             }
 
             @Override
@@ -69,6 +68,19 @@ public class MdnsDiscovery implements AutoCloseable {
 
     public List<DiscoveredDevice> devices() {
         return List.copyOf(found.values());
+    }
+
+    /** {@code listener} hears every device that announces itself, a known one too: it may be back from an outage. */
+    public void onAnnounced(Consumer<DiscoveredDevice> listener) {
+        announcements.add(listener);
+    }
+
+    void resolved(MdnsBrowser.MdnsService service) {
+        toDevice(service.name(), service.addresses().toArray(InetAddress[]::new), service.port()).ifPresent(device -> {
+            found.put(service.name(), device);
+            log.info("Discovered {} at {}:{}", device.name(), device.host(), device.port());
+            announcements.forEach(listener -> listener.accept(device));
+        });
     }
 
     /** Pure mapping so it can be tested without multicast. */

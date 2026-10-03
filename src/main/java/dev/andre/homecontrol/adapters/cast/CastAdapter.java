@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.cast;
 
+import dev.andre.homecontrol.adapters.support.SessionRegistry;
 import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.ForegroundAppReporting;
@@ -24,10 +25,14 @@ public class CastAdapter implements DeviceAdapter, AdapterDiscovery {
 
     private final CastDiscovery discovery;
     private final CastProperties properties;
+    private final SessionRegistry<CastSession> sessions = new SessionRegistry<>();
 
     public CastAdapter(CastDiscovery discovery, CastProperties properties) {
         this.discovery = discovery;
         this.properties = properties;
+        // A receiver that announces itself is back: reconnect now instead of waiting out the backoff.
+        discovery.onAnnounced(found -> sessions.matching(session -> session.isAnnouncedBy(found))
+                .forEach(CastSession::reconnectNow));
     }
 
     @Override
@@ -53,7 +58,7 @@ public class CastAdapter implements DeviceAdapter, AdapterDiscovery {
 
     @Override
     public DeviceHandle connect(Device device, Consumer<DeviceState> onChange) {
-        CastSession session = new CastSession(device, properties, onChange);
+        CastSession session = sessions.open(device.id(), onClose -> new CastSession(device, properties, onChange, onClose));
         session.start();
         return session;
     }
@@ -83,9 +88,8 @@ public class CastAdapter implements DeviceAdapter, AdapterDiscovery {
         if (!device.hasAdapter(ADAPTER_ID)) {
             return false;
         }
-        String castId = device.adapterSettings(ADAPTER_ID).get(CastSettings.CAST_ID);
-        return (castId != null && castId.equals(found.attributes().get("id")))
-                || hostOf(device).equalsIgnoreCase(found.host());
+        return CastSettings.isReceiver(device.adapterSettings(ADAPTER_ID).get(CastSettings.CAST_ID), hostOf(device),
+                found);
     }
 
     @Override

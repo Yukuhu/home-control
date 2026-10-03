@@ -11,17 +11,20 @@ import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.RemoteKey;
 import dev.andre.homecontrol.core.playback.ServiceLinks;
+import dev.andre.homecontrol.discovery.MdnsBrowser;
 import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.storage.StorageException;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.InetAddress;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -103,6 +106,31 @@ class AndroidTvAdapterTest {
                 handle.execute(new Action.PressKey(RemoteKey.DPAD_UP));
 
                 assertThat(remote.nextKeyPress()).isEqualTo(19);
+            }
+        }
+    }
+
+    @Test
+    void aDeviceThatAnnouncesItselfIsReconnectedAtOnce() throws Exception {
+        try (FakeRemoteServer remote = new FakeRemoteServer()) {
+            CertificateStore certificates = new CertificateStore(dir.resolve(DataDirectory.KEYSTORE), "shield".toCharArray());
+            certificates.loadOrCreate("shield");
+            Device device = AndroidTvSettings.device("shield", "Shield", "127.0.0.1", remote.port(), null, Instant.now());
+            MdnsDiscovery discovery = new MdnsDiscovery(false);
+            // Retries a minute apart: only the announcement can bring the device back within the test.
+            AndroidTvAdapter adapter = new AndroidTvAdapter(certificates,
+                    new AndroidTvProperties(true, "shield", Duration.ofSeconds(10), Duration.ofMinutes(1),
+                            Duration.ofMinutes(1)), discovery);
+
+            try (DeviceHandle handle = adapter.connect(device, state -> { })) {
+                await().until(() -> handle.state().status() == DeviceStatus.CONNECTED);
+                remote.hangUp();
+                await().until(() -> handle.state().status() == DeviceStatus.DISCONNECTED);
+
+                discovery.resolved(new MdnsBrowser.MdnsService(MdnsDiscovery.SERVICE_TYPE, "SHIELD",
+                        List.of(InetAddress.getByName("127.0.0.1")), remote.port(), Map.of()));
+
+                await().atMost(Duration.ofSeconds(10)).until(() -> handle.state().status() == DeviceStatus.CONNECTED);
             }
         }
     }

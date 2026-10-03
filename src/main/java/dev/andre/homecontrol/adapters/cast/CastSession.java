@@ -19,6 +19,7 @@ import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
+import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.core.NowPlaying;
 import dev.andre.homecontrol.core.PlaybackState;
 import dev.andre.homecontrol.core.ReceiverApps;
@@ -61,6 +62,7 @@ public class CastSession implements DeviceHandle, ReceiverApps {
     private final SessionLoop loop;
     private final Reconnector reconnector;
     private final ConnectionSlot<CastConnection> connection;
+    private final Runnable onClosed;
 
     // Immutable record replaced wholesale on the loop; command threads only read it.
     @SuppressWarnings("java:S3077")
@@ -70,11 +72,15 @@ public class CastSession implements DeviceHandle, ReceiverApps {
     /** The last media status, so partial statuses (without {@code media}) keep their title. Loop thread only. */
     private MediaStatus lastMedia;
 
-    public CastSession(Device device, CastProperties properties, Consumer<DeviceState> onChange) {
-        this(device, CastTimings.from(properties), onChange);
+    public CastSession(Device device, CastProperties properties, Consumer<DeviceState> onChange, Runnable onClosed) {
+        this(device, CastTimings.from(properties), onChange, onClosed);
     }
 
     CastSession(Device device, CastTimings timings, Consumer<DeviceState> onChange) {
+        this(device, timings, onChange, () -> { });
+    }
+
+    CastSession(Device device, CastTimings timings, Consumer<DeviceState> onChange, Runnable onClosed) {
         this.device = device;
         this.settings = CastSettings.of(device);
         this.timings = timings;
@@ -83,11 +89,22 @@ public class CastSession implements DeviceHandle, ReceiverApps {
         this.reconnector = new Reconnector(loop, new Backoff(timings.reconnectInitialDelay(),
                 timings.reconnectMaxDelay()), this::connect);
         this.connection = new ConnectionSlot<>("cast-session-" + device.id());
+        this.onClosed = onClosed;
     }
 
     public void start() {
         reconnector.start();
         loop.every(this::pollMediaPosition, timings.mediaStatusInterval());
+    }
+
+    /** Whether {@code found} is this session's receiver announcing itself. */
+    public boolean isAnnouncedBy(DiscoveredDevice found) {
+        return CastSettings.isReceiver(settings.castId(), settings.host(), found);
+    }
+
+    /** The receiver announced itself, so it may be back: try now instead of waiting out the backoff. */
+    public void reconnectNow() {
+        reconnector.reconnectNow();
     }
 
     @Override
@@ -243,6 +260,7 @@ public class CastSession implements DeviceHandle, ReceiverApps {
         publisher.close();
         loop.close();
         connection.close();
+        onClosed.run();
     }
 
     /** One connection's listener: its callbacks run on the loop, and only while its connection is the current one. */
