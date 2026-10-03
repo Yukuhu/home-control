@@ -64,7 +64,10 @@ public final class SsapConnection implements AutoCloseable {
         this.requestTimeout = options.requestTimeout();
     }
 
-    /** ws://host:port first, then wss://host:securePort (firmware that closed the plain port or insists on TLS). */
+    /**
+     * wss://host:securePort first, so the client key in the registration never crosses the LAN in clear; then
+     * ws://host:port, for older firmware without the TLS port.
+     */
     public static SsapConnection open(HttpClient http, String host, SsapOptions options, Consumer<String> onClosed)
             throws IOException {
         SsapConnection connection = new SsapConnection(http, host, options);
@@ -81,15 +84,15 @@ public final class SsapConnection implements AutoCloseable {
             }
         };
         try {
-            connection.socket = TextWebSocket.connect(http, DeviceUris.of("ws", host, options.port(), ""),
+            connection.socket = TextWebSocket.connect(http, DeviceUris.of("wss", host, options.securePort(), ""),
                     connection.connectTimeout, listener);
-        } catch (IOException plainFailed) {
+        } catch (IOException secureFailed) {
             try {
-                connection.socket = TextWebSocket.connect(http, DeviceUris.of("wss", host, options.securePort(), ""),
+                connection.socket = TextWebSocket.connect(http, DeviceUris.of("ws", host, options.port(), ""),
                         connection.connectTimeout, listener);
-            } catch (IOException secureFailed) {
-                secureFailed.addSuppressed(plainFailed);
-                throw secureFailed;
+            } catch (IOException plainFailed) {
+                plainFailed.addSuppressed(secureFailed);
+                throw plainFailed;
             }
         }
         return connection;
