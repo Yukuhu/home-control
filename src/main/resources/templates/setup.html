@@ -55,7 +55,7 @@
         <p class="eyebrow">FINISH CONNECTING</p>
         <h2>Enter the code shown on your TV</h2>
         <p class="hint">Your TV is waiting. Enter its six-character code to finish pairing.</p>
-        <form method="post" th:action="@{/setup/code}">
+        <form method="post" th:action="@{/setup/code}" data-submit-once>
             <label>Pairing code
                 <input name="code" class="pairing-code" maxlength="6" minlength="6" autocomplete="off"
                        autocapitalize="characters" spellcheck="false" placeholder="A1B2C3" required>

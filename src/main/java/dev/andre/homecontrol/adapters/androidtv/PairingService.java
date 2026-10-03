@@ -13,6 +13,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -20,6 +23,9 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * <p>A failed attempt always ends the session: the device shows a brand new code next
  * time, so there is nothing to retry into (spec §5.2).
+ *
+ * <p>An attempt checks one code. A code sent twice, as a double click does, gets the first
+ * submit's answer, whether the second arrives while the first is checked or after it.
  */
 public class PairingService implements CodePairing {
 
@@ -41,6 +47,8 @@ public class PairingService implements CodePairing {
      * so every session is closed exactly once, and an attempt that ends only ever clears itself.
      */
     private final AtomicReference<Attempt> attempt = new AtomicReference<>();
+    /** The code the last attempt was given, and its answer. */
+    private final AtomicReference<Answered> answered = new AtomicReference<>();
 
     public PairingService(CertificateStore certificates, DeviceEnrollment enrollment,
                           DataDirectory dataDirectory) {
@@ -89,27 +97,24 @@ public class PairingService implements CodePairing {
     public CodePairingOutcome submit(String code) {
         Attempt current = attempt.get();
         if (current == null) {
+            Answered last = answered.get();
+            if (last != null && last.code().equals(code)) {
+                return last.outcome();
+            }
             return new CodePairingOutcome.Failed("No pairing is in progress; start again from the device list");
+        }
+        if (!current.claimed().compareAndSet(false, true)) {
+            return answerOf(current);
         }
 
         try {
-            PairingResult result = current.session().submitCode(code);
-            return switch (result) {
-                case PairingResult.Paired(var serverCertificate) -> {
-                    certificates.save(current.deviceId(), current.credential());
-                    enrollment.adopt(AndroidTvSettings.device(
-                            current.deviceId(),
-                            current.name(),
-                            current.host(),
-                            AndroidTvSettings.DEFAULT_PORT,
-                            ClientCertificate.fingerprintOf(serverCertificate),
-                            Instant.now()));
-                    log.info("Paired with {} at {}", current.name(), current.host());
-                    yield new CodePairingOutcome.Paired();
-                }
-                case PairingResult.WrongCode _ -> new CodePairingOutcome.WrongCode();
-                case PairingResult.Failed(var reason) -> new CodePairingOutcome.Failed(reason);
-            };
+            CodePairingOutcome outcome = check(current, code);
+            answered.set(new Answered(code, outcome));
+            current.outcome().complete(outcome);
+            return outcome;
+        } catch (RuntimeException e) {
+            current.outcome().completeExceptionally(e);
+            throw e;
         } finally {
             // The device shows a brand new code next time whatever happened here, so the
             // attempt is over either way. In a finally because an exception out of adopt()
@@ -122,7 +127,37 @@ public class PairingService implements CodePairing {
         }
     }
 
+    /** Waits for the submit that checks {@code current}'s code, and answers as it does. */
+    private static CodePairingOutcome answerOf(Attempt current) {
+        try {
+            return current.outcome().join();
+        } catch (CompletionException e) {
+            throw e.getCause() instanceof RuntimeException failure ? failure : e;
+        }
+    }
+
+    private CodePairingOutcome check(Attempt current, String code) {
+        PairingResult result = current.session().submitCode(code);
+        return switch (result) {
+            case PairingResult.Paired(var serverCertificate) -> {
+                certificates.save(current.deviceId(), current.credential());
+                enrollment.adopt(AndroidTvSettings.device(
+                        current.deviceId(),
+                        current.name(),
+                        current.host(),
+                        AndroidTvSettings.DEFAULT_PORT,
+                        ClientCertificate.fingerprintOf(serverCertificate),
+                        Instant.now()));
+                log.info("Paired with {} at {}", current.name(), current.host());
+                yield new CodePairingOutcome.Paired();
+            }
+            case PairingResult.WrongCode _ -> new CodePairingOutcome.WrongCode();
+            case PairingResult.Failed(var reason) -> new CodePairingOutcome.Failed(reason);
+        };
+    }
+
     public void cancel() {
+        answered.set(null);
         close(attempt.getAndSet(null));
     }
 
@@ -142,7 +177,15 @@ public class PairingService implements CodePairing {
         return host.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-)|(-$)", "");
     }
 
-    private record Attempt(PairingSession session, ClientCertificate credential,
-                           String host, String name, String deviceId) {
+    /** {@code claimed} by the submit that checks the code; {@code outcome} is its answer, for a second submit. */
+    private record Attempt(PairingSession session, ClientCertificate credential, String host, String name,
+                           String deviceId, AtomicBoolean claimed, CompletableFuture<CodePairingOutcome> outcome) {
+
+        Attempt(PairingSession session, ClientCertificate credential, String host, String name, String deviceId) {
+            this(session, credential, host, name, deviceId, new AtomicBoolean(), new CompletableFuture<>());
+        }
+    }
+
+    private record Answered(String code, CodePairingOutcome outcome) {
     }
 }

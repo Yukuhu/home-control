@@ -4,6 +4,7 @@ import dev.andre.homecontrol.core.content.PinnedLinks;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 
 /** Adds the fake device adapter and content source the browser tests drive to the real application context. */
 @TestConfiguration
@@ -17,5 +18,12 @@ public class E2eFakesConfiguration {
     @Bean
     public FakeContentSource fakeContentSource(ObjectProvider<PinnedLinks> pinnedLinks) {
         return new FakeContentSource(pinnedLinks);
+    }
+
+    /** In place of Android TV's, which needs a TV to show a code. */
+    @Bean
+    @Primary
+    public FakeCodePairing fakeCodePairing() {
+        return new FakeCodePairing();
     }
 }
