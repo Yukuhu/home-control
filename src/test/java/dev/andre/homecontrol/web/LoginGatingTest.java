@@ -256,10 +256,24 @@ class LoginGatingTest extends FullAppTest {
                         .param("current", "x"))
                 .andExpect(status().isSeeOther())
                 .andExpect(redirectedUrl("/login?next=%2Fsetup%3Ftab%3Daccount"));
+        // Behind a proxy that rewrites Host, the page's address differs from Host; only its path is used.
+        mockMvc.perform(post("/setup/password").header("Host", "backend:8080").header("Origin", "http://backend:8080")
+                        .header("Referer", "https://home.example.org/setup").accept("text/html"))
+                .andExpect(status().isSeeOther())
+                .andExpect(redirectedUrl("/login?next=%2Fsetup"));
         mockMvc.perform(post("/setup/password").header("Host", "localhost").header("Origin", "http://localhost")
-                        .header("Referer", "http://elsewhere.example/setup").accept("text/html"))
+                        .header("Referer", "http://localhost//elsewhere.example/x").accept("text/html"))
                 .andExpect(status().isSeeOther())
                 .andExpect(redirectedUrl("/login?next=%2F"));
+    }
+
+    @Test
+    void theLoginPageLetsARememberedBrowserStraightThrough() throws Exception {
+        storeAFirstSecret();
+        Cookie remembered = rememberedLogin();
+
+        mockMvc.perform(get("/login").param("next", "/setup").cookie(remembered))
+                .andExpect(redirectedUrl("/setup"));
     }
 
     @Test
