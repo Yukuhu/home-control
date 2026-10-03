@@ -65,7 +65,7 @@ public class SecurityConfiguration {
     @Bean
     public WebServerFactoryCustomizer<TomcatServletWebServerFactory> trustedProxies(SecurityProperties security,
                                                                                    Environment environment) {
-        return new TrustedProxies(security.trustedProxies(), environment.getProperty("server.forward-headers-strategy"));
+        return new TrustedProxies(security.trustedProxies(), environment);
     }
 
     /** First filter of all: independent of the login gate, whether or not a login exists. */

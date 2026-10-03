@@ -152,7 +152,8 @@ public class RememberedLogins {
             return file.read();
         } catch (StorageException e) {
             if (warned.compareAndSet(false, true)) {
-                log.warn("Remembered logins are unreadable; browsers log in again, and the next login replaces them", e);
+                log.warn("Remembered logins are unreadable; browsers log in again, and the next login replaces them",
+                        e);
             }
             return List.of();
         }

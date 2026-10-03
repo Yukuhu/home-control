@@ -342,8 +342,9 @@ buttons require their matching Google client type; a Web client cannot request d
 **HTTPS reverse proxy:** open Setup at the same external address you will use to sign in.
 Set `HOME_CONTROL_TRUSTED_PROXIES` to the proxy's IP address so the displayed callback uses the
 external scheme, host and port the proxy reports in `X-Forwarded-Proto`, `X-Forwarded-Host` and
-`X-Forwarded-Port` (see [Security](security.md)), and `HOME_CONTROL_SECURE_COOKIE=true`. Add the
-external hostname to `HOME_CONTROL_ALLOWED_HOSTS`.
+`X-Forwarded-Port` (see [Security](security.md)), and `HOME_CONTROL_SECURE_COOKIE=true`. Without
+`X-Forwarded-Port` the callback has the scheme's default port, 443 for HTTPS: a proxy on another
+external port must send it. Add the external hostname to `HOME_CONTROL_ALLOWED_HOSTS`.
 Register the displayed callback in Google Cloud. A public HTTPS hostname may resolve only on
 your LAN: the browser needs to reach the callback, not Google's servers.
 

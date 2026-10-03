@@ -13,8 +13,8 @@ proxy in front of it.
 A browser stays logged in for 30 days from its login, also across restarts and upgrades of the
 app. Logging out ends that browser's login, and a new password ends every browser's. The browser
 keeps a random token in the `HOME_CONTROL_LOGIN` cookie; `/data/logins.json` keeps only a hash
-of each token, which logs nobody in, so the file needs no backup. Deleting it logs every browser
-out.
+of each token, which logs nobody in, so the file needs no backup. Deleting it while the app is
+stopped logs every browser out at the next start; a new password does so at once.
 
 Theme names, author metadata and validated presentation assets are public so the login page can use the chosen
 theme. Importing, removing and exporting themes follows the normal login rules. Theme packages contain styling
