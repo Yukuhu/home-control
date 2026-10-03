@@ -9,9 +9,12 @@
 set -euo pipefail
 
 documentation='^(docs/.*|[^/]+\.md|LICENSE|\.github/ISSUE_TEMPLATE/.*|\.github/pull_request_template\.md)$'
+# Guides that the deployment tests read (their inputs in build.gradle.kts) are code too: a change to one of them
+# alone has to run the tests that check it.
+read_by_tests='^(docs/user/bluetooth-speakers\.md|docs/bluetooth-speakers\.md)$'
 
 files="$(grep -v '^[[:space:]]*$' || true)"
-if [[ -z "$files" ]] || grep -Evq "$documentation" <<< "$files"; then
+if [[ -z "$files" ]] || grep -Evq "$documentation" <<< "$files" || grep -Eq "$read_by_tests" <<< "$files"; then
   echo true
 else
   echo false
