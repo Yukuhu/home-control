@@ -256,7 +256,7 @@ class SsdpDiscoveryTest {
 
     /** The search answers and the announcements are read by two threads; together they still keep to the caps. */
     @Test
-    void bothReceivingThreadsTogetherKeepToTheCaps() throws Exception {
+    void bothReceivingThreadsTogetherKeepToTheCaps() {
         discovery.watch("urn:x:1");
         for (int round = 0; round < 20; round++) {
             discovery.close();
