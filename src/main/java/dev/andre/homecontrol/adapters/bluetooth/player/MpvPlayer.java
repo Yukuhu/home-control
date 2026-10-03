@@ -154,9 +154,9 @@ public final class MpvPlayer implements AutoCloseable {
                     case "file-loaded" -> loaded.complete(null);
                     // A playlist (M3U, PLS) ends with "redirect" once mpv has read it; its first entry loads next.
                     case "end-file" -> {
-                        if (!"redirect".equals(event.path("reason").asString(""))) {
-                            loaded.completeExceptionally(MpvException.loadFailed(
-                                    event.path("file_error").asString(event.path("reason").asString("stopped"))));
+                        String reason = event.path("reason").asString("stopped");
+                        if (!reason.equals("redirect")) {
+                            loaded.completeExceptionally(MpvException.loadFailed(event.path("file_error").asString(reason)));
                         }
                     }
                     default -> {
