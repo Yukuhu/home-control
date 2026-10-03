@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.content;
 
 import dev.andre.homecontrol.core.content.ContentSource;
+import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.content.SourcePreferences;
 
@@ -39,9 +40,9 @@ public class StoredRailPreferences implements RailPreferences {
 
     private List<RailDescriptor> allRailsInOrder(List<ContentSource> sources, SourcePreferences current) {
         List<RailDescriptor> gathered = sources.stream()
-                .filter(ContentSource::available)
+                .filter(ContentSources::available)
                 .filter(source -> !current.disabledSources().contains(source.id()))
-                .flatMap(source -> source.rails().stream())
+                .flatMap(source -> ContentSources.rails(source).stream())
                 .toList();
 
         Map<String, RailDescriptor> remaining = new LinkedHashMap<>();

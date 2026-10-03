@@ -73,6 +73,54 @@ class ContentSourcesTest {
         assertThat(sources.searchable()).containsExactly(jellyfin);
     }
 
+    /** A source whose checks throw is left out, so that it cannot take search or the dashboard down with it. */
+    @Test
+    void aSourceWhoseChecksFailIsTreatedAsUnavailable() {
+        ContentSource jellyfin = source("jellyfin", true, true);
+        ContentSource broken = new ContentSource() {
+            @Override
+            public String id() {
+                return "broken";
+            }
+
+            @Override
+            public String displayName() {
+                return "Broken";
+            }
+
+            @Override
+            public boolean available() {
+                throw new IllegalStateException("its store cannot be read");
+            }
+
+            @Override
+            public List<RailDescriptor> rails() {
+                throw new IllegalStateException("its store cannot be read");
+            }
+
+            @Override
+            public Rail rail(String railId) {
+                throw new IllegalStateException("its store cannot be read");
+            }
+
+            @Override
+            public Optional<ContentItem> item(String itemId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean searchable() {
+                return true;
+            }
+        };
+        ContentSources sources = new ContentSources(List.of(jellyfin, broken));
+
+        assertThat(sources.searchable()).containsExactly(jellyfin);
+        assertThat(ContentSources.available(broken)).isFalse();
+        assertThat(ContentSources.rails(broken)).isEmpty();
+        assertThat(ContentSources.available(jellyfin)).isTrue();
+    }
+
     @Test
     void duplicateSourceIdsAreAProgrammingError() {
         ContentSource first = source("jellyfin", true, true);
