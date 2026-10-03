@@ -108,6 +108,8 @@ public class JellyfinClient implements AutoCloseable {
         JsonNode info;
         try {
             info = send(serverUrl, signed(OutboundRequest.get(uri(serverUrl, "/System/Info/Public", Map.of())), null, null));
+        } catch (Redirected e) {
+            throw e; // Jellyfin at another address: the advice says which one to enter
         } catch (JellyfinException e) {
             if (e.kind() == ContentSourceException.Kind.NOT_FOUND || e.kind() == ContentSourceException.Kind.BAD_RESPONSE) {
                 throw notJellyfin(serverUrl);
@@ -237,8 +239,7 @@ public class JellyfinClient implements AutoCloseable {
     /** Redirects, rejected credentials, unknown paths and every other 4xx/5xx answer end the call. */
     private static void requireSuccess(URI serverUrl, int status) {
         if (status >= 300 && status < 400) {
-            throw new JellyfinException(ContentSourceException.Kind.BAD_RESPONSE,
-                    "Jellyfin at " + serverUrl + " redirected elsewhere; enter the final server address");
+            throw new Redirected(serverUrl);
         }
         if (status == 401 || status == 403) {
             throw new JellyfinException(ContentSourceException.Kind.UNAUTHORIZED,
@@ -266,5 +267,13 @@ public class JellyfinClient implements AutoCloseable {
 
     private static String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    /** The server answered with a redirect: the setup page passes its advice on instead of "not Jellyfin". */
+    private static final class Redirected extends JellyfinException {
+        Redirected(URI serverUrl) {
+            super(ContentSourceException.Kind.BAD_RESPONSE,
+                    "Jellyfin at " + serverUrl + " redirected elsewhere; enter the final server address");
+        }
     }
 }
