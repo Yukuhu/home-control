@@ -88,12 +88,13 @@ public class SubscriptionsFeed {
         firstRefreshFailedAt = null;
     }
 
+    /**
+     * Kept only once every subscribed channel's uploads playlist is known: a lookup that fails leaves the old list, so
+     * the next refresh asks again instead of leaving those channels out until the next daily reload.
+     */
     private void loadSubscriptions(Instant now) {
         LinkedHashMap<String, String> fresh = fetchSubscriptions();
-        subscriptions = fresh;
-        subscriptionsFetchedAt = now;
-        uploads.keySet().retainAll(fresh.keySet());
-        polled.keySet().retainAll(fresh.keySet());
+        Map<String, String> found = new LinkedHashMap<>();
         List<String> unknown = fresh.keySet().stream().filter(id -> !uploads.containsKey(id)).toList();
         for (int from = 0; from < unknown.size(); from += 50) {
             List<String> batch = unknown.subList(from, Math.min(unknown.size(), from + 50));
@@ -103,15 +104,20 @@ public class SubscriptionsFeed {
             query.put(MAX_RESULTS, "50");
             JsonNode response = api.get(QuotaLedger.Call.CHANNELS_LIST, "channels", query);
             for (String id : batch) {
-                uploads.put(id, "");
+                found.put(id, "");
             }
             for (JsonNode channel : response.path("items")) {
                 String id = channel.path("id").asString("");
                 if (batch.contains(id)) {
-                    uploads.put(id, channel.path("contentDetails").path("relatedPlaylists").path("uploads").asString(""));
+                    found.put(id, channel.path("contentDetails").path("relatedPlaylists").path("uploads").asString(""));
                 }
             }
         }
+        uploads.putAll(found);
+        uploads.keySet().retainAll(fresh.keySet());
+        polled.keySet().retainAll(fresh.keySet());
+        subscriptions = fresh;
+        subscriptionsFetchedAt = now;
     }
 
     /** Every subscribed channel id → its title, in YouTube's order, up to the configured number of pages. */
@@ -147,6 +153,8 @@ public class SubscriptionsFeed {
                         .thenComparing(order::indexOf))
                 .limit(properties.channelsPerRefresh())
                 .toList();
+        boolean anyPolled = false;
+        YouTubeException skipped = null;
         for (String channelId : candidates) {
             Map<String, String> query = new LinkedHashMap<>();
             query.put("part", "snippet,contentDetails");
@@ -155,15 +163,22 @@ public class SubscriptionsFeed {
             try {
                 JsonNode response = api.get(QuotaLedger.Call.PLAYLIST_ITEMS_LIST, "playlistItems", query);
                 polled.put(channelId, new Polled(YouTubeVideoMapper.playlistItems(response), now));
+                anyPolled = true;
             } catch (YouTubeException e) {
                 if (e.kind() == ContentSourceException.Kind.NOT_FOUND) {
                     polled.put(channelId, new Polled(List.of(), now));
+                    anyPolled = true;
                 } else if (e.kind() == ContentSourceException.Kind.QUOTA_EXHAUSTED || FATAL.contains(e.kind())) {
                     throw e;
                 } else {
                     log.debug("Skipping channel {} this time: {}", channelId, e.getMessage());
+                    skipped = e;
                 }
             }
+        }
+        // Nothing to show and nothing came back: that is the failure, not an empty rail that looks like a quiet week.
+        if (!anyPolled && skipped != null && polled.isEmpty()) {
+            throw skipped;
         }
     }
 
