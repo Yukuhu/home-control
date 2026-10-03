@@ -203,8 +203,15 @@ class SsdpDiscoveryTest {
                 // not needed here
             }
         });
-        String alive = "NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\n"
-                + "USN: %s::urn:x:1\r\nCACHE-CONTROL: max-age=%s\r\n\r\n";
+        String alive = """
+                NOTIFY * HTTP/1.1\r
+                HOST: 239.255.255.250:1900\r
+                NT: urn:x:1\r
+                NTS: ssdp:alive\r
+                USN: %s::urn:x:1\r
+                CACHE-CONTROL: max-age=%s\r
+                \r
+                """;
 
         sendUdp(alive.formatted("uuid:lives-for-ever", "99999999999999999999"));
         sendUdp(alive.formatted("uuid:breaks-the-listener", "120"));
@@ -245,6 +252,44 @@ class SsdpDiscoveryTest {
         assertThat(discovery.services("urn:x:1")).filteredOn(service -> service.address().equals("10.0.0.66"))
                 .hasSize(SsdpDiscovery.MAX_SERVICES_PER_HOST);
         assertThat(heard()).contains("uuid:tv::urn:x:1");
+    }
+
+    /** The search answers and the announcements are read by two threads; together they still keep to the caps. */
+    @Test
+    void bothReceivingThreadsTogetherKeepToTheCaps() throws Exception {
+        discovery.watch("urn:x:1");
+        for (int round = 0; round < 20; round++) {
+            discovery.close();
+            discovery = new SsdpDiscovery(new SsdpProperties(false, "127.0.0.1", responder.port(), 0,
+                    Duration.ofSeconds(1), 1), new SsdpTimings(Duration.ofMillis(200)), clock,
+                    HttpClient.newHttpClient());
+            discovery.watch("urn:x:1");
+            int r = round;
+            CountDownLatch start = new CountDownLatch(1);
+            try (ExecutorService readers = Executors.newFixedThreadPool(2)) {
+                for (int thread = 0; thread < 2; thread++) {
+                    int t = thread;
+                    readers.execute(() -> {
+                        awaitQuietly(start);
+                        for (int i = 0; i < SsdpDiscovery.MAX_SERVICES_PER_HOST; i++) {
+                            discovery.handle(announcement("uuid:r" + r + "-t" + t + "-" + i, 1800), host(66));
+                        }
+                    });
+                }
+                start.countDown();
+            }
+
+            assertThat(discovery.services("urn:x:1")).as("round " + round)
+                    .hasSize(SsdpDiscovery.MAX_SERVICES_PER_HOST);
+        }
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**

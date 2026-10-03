@@ -247,16 +247,9 @@ public class SsdpDiscovery implements AutoCloseable {
                 ? previous.description() : null;
         SsdpService seen = new SsdpService(usn.get(), type.get(), address, location, message.headers(),
                 clock.instant().plus(message.maxAge()), known);
-        if (previous == null) {
-            if (keptFrom(address) >= MAX_SERVICES_PER_HOST) {
-                log.debug("{} announces more than {} services; not keeping {}", address, MAX_SERVICES_PER_HOST,
-                        usn.get());
-                return;
-            }
-            makeRoom();
+        if (!keep(seen)) {
+            return;
         }
-        services.put(usn.get(), seen);
-        heard.put(usn.get(), clock.instant());
         if (known == null && location != null) {
             if (DeviceFetch.isSafeToFetch(location, sender)) {
                 fetchDescription(seen);
@@ -268,6 +261,24 @@ public class SsdpDiscovery implements AutoCloseable {
             }
         }
         listenersOf(seen.type()).forEach(listener -> listener.alive(seen));
+    }
+
+    /**
+     * Keeps a service just heard, unless it is new and its host already has its share. One at a time: both receive
+     * loops call this, and the caps hold only if no other insertion slips between a check and its insertion.
+     */
+    private synchronized boolean keep(SsdpService seen) {
+        if (!services.containsKey(seen.usn())) {
+            if (keptFrom(seen.address()) >= MAX_SERVICES_PER_HOST) {
+                log.debug("{} announces more than {} services; not keeping {}", seen.address(), MAX_SERVICES_PER_HOST,
+                        seen.usn());
+                return false;
+            }
+            makeRoom();
+        }
+        services.put(seen.usn(), seen);
+        heard.put(seen.usn(), clock.instant());
+        return true;
     }
 
     private long keptFrom(String address) {
