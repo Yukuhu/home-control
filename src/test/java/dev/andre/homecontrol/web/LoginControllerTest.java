@@ -154,11 +154,25 @@ class LoginControllerTest {
 
     @Test
     void loggingOutGoesToTheLoginPageOnlyWhileALoginExists() {
-        assertThat(controller.logout(context)).isEqualTo("redirect:/login");
+        given(login.logout(context)).willReturn(true);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        assertThat(controller.logout(context, redirect)).isEqualTo("redirect:/login");
 
         given(login.loginRequired()).willReturn(false);
-        assertThat(controller.logout(context)).isEqualTo("redirect:/");
+        assertThat(controller.logout(context, redirect)).isEqualTo("redirect:/");
         verify(login, times(2)).logout(context);
+        assertThat(redirect.getFlashAttributes()).isEmpty();
+    }
+
+    @Test
+    void aLogoutThatCouldNotBeSavedSaysWhatThatMeans() {
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        assertThat(controller.logout(context, redirect)).isEqualTo("redirect:/login");
+
+        assertThat(redirect.getFlashAttributes().get("error")).asString()
+                .contains("could not be saved").contains("restart").contains("Change the password");
     }
 
     @Test

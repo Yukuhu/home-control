@@ -45,8 +45,9 @@ public final class FakeLoginContext implements LoginContext {
     }
 
     @Override
-    public void endSession() {
+    public boolean endSession() {
         loggedIn = false;
+        return true;
     }
 
     @Override
