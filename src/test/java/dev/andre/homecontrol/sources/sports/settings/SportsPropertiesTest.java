@@ -28,7 +28,7 @@ class SportsPropertiesTest {
         MapConfigurationPropertySource source = new MapConfigurationPropertySource(Map.of(
                 "home-control.sports.default-event-duration", "90",
                 "home-control.sports.calendar.refresh", "6",
-                "home-control.sports.the-sports-db.fixtures-ttl", "24"));
+                "home-control.sports.thesportsdb.fixtures-ttl", "24"));
 
         SportsProperties properties = new Binder(source).bind("home-control.sports", SportsProperties.class).get();
 
@@ -49,7 +49,7 @@ class SportsPropertiesTest {
                 .hasMessageContaining("home-control.sports.calendar.refresh");
         assertThatThrownBy(() -> theSportsDb(Duration.ZERO, null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("home-control.sports.the-sports-db.fixtures-ttl");
+                .hasMessageContaining("home-control.sports.thesportsdb.fixtures-ttl");
     }
 
     @Test
@@ -59,7 +59,7 @@ class SportsPropertiesTest {
 
         assertThatThrownBy(() -> theSportsDb(Duration.ofHours(24), durations))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("home-control.sports.the-sports-db.sport-durations.soccer")
+                .hasMessageContaining("home-control.sports.thesportsdb.sport-durations.soccer")
                 .hasMessageContaining("90m");
     }
 }

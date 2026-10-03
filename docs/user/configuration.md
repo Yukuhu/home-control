@@ -79,7 +79,7 @@ Every setting, as a Spring property or an environment variable.
 | `home-control.bluetooth.default-volume` | `50` | Player volume until changed |
 
 Sports durations must be at least a minute, or the server does not start and names the setting. The per-sport
-lengths under `home-control.sports.the-sports-db.sport-durations` need a unit (`90m`): a bare number there is
+lengths under `home-control.sports.thesportsdb.sport-durations` need a unit (`90m`): a bare number there is
 milliseconds.
 
 Durations take a unit (`10s`, `2m`, `6h`); a bare number of a key that was once `…-seconds` still means seconds.

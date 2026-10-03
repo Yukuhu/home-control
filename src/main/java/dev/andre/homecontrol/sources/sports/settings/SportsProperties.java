@@ -76,11 +76,11 @@ public record SportsProperties(@DefaultValue("true") boolean enabled,
                 "darts", Duration.ofMinutes(240));
 
         public TheSportsDb {
-            atLeastAMinute("home-control.sports.the-sports-db.fixtures-ttl", fixturesTtl);
+            atLeastAMinute("home-control.sports.thesportsdb.fixtures-ttl", fixturesTtl);
             Map<String, Duration> source = sportDurations == null || sportDurations.isEmpty() ? DEFAULT_DURATIONS : sportDurations;
             // The map's values are read without a unit of their own: a bare 90 is 90 ms.
             source.forEach((sport, duration) ->
-                    atLeastAMinute("home-control.sports.the-sports-db.sport-durations." + sport, duration));
+                    atLeastAMinute("home-control.sports.thesportsdb.sport-durations." + sport, duration));
             Map<String, Duration> normalised = new HashMap<>();
             source.forEach((sport, duration) -> normalised.put(normalise(sport), duration));
             sportDurations = Map.copyOf(normalised);
