@@ -202,6 +202,53 @@ class PairingServiceTest {
     }
 
     @Test
+    void anOldAttemptEndingLateLeavesTheNewAttemptsAnswer() throws Exception {
+        CountDownLatch adopting = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(_ -> {
+            adopting.countDown();
+            assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+            return null;
+        }).doNothing().when(enrollment).adopt(any());
+        service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
+        String oldCode = fakeDevice.awaitDisplayedCode();
+        CompletableFuture<CodePairingOutcome> old = CompletableFuture.supplyAsync(() -> service.submit(oldCode));
+        assertThat(adopting.await(5, TimeUnit.SECONDS)).isTrue();
+
+        try (FakePairingServer secondDevice = new FakePairingServer()) {
+            // Another tab pairs the next device while the first one's code is still being checked.
+            service.begin("127.0.0.1", secondDevice.port(), "Bedroom Shield");
+            String newCode = secondDevice.awaitDisplayedCode();
+            assertThat(service.submit(newCode)).isInstanceOf(CodePairingOutcome.Paired.class);
+            release.countDown();
+            assertThat(old.get(5, TimeUnit.SECONDS)).isInstanceOf(CodePairingOutcome.Paired.class);
+
+            assertThat(service.submit(newCode)).isInstanceOf(CodePairingOutcome.Paired.class);
+        }
+    }
+
+    @Test
+    void anAttemptCancelledWhileItsCodeIsCheckedLeavesNoAnswer() throws Exception {
+        CountDownLatch adopting = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(_ -> {
+            adopting.countDown();
+            assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+            return null;
+        }).when(enrollment).adopt(any());
+        service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
+        String code = fakeDevice.awaitDisplayedCode();
+        CompletableFuture<CodePairingOutcome> checking = CompletableFuture.supplyAsync(() -> service.submit(code));
+        assertThat(adopting.await(5, TimeUnit.SECONDS)).isTrue();
+
+        service.cancel();
+        release.countDown();
+        assertThat(checking.get(5, TimeUnit.SECONDS)).isInstanceOf(CodePairingOutcome.Paired.class);
+
+        assertThat(service.submit(code)).isInstanceOf(CodePairingOutcome.Failed.class);
+    }
+
+    @Test
     void closesThePairingSocketWhenTheHandshakeFails() throws Exception {
         try (RefusingPairingServer rudeDevice = new RefusingPairingServer()) {
             assertThatThrownBy(() -> service.begin("127.0.0.1", rudeDevice.port(), "Rude Shield"))

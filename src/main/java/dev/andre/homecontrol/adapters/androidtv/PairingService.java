@@ -15,7 +15,6 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -47,8 +46,11 @@ public class PairingService implements CodePairing {
      * so every session is closed exactly once, and an attempt that ends only ever clears itself.
      */
     private final AtomicReference<Attempt> attempt = new AtomicReference<>();
-    /** The code the last attempt was given, and its answer. */
-    private final AtomicReference<Answered> answered = new AtomicReference<>();
+    /**
+     * The attempt {@code begin()} installed last, kept once it has ended so the same code sent again gets its answer.
+     * Only {@code begin()} and {@code cancel()} change it: an older attempt that ends late answers on itself alone.
+     */
+    private final AtomicReference<Attempt> latest = new AtomicReference<>();
 
     public PairingService(CertificateStore certificates, DeviceEnrollment enrollment,
                           DataDirectory dataDirectory) {
@@ -79,8 +81,13 @@ public class PairingService implements CodePairing {
             starting.close();
             throw e;
         }
-        // A concurrent begin() may have installed its attempt meanwhile: the newest one wins.
-        close(attempt.getAndSet(new Attempt(starting, credential, host, resolvedName, deviceId)));
+        install(new Attempt(starting, credential, host, resolvedName, deviceId));
+    }
+
+    /** A concurrent begin() may have installed its attempt meanwhile: the newest one wins, here and in latest. */
+    private synchronized void install(Attempt next) {
+        close(attempt.getAndSet(next));
+        latest.set(next);
     }
 
     @Override
@@ -97,19 +104,18 @@ public class PairingService implements CodePairing {
     public CodePairingOutcome submit(String code) {
         Attempt current = attempt.get();
         if (current == null) {
-            Answered last = answered.get();
-            if (last != null && last.code().equals(code)) {
-                return last.outcome();
+            Attempt last = latest.get();
+            if (last != null && last.outcome().isDone() && code.equals(last.code().get())) {
+                return answerOf(last);
             }
             return new CodePairingOutcome.Failed("No pairing is in progress; start again from the device list");
         }
-        if (!current.claimed().compareAndSet(false, true)) {
+        if (!current.code().compareAndSet(null, code)) {
             return answerOf(current);
         }
 
         try {
             CodePairingOutcome outcome = check(current, code);
-            answered.set(new Answered(code, outcome));
             current.outcome().complete(outcome);
             return outcome;
         } catch (RuntimeException e) {
@@ -130,7 +136,7 @@ public class PairingService implements CodePairing {
         }
     }
 
-    /** Waits for the submit that checks {@code current}'s code, and answers as it does. */
+    /** Waits for the submit that checks {@code current}'s code, if it still runs, and answers as it does. */
     private static CodePairingOutcome answerOf(Attempt current) {
         try {
             return current.outcome().join();
@@ -159,8 +165,8 @@ public class PairingService implements CodePairing {
         };
     }
 
-    public void cancel() {
-        answered.set(null);
+    public synchronized void cancel() {
+        latest.set(null);
         close(attempt.getAndSet(null));
     }
 
@@ -180,15 +186,13 @@ public class PairingService implements CodePairing {
         return host.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-)|(-$)", "");
     }
 
-    /** {@code claimed} by the submit that checks the code; {@code outcome} is its answer, for a second submit. */
+    /** {@code code} is set by the submit that checks it; {@code outcome} is its answer, for the same code again. */
     private record Attempt(PairingSession session, ClientCertificate credential, String host, String name,
-                           String deviceId, AtomicBoolean claimed, CompletableFuture<CodePairingOutcome> outcome) {
+                           String deviceId, AtomicReference<String> code,
+                           CompletableFuture<CodePairingOutcome> outcome) {
 
         Attempt(PairingSession session, ClientCertificate credential, String host, String name, String deviceId) {
-            this(session, credential, host, name, deviceId, new AtomicBoolean(), new CompletableFuture<>());
+            this(session, credential, host, name, deviceId, new AtomicReference<>(), new CompletableFuture<>());
         }
-    }
-
-    private record Answered(String code, CodePairingOutcome outcome) {
     }
 }
