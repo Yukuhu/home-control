@@ -91,6 +91,10 @@ public class EventStream {
         emitter.onError(_ -> subscriber.end());
         subscribers.add(subscriber);
         Thread.ofVirtual().name("home-control-sse-tab").start(subscriber);
+        if (closed) {
+            // Subscribed once closing had begun: graceful shutdown would otherwise wait for this tab.
+            subscriber.end();
+        }
         return emitter;
     }
 
