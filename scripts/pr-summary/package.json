@@ -9,6 +9,6 @@
   },
   "engines": { "node": ">=22" },
   "devDependencies": {
-    "fast-xml-parser": "5.11.1"
+    "fast-xml-parser": "5.11.2"
   }
 }
