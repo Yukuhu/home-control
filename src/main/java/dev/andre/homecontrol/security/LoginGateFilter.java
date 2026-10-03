@@ -73,7 +73,7 @@ public class LoginGateFilter extends OncePerRequestFilter {
         } else if (accepts(request, "text/html")) {
             // A form posted after the login ended: back to its page once logged in, not a bare text answer.
             response.setStatus(HttpServletResponse.SC_SEE_OTHER);
-            response.setHeader("Location", loginPage(sameSiteReferer(request)));
+            response.setHeader("Location", loginPage(refererPage(request)));
         } else {
             plain(response, HttpServletResponse.SC_UNAUTHORIZED, "Log in first");
         }
@@ -83,20 +83,22 @@ public class LoginGateFilter extends OncePerRequestFilter {
         return "/login?next=" + URLEncoder.encode(next, StandardCharsets.UTF_8);
     }
 
-    /** The page a form was posted from, when the browser names one on this server; else the dashboard. */
-    private static String sameSiteReferer(HttpServletRequest request) {
+    /**
+     * The path of the page a form was posted from, else the dashboard. Only the path is used, so a page on another
+     * address (a proxy that rewrites Host) still comes back, and the login page never leaves this server.
+     */
+    private static String refererPage(HttpServletRequest request) {
         String referer = request.getHeader("Referer");
-        String host = request.getHeader("Host");
-        if (referer == null || host == null) {
+        if (referer == null) {
             return "/";
         }
         try {
-            URI page = new URI(referer);
-            if (!host.equalsIgnoreCase(page.getRawAuthority()) || page.getRawPath() == null
-                    || !page.getRawPath().startsWith("/")) {
+            String path = new URI(referer).getRawPath();
+            if (path == null || !path.startsWith("/") || path.startsWith("//")) {
                 return "/";
             }
-            return page.getRawPath() + (page.getRawQuery() == null ? "" : "?" + page.getRawQuery());
+            String query = new URI(referer).getRawQuery();
+            return path + (query == null ? "" : "?" + query);
         } catch (URISyntaxException _) {
             return "/";
         }

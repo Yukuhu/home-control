@@ -41,7 +41,8 @@ public class LoginController {
         if (!loginService.loginRequired()) {
             return HOME_REDIRECT;
         }
-        if (context.loggedIn()) {
+        // The login page is open, so the gate resumes no remembered login for it: a browser that has one goes on.
+        if (context.loggedIn() || loginService.resume(context)) {
             return "redirect:" + safeNext(next);
         }
         model.addAttribute("next", safeNext(next));
