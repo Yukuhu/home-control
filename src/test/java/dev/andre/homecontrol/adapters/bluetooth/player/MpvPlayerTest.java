@@ -83,6 +83,14 @@ class MpvPlayerTest {
     }
 
     @Test
+    void playsARadioPlaylistThatMpvExpandsFirst() throws Exception {
+        player.play(URI.create("http://radio.example/live.m3u"), "pulse/x", 40, false);
+
+        assertThat(player.active()).isTrue();
+        assertThat(launcher.latest().path()).isEqualTo("http://radio.example/live.m3u");
+    }
+
+    @Test
     void mutesBeforeLoadingWhenAsked() throws Exception {
         player.play(URI.create("http://nas/a.mp3"), "pulse/x", 40, true);
 

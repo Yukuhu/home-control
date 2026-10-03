@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -404,6 +405,13 @@ public final class FakeMpv implements AutoCloseable {
     /** Returns whether the player quits (--idle=once: a failed first file ends the playlist). */
     private boolean load(String url, List<ObjectNode> events) {
         events.add(event("start-file"));
+        if (isPlaylist(url)) {
+            // mpv opens a playlist as a file of its own, ends that with "redirect" and goes on with the first entry.
+            ObjectNode redirect = event("end-file");
+            redirect.put("reason", "redirect");
+            events.add(redirect);
+            events.add(event("start-file"));
+        }
         if (options.failUrlsContaining() != null && url.contains(options.failUrlsContaining())) {
             ObjectNode end = event("end-file");
             end.put("reason", "error");
@@ -420,6 +428,12 @@ public final class FakeMpv implements AutoCloseable {
         events.add(event("file-loaded"));
         events.add(event("playback-restart"));
         return false;
+    }
+
+    /** M3U and PLS; not M3U8, which is HLS and plays as one stream. */
+    private static boolean isPlaylist(String url) {
+        String path = url.split("[?#]", 2)[0].toLowerCase(Locale.ROOT);
+        return path.endsWith(".m3u") || path.endsWith(".pls");
     }
 
     private boolean end(String reason, List<ObjectNode> events) {
