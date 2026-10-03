@@ -271,6 +271,8 @@ class YouTubeSetupServiceTest {
             YouTubeApiClient api = new YouTubeApiClient(new YouTubeHttp(fake.properties()),
                     URI.create(fake.base() + "/youtube/v3"), accountTokens, realLedger);
             YouTubeAccount youTubeAccount = new YouTubeAccount(api, service);
+            given(tokens.hasClient()).willReturn(true);
+            given(tokens.hasRefreshToken()).willReturn(true);
 
             String title = youTubeAccount.refreshChannel();
 
@@ -278,6 +280,27 @@ class YouTubeSetupServiceTest {
             assertThat(service.settings().channelId()).isEqualTo("UC4fixtureHomeControl00a");
             assertThat(service.settings().channelTitle()).isEqualTo("Andre at Home");
             assertThat(realLedger.usage().calls()).isEqualTo(Map.of("channels.list", 1));
+        }
+    }
+
+    @Test
+    void aChannelLookupThatEndsAfterADisconnectKeepsNothing() throws IOException {
+        try (FakeGoogleServer fake = new FakeGoogleServer()) {
+            fake.respondWhen("GET", "/youtube/v3/channels", r -> "true".equals(r.query().get("mine")),
+                    FakeGoogleServer.Canned.fixture(200, "channels-mine.json"));
+            GoogleTokens accountTokens = mock(GoogleTokens.class);
+            given(accountTokens.accessToken()).willReturn("ya29.a");
+            QuotaLedger ledgerOfGone = new QuotaLedger(tempDir.resolve("gone-quota.json"),
+                    MutableClock.at(Instant.parse("2026-09-16T10:00:00Z")), 10000, 20);
+            YouTubeApiClient api = new YouTubeApiClient(new YouTubeHttp(fake.properties()),
+                    URI.create(fake.base() + "/youtube/v3"), accountTokens, ledgerOfGone);
+            // The refresh token is gone: the account was disconnected while Google answered.
+            given(tokens.hasClient()).willReturn(true);
+            given(tokens.hasRefreshToken()).willReturn(false);
+
+            new YouTubeAccount(api, service).refreshChannel();
+
+            assertThat(service.settings().channelId()).isNull();
         }
     }
 
