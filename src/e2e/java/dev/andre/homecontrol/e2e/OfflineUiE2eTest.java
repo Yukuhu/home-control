@@ -42,6 +42,42 @@ class OfflineUiE2eTest extends E2eApplicationTest {
         themes.themes().stream().filter(theme -> !theme.builtIn()).forEach(theme -> themes.remove(theme.id()));
     }
 
+    /**
+     * The worker only exists behind an HTTPS proxy, and a proxy whose server is down or restarting answers 502, 503 or
+     * 504 instead of refusing the connection: those get the offline page too. Other answers pass through.
+     */
+    @BrowserTest
+    void aProxyThatCannotReachTheServerGetsTheOfflinePage(String browser) throws IOException, InterruptedException {
+        try (OfflineOrigin origin = new OfflineOrigin(baseUrl(), themes);
+             BrowserSession session = Browsers.open(browser, origin.baseUrl(),
+                     "OfflineUiE2eTest-aProxyThatCannotReachTheServerGetsTheOfflinePage")) {
+            session.context().route("**/*", Route::resume);
+            Page page = session.page();
+            page.navigate("/offline.html");
+            assumeTrue((Boolean) page.evaluate("() => 'serviceWorker' in navigator"),
+                    "This browser does not expose service workers");
+            page.evaluate("""
+                    async script => {
+                        await navigator.serviceWorker.register(script);
+                        await navigator.serviceWorker.ready;
+                    }
+                    """, REPORTING_WORKER);
+            page.waitForFunction("() => Boolean(navigator.serviceWorker.controller)");
+            for (int status : new int[] {502, 503, 504, 404}) {
+                origin.answer("/answered-" + status, status);
+            }
+
+            for (int status : new int[] {502, 503, 504}) {
+                page.navigate("/answered-" + status);
+                assertThat(page).hasTitle("Home Control is offline");
+            }
+            Response missing = page.navigate("/answered-404");
+            org.assertj.core.api.Assertions.assertThat(missing).isNotNull();
+            org.assertj.core.api.Assertions.assertThat(missing.status()).isEqualTo(404);
+            assertThat(page).hasTitle("Answered 404");
+        }
+    }
+
     @BrowserTest
     void offlineNavigationsKeepTheirStylesWithoutCachingLiveRequests(String browser) throws IOException, InterruptedException {
         try (OfflineOrigin origin = new OfflineOrigin(baseUrl(), themes);
@@ -508,6 +544,12 @@ class OfflineUiE2eTest extends E2eApplicationTest {
         private String shellPolicy() { return shellPolicy; }
 
         private void disconnect() { server.close(); }
+
+        /** A page a proxy would answer with this status, titled after it. */
+        private void answer(String path, int status) {
+            server.respond("GET", path, dev.andre.homecontrol.testsupport.Response.of(status, "text/html",
+                    "<!doctype html><title>Answered " + status + "</title>"));
+        }
 
         @Override
         public void close() { disconnect(); }
