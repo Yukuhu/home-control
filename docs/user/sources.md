@@ -192,7 +192,13 @@ Playing a Jellyfin item on a device tries, in order:
    `Cast with the Jellyfin receiver` message starts playback there instead. A Shield with a
    merged Cast receiver also offers this as a retry option if native app startup fails;
    casting starts only when you choose that option.
-3. Otherwise there is no route: `/devices/<id>/route` and `/devices/<id>/play` answer 422 with
+3. **A direct stream to the device** — the device fetches a stream URL that Jellyfin builds. Wi-Fi
+   speakers and media renderers play it as "Stream directly to this device (DLNA/UPnP)", and a
+   Bluetooth speaker plays audio items as "Play through the server on this Bluetooth speaker"; see
+   [Wi-Fi speakers](devices.md#wi-fi-speakers-dlnaupnp-and-sonos) and
+   [Bluetooth speakers](devices.md#bluetooth-speakers-optional). Cast devices never get here: the
+   Jellyfin receiver always wins for them.
+4. Otherwise there is no route: `/devices/<id>/route` and `/devices/<id>/play` answer 422 with
    the reason.
 
 Install Jellyfin for Android TV and sign in on the Shield once. If the app asks you to choose a
@@ -219,13 +225,6 @@ If Jellyfin closes back to the Shield dashboard when remote playback starts, dis
 player. [Jellyfin Android TV issue #5731](https://github.com/jellyfin/jellyfin-androidtv/issues/5731)
 reports this `PlayNow` crash on Shield with version 0.19.9. This is separate from app launch
 failure; remote reconnect messages alone do not identify a Jellyfin crash.
-
-A fourth option is a direct stream URL that Jellyfin builds for the device to fetch itself. Wi-Fi
-speakers and media renderers play it as "Stream directly to this device (DLNA/UPnP)", and a
-Bluetooth speaker plays audio items as "Play through the server on this Bluetooth speaker"; see
-[Wi-Fi speakers](devices.md#wi-fi-speakers-dlnaupnp-and-sonos) and
-[Bluetooth speakers](devices.md#bluetooth-speakers-optional). Cast devices never use it: the
-Jellyfin receiver message always wins for them.
 
 `GET /devices/<id>/route?source=jellyfin&item=<id>` reports which of these a device would use,
 without playing anything.

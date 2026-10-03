@@ -85,8 +85,8 @@ only work together. The important ones are:
 
 - `/DATA/AppData/$AppID/data/keystore.p12` — the Remote v2 client credential;
 - `/DATA/AppData/$AppID/data/devices.json` — the paired-device registry;
-- `/DATA/AppData/$AppID/data/secrets.json` — the keystore password, the LG and Samsung pairing keys and the
-  content sources' credentials, encrypted;
+- `/DATA/AppData/$AppID/data/secrets.json` — the keystore password, the LG and Samsung pairing keys, the login
+  password's hash and the content sources' credentials, encrypted;
 - `/DATA/AppData/$AppID/data/secret.key` — the key that decrypts `secrets.json`, unless `HOME_CONTROL_SECRET` is
   set (see [Security](docs/user/security.md)).
 
