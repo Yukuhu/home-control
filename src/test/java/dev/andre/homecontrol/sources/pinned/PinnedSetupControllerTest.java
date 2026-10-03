@@ -127,6 +127,18 @@ class PinnedSetupControllerTest extends WebSliceTest {
         assertThat(section(page, "pinned")).contains(problem).doesNotContain("No pinned links yet.");
     }
 
+    /** One module's section failing leaves only that section out of the setup page, not the page. */
+    @Test
+    void aSectionThatFailsLeavesTheRestOfTheSetupPage() throws Exception {
+        given(pins.all()).willThrow(new IllegalStateException("a bug in the pinned links"));
+
+        String page = mockMvc.perform(get("/setup"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).doesNotContain("id=\"pinned\"").contains("id=\"account\"");
+    }
+
     @Test
     void renameMoveAndRemoveReportRefusalsAndStorageFailures() throws Exception {
         willThrow(new IllegalArgumentException("A title needs 1 to 80 characters")).given(pins).rename("p-aaaaaaaaaaaa", "");

@@ -210,7 +210,7 @@ public class SetupController {
         URI baseUrl = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUri();
         Map<SetupSection.Group, List<SetupSection>> shown = new EnumMap<>(SetupSection.Group.class);
         sections.orderedStream().sorted(Comparator.comparingInt(SetupSection::order)).forEach(section -> {
-            Object view = section.view(baseUrl);
+            Object view = viewOf(section, baseUrl);
             if (view != null) {
                 model.addAttribute(section.id(), view);
                 shown.computeIfAbsent(section.group(), group -> new ArrayList<>()).add(section);
@@ -218,6 +218,16 @@ public class SetupController {
         });
         model.addAttribute("deviceSections", shown.getOrDefault(SetupSection.Group.DEVICES, List.of()));
         model.addAttribute("sourceSections", shown.getOrDefault(SetupSection.Group.CONTENT_SOURCES, List.of()));
+    }
+
+    /** A section that fails is left out, so that one module cannot take the whole setup page down with it. */
+    private static Object viewOf(SetupSection section, URI baseUrl) {
+        try {
+            return section.view(baseUrl);
+        } catch (RuntimeException e) {
+            log.warn("Leaving the {} section out of the setup page", section.id(), e);
+            return null;
+        }
     }
 
     @PostMapping("/setup/forget")

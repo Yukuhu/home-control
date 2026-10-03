@@ -16,8 +16,7 @@ public class PinnedSetupSection extends SetupSection {
     public record PinView(String id, String title, String subtitle, String url, boolean first, boolean last) {
     }
 
-    /** What the setup page shows about pinned shortcuts. */
-    /** {@code problem}: why the pins cannot be read, or null. */
+    /** What the setup page shows about pinned shortcuts; {@code problem} is why the pins cannot be read, or null. */
     public record View(List<PinView> pins, int maxPins, String problem) {
     }
 
