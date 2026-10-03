@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Predicate;
 
 /** Google OAuth, YouTube Data API v3, Lounge and thumbnails in one in-process fake. */
@@ -96,6 +97,14 @@ public final class FakeGoogleServer implements AutoCloseable {
         server.respond(method, path, request -> when.test(recorded(request)), Arrays.stream(answers)
                 .map(answer -> Response.of(answer.status(), answer.contentType(), answer.body()))
                 .toArray(Response[]::new));
+        return this;
+    }
+
+    /** Records each request {@code when} accepts at once, and answers it with {@code answer} once {@code release} opens. */
+    public FakeGoogleServer holdWhen(String method, String path, Predicate<Recorded> when, CountDownLatch release,
+                                     Canned answer) {
+        server.hold(method, path, request -> when.test(recorded(request)), release,
+                Response.of(answer.status(), answer.contentType(), answer.body()));
         return this;
     }
 

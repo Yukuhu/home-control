@@ -13,10 +13,14 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 
 class SubscriptionsFeedTest {
@@ -207,6 +211,28 @@ class SubscriptionsFeedTest {
         SubscriptionsFeed feed = feed(api());
 
         assertThatThrownBy(feed::refresh).isInstanceOf(YouTubeException.class);
+    }
+
+    @Test
+    void clearingWaitsForNoRunningRefreshAndKeepsNothingOfIt() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        fake.holdWhen("GET", "/youtube/v3/playlistItems", r -> true, release,
+                FakeGoogleServer.Canned.fixture(200, "playlist-items-uploads-kurzgesagt.json"));
+        SubscriptionsFeed feed = feed(api());
+        CompletableFuture<List<YouTubeVideo>> running = CompletableFuture.supplyAsync(feed::refresh);
+        await().until(() -> !fake.requests("/youtube/v3/playlistItems").isEmpty());
+
+        // A disconnect or a new grant clears the feed while a refresh waits on Google.
+        try {
+            CompletableFuture.runAsync(feed::clear).get(2, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+        }
+
+        assertThat(running.get(5, TimeUnit.SECONDS)).as("the forgotten account's videos").isEmpty();
+        int lookups = fake.requests("/youtube/v3/subscriptions").size();
+        feed.refresh();
+        assertThat(fake.requests("/youtube/v3/subscriptions")).hasSizeGreaterThan(lookups);
     }
 
     @Test

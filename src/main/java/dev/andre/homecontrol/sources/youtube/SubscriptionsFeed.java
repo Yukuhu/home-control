@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** "New from your subscriptions": subscriptions → uploads playlists → newest videos, inside a per-refresh budget. */
 public class SubscriptionsFeed {
@@ -40,6 +41,9 @@ public class SubscriptionsFeed {
     private Instant lastRefreshAt;
     private YouTubeException firstRefreshFailure;
     private Instant firstRefreshFailedAt;
+    /** Moved on by {@link #clear()}, which does not wait for a running refresh; refresh() drops an older epoch's state. */
+    private final AtomicLong epoch = new AtomicLong();
+    private long seenEpoch;
 
     public SubscriptionsFeed(YouTubeApiClient api, YouTubeProperties properties, Clock clock) {
         this.api = api;
@@ -48,6 +52,11 @@ public class SubscriptionsFeed {
     }
 
     public synchronized List<YouTubeVideo> refresh() {
+        long started = epoch.get();
+        if (started != seenEpoch) {
+            reset();
+            seenEpoch = started;
+        }
         Instant now = clock.instant();
         if (lastResult != null && now.isBefore(lastRefreshAt.plus(properties.minRefreshSpacing()))) {
             return lastResult;
@@ -70,6 +79,10 @@ public class SubscriptionsFeed {
                 throw e;
             }
         }
+        if (epoch.get() != started) {
+            reset(); // cleared meanwhile: what this refresh found belongs to the account that was forgotten
+            return List.of();
+        }
         firstRefreshFailure = null;
         firstRefreshFailedAt = null;
         lastResult = merge();
@@ -77,7 +90,12 @@ public class SubscriptionsFeed {
         return lastResult;
     }
 
-    public synchronized void clear() {
+    /** Forgets the account, at once: a refresh that runs now keeps nothing of what it finds. */
+    public void clear() {
+        epoch.incrementAndGet();
+    }
+
+    private void reset() {
         subscriptions = null;
         subscriptionsFetchedAt = null;
         uploads.clear();
