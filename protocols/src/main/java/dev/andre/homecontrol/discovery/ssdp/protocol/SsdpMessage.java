@@ -17,6 +17,8 @@ public record SsdpMessage(Kind kind, Map<String, String> headers) {
 
     private static final Pattern MAX_AGE = Pattern.compile("max-age\\s*=\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Duration DEFAULT_MAX_AGE = Duration.ofMinutes(30);
+    /** Any host on the LAN can announce any lifetime; a longer one counts as this. */
+    private static final Duration LONGEST_MAX_AGE = Duration.ofDays(1);
 
     public static Optional<SsdpMessage> parse(byte[] data, int length) {
         if (data == null || length <= 0) {
@@ -62,9 +64,18 @@ public record SsdpMessage(Kind kind, Map<String, String> headers) {
         return kind == Kind.NOTIFY && header("NTS").map("ssdp:byebye"::equalsIgnoreCase).orElse(false);
     }
 
+    /** The announced lifetime, at most a day, even when the number is too long for a {@code long}. */
     public Duration maxAge() {
         Matcher matcher = MAX_AGE.matcher(header("CACHE-CONTROL").orElse(""));
-        return matcher.find() ? Duration.ofSeconds(Long.parseLong(matcher.group(1))) : DEFAULT_MAX_AGE;
+        if (!matcher.find()) {
+            return DEFAULT_MAX_AGE;
+        }
+        String seconds = matcher.group(1).replaceFirst("^0+(?=\\d)", "");
+        if (seconds.length() > String.valueOf(LONGEST_MAX_AGE.toSeconds()).length()) {
+            return LONGEST_MAX_AGE;
+        }
+        Duration announced = Duration.ofSeconds(Long.parseLong(seconds));
+        return announced.compareTo(LONGEST_MAX_AGE) > 0 ? LONGEST_MAX_AGE : announced;
     }
 
     public static byte[] search(String searchTarget, String hostHeader, int mx, String userAgent) {

@@ -97,6 +97,21 @@ class SsdpMessageTest {
         assertThat(message.maxAge()).isEqualTo(Duration.ofMinutes(30));
     }
 
+    /** Any LAN host can send this: a lifetime past a day is a day, and one no long can hold is too. */
+    @Test
+    void aMaxAgeLongerThanADayCountsAsADay() {
+        assertThat(maxAgeOf("max-age=86401")).isEqualTo(Duration.ofDays(1));
+        assertThat(maxAgeOf("max-age=99999999999999999")).isEqualTo(Duration.ofDays(1));
+        assertThat(maxAgeOf("max-age=99999999999999999999")).isEqualTo(Duration.ofDays(1));
+        assertThat(maxAgeOf("max-age=0")).isEqualTo(Duration.ZERO);
+    }
+
+    private static Duration maxAgeOf(String cacheControl) {
+        String alive = "NOTIFY * HTTP/1.1\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\nUSN: uuid:a::urn:x:1\r\nCACHE-CONTROL: "
+                + cacheControl + "\r\n\r\n";
+        return SsdpMessage.parse(alive.getBytes(US_ASCII), alive.length()).orElseThrow().maxAge();
+    }
+
     @Test
     void rejectsDatagramsThatAreNotSsdp() {
         String getRequest = "GET / HTTP/1.1\r\n\r\n";

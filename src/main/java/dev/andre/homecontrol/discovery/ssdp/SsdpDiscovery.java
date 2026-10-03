@@ -196,7 +196,14 @@ public class SsdpDiscovery implements AutoCloseable {
                 return;
             }
             InetAddress sender = packet.getAddress();
-            SsdpMessage.parse(packet.getData(), packet.getLength()).ifPresent(message -> handle(message, sender));
+            try {
+                SsdpMessage.parse(packet.getData(), packet.getLength()).ifPresent(message -> handle(message, sender));
+            } catch (RuntimeException e) {
+                // Neither a datagram nor a listener may end discovery until the next restart: the next one is read.
+                log.warn("Ignored an SSDP datagram from {} that could not be handled: {}", sender.getHostAddress(),
+                        e.toString());
+                log.debug("The SSDP datagram's failure", e);
+            }
         }
     }
 
