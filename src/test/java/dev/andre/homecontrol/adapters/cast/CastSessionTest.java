@@ -120,6 +120,22 @@ class CastSessionTest {
     }
 
     @Test
+    void aReceiverIsConnectedOnlyOnceItHasAnswered() throws Exception {
+        receiver.ignore("GET_STATUS");
+        start(receiver.port());
+        await().until(() -> !receiver.received(RECEIVER, "GET_STATUS").isEmpty());
+
+        await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
+                .until(() -> session.state().status() == DeviceStatus.CONNECTING);
+        // Nothing is known about the receiver yet, so a Stop has nothing it could stop.
+        assertThatThrownBy(() -> session.execute(new Action.Stop()))
+                .isInstanceOf(DeviceOfflineException.class).hasMessage("Living Room TV is not connected");
+
+        receiver.pushReceiverStatus();
+        await().until(() -> session.state().connected());
+    }
+
+    @Test
     void reconnectsAfterTheReceiverHangsUp() throws Exception {
         start(receiver.port());
         awaitStatus();

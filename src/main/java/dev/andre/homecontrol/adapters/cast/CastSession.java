@@ -41,7 +41,9 @@ import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.RECEIV
 
 /**
  * One Cast receiver's live connection. Connection, receiver and media state change only on the session's loop, and
- * the {@link Reconnector} retries with a growing backoff. Commands run on the caller's thread and fail at once when
+ * the {@link Reconnector} retries with a growing backoff. A connection counts once the receiver has answered: until
+ * its first RECEIVER_STATUS the attempt stays pending, so a receiver that hangs up at once backs off like one that
+ * cannot be reached. Commands run on the caller's thread and fail at once when
  * they cannot be sent (nothing is queued). The session follows the media channel of whichever app is in front, so
  * casts started from a phone show up as now playing too. Cast has no pairing, so there is no UNPAIRED state.
  */
@@ -129,7 +131,10 @@ public class CastSession implements DeviceHandle, ReceiverApps {
     private void stopForegroundApp() {
         requireConnected();
         ReceiverStatus status = receiver;
-        Optional<ReceiverStatus.ReceiverApp> app = status == null ? Optional.empty() : status.foregroundApp();
+        if (status == null) {
+            throw DeviceCalls.notConnected(device.name()); // the connection dropped just now
+        }
+        Optional<ReceiverStatus.ReceiverApp> app = status.foregroundApp();
         if (app.isEmpty()) {
             return; // nothing is casting, so it is already stopped
         }
@@ -199,8 +204,8 @@ public class CastSession implements DeviceHandle, ReceiverApps {
             if (!connection.set(opened)) {
                 return Reconnector.Outcome.STOP; // closed meanwhile; the slot closed the connection
             }
-            publisher.update(state -> state.withStatus(DeviceStatus.CONNECTED));
-            return Reconnector.Outcome.CONNECTED;
+            return Reconnector.Outcome.PENDING; // connected once the receiver answers
+
         } catch (IOException e) {
             if (opened != null) {
                 opened.close();
@@ -267,8 +272,11 @@ public class CastSession implements DeviceHandle, ReceiverApps {
 
         private void onReceiverStatus(ReceiverStatus status) {
             receiver = status;
+            if (publisher.current().status() == DeviceStatus.CONNECTING) {
+                reconnector.connected();
+            }
             Optional<ReceiverStatus.ReceiverApp> foreground = status.foregroundApp();
-            publisher.update(state -> state.withPower(!status.standBy())
+            publisher.update(state -> state.withStatus(DeviceStatus.CONNECTED).withPower(!status.standBy())
                     .withCurrentApp(foreground.map(ReceiverStatus.ReceiverApp::displayName).orElse(null))
                     .withVolume(status.volumePercent(), 100, status.muted()));
             followMedia(foreground.filter(app -> app.speaks(MEDIA)).map(ReceiverStatus.ReceiverApp::transportId).orElse(null));
