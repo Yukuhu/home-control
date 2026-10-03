@@ -324,7 +324,6 @@ class EventStreamTest {
     void theHeartbeatStopsWhenTheApplicationCloses() throws InterruptedException {
         AtomicInteger beats = new AtomicInteger();
         CountDownLatch slowTab = new CountDownLatch(1);
-        CountDownLatch drained = new CountDownLatch(1);
         EventStream stream = new EventStream(new EventStreamProperties(Duration.ofMillis(50))) {
             @Override
             void sendHeartbeat(SseEmitter emitter) {
@@ -333,11 +332,6 @@ class EventStreamTest {
                     awaitQuietly(slowTab);
                 }
             }
-
-            @Override
-            void sendNamed(SseEmitter emitter, String name, Object data) {
-                drained.countDown();
-            }
         };
         try {
             stream.subscribe(() -> true, _ -> { });
@@ -345,17 +339,23 @@ class EventStreamTest {
             await().during(Duration.ofMillis(250)).atMost(Duration.ofSeconds(2)).until(() -> beats.get() == 1);
 
             stream.onContextClosed();
-            stream.subscribe(() -> true, _ -> { });
-            stream.onRailsChanged(new RailsChangedEvent(List.of()));
             slowTab.countDown();
-            // The slow tab was ended by the close; its queued heartbeats are dropped, not sent, once it is free again.
-            assertThat(drained.await(2, TimeUnit.SECONDS)).isTrue();
 
-            assertThat(beats).hasValue(1);
+            // The close ended the slow tab: once it is free again, its queued heartbeats are dropped, not sent.
             await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2)).until(() -> beats.get() == 1);
         } finally {
             stream.shutdown();
         }
+    }
+
+    /** Graceful shutdown waits for open requests: a tab that subscribes once closing has begun must not hold it up. */
+    @Test
+    void aTabThatSubscribesAfterTheApplicationStartedClosingIsEndedAtOnce() {
+        broadcaster.onContextClosed();
+
+        CountingEmitter late = (CountingEmitter) broadcaster.register(new CountingEmitter());
+
+        await().atMost(Duration.ofSeconds(2)).until(late::completed);
     }
 
     private static void awaitQuietly(CountDownLatch latch) {

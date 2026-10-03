@@ -6,6 +6,7 @@ let source;
 const handlers = new Map();
 const FIRST_RETRY_MS = 1000;
 const LAST_RETRY_MS = 30000;
+const SESSION_TIMEOUT_MS = 10000;
 let retryMs = FIRST_RETRY_MS;
 
 function announce(connected) {
@@ -25,9 +26,9 @@ function open() {
         retryMs = FIRST_RETRY_MS;
         announce(true);
     });
-    source.addEventListener("error", () => {
+    source.addEventListener("error", (event) => {
         announce(false);
-        if (source.readyState === EventSource.CLOSED) setTimeout(recover, nextRetry());
+        if (event.target.readyState === EventSource.CLOSED) setTimeout(recover, nextRetry());
     });
     for (const name of handlers.keys()) source.addEventListener(name, deliver(name));
 }
@@ -40,13 +41,14 @@ function nextRetry() {
 
 async function recover() {
     try {
-        const answer = await fetch("/session", { cache: "no-store" });
+        // A connection left half-open by a network switch must not keep the page waiting for ever.
+        const answer = await fetch("/session", { cache: "no-store", signal: AbortSignal.timeout(SESSION_TIMEOUT_MS) });
         if (answer.status === 401) {
             location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`);
             return;
         }
     } catch {
-        // The server is still unreachable; the new stream finds out and tries again.
+        // The server is still unreachable, or did not answer in time; the new stream finds out and tries again.
     }
     open();
 }

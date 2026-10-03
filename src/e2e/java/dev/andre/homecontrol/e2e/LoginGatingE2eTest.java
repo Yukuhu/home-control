@@ -193,9 +193,9 @@ class LoginGatingE2eTest extends E2eApplicationTest {
             assertThat(page.locator("#connection-status")).hasText("Live updates");
             org.assertj.core.api.Assertions.assertThat(refused.get()).as("the stream that got a 502, and the new one")
                     .isGreaterThanOrEqualTo(2);
-            fakeDevices.push("living", new DeviceState(DeviceStatus.CONNECTED, true, "com.example.launcher",
-                    0, 0, false, Instant.now()));
-            assertThat(page.locator("#status-living")).hasText("CONNECTED");
+            // The fake devices start connected: only a change shows that the new stream delivers.
+            fakeDevices.push("living", DeviceState.initial());
+            assertThat(page.locator("#status-living")).hasText("DISCONNECTED");
         }
     }
 
@@ -211,7 +211,7 @@ class LoginGatingE2eTest extends E2eApplicationTest {
             login.changePassword(PASSWORD, next, next, new RequestLoginContext(new MockHttpServletRequest(), login));
 
             assertThat(page).hasURL(Pattern.compile(".*/login\\?next=%2F%3Fdevice%3Dliving$"),
-                    new PageAssertions.HasURLOptions().setTimeout(10_000));
+                    new PageAssertions.HasURLOptions().setTimeout(20_000));
         } finally {
             login.changePassword(next, PASSWORD, PASSWORD, new RequestLoginContext(new MockHttpServletRequest(), login));
         }

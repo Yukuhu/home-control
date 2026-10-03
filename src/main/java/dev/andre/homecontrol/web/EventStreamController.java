@@ -56,7 +56,7 @@ public class EventStreamController {
         for (RailSnapshot rail : snapshots) {
             emitter.send(SseEmitter.event().name("rail").data(RailEventView.of(rail)));
         }
-        List<String> keys = snapshots.stream().map(rail -> RailSnapshot.key(rail.descriptor())).toList();
+        List<String> keys = snapshots.stream().map(RailSnapshot::key).toList();
         emitter.send(SseEmitter.event().name("rails").data(Map.of("rails", keys)));
     }
 }
