@@ -11,8 +11,10 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -40,6 +42,8 @@ public final class SsapConnection implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(SsapConnection.class);
 
     private final HttpClient http;
+    private final String host;
+    private final SsapOptions options;
     private final Duration connectTimeout;
     private final Duration requestTimeout;
     private final Map<String, CompletableFuture<JsonNode>> pending = new ConcurrentHashMap<>();
@@ -52,8 +56,10 @@ public final class SsapConnection implements AutoCloseable {
     private volatile String closedReason;
     private TextWebSocket pointer; // guarded by this
 
-    private SsapConnection(HttpClient http, SsapOptions options) {
+    private SsapConnection(HttpClient http, String host, SsapOptions options) {
         this.http = http;
+        this.host = host;
+        this.options = options;
         this.connectTimeout = options.connectTimeout();
         this.requestTimeout = options.requestTimeout();
     }
@@ -61,7 +67,7 @@ public final class SsapConnection implements AutoCloseable {
     /** ws://host:port first, then wss://host:securePort (firmware that closed the plain port or insists on TLS). */
     public static SsapConnection open(HttpClient http, String host, SsapOptions options, Consumer<String> onClosed)
             throws IOException {
-        SsapConnection connection = new SsapConnection(http, options);
+        SsapConnection connection = new SsapConnection(http, host, options);
         TextWebSocket.Listener listener = new TextWebSocket.Listener() {
             @Override
             public void onText(String text) {
@@ -156,7 +162,7 @@ public final class SsapConnection implements AutoCloseable {
             if (path.isEmpty()) {
                 throw new SsapException("The TV did not offer a pointer input socket");
             }
-            pointer = TextWebSocket.connect(http, URI.create(path), connectTimeout, new TextWebSocket.Listener() {
+            pointer = TextWebSocket.connect(http, pointerSocket(path), connectTimeout, new TextWebSocket.Listener() {
                 @Override
                 public void onText(String text) {
                     // Pointer input is a write-only channel; incoming text has no protocol meaning.
@@ -169,6 +175,27 @@ public final class SsapConnection implements AutoCloseable {
             });
         }
         pointer.send(SsapMessages.button(name));
+    }
+
+    /**
+     * The pointer input socket on the TV itself. The TV's answer names it, but only its scheme, port and path are used:
+     * whatever host it names, this server opens no socket to another machine.
+     */
+    private URI pointerSocket(String socketPath) throws IOException {
+        URI offered;
+        try {
+            offered = new URI(socketPath);
+        } catch (URISyntaxException _) {
+            throw new SsapException("The TV offered an unusable pointer input socket");
+        }
+        String scheme = offered.getScheme() == null ? "" : offered.getScheme().toLowerCase(Locale.ROOT);
+        if (!(scheme.equals("ws") || scheme.equals("wss")) || offered.getRawPath() == null) {
+            throw new SsapException("The TV offered an unusable pointer input socket");
+        }
+        int defaultPort = scheme.equals("wss") ? options.securePort() : options.port();
+        String query = offered.getRawQuery() == null ? "" : "?" + offered.getRawQuery();
+        return DeviceUris.of(scheme, host, offered.getPort() > 0 ? offered.getPort() : defaultPort,
+                offered.getRawPath() + query);
     }
 
     static JsonNode payloadOf(String uri, JsonNode message) throws SsapException {
