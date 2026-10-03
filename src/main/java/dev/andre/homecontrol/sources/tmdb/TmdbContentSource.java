@@ -17,6 +17,7 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -34,6 +35,10 @@ public class TmdbContentSource implements ContentSource {
 
     public static final String SOURCE_ID = "tmdb";
     private static final RailDescriptor TRENDING = new RailDescriptor(SOURCE_ID, "trending", "Trending on your services");
+    /** Failures that are not about one title: TMDB is away, limiting this server, or refusing its key. */
+    private static final Set<ContentSourceException.Kind> STOPS_THE_LOOKUPS = EnumSet.of(
+            ContentSourceException.Kind.UNREACHABLE, ContentSourceException.Kind.RATE_LIMITED,
+            ContentSourceException.Kind.UNAUTHORIZED);
 
     private final TmdbSetupService setup;
     private final TmdbClient client;
@@ -118,6 +123,9 @@ public class TmdbContentSource implements ContentSource {
             } catch (TmdbException e) {
                 if (firstFailure == null) {
                     firstFailure = e;
+                }
+                if (STOPS_THE_LOOKUPS.contains(e.kind())) {
+                    break; // every further lookup would fail the same way, and each waits out its timeout
                 }
             }
             if (watchProviders != null) {
