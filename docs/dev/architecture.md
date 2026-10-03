@@ -97,8 +97,8 @@ alone.
 | `config` depends on no other application package | strict |
 | Nothing outside `device` depends on it, except the application's configuration (`HomeControlConfiguration`): callers use the four `core` device interfaces | strict |
 | `jakarta.servlet` is used only in `web`, `security`, controllers and controller advice | strict |
-| Only `LoginService` starts and ends a login session (`LoginContext.startSession`, `endSession`) | strict |
-| Only `LoginContextResolver` makes a `RequestLoginContext`, for a controller's `LoginContext` argument | strict |
+| Only `LoginService` starts, resumes and ends a login session (`LoginContext.startSession`, `resumeSession`, `endSession`) | strict |
+| Only `LoginContextResolver` makes a `RequestLoginContext`, for a controller's `LoginContext` argument and for the login gate | strict |
 | Only `LoginService`, `RequestLoginContext` and `LoginGateFilter` call `LoginService.isAuthenticated`; the rest ask their `LoginContext` | strict |
 | Classes named `*Session` in `adapters`, and the classes nested in them, create no executors: their thread is a `SessionLoop` | strict |
 | `..protocol..` packages depend on neither Spring nor any application package other than `adapters.net` and other protocol packages | strict |

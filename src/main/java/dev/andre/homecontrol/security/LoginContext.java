@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.security;
 
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -30,4 +31,10 @@ public interface LoginContext {
 
     /** Ends this browser's session. For {@link LoginService}. */
     void endSession();
+
+    /** The password version of the login this browser is remembered by, if any (see {@link RememberedLogins}). */
+    Optional<String> rememberedVersion();
+
+    /** Logs this browser back in with its remembered login, under a new session id. For {@link LoginService}. */
+    void resumeSession(String version);
 }

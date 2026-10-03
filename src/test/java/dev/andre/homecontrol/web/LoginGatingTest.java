@@ -1,10 +1,13 @@
 package dev.andre.homecontrol.web;
 
 import dev.andre.homecontrol.security.LoginService;
+import dev.andre.homecontrol.security.RememberedLogins;
 import dev.andre.homecontrol.security.RequestLoginContext;
+import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.testsupport.FullAppReset;
 import dev.andre.homecontrol.testsupport.FullAppTest;
 import dev.andre.homecontrol.themes.ThemeCatalog;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -47,6 +52,9 @@ class LoginGatingTest extends FullAppTest {
 
     @Autowired
     ApplicationContext context;
+
+    @Autowired
+    DataDirectory data;
 
     /** The context is shared, so every test starts from a fresh install: no login, no secrets, no rate limit. */
     @AfterEach
@@ -183,6 +191,75 @@ class LoginGatingTest extends FullAppTest {
         mockMvc.perform(post("/login").param("password", PASSWORD))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(content().string(containsString("Too many attempts")));
+    }
+
+    /** Logs in and returns the remembered-login cookie, which is all a browser has left after a restart. */
+    private Cookie rememberedLogin() throws Exception {
+        MvcResult result = mockMvc.perform(post("/login").header("Host", "localhost").header("Origin", "http://localhost")
+                        .param("password", PASSWORD).param("next", "/setup"))
+                .andExpect(status().isFound()).andReturn();
+        Cookie cookie = result.getResponse().getCookie("HOME_CONTROL_LOGIN");
+        assertThat(cookie).isNotNull();
+        return cookie;
+    }
+
+    @Test
+    void aLoginSurvivesARestartOfTheServer() throws Exception {
+        storeAFirstSecret();
+        Cookie remembered = rememberedLogin();
+
+        MvcResult result = mockMvc.perform(get("/setup").cookie(remembered).accept("text/html"))
+                .andExpect(status().isOk()).andReturn();
+        MockHttpSession resumed = (MockHttpSession) result.getRequest().getSession(false);
+
+        mockMvc.perform(get("/setup").session(resumed).accept("text/html")).andExpect(status().isOk());
+        mockMvc.perform(get("/events").cookie(remembered).accept("text/event-stream")).andExpect(status().isOk());
+    }
+
+    @Test
+    void aBrowserThatLoggedOutIsNotLetBackInByItsOldCookie() throws Exception {
+        storeAFirstSecret();
+        MvcResult loggedIn = mockMvc.perform(post("/login").header("Host", "localhost")
+                        .header("Origin", "http://localhost").param("password", PASSWORD))
+                .andExpect(status().isFound()).andReturn();
+        Cookie remembered = loggedIn.getResponse().getCookie("HOME_CONTROL_LOGIN");
+
+        mockMvc.perform(post("/logout").header("Host", "localhost").header("Origin", "http://localhost")
+                        .session((MockHttpSession) loggedIn.getRequest().getSession(false)).cookie(remembered))
+                .andExpect(status().isFound())
+                .andExpect(cookie().maxAge("HOME_CONTROL_LOGIN", 0));
+
+        mockMvc.perform(get("/setup").cookie(remembered).accept("text/html"))
+                .andExpect(redirectedUrl("/login?next=%2Fsetup"));
+    }
+
+    @Test
+    void aDamagedLoginsFileMeansLoggingInAgainNotAnError() throws Exception {
+        storeAFirstSecret();
+        Cookie remembered = rememberedLogin();
+        // As after a restart: nothing in memory, and the file is damaged.
+        context.getBean(RememberedLogins.class).clear();
+        Files.writeString(data.resolve(DataDirectory.LOGINS), "{ not json");
+
+        mockMvc.perform(get("/setup").cookie(remembered).accept("text/html"))
+                .andExpect(redirectedUrl("/login?next=%2Fsetup"));
+        mockMvc.perform(get("/events").cookie(remembered).accept("text/event-stream"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void aFormPostedWithoutALoginGoesToTheLoginPageAndBackToItsPage() throws Exception {
+        storeAFirstSecret();
+
+        mockMvc.perform(post("/setup/password").header("Host", "localhost").header("Origin", "http://localhost")
+                        .header("Referer", "http://localhost/setup?tab=account").accept("text/html")
+                        .param("current", "x"))
+                .andExpect(status().isSeeOther())
+                .andExpect(redirectedUrl("/login?next=%2Fsetup%3Ftab%3Daccount"));
+        mockMvc.perform(post("/setup/password").header("Host", "localhost").header("Origin", "http://localhost")
+                        .header("Referer", "http://elsewhere.example/setup").accept("text/html"))
+                .andExpect(status().isSeeOther())
+                .andExpect(redirectedUrl("/login?next=%2F"));
     }
 
     @Test

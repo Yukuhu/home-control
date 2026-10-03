@@ -20,6 +20,8 @@ public final class DataDirectory {
     public static final String SPORTS = "sports.json";
     public static final String PINNED = "pinned.json";
     public static final String YOUTUBE_QUOTA = "youtube-quota.json";
+    /** Hashes of the tokens that keep browsers logged in across restarts; losing it only logs them out. */
+    public static final String LOGINS = "logins.json";
     /** Present while {@code home-control.security.reset-login} is set and has run once. */
     public static final String LOGIN_RESET = "login-reset.done";
 
