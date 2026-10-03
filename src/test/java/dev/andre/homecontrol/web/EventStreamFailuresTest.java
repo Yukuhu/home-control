@@ -37,8 +37,8 @@ class EventStreamFailuresTest {
 
         broadcaster.onStateChanged(event());
         await().until(() -> healthy.sends.get() == 1);
+        await().until(() -> broken.completedWithError);
         assertThat(broken.sends).hasValue(1);
-        assertThat(broken.completedWithError).isTrue();
 
         broadcaster.onStateChanged(event());
         await().until(() -> healthy.sends.get() == 2);
@@ -56,11 +56,14 @@ class EventStreamFailuresTest {
         broadcaster.onStateChanged(event());
 
         await().until(() -> other.sends.get() == 1);
-        assertThat(revoked.completed).isTrue();
+        await().until(() -> revoked.completed);
         assertThat(revoked.sends).hasValue(0);
     }
 
-    /** An Error reaches the thread's handler instead of being swallowed; its subscriber is dropped and later events go out. */
+    /**
+     * An Error reaches the thread's handler instead of being swallowed; its subscriber is dropped, and as every tab
+     * has a sender of its own, the other tabs hear that event and the later ones.
+     */
     @Test
     void anErrorDuringASendIsNotSwallowedAndOnlyItsSubscriberIsDropped() {
         List<Throwable> uncaught = new CopyOnWriteArrayList<>();
@@ -84,7 +87,7 @@ class EventStreamFailuresTest {
             assertThat(uncaught).singleElement().isInstanceOf(AssertionError.class);
 
             broadcaster.onStateChanged(event());
-            await().dontCatchUncaughtExceptions().until(() -> healthy.sends.get() == 1);
+            await().dontCatchUncaughtExceptions().until(() -> healthy.sends.get() == 2);
             assertThat(flaky.sends).as("the subscriber that raised the Error is off the list").hasValue(1);
             assertThat(uncaught).hasSize(1);
         } finally {
