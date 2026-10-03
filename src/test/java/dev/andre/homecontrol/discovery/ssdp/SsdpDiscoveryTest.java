@@ -2,6 +2,7 @@ package dev.andre.homecontrol.discovery.ssdp;
 
 import com.sun.net.httpserver.HttpServer;
 import dev.andre.homecontrol.discovery.ssdp.protocol.FakeSsdpResponder;
+import dev.andre.homecontrol.discovery.ssdp.protocol.SsdpMessage;
 import dev.andre.homecontrol.testsupport.Fixtures;
 import dev.andre.homecontrol.testsupport.MutableClock;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -216,21 +218,100 @@ class SsdpDiscoveryTest {
                 .doesNotContain("uuid:lives-for-ever::urn:x:1");
     }
 
-    /** A flood of announcements with new USNs keeps the services that last longest, and no more than the cap. */
-    @Test
-    void aFloodOfAnnouncementsKeepsAtMostTheCap() throws IOException {
-        discovery.watch("urn:x:1");
-        int sent = SsdpDiscovery.MAX_SERVICES + 20;
+    private static SsdpMessage announcement(String uuid, int maxAge) {
+        String alive = "NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\n"
+                + "USN: " + uuid + "::urn:x:1\r\nCACHE-CONTROL: max-age=" + maxAge + "\r\n\r\n";
+        return SsdpMessage.parse(alive.getBytes(StandardCharsets.US_ASCII), alive.length()).orElseThrow();
+    }
 
-        for (int i = 0; i < sent; i++) {
-            sendUdp("NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\n"
-                    + "USN: uuid:flood-" + i + "::urn:x:1\r\nCACHE-CONTROL: max-age=" + (1000 + i) + "\r\n\r\n");
+    private static InetAddress host(int last) {
+        return InetAddress.ofLiteral("10.0.0." + last);
+    }
+
+    private List<String> heard() {
+        return discovery.services("urn:x:1").stream().map(SsdpService::usn).toList();
+    }
+
+    /** One host on the LAN cannot fill discovery with announcements of services it invents. */
+    @Test
+    void oneHostKeepsAtMostItsShareOfTheServices() {
+        discovery.watch("urn:x:1");
+
+        for (int i = 0; i < SsdpDiscovery.MAX_SERVICES_PER_HOST + 10; i++) {
+            discovery.handle(announcement("uuid:flood-" + i, 86400), host(66));
+        }
+        discovery.handle(announcement("uuid:tv", 1800), host(5));
+
+        assertThat(discovery.services("urn:x:1")).filteredOn(service -> service.address().equals("10.0.0.66"))
+                .hasSize(SsdpDiscovery.MAX_SERVICES_PER_HOST);
+        assertThat(heard()).contains("uuid:tv::urn:x:1");
+    }
+
+    /**
+     * When discovery is full, the service heard from longest ago makes room, not one the sender says expires soonest:
+     * a real device answers every search, so a burst of announcements with long lifetimes cannot push it out.
+     */
+    @Test
+    void whenFullTheServiceHeardFromLongestAgoMakesRoom() {
+        discovery.watch("urn:x:1");
+        discovery.handle(announcement("uuid:tv", 1800), host(5));
+        int hosts = SsdpDiscovery.MAX_SERVICES / SsdpDiscovery.MAX_SERVICES_PER_HOST;
+
+        for (int h = 0; h < hosts; h++) {
+            for (int i = 0; i < SsdpDiscovery.MAX_SERVICES_PER_HOST; i++) {
+                clock.advance(Duration.ofSeconds(1));
+                discovery.handle(announcement("uuid:flood-" + h + "-" + i, 86400), host(100 + h));
+                if (h == hosts / 2 && i == 0) {
+                    // The TV answers the search that runs every minute.
+                    discovery.handle(announcement("uuid:tv", 1800), host(5));
+                }
+            }
         }
 
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(discovery.services("urn:x:1"))
-                .extracting(SsdpService::usn).contains("uuid:flood-" + (sent - 1) + "::urn:x:1"));
-        assertThat(discovery.services("urn:x:1")).hasSizeLessThanOrEqualTo(SsdpDiscovery.MAX_SERVICES)
-                .extracting(SsdpService::usn).doesNotContain("uuid:flood-0::urn:x:1");
+        assertThat(heard()).hasSize(SsdpDiscovery.MAX_SERVICES).contains("uuid:tv::urn:x:1")
+                .doesNotContain("uuid:flood-0-0::urn:x:1");
+    }
+
+    /** A service that moved to a new LOCATION while its old description was being fetched never gets the old one. */
+    @Test
+    void aDescriptionFetchedForAnOldLocationIsNotKept() throws Exception {
+        CountDownLatch released = new CountDownLatch(1);
+        HttpServer moving = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        ExecutorService handlers = Executors.newCachedThreadPool();
+        moving.setExecutor(handlers);
+        moving.createContext("/old", exchange -> {
+            try {
+                released.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+            serve(exchange, "lg-description.xml");
+        });
+        moving.createContext("/new", exchange -> serve(exchange, "samsung-description.xml"));
+        moving.start();
+        try {
+            discovery.watch("urn:x:1");
+            String base = "http://127.0.0.1:" + moving.getAddress().getPort();
+            String announce = "NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\n"
+                    + "USN: uuid:moving::urn:x:1\r\nCACHE-CONTROL: max-age=120\r\nLOCATION: " + base + "%s\r\n\r\n";
+            sendUdp(announce.formatted("/old"));
+            await().atMost(Duration.ofSeconds(5)).until(() -> !discovery.services("urn:x:1").isEmpty());
+            sendUdp(announce.formatted("/new"));
+            await().atMost(Duration.ofSeconds(5)).until(() -> discovery.services("urn:x:1").getFirst().location()
+                    .toString().endsWith("/new"));
+
+            released.countDown();
+            await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                    assertThat(discovery.services("urn:x:1").getFirst().description()).isNull());
+
+            sendUdp(announce.formatted("/new"));
+            await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                    assertThat(discovery.services("urn:x:1").getFirst().friendlyName()).isPresent());
+        } finally {
+            released.countDown();
+            moving.stop(0);
+            handlers.shutdownNow();
+        }
     }
 
     /** Each new service's description is fetched once, by a few fetches at a time, however many are announced. */
@@ -241,7 +322,8 @@ class SsdpDiscoveryTest {
         AtomicInteger requests = new AtomicInteger();
         CountDownLatch released = new CountDownLatch(1);
         HttpServer slow = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-        slow.setExecutor(Executors.newCachedThreadPool());
+        ExecutorService handlers = Executors.newCachedThreadPool();
+        slow.setExecutor(handlers);
         slow.createContext("/slow", exchange -> {
             requests.incrementAndGet();
             mostAtOnce.accumulateAndGet(running.incrementAndGet(), Math::max);
@@ -274,6 +356,7 @@ class SsdpDiscoveryTest {
         } finally {
             released.countDown();
             slow.stop(0);
+            handlers.shutdownNow();
         }
         assertThat(mostAtOnce.get()).isEqualTo(SsdpDiscovery.MAX_FETCHES);
     }

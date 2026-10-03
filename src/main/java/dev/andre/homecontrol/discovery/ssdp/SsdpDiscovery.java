@@ -29,10 +29,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -50,6 +50,8 @@ public class SsdpDiscovery implements AutoCloseable {
     private static final String USER_AGENT = DeviceFetch.USER_AGENT;
     /** Any host on the LAN can announce any number of services; at most this many are kept. */
     static final int MAX_SERVICES = 256;
+    /** At most this many of them from one host, so that one host cannot fill discovery with services it invents. */
+    static final int MAX_SERVICES_PER_HOST = 32;
     /** Description fetches at once; a service announced meanwhile is fetched at a later announcement. */
     static final int MAX_FETCHES = 4;
 
@@ -59,6 +61,8 @@ public class SsdpDiscovery implements AutoCloseable {
     private final HttpClient http;
     private final Set<String> watched = ConcurrentHashMap.newKeySet();
     private final Map<String, SsdpService> services = new ConcurrentHashMap<>();
+    /** When each kept service was last heard: what a full discovery makes room by, not a lifetime its sender chose. */
+    private final Map<String, Instant> heard = new ConcurrentHashMap<>();
     private final Map<String, List<SsdpListener>> listeners = new ConcurrentHashMap<>();
     /** USNs whose description is being fetched, so that their next announcements do not fetch it again. */
     private final Set<String> fetching = ConcurrentHashMap.newKeySet();
@@ -139,6 +143,7 @@ public class SsdpDiscovery implements AutoCloseable {
     public List<SsdpService> services(String searchTarget) {
         Instant now = clock.instant();
         services.values().removeIf(service -> !service.expiresAt().isAfter(now));
+        heard.keySet().retainAll(services.keySet());
         return services.values().stream()
                 .filter(service -> service.type().equals(searchTarget))
                 .sorted(Comparator.comparing(SsdpService::address))
@@ -226,6 +231,7 @@ public class SsdpDiscovery implements AutoCloseable {
         }
         if (message.isByeBye()) {
             SsdpService gone = services.remove(usn.get());
+            heard.remove(usn.get());
             if (gone != null) {
                 listenersOf(gone.type()).forEach(listener -> listener.byebye(gone));
             }
@@ -242,9 +248,15 @@ public class SsdpDiscovery implements AutoCloseable {
         SsdpService seen = new SsdpService(usn.get(), type.get(), address, location, message.headers(),
                 clock.instant().plus(message.maxAge()), known);
         if (previous == null) {
+            if (keptFrom(address) >= MAX_SERVICES_PER_HOST) {
+                log.debug("{} announces more than {} services; not keeping {}", address, MAX_SERVICES_PER_HOST,
+                        usn.get());
+                return;
+            }
             makeRoom();
         }
         services.put(usn.get(), seen);
+        heard.put(usn.get(), clock.instant());
         if (known == null && location != null) {
             if (DeviceFetch.isSafeToFetch(location, sender)) {
                 fetchDescription(seen);
@@ -258,16 +270,30 @@ public class SsdpDiscovery implements AutoCloseable {
         listenersOf(seen.type()).forEach(listener -> listener.alive(seen));
     }
 
-    /** Below the cap, after the expired services; else without the one that would expire soonest. */
+    private long keptFrom(String address) {
+        Instant now = clock.instant();
+        return services.values().stream()
+                .filter(service -> service.address().equals(address) && service.expiresAt().isAfter(now))
+                .count();
+    }
+
+    /**
+     * Below the cap, after the expired services; else without the one heard from longest ago. Not the one that would
+     * expire soonest: a sender chooses its lifetime, while a real device answers every search and stays recent.
+     */
     private synchronized void makeRoom() {
         if (services.size() < MAX_SERVICES) {
             return;
         }
         Instant now = clock.instant();
         services.values().removeIf(service -> !service.expiresAt().isAfter(now));
+        heard.keySet().retainAll(services.keySet());
         while (services.size() >= MAX_SERVICES) {
-            services.values().stream().min(Comparator.comparing(SsdpService::expiresAt))
-                    .ifPresent(soonest -> services.remove(soonest.usn(), soonest));
+            services.keySet().stream().min(Comparator.comparing(usn -> heard.getOrDefault(usn, Instant.MIN)))
+                    .ifPresent(oldest -> {
+                        services.remove(oldest);
+                        heard.remove(oldest);
+                    });
         }
     }
 
@@ -299,7 +325,9 @@ public class SsdpDiscovery implements AutoCloseable {
         try {
             byte[] bytes = DeviceFetch.get(http, service.location(), Duration.ofSeconds(3), DeviceFetch.MAX_DESCRIPTION_BYTES);
             DeviceDescription description = DeviceDescriptions.parse(bytes, service.location());
-            services.computeIfPresent(service.usn(), (usn, current) -> current.withDescription(description));
+            // A service announced at a new LOCATION meanwhile keeps waiting for that one's description.
+            services.computeIfPresent(service.usn(), (usn, current) -> Objects.equals(current.location(),
+                    service.location()) ? current.withDescription(description) : current);
         } catch (IOException | IllegalArgumentException e) {
             log.debug("No description for {}: {}", service.usn(), e.getMessage());
         } catch (InterruptedException _) {
