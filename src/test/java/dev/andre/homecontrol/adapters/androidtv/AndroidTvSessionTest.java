@@ -295,7 +295,8 @@ class AndroidTvSessionTest {
             pinned.start();
             await().until(() -> pinned.state().status() == DeviceStatus.UNPAIRED);
 
-            assertThatThrownBy(() -> pinned.execute(new Action.PressKey(RemoteKey.HOME)))
+            Action.PressKey home = new Action.PressKey(RemoteKey.HOME);
+            assertThatThrownBy(() -> pinned.execute(home))
                     .isInstanceOf(DeviceOfflineException.class)
                     .hasMessage("Impostor must be paired again before it can be controlled");
         }
