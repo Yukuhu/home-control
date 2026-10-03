@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.groups.Tuple.tuple;
@@ -25,6 +27,22 @@ class IcsOccurrencesEdgeCaseTest {
     private static IcsOccurrence only(IcsOccurrences.Result result) {
         assertThat(result.occurrences()).hasSize(1);
         return result.occurrences().getFirst();
+    }
+
+    @Test
+    void oneCalendarsExpansionHasOneBudgetForAllItsEvents() {
+        // Each event steps day by day from 1900 to the window, near the cap of one event; twenty of them are
+        // hostile, and stop once the calendar's budget is spent rather than each spending its own.
+        List<String> lines = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            lines.addAll(List.of("BEGIN:VEVENT", "UID:daily-" + i + "@x", "SUMMARY:Daily " + i,
+                    "DTSTART:19000101T120000Z", "RRULE:FREQ=DAILY", "END:VEVENT"));
+        }
+
+        List<IcsOccurrence> occurrences = expand(lines.toArray(String[]::new)).occurrences();
+
+        assertThat(occurrences).isNotEmpty();
+        assertThat(occurrences.stream().map(IcsOccurrence::uid).distinct().count()).isLessThan(20);
     }
 
     @Test

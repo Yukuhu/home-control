@@ -159,6 +159,17 @@ class CalendarScheduleTest {
     }
 
     @Test
+    void theStatusShowsTheLastPassRatherThanExpandingAgain() {
+        int counted = schedule.status("c-3f9a1c2b7d4e").orElseThrow().events();
+        assertThat(counted).isPositive();
+
+        // A setup view later: the window would now hold none of these events, but the status is the last pass's.
+        clock.advance(Duration.ofDays(30));
+
+        assertThat(schedule.status("c-3f9a1c2b7d4e").orElseThrow().events()).isEqualTo(counted);
+    }
+
+    @Test
     void aMovedKickOffKeepsItsId() {
         IcsOccurrence planned = new IcsOccurrence("bl-1@fixtures.example", "A – B",
                 Instant.parse("2026-09-19T13:30:00Z"), Instant.parse("2026-09-19T15:30:00Z"), null, null);
