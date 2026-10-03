@@ -63,6 +63,35 @@ class IcsOccurrencesTest {
     }
 
     @Test
+    void anAllDayOccurrenceIsPlacedInItsSeriesByItsDateAlone() {
+        IcsCalendar calendar = IcsParser.parse("""
+                BEGIN:VCALENDAR
+                BEGIN:VEVENT
+                UID:matchdays@fixtures.example
+                DTSTART;VALUE=DATE:20260920
+                RRULE:FREQ=WEEKLY;COUNT=3
+                SUMMARY:Matchday
+                END:VEVENT
+                BEGIN:VEVENT
+                UID:matchdays@fixtures.example
+                RECURRENCE-ID;VALUE=DATE:20260927
+                DTSTART;VALUE=DATE:20260926
+                SUMMARY:Matchday moved
+                END:VEVENT
+                END:VCALENDAR
+                """);
+
+        List<IcsOccurrence> occurrences = IcsOccurrences.expand(calendar, BERLIN, Instant.parse("2026-09-18T00:00:00Z"),
+                Instant.parse("2026-10-10T00:00:00Z"), DEFAULT_DURATION).occurrences();
+
+        // Midnight in UTC, not in the household's zone: a series keeps its places when that zone changes.
+        assertThat(occurrences).extracting(IcsOccurrence::summary, IcsOccurrence::recurrenceId).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("Matchday", Instant.parse("2026-09-20T00:00:00Z")),
+                org.assertj.core.groups.Tuple.tuple("Matchday moved", Instant.parse("2026-09-27T00:00:00Z")),
+                org.assertj.core.groups.Tuple.tuple("Matchday", Instant.parse("2026-10-04T00:00:00Z")));
+    }
+
+    @Test
     void expandsTheBundesligaFixture() {
         IcsCalendar calendar = IcsParser.parse(fixture("bundesliga.ics"));
         IcsOccurrences.Result result = IcsOccurrences.expand(calendar, BERLIN,

@@ -144,6 +144,16 @@ public final class IcsOccurrences {
         Instant instant(IcsTime time) {
             return local(time).atZone(zoneOf(time)).toInstant();
         }
+
+        /** A RECURRENCE-ID's place in its series; a date's is the one an all-day occurrence has on it. */
+        Instant inSeries(IcsTime recurrenceId) {
+            return recurrenceId instanceof IcsTime.Date(var dateValue) ? inSeries(dateValue) : instant(recurrenceId);
+        }
+
+        /** Midnight in UTC: an all-day series keeps its places when the household's zone changes. */
+        static Instant inSeries(LocalDate date) {
+            return date.atStartOfDay(ZoneOffset.UTC).toInstant();
+        }
     }
 
     private static final class Expansion {
@@ -171,7 +181,7 @@ public final class IcsOccurrences {
             this.pass = pass;
             this.zone = zones.zoneOf(event.start());
             this.first = Zones.local(event.start());
-            this.replaces = event.recurrenceId() == null ? null : zones.instant(event.recurrenceId());
+            this.replaces = event.recurrenceId() == null ? null : zones.inSeries(event.recurrenceId());
             this.allDay = event.start() instanceof IcsTime.Date;
             this.days = allDay ? allDayLength(event, first) : 0;
             this.length = allDay ? null : timedLength(event, first.atZone(zone).toInstant(), zones, defaultDuration);
@@ -292,9 +302,18 @@ public final class IcsOccurrences {
             if (!end.isAfter(pass.window().start()) || !start.isBefore(pass.window().end())) {
                 return;
             }
-            Instant inSeries = replaces != null ? replaces : rule != null ? start : null;
             pass.out().add(new IcsOccurrence(event.uid(), event.summary() == null ? "" : event.summary(), start, end,
-                    allDay ? occurrence.toLocalDate() : null, inSeries));
+                    allDay ? occurrence.toLocalDate() : null, inSeries(occurrence, start)));
+        }
+
+        private Instant inSeries(LocalDateTime occurrence, Instant start) {
+            if (replaces != null) {
+                return replaces;
+            }
+            if (rule == null) {
+                return null;
+            }
+            return allDay ? Zones.inSeries(occurrence.toLocalDate()) : start;
         }
     }
 }
