@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -47,6 +48,10 @@ public class SsdpDiscovery implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(SsdpDiscovery.class);
     private static final String USER_AGENT = DeviceFetch.USER_AGENT;
+    /** Any host on the LAN can announce any number of services; at most this many are kept. */
+    static final int MAX_SERVICES = 256;
+    /** Description fetches at once; a service announced meanwhile is fetched at a later announcement. */
+    static final int MAX_FETCHES = 4;
 
     private final SsdpProperties properties;
     private final SsdpTimings timings;
@@ -55,6 +60,9 @@ public class SsdpDiscovery implements AutoCloseable {
     private final Set<String> watched = ConcurrentHashMap.newKeySet();
     private final Map<String, SsdpService> services = new ConcurrentHashMap<>();
     private final Map<String, List<SsdpListener>> listeners = new ConcurrentHashMap<>();
+    /** USNs whose description is being fetched, so that their next announcements do not fetch it again. */
+    private final Set<String> fetching = ConcurrentHashMap.newKeySet();
+    private final Semaphore fetches = new Semaphore(MAX_FETCHES);
 
     private volatile boolean running;
     // Assigned once in start() and never replaced; the socket is thread-safe, volatile only publishes it.
@@ -233,10 +241,13 @@ public class SsdpDiscovery implements AutoCloseable {
                 ? previous.description() : null;
         SsdpService seen = new SsdpService(usn.get(), type.get(), address, location, message.headers(),
                 clock.instant().plus(message.maxAge()), known);
+        if (previous == null) {
+            makeRoom();
+        }
         services.put(usn.get(), seen);
         if (known == null && location != null) {
             if (DeviceFetch.isSafeToFetch(location, sender)) {
-                Thread.ofVirtual().name("ssdp-describe").start(() -> describe(seen));
+                fetchDescription(seen);
             } else {
                 // Deliberately omit the LOCATION value itself: it is attacker-controlled and this
                 // is exactly the case where we do not want it dignified by ending up in a log sink.
@@ -245,6 +256,38 @@ public class SsdpDiscovery implements AutoCloseable {
             }
         }
         listenersOf(seen.type()).forEach(listener -> listener.alive(seen));
+    }
+
+    /** Below the cap, after the expired services; else without the one that would expire soonest. */
+    private synchronized void makeRoom() {
+        if (services.size() < MAX_SERVICES) {
+            return;
+        }
+        Instant now = clock.instant();
+        services.values().removeIf(service -> !service.expiresAt().isAfter(now));
+        while (services.size() >= MAX_SERVICES) {
+            services.values().stream().min(Comparator.comparing(SsdpService::expiresAt))
+                    .ifPresent(soonest -> services.remove(soonest.usn(), soonest));
+        }
+    }
+
+    /** Once per service at a time, and a few at once; one left out is fetched at a later announcement. */
+    private void fetchDescription(SsdpService service) {
+        if (!fetching.add(service.usn())) {
+            return;
+        }
+        if (!fetches.tryAcquire()) {
+            fetching.remove(service.usn());
+            return;
+        }
+        Thread.ofVirtual().name("ssdp-describe").start(() -> {
+            try {
+                describe(service);
+            } finally {
+                fetches.release();
+                fetching.remove(service.usn());
+            }
+        });
     }
 
     private List<SsdpListener> listenersOf(String type) {

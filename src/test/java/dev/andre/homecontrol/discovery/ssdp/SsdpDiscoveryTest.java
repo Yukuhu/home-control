@@ -21,6 +21,9 @@ import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -211,6 +214,68 @@ class SsdpDiscoveryTest {
         clock.advance(Duration.ofDays(1));
         assertThat(discovery.services("urn:x:1")).extracting(SsdpService::usn)
                 .doesNotContain("uuid:lives-for-ever::urn:x:1");
+    }
+
+    /** A flood of announcements with new USNs keeps the services that last longest, and no more than the cap. */
+    @Test
+    void aFloodOfAnnouncementsKeepsAtMostTheCap() throws IOException {
+        discovery.watch("urn:x:1");
+        int sent = SsdpDiscovery.MAX_SERVICES + 20;
+
+        for (int i = 0; i < sent; i++) {
+            sendUdp("NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\n"
+                    + "USN: uuid:flood-" + i + "::urn:x:1\r\nCACHE-CONTROL: max-age=" + (1000 + i) + "\r\n\r\n");
+        }
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(discovery.services("urn:x:1"))
+                .extracting(SsdpService::usn).contains("uuid:flood-" + (sent - 1) + "::urn:x:1"));
+        assertThat(discovery.services("urn:x:1")).hasSizeLessThanOrEqualTo(SsdpDiscovery.MAX_SERVICES)
+                .extracting(SsdpService::usn).doesNotContain("uuid:flood-0::urn:x:1");
+    }
+
+    /** Each new service's description is fetched once, by a few fetches at a time, however many are announced. */
+    @Test
+    void descriptionsAreFetchedAFewAtATimeAndOncePerService() throws Exception {
+        AtomicInteger running = new AtomicInteger();
+        AtomicInteger mostAtOnce = new AtomicInteger();
+        AtomicInteger requests = new AtomicInteger();
+        CountDownLatch released = new CountDownLatch(1);
+        HttpServer slow = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        slow.setExecutor(Executors.newCachedThreadPool());
+        slow.createContext("/slow", exchange -> {
+            requests.incrementAndGet();
+            mostAtOnce.accumulateAndGet(running.incrementAndGet(), Math::max);
+            try {
+                released.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            } finally {
+                running.decrementAndGet();
+                exchange.sendResponseHeaders(404, -1);
+                exchange.close();
+            }
+        });
+        slow.start();
+        try {
+            discovery.watch("urn:x:1");
+            String location = "http://127.0.0.1:" + slow.getAddress().getPort() + "/slow";
+            for (int round = 0; round < 3; round++) {
+                for (int i = 0; i < 10; i++) {
+                    sendUdp("NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\n"
+                            + "USN: uuid:slow-" + i + "::urn:x:1\r\nCACHE-CONTROL: max-age=120\r\nLOCATION: "
+                            + location + "\r\n\r\n");
+                }
+            }
+
+            await().atMost(Duration.ofSeconds(5)).until(() -> running.get() == SsdpDiscovery.MAX_FETCHES);
+            await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2))
+                    .until(() -> running.get() == SsdpDiscovery.MAX_FETCHES);
+            assertThat(requests).as("a service whose fetch runs is not fetched again").hasValue(SsdpDiscovery.MAX_FETCHES);
+        } finally {
+            released.countDown();
+            slow.stop(0);
+        }
+        assertThat(mostAtOnce.get()).isEqualTo(SsdpDiscovery.MAX_FETCHES);
     }
 
     @Test
