@@ -175,37 +175,45 @@ public class CalendarSchedule implements SportsFeed {
             pass = ++passes;
         }
         ZoneId household = zones.effective();
-        List<SportsEvent> events = new ArrayList<>();
-        List<String> errors = new ArrayList<>();
-        int succeeded = 0;
-        Map<String, SportsEvent> byId = new HashMap<>();
-        for (SportsSettings.CalendarEntry entry : settings.calendars()) {
-            Cached calendar = cached.get(entry.id());
-            if (calendar != null && calendar.calendar() != null) {
-                succeeded++;
-                for (SportsEvent event : toEvents(entry.id(), calendar.calendar(),
-                        expand(entry.id(), calendar, now, household).occurrences(), household)) {
-                    events.add(event);
-                    byId.put(event.itemId(), event);
-                    if (event.formerItemId() != null) {
-                        byId.putIfAbsent(event.formerItemId(), event); // pins and links made under the former id
-                    }
+        Map<String, List<SportsEvent>> found = new HashMap<>();
+        cached.forEach((id, calendar) -> {
+            if (calendar.calendar() != null) {
+                found.put(id, toEvents(id, calendar.calendar(), expand(id, calendar, now, household).occurrences(),
+                        household));
+            }
+        });
+        synchronized (lock) {
+            // A calendar removed meanwhile is left out of the result and the index; a later pass may have published.
+            SportsSettings current = settingsService.current();
+            List<SportsSettings.CalendarEntry> kept = settings.calendars().stream()
+                    .filter(entry -> current.calendar(entry.id()).isPresent()).toList();
+            List<SportsEvent> events = new ArrayList<>();
+            List<String> errors = new ArrayList<>();
+            for (SportsSettings.CalendarEntry entry : kept) {
+                events.addAll(found.getOrDefault(entry.id(), List.of()));
+                Cached calendar = cached.get(entry.id());
+                if (calendar != null && calendar.error() != null) {
+                    errors.add(entry.label() + ": " + calendar.error());
                 }
             }
-            if (calendar != null && calendar.error() != null) {
-                errors.add(entry.label() + ": " + calendar.error());
-            }
-        }
-        synchronized (lock) {
-            // A later pass may have published already; a calendar removed meanwhile keeps none of its events.
             if (pass > published) {
                 published = pass;
-                Set<String> kept = cache.keySet().stream().map(SportsSettings::calendarKey).collect(Collectors.toSet());
-                byId.values().removeIf(event -> !kept.contains(event.competitionKey()));
-                byItemId.set(Map.copyOf(byId));
+                byItemId.set(index(events));
+            }
+            int succeeded = (int) kept.stream().filter(entry -> found.containsKey(entry.id())).count();
+            return new FeedResult(events, errors, kept.size(), succeeded);
+        }
+    }
+
+    private static Map<String, SportsEvent> index(List<SportsEvent> events) {
+        Map<String, SportsEvent> byId = new HashMap<>();
+        for (SportsEvent event : events) {
+            byId.put(event.itemId(), event);
+            if (event.formerItemId() != null) {
+                byId.putIfAbsent(event.formerItemId(), event); // pins and links made under the former id
             }
         }
-        return new FeedResult(events, errors, settings.calendars().size(), succeeded);
+        return Map.copyOf(byId);
     }
 
     /** Expands one download into the window around {@code now}, and keeps what it found for the setup page. */

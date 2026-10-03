@@ -257,9 +257,13 @@ class CalendarScheduleConcurrencyTest {
         settingsService.update(s -> s.withCalendars(List.of(s.calendars().get(1))));
         schedule.forget(BUNDESLIGA);
         release.countDown();
-        pass.get(10, TimeUnit.SECONDS);
+        FeedResult result = pass.get(10, TimeUnit.SECONDS);
 
         assertThat(schedule.find(BUNDESLIGA_ITEM)).isEmpty();
+        // Nor does the pass return it, for a rail to show.
+        assertThat(result.events()).noneMatch(e -> e.competitionKey().equals("calendar:" + BUNDESLIGA));
+        assertThat(result.feeds()).isEqualTo(1);
+        assertThat(result.succeeded()).isEqualTo(1);
     }
 
     @Test
