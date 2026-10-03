@@ -49,6 +49,17 @@ marked `Secure`. If the proxy rewrites the `Host` header, also set
 `HOME_CONTROL_TRUSTED_ORIGINS` (see [Configuration](configuration.md)) to the origin your browser actually
 sees, or requests will be refused as cross-site.
 
+Wrong passwords are limited per address: after five within 15 minutes, that address must wait,
+even with the right password. Behind a reverse proxy every browser comes from the proxy's
+address, so set `HOME_CONTROL_TRUSTED_PROXIES` to the proxy's IP address (several separated by
+commas). Its `X-Forwarded-For` then names each browser, and its `X-Forwarded-Proto`,
+`X-Forwarded-Host` and `X-Forwarded-Port` the address the browser used; without it, one
+browser's wrong guesses lock every browser out. Only the
+listed addresses are believed: a browser that reaches the app directly cannot claim to be
+another. Configure the proxy to replace `X-Forwarded-For` rather than pass on what the browser
+sent, and do not set `SERVER_FORWARD_HEADERS_STRATEGY`, which believes these headers from
+anyone; the app refuses to start with both.
+
 ## Allowed hosts and origins
 
 The app only answers to host names that cannot be pointed at it by someone else's DNS

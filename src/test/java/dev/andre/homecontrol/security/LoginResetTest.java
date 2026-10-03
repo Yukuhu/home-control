@@ -22,7 +22,7 @@ class LoginResetTest {
 
     private SecretStore start(boolean resetLogin) {
         SecurityProperties properties = new SecurityProperties(null, List.of(), 5, 50, Duration.ofMinutes(15), List.of(),
-                resetLogin);
+                resetLogin, List.of());
         return new SecurityConfiguration().secretStore(new DataDirectory(dir), properties, new SecureRandom());
     }
 

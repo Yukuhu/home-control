@@ -4,12 +4,15 @@ import dev.andre.homecontrol.storage.DataDirectory;
 import dev.andre.homecontrol.config.PublicAssetPaths;
 import dev.andre.homecontrol.storage.SecretKeySource;
 import dev.andre.homecontrol.storage.SecretStore;
+import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
+import org.springframework.core.env.Environment;
 
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -53,6 +56,13 @@ public class SecurityConfiguration {
     public LoginRateLimiter loginRateLimiter(SecurityProperties security) {
         return new LoginRateLimiter(Clock.systemUTC(), security.loginAttemptsPerAddress(),
                 security.loginAttemptsTotal(), security.loginWindow());
+    }
+
+    /** Fails startup when both the trusted proxies and Spring's forwarded-header support are set. */
+    @Bean
+    public WebServerFactoryCustomizer<TomcatServletWebServerFactory> trustedProxies(SecurityProperties security,
+                                                                                   Environment environment) {
+        return new TrustedProxies(security.trustedProxies(), environment.getProperty("server.forward-headers-strategy"));
     }
 
     /** First filter of all: independent of the login gate, whether or not a login exists. */

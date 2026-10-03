@@ -29,6 +29,7 @@ Every setting, as a Spring property or an environment variable.
 | `HOME_CONTROL_TRUSTED_ORIGINS` | empty | Comma-separated origins allowed to send changes, e.g. `https://home.example.org` behind a reverse proxy; their host names are also allowed |
 | `HOME_CONTROL_ALLOWED_HOSTS` | empty | Comma-separated extra host names the app answers to: exact names, or `*.example.org` for its subdomains |
 | `HOME_CONTROL_SECURE_COOKIE` | `false` | Mark the login cookie `Secure` when the app is only reached over HTTPS |
+| `HOME_CONTROL_TRUSTED_PROXIES` | empty | Comma-separated IP addresses of reverse proxies whose `X-Forwarded-For` and `X-Forwarded-Proto` are believed; see [Security](security.md) |
 | `HOME_CONTROL_JELLYFIN_ENABLED` | `true` | Turn the Jellyfin module off entirely |
 | `HOME_CONTROL_YOUTUBE_ENABLED` | `true` | Turn the YouTube module off entirely |
 | `HOME_CONTROL_WORKFLOWS_ENABLED` | `true` | Turn the workflow UI, source, Test and Cast execution off while retaining encrypted definitions |

@@ -15,8 +15,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.web.filter.ForwardedHeaderFilter;
 
 import java.net.URI;
 import java.net.URLDecoder;
@@ -194,18 +192,18 @@ class YouTubeBrowserAuthorizationTest {
                 .isInstanceOf(YouTubeException.class).hasMessageContaining("device code");
     }
 
+    /** A request as a trusted proxy's forwarded headers leave it (TrustedProxiesTest): the address the browser used. */
     @Test
-    void callbackUsesTheProxyOriginWhenForwardedHeadersAreEnabled() throws Exception {
+    void callbackUsesTheAddressATrustedProxyReports() {
         var request = new MockHttpServletRequest("GET", "/setup");
-        request.setServerName("backend");
-        request.setServerPort(8080);
-        request.addHeader("X-Forwarded-Host", "home.example.com");
-        request.addHeader("X-Forwarded-Proto", "https");
-        request.addHeader("X-Forwarded-Port", "443");
-        var result = new AtomicReference<URI>();
-        new ForwardedHeaderFilter().doFilter(request, new MockHttpServletResponse(),
-                (req, res) -> result.set(YouTubeSetupController.callback((jakarta.servlet.http.HttpServletRequest) req)));
-        assertThat(result.get()).isEqualTo(callback);
-        assertThat(YouTubeOAuthCallback.supported(result.get())).isTrue();
+        request.setScheme("https");
+        request.setSecure(true);
+        request.setServerName("home.example.com");
+        request.setServerPort(443);
+
+        URI result = YouTubeSetupController.callback(request);
+
+        assertThat(result).isEqualTo(callback);
+        assertThat(YouTubeOAuthCallback.supported(result)).isTrue();
     }
 }

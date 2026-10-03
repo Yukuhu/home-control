@@ -149,6 +149,8 @@ home-control:
     trusted-origins: ${HOME_CONTROL_TRUSTED_ORIGINS:}
     # Extra host names (exact, or *.suffix) besides IP addresses, localhost, single-label and .local/.lan/.home.arpa/.internal names.
     allowed-hosts: ${HOME_CONTROL_ALLOWED_HOSTS:}
+    # IP addresses of reverse proxies whose X-Forwarded-For and X-Forwarded-Proto are believed; nobody else's are.
+    trusted-proxies: ${HOME_CONTROL_TRUSTED_PROXIES:}
     login-attempts-per-address: 5
     login-attempts-total: 50
     login-window: 15m
