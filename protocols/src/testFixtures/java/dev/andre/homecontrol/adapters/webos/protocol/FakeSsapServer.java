@@ -41,6 +41,7 @@ public class FakeSsapServer implements AutoCloseable {
     private volatile String foregroundApp = "com.webos.app.home";
     private volatile int volume = 12;
     private volatile boolean muted;
+    private volatile String pointerSocket;
 
     public FakeSsapServer(boolean tls) throws IOException {
         FakeWebSocketServer.Handler handler = new FakeWebSocketServer.Handler() {
@@ -61,6 +62,11 @@ public class FakeSsapServer implements AutoCloseable {
             }
         };
         server = tls ? FakeWebSocketServer.tls(handler) : FakeWebSocketServer.plain(handler);
+    }
+
+    /** Offers {@code socketPath} as the pointer input socket in place of this fake's own. */
+    public void offerPointerSocket(String socketPath) {
+        pointerSocket = socketPath;
     }
 
     /** Requests for {@code uri} are still recorded but never answered: a TV that hangs on one service. */
@@ -178,8 +184,8 @@ public class FakeSsapServer implements AutoCloseable {
             case SsapUris.GET_VOLUME -> connection.send(response(id, volumePayload()));
             case SsapUris.POWER_STATE -> connection.send(
                     response(id, "{\"returnValue\":true,\"state\":\"Active\",\"subscribed\":true}"));
-            case SsapUris.POINTER_INPUT_SOCKET -> connection.send(
-                    response(id, "{\"returnValue\":true,\"socketPath\":\"" + server.url(POINTER_PATH) + "\"}"));
+            case SsapUris.POINTER_INPUT_SOCKET -> connection.send(response(id, "{\"returnValue\":true,\"socketPath\":\""
+                    + (pointerSocket == null ? server.url(POINTER_PATH) : pointerSocket) + "\"}"));
             case SsapUris.EXTERNAL_INPUTS -> connection.send(response(id, fixture("external-inputs.json")));
             case SsapUris.CONNECTION_INFO -> connection.send(response(id, fixture("connection-info.json")));
             case SsapUris.SYSTEM_INFO -> connection.send(

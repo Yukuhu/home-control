@@ -219,6 +219,40 @@ class SsapConnectionTest {
     }
 
     @Test
+    void thePointerSocketIsOpenedOnTheTvWhateverHostTheTvNames() throws Exception {
+        // The TV's answer names the address; buttons still go to the TV and nowhere else.
+        server.offerPointerSocket("ws://192.0.2.1:" + server.port() + FakeSsapServer.POINTER_PATH);
+        SsapConnection opened = open();
+        opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
+
+        opened.button("UP");
+
+        assertThat(server.nextButton()).isEqualTo("type:button\nname:UP\n\n");
+    }
+
+    @Test
+    void aPointerSocketThatIsNoWebSocketIsRefusedWithAReason() throws IOException {
+        server.offerPointerSocket("http://127.0.0.1:" + server.port() + FakeSsapServer.POINTER_PATH);
+        SsapConnection opened = open();
+        opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> opened.button("UP"))
+                .isInstanceOf(SsapException.class)
+                .hasMessage("The TV offered an unusable pointer input socket");
+    }
+
+    @Test
+    void aMalformedPointerSocketIsRefusedWithAReason() throws IOException {
+        server.offerPointerSocket("ws://127.0.0.1:" + server.port() + "/not a path");
+        SsapConnection opened = open();
+        opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> opened.button("UP"))
+                .isInstanceOf(SsapException.class)
+                .hasMessage("The TV offered an unusable pointer input socket");
+    }
+
+    @Test
     void fallsBackToTlsWhenThePlainPortIsClosed() throws IOException {
         try (FakeSsapServer tls = new FakeSsapServer(true)) {
             connection = SsapConnection.open(http, "127.0.0.1",
