@@ -30,14 +30,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Logins that outlive the server's sessions, which live in memory and end with every restart. A browser that logs in
- * also gets a {@value #COOKIE} cookie with a random token; logins.json keeps only the token's SHA-256 hash, the version
+ * also gets a {@value #COOKIE_NAME} cookie with a random token; logins.json keeps only the token's SHA-256 hash, the version
  * of the password it logged in with, and when it expires. A token is never rotated: after a restart a page's requests
  * arrive together, each with the same token, and each is let in. The file holds nothing a browser could log in with,
  * and losing it only logs every browser out, so a damaged file remembers nobody and the next login replaces it.
  */
 public class RememberedLogins {
 
-    static final String COOKIE = "HOME_CONTROL_LOGIN";
+    static final String COOKIE_NAME = "HOME_CONTROL_LOGIN";
     /** As long as the session cookie lasts (server.servlet.session.cookie.max-age). */
     static final Duration LIFETIME = Duration.ofDays(30);
 
@@ -123,7 +123,8 @@ public class RememberedLogins {
         try {
             file.write(remembered.stream().filter(login -> !login.hash().equals(hash)).toList());
         } catch (StorageException e) {
-            log.warn("Could not forget a remembered login on disk; it stays forgotten until the server restarts", e);
+            log.warn("Could not forget a remembered login on disk; it stays forgotten until the server restarts."
+                    + " Change the login password once /data can be written, to end it for good", e);
         }
     }
 
@@ -143,7 +144,7 @@ public class RememberedLogins {
     }
 
     private ResponseCookie.ResponseCookieBuilder base(String value, boolean secureRequest) {
-        return ResponseCookie.from(COOKIE, value).path("/").httpOnly(true)
+        return ResponseCookie.from(COOKIE_NAME, value).path("/").httpOnly(true)
                 .secure(secureCookie || secureRequest).sameSite("Lax");
     }
 

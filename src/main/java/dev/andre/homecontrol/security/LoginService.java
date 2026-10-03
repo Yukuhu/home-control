@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** The single household password (spec §9): set and removed on purpose, required while it exists. */
 public class LoginService {
@@ -48,7 +49,7 @@ public class LoginService {
     /** Each verification holds ~19 MiB; two at a time bounds memory under a login flood. */
     private final Semaphore verifications = new Semaphore(2);
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
-    private volatile RememberedLogins remembered;
+    private final AtomicReference<RememberedLogins> remembered = new AtomicReference<>();
     private final ExecutorService hashing;
 
     public LoginService(SecretStore store, Argon2PasswordHasher hasher, SecureRandom random) {
@@ -64,7 +65,7 @@ public class LoginService {
 
     /** A session made with a remembered login lasts only while its token is remembered. */
     public void rememberedBy(RememberedLogins remembered) {
-        this.remembered = remembered;
+        this.remembered.set(remembered);
     }
 
     public boolean loginRequired() {
@@ -88,10 +89,15 @@ public class LoginService {
             // A session from before logins were remembered has no token, and lasts as it always did.
             return login.get().version().equals(session.getAttribute(SESSION_ATTRIBUTE))
                     && (!(session.getAttribute(TOKEN_ATTRIBUTE) instanceof String token)
-                    || remembered == null || remembered.remembersHash(token));
+                    || remembersToken(token));
         } catch (IllegalStateException _) {
             return false;
         }
+    }
+
+    private boolean remembersToken(String hash) {
+        RememberedLogins logins = remembered.get();
+        return logins == null || logins.remembersHash(hash);
     }
 
     /**

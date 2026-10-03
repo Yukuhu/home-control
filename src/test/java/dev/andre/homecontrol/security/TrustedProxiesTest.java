@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -111,27 +112,27 @@ class TrustedProxiesTest {
 
     @Test
     void addressesMatchExactlyInTheFormTomcatReportsThem() {
-        String pattern = TrustedProxies.pattern(List.of("::1", "192.168.1.5"));
+        Pattern trusted = Pattern.compile(TrustedProxies.pattern(List.of("::1", "192.168.1.5")));
 
-        assertThat("0:0:0:0:0:0:0:1").matches(pattern);
-        assertThat("192.168.1.5").matches(pattern);
-        assertThat("192.168.1.50").doesNotMatch(pattern);
-        assertThat("192x168x1x5").doesNotMatch(pattern);
+        assertThat(List.of("0:0:0:0:0:0:0:1", "192.168.1.5")).allMatch(peer -> trusted.matcher(peer).matches());
+        assertThat(List.of("192.168.1.50", "192x168x1x5")).noneMatch(peer -> trusted.matcher(peer).matches());
     }
 
     /** Spring Boot's own forwarded-header support believes every private address, so a LAN client could fake one. */
     @Test
     void theyReplaceSpringsForwardedHeaderSupportWhichTrustsEveryClient() {
         List<String> proxy = List.of("192.168.1.5");
-        assertThatThrownBy(() -> new TrustedProxies(proxy, settings("server.forward-headers-strategy", "framework")))
+        MockEnvironment strategy = settings("server.forward-headers-strategy", "framework");
+        MockEnvironment remoteIp = settings("server.tomcat.remoteip.remote-ip-header", "X-Real-IP");
+        MockEnvironment protocol = settings("server.tomcat.remoteip.protocol-header", "X-Forwarded-Proto");
+
+        assertThatThrownBy(() -> new TrustedProxies(proxy, strategy))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("SERVER_FORWARD_HEADERS_STRATEGY");
-        assertThatThrownBy(() -> new TrustedProxies(proxy,
-                settings("server.tomcat.remoteip.remote-ip-header", "X-Real-IP")))
+        assertThatThrownBy(() -> new TrustedProxies(proxy, remoteIp))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("server.tomcat.remoteip.remote-ip-header");
-        assertThatThrownBy(() -> new TrustedProxies(proxy,
-                settings("server.tomcat.remoteip.protocol-header", "X-Forwarded-Proto")))
+        assertThatThrownBy(() -> new TrustedProxies(proxy, protocol))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("server.tomcat.remoteip.protocol-header");
         new TrustedProxies(proxy, settings("server.forward-headers-strategy", "none"));
@@ -158,8 +159,12 @@ class TrustedProxiesTest {
 
     @Test
     void onlyAddressesMayBeTrustedNotNames() {
-        assertThatThrownBy(() -> new SecurityProperties(null, List.of(), 5, 50, Duration.ofMinutes(15), List.of(),
-                false, List.of("proxy.lan"))).isInstanceOf(IllegalArgumentException.class)
+        List<String> none = List.of();
+        Duration window = Duration.ofMinutes(15);
+        List<String> named = List.of("proxy.lan");
+
+        assertThatThrownBy(() -> new SecurityProperties(null, none, 5, 50, window, none, false, named))
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("home-control.security.trusted-proxies").hasMessageContaining("proxy.lan");
     }
 }
