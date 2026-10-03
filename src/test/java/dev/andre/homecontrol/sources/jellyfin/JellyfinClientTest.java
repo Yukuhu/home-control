@@ -86,6 +86,17 @@ class JellyfinClientTest {
     }
 
     @Test
+    void aRedirectingServerIsToldToUseItsFinalAddress() throws IOException {
+        // A Base URL, or a proxy that sends http to https: it is Jellyfin, at another address.
+        fake = new FakeJellyfinServer().respondJson("GET", "/System/Info/Public", 302, null);
+        var redirecting = fake.url();
+
+        assertThatThrownBy(() -> client.publicInfo(redirecting))
+                .isInstanceOf(JellyfinException.class)
+                .hasMessage("Jellyfin at " + redirecting + " redirected elsewhere; enter the final server address");
+    }
+
+    @Test
     void refusesAServerThatIsNotJellyfin() throws IOException {
         fake = new FakeJellyfinServer().respondJson("GET", "/System/Info/Public", 200, "{\"hello\":\"world\"}");
         var notJellyfinUrl = fake.url();
