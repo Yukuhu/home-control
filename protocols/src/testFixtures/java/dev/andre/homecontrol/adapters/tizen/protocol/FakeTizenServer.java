@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -55,6 +56,8 @@ public class FakeTizenServer implements AutoCloseable {
     private volatile boolean dialAvailable = true;
     private volatile boolean issueTokens = true;
     private volatile int deviceInfoPadding;
+    private volatile boolean stalling;
+    private final CountDownLatch closing = new CountDownLatch(1);
 
     public FakeTizenServer() throws IOException {
         remote = FakeWebSocketServer.tls(new FakeWebSocketServer.Handler() {
@@ -119,6 +122,11 @@ public class FakeTizenServer implements AutoCloseable {
     /** Trailing whitespace after the device info JSON: still valid JSON, but as large as asked. */
     public void setDeviceInfoPadding(int bytes) {
         deviceInfoPadding = bytes;
+    }
+
+    /** REST and DIAL answers send their headers and then nothing, until the fake closes: a TV whose web server hung. */
+    public void stallAnswers() {
+        stalling = true;
     }
 
     public void setVisible(String appId, boolean isVisible) {
@@ -210,6 +218,9 @@ public class FakeTizenServer implements AutoCloseable {
     }
 
     private void rest(HttpExchange exchange) throws IOException {
+        if (stalled(exchange)) {
+            return;
+        }
         if (!restAvailable) {
             exchange.close();
             return;
@@ -235,6 +246,9 @@ public class FakeTizenServer implements AutoCloseable {
     }
 
     private void dial(HttpExchange exchange) throws IOException {
+        if (stalled(exchange)) {
+            return;
+        }
         if (!dialAvailable || !exchange.getRequestMethod().equals("POST")
                 || !exchange.getRequestURI().getPath().equals("/ws/apps/YouTube")) {
             respond(exchange, 404, "");
@@ -245,6 +259,21 @@ public class FakeTizenServer implements AutoCloseable {
         showOnly(YOUTUBE);
         exchange.getResponseHeaders().add("LOCATION", "http://127.0.0.1:" + httpPort() + "/ws/apps/YouTube/run");
         respond(exchange, 201, "");
+    }
+
+    private boolean stalled(HttpExchange exchange) throws IOException {
+        if (!stalling) {
+            return false;
+        }
+        exchange.sendResponseHeaders(200, 1024);
+        exchange.getResponseBody().flush();
+        try {
+            closing.await();
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+        }
+        exchange.close();
+        return true;
     }
 
     private void showOnly(String appId) {
@@ -293,6 +322,7 @@ public class FakeTizenServer implements AutoCloseable {
 
     @Override
     public void close() {
+        closing.countDown();
         remote.close();
         http.stop(0);
     }

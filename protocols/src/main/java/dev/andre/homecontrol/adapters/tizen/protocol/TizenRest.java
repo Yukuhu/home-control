@@ -1,11 +1,11 @@
 package dev.andre.homecontrol.adapters.tizen.protocol;
 
 import dev.andre.homecontrol.adapters.net.DeviceUris;
+import dev.andre.homecontrol.discovery.ssdp.protocol.DeviceFetch;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -13,7 +13,10 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
-/** The TV's REST API on 8001. Every failure is "no answer": the TV may be off or the model may lack the endpoint. */
+/**
+ * The TV's REST API on 8001. Every failure is "no answer": the TV may be off or the model may lack the endpoint. The
+ * request timeout bounds the whole answer, so a TV that stalls mid-body cannot hold the session.
+ */
 public final class TizenRest {
 
     /** The device info is a few KiB; anything past this is refused unread. */
@@ -51,17 +54,12 @@ public final class TizenRest {
             HttpRequest request = HttpRequest.newBuilder(DeviceUris.of("http", host, options.restPort(), path))
                     .timeout(options.requestTimeout())
                     .GET().build();
-            HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            try (InputStream body = response.body()) {
-                if (response.statusCode() != 200) {
-                    return Optional.empty();
-                }
-                byte[] bytes = body.readNBytes(MAX_BODY_BYTES + 1);
-                if (bytes.length > MAX_BODY_BYTES) {
-                    return Optional.empty(); // not a TV's small JSON; never read it into memory
-                }
-                return Optional.of(TizenMessages.JSON.readTree(bytes));
+            // A body over the cap is not a TV's small JSON: refused unread, as an IOException.
+            HttpResponse<byte[]> response = DeviceFetch.send(http, request, MAX_BODY_BYTES, options.requestTimeout());
+            if (response.statusCode() != 200) {
+                return Optional.empty();
             }
+            return Optional.of(TizenMessages.JSON.readTree(response.body()));
         } catch (IOException | JacksonException _) {
             return Optional.empty();
         } catch (InterruptedException _) {
