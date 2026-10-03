@@ -89,7 +89,8 @@ class EventStreamShutdownEndToEndTest {
 
             await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(reader.lines())
                     .anySatisfy(line -> assertThat(line).startsWith(":").contains("keep-alive")));
-            assertThat(reader.lines()).noneMatch(line -> line.startsWith("data:"));
+            // An empty install's snapshot is just its empty list of rails; everything after it is the keep-alive.
+            assertThat(reader.lines()).filteredOn(line -> line.startsWith("data:")).containsExactly("data:{\"rails\":[]}");
         } finally {
             http.shutdownNow();
             app.close();

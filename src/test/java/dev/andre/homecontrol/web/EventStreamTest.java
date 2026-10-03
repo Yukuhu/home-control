@@ -93,7 +93,8 @@ class EventStreamTest {
         allowed.set(false);
         broadcaster.revalidate();
 
-        assertThat(revoked.completed()).isTrue();
+        // Each tab's own sender completes it, so a tab stuck in a send cannot hold up the logout that ends it.
+        await().atMost(Duration.ofSeconds(2)).until(revoked::completed);
         assertThat(other.completed()).isFalse();
         broadcaster.onStateChanged(event());
         await().until(() -> other.count().get() == 1);
@@ -110,8 +111,8 @@ class EventStreamTest {
         broadcaster.onStateChanged(event());
 
         await().until(() -> other.count().get() == 1);
+        await().atMost(Duration.ofSeconds(2)).until(revoked::completed);
         assertThat(revoked.count()).hasValue(0);
-        assertThat(revoked.completed()).isTrue();
     }
 
     @Test
@@ -145,6 +146,105 @@ class EventStreamTest {
         recording.shutdown();
     }
 
+    /** A phone that left the Wi-Fi without closing its connection: its sends block until the write times out. */
+    @Test
+    void aStalledTabDelaysNoOtherTab() {
+        CountDownLatch released = new CountDownLatch(1);
+        CountingEmitter stalled = (CountingEmitter) broadcaster.register(new CountingEmitter() {
+            @Override
+            public void send(SseEventBuilder builder) {
+                super.send(builder);
+                awaitQuietly(released);
+            }
+        });
+        CountingEmitter healthy = (CountingEmitter) broadcaster.register(new CountingEmitter());
+
+        broadcaster.onStateChanged(event());
+        broadcaster.onStateChanged(event());
+
+        await().atMost(Duration.ofSeconds(2)).until(() -> healthy.count().get() == 2);
+        assertThat(stalled.count()).hasValue(1);
+        released.countDown();
+        await().atMost(Duration.ofSeconds(2)).until(() -> stalled.count().get() == 2);
+    }
+
+    /** Its browser reconnects and gets a fresh snapshot; nothing waits behind it, and its backlog does not grow. */
+    @Test
+    void aTabThatFallsTooFarBehindIsDroppedAndTheOthersHearEverything() {
+        CountDownLatch released = new CountDownLatch(1);
+        CountingEmitter stalled = (CountingEmitter) broadcaster.register(new CountingEmitter() {
+            @Override
+            public void send(SseEventBuilder builder) {
+                super.send(builder);
+                awaitQuietly(released);
+            }
+        });
+        CountingEmitter healthy = (CountingEmitter) broadcaster.register(new CountingEmitter());
+        int events = EventStream.QUEUE_CAPACITY + 10;
+
+        // Paced, as events come: the healthy tab keeps up while the stalled one's backlog grows past its queue.
+        for (int i = 1; i <= events; i++) {
+            broadcaster.onStateChanged(event());
+            int sent = i;
+            await().pollInterval(Duration.ofMillis(1)).atMost(Duration.ofSeconds(2))
+                    .until(() -> healthy.count().get() == sent);
+        }
+        released.countDown();
+
+        await().atMost(Duration.ofSeconds(2)).until(stalled::completed);
+        assertThat(stalled.count().get()).isLessThan(events);
+        broadcaster.onStateChanged(event());
+        await().atMost(Duration.ofSeconds(2)).until(() -> healthy.count().get() == events + 1);
+        assertThat(stalled.count().get()).isLessThan(events);
+    }
+
+    /**
+     * A new tab's snapshot is sent from its own queue, so an event published while the snapshot is being read or sent
+     * follows it, and the tab never shows an older state over a newer one.
+     */
+    @Test
+    void theSnapshotComesBeforeEveryEventPublishedAfterTheTabSubscribed() throws InterruptedException {
+        List<String> sent = new CopyOnWriteArrayList<>();
+        CountDownLatch snapshotStarted = new CountDownLatch(1);
+        CountDownLatch released = new CountDownLatch(1);
+        EventStream recording = new EventStream(new EventStreamProperties(Duration.ofSeconds(25))) {
+            @Override
+            void sendData(SseEmitter emitter, DeviceStateChangedEvent event) {
+                sent.add("event");
+            }
+        };
+        try {
+            recording.subscribe(() -> true, emitter -> {
+                snapshotStarted.countDown();
+                awaitQuietly(released);
+                sent.add("snapshot");
+            });
+            assertThat(snapshotStarted.await(2, TimeUnit.SECONDS)).isTrue();
+
+            recording.onStateChanged(event());
+            released.countDown();
+
+            await().atMost(Duration.ofSeconds(2)).until(() -> sent.size() == 2);
+            assertThat(sent).containsExactly("snapshot", "event");
+        } finally {
+            recording.shutdown();
+        }
+    }
+
+    @Test
+    void aSnapshotThatFailsEndsOnlyItsOwnTab() {
+        CountingEmitter healthy = (CountingEmitter) broadcaster.register(new CountingEmitter());
+        CountingEmitter failing = (CountingEmitter) broadcaster.register(new CountingEmitter(), () -> true, emitter -> {
+            throw new IllegalStateException("the device registry is unreadable");
+        });
+
+        await().atMost(Duration.ofSeconds(2)).until(failing::completed);
+        broadcaster.onStateChanged(event());
+
+        await().atMost(Duration.ofSeconds(2)).until(() -> healthy.count().get() == 1);
+        assertThat(failing.count()).hasValue(0);
+    }
+
     private static DeviceStateChangedEvent event() {
         return new DeviceStateChangedEvent("test", DeviceState.initial());
     }
@@ -169,6 +269,11 @@ class EventStreamTest {
         }
 
         @Override
+        public void completeWithError(Throwable failure) {
+            completed.set(true);
+        }
+
+        @Override
         public void send(SseEventBuilder builder) {
             sends.incrementAndGet();
         }
@@ -184,8 +289,8 @@ class EventStreamTest {
             }
         };
         try {
-            SseEmitter first = stream.subscribe(() -> true);
-            SseEmitter second = stream.subscribe(() -> true);
+            SseEmitter first = stream.subscribe(() -> true, _ -> { });
+            SseEmitter second = stream.subscribe(() -> true, _ -> { });
 
             await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> assertThat(beats).contains(first, second));
         } finally {
@@ -204,7 +309,7 @@ class EventStreamTest {
             }
         };
         try {
-            stream.subscribe(() -> true);
+            stream.subscribe(() -> true, _ -> { });
 
             await().atMost(Duration.ofSeconds(2)).until(() -> beats.get() >= 1);
             int afterFirst = beats.get();
@@ -235,15 +340,15 @@ class EventStreamTest {
             }
         };
         try {
-            stream.subscribe(() -> true);
+            stream.subscribe(() -> true, _ -> { });
             await().atMost(Duration.ofSeconds(2)).until(() -> beats.get() == 1);
             await().during(Duration.ofMillis(250)).atMost(Duration.ofSeconds(2)).until(() -> beats.get() == 1);
 
             stream.onContextClosed();
-            stream.subscribe(() -> true);
+            stream.subscribe(() -> true, _ -> { });
             stream.onRailsChanged(new RailsChangedEvent(List.of()));
             slowTab.countDown();
-            // The fan-out sends in order: once this event arrives, every heartbeat queued before it has had its turn.
+            // The slow tab was ended by the close; its queued heartbeats are dropped, not sent, once it is free again.
             assertThat(drained.await(2, TimeUnit.SECONDS)).isTrue();
 
             assertThat(beats).hasValue(1);

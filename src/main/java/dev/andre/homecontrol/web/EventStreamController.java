@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 /** {@code GET /events}: opens a browser tab's {@link EventStream}, starting with a snapshot of every device and rail. */
@@ -37,25 +38,25 @@ public class EventStreamController {
     }
 
     @GetMapping(path = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter events(LoginContext login) throws IOException {
+    public SseEmitter events(LoginContext login) {
         // Bound to the session, not the request: the stream outlives the request that opened it.
-        SseEmitter emitter = stream.subscribe(login.whileLoggedIn());
-        try {
-            // One snapshot per device so a new tab paints every chip before anything changes.
-            for (Map.Entry<String, DeviceState> entry : devices.states().entrySet()) {
-                emitter.send(SseEmitter.event().name("state")
-                        .data(new DeviceStateChangedEvent(entry.getKey(), entry.getValue())));
-            }
-            // Rail summaries let a reconnecting tab notice what changed while it was away.
-            for (RailSnapshot rail : rails.peek()) {
-                emitter.send(SseEmitter.event().name("rail").data(RailEventView.of(rail)));
-            }
-        } catch (IOException e) {
-            // The emitter never reached Spring, so its onCompletion/onTimeout/onError
-            // will never fire; undo the subscribe ourselves or it leaks forever.
-            stream.unsubscribe(emitter);
-            throw e;
+        return stream.subscribe(login.whileLoggedIn(), this::snapshot);
+    }
+
+    /**
+     * What a new or reconnecting tab paints before anything changes: every device's state, every rail's summary, so it
+     * notices what changed while it was away, and the list of rails, so it notices one that appeared or went.
+     */
+    private void snapshot(SseEmitter emitter) throws IOException {
+        for (Map.Entry<String, DeviceState> entry : devices.states().entrySet()) {
+            emitter.send(SseEmitter.event().name("state")
+                    .data(new DeviceStateChangedEvent(entry.getKey(), entry.getValue())));
         }
-        return emitter;
+        List<RailSnapshot> snapshots = rails.peek();
+        for (RailSnapshot rail : snapshots) {
+            emitter.send(SseEmitter.event().name("rail").data(RailEventView.of(rail)));
+        }
+        List<String> keys = snapshots.stream().map(rail -> RailSnapshot.key(rail.descriptor())).toList();
+        emitter.send(SseEmitter.event().name("rails").data(Map.of("rails", keys)));
     }
 }

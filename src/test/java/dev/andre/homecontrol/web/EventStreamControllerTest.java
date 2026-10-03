@@ -37,7 +37,7 @@ class EventStreamControllerTest extends WebSliceTest {
         states.put("living", new DeviceState(DeviceStatus.CONNECTED, true, "com.netflix.ninja", 12, 100, false, Instant.EPOCH));
         states.put("bedroom", DeviceState.unpaired());
         given(devices.states()).willReturn(states);
-        given(broadcaster.subscribe(any())).willReturn(new SseEmitter(0L));
+        sendsTheSnapshotAtOnce();
         given(rails.peek()).willReturn(List.of());
 
         MvcResult result = mockMvc.perform(get("/events").accept("text/event-stream"))
@@ -56,7 +56,7 @@ class EventStreamControllerTest extends WebSliceTest {
         Map<String, DeviceState> states = new LinkedHashMap<>();
         states.put("living", DeviceState.unpaired());
         given(devices.states()).willReturn(states);
-        given(broadcaster.subscribe(any())).willReturn(new SseEmitter(0L));
+        sendsTheSnapshotAtOnce();
         RailDescriptor descriptor = new RailDescriptor("jellyfin", "a", "Rail A");
         ContentItem item = new ContentItem("item-1", "jellyfin", ContentKind.MOVIE, "Big Buck Bunny", null, null, List.of());
         RailSnapshot snapshot = new RailSnapshot(descriptor, RailStatus.READY,
@@ -71,5 +71,16 @@ class EventStreamControllerTest extends WebSliceTest {
         String body = result.getResponse().getContentAsString();
         assertThat(body.indexOf("event:state")).isLessThan(body.indexOf("event:rail"));
         assertThat(body).contains("\"railId\":\"a\"").doesNotContain("Big Buck Bunny");
+        // A tab that missed a rail appearing or going while it was away learns of it from the list.
+        assertThat(body).contains("event:rails").contains("{\"rails\":[\"jellyfin/a\"]}");
+    }
+
+    /** The stream sends a new tab's snapshot from that tab's own queue; here it runs at once, as on an idle stream. */
+    private void sendsTheSnapshotAtOnce() {
+        given(broadcaster.subscribe(any(), any())).willAnswer(call -> {
+            SseEmitter emitter = new SseEmitter(0L);
+            call.<EventStream.Send>getArgument(1).to(emitter);
+            return emitter;
+        });
     }
 }

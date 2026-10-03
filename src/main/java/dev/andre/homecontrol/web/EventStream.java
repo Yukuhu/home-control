@@ -14,14 +14,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
@@ -29,6 +27,11 @@ import java.util.function.BooleanSupplier;
  * The server-sent event stream every open browser tab follows: device state ({@code state}), a rail's new content
  * ({@code rail}) and the list of rails ({@code rails}), plus a comment line as a heartbeat, so a reverse proxy does not
  * close a stream that is quiet for a while.
+ *
+ * <p>Every tab has a queue of its own, drained by a virtual thread of its own, so a tab whose sends block (a phone that
+ * left the Wi-Fi without closing its connection) delays nobody else, and nothing publishing an event ever waits for a
+ * browser. A tab receives its sends in the order they were queued, its snapshot first. A tab that falls
+ * {@value #QUEUE_CAPACITY} sends behind is dropped: its browser reconnects and gets a fresh snapshot.
  */
 @Component
 public class EventStream {
@@ -36,21 +39,19 @@ public class EventStream {
     private static final Logger log = LoggerFactory.getLogger(EventStream.class);
 
     private static final long NO_TIMEOUT = 0L;
+    /** How many sends a tab may have waiting before it is dropped. */
+    static final int QUEUE_CAPACITY = 256;
+    /** Ends a tab's sender once everything before it was sent. */
+    private static final Send STOP = _ -> { };
 
-    private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
-    /** Whether each subscriber may still receive state; checked before every send and on {@link #revalidate()}. */
-    private final Map<SseEmitter, BooleanSupplier> allowed = new ConcurrentHashMap<>();
+    private final List<Subscriber> subscribers = new CopyOnWriteArrayList<>();
 
-    /**
-     * The fan-out's own thread. {@code publishEvent} is synchronous, so without this the
-     * loop below would run on the publishing {@code AndroidTvSession}'s single scheduler
-     * thread, and one wedged browser blocking in {@code send} would stall that device's
-     * reconnects. Single-threaded, so events and heartbeats still reach each tab in the order published. A plain
-     * executor, not a scheduled one: that would wrap each task in a future and swallow an Error in a send.
-     */
-    private final ExecutorService fanOut = Executors.newSingleThreadExecutor(daemon("home-control-sse-broadcast"));
-    /** Only keeps time: each tick queues a heartbeat on {@link #fanOut}, which sends it in order with the events. */
-    private final ScheduledExecutorService ticks = Executors.newSingleThreadScheduledExecutor(daemon("home-control-sse-heartbeat"));
+    /** Only keeps time: each tick queues a heartbeat for every tab, in order with its events. */
+    private final ScheduledExecutorService ticks = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "home-control-sse-heartbeat");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final ScheduledFuture<?> heartbeat;
     /** Set first thing on close: a heartbeat a tick queued just before, or is queueing still, then sends nothing. */
     private volatile boolean closed;
@@ -61,67 +62,48 @@ public class EventStream {
                 TimeUnit.MILLISECONDS);
     }
 
-    private static ThreadFactory daemon(String name) {
-        return runnable -> {
-            Thread thread = new Thread(runnable, name);
-            thread.setDaemon(true);
-            return thread;
-        };
-    }
-
-    /** @param stillAllowed false once this subscriber's browser logged out or lost its login */
-    public SseEmitter subscribe(BooleanSupplier stillAllowed) {
-        return register(new SseEmitter(NO_TIMEOUT), stillAllowed);
+    /**
+     * Opens a tab's stream. Its {@code snapshot} is the first thing sent, from the tab's own queue, so no event
+     * published while the snapshot is read or sent can arrive before it.
+     *
+     * @param stillAllowed false once this subscriber's browser logged out or lost its login
+     */
+    public SseEmitter subscribe(BooleanSupplier stillAllowed, Send snapshot) {
+        return register(new SseEmitter(NO_TIMEOUT), stillAllowed, snapshot);
     }
 
     SseEmitter register(SseEmitter emitter) {
         return register(emitter, () -> true);
     }
 
-    /** Wires one emitter's lifecycle callbacks and adds it to the fan-out. */
     SseEmitter register(SseEmitter emitter, BooleanSupplier stillAllowed) {
-        emitter.onCompletion(() -> drop(emitter));
-        emitter.onTimeout(() -> drop(emitter));
-        emitter.onError(error -> drop(emitter));
-        allowed.put(emitter, stillAllowed);
-        emitters.add(emitter);
+        return register(emitter, stillAllowed, null);
+    }
+
+    /** Wires one emitter's lifecycle callbacks, queues its snapshot and starts its sender. */
+    SseEmitter register(SseEmitter emitter, BooleanSupplier stillAllowed, Send snapshot) {
+        Subscriber subscriber = new Subscriber(emitter, stillAllowed);
+        if (snapshot != null) {
+            subscriber.queue.add(snapshot);
+        }
+        emitter.onCompletion(subscriber::end);
+        emitter.onTimeout(subscriber::end);
+        emitter.onError(_ -> subscriber.end());
+        subscribers.add(subscriber);
+        Thread.ofVirtual().name("home-control-sse-tab").start(subscriber);
         return emitter;
     }
 
     /** Ends every stream whose subscriber may no longer see device state (after a login change). */
     public void revalidate() {
-        for (SseEmitter emitter : emitters) {
-            if (!isAllowed(emitter)) {
-                drop(emitter);
-                completeQuietly(emitter);
+        for (Subscriber subscriber : subscribers) {
+            if (!subscriber.allowed()) {
+                subscriber.end();
             }
         }
     }
 
-    private boolean isAllowed(SseEmitter emitter) {
-        BooleanSupplier check = allowed.get(emitter);
-        try {
-            return check != null && check.getAsBoolean();
-        } catch (RuntimeException _) {
-            return false;
-        }
-    }
-
-    private void drop(SseEmitter emitter) {
-        emitters.remove(emitter);
-        allowed.remove(emitter);
-    }
-
-    /**
-     * Undoes a {@link #subscribe(BooleanSupplier)} whose caller never got to hand the emitter back to
-     * Spring — e.g. the initial state send failed. Without this, that emitter's
-     * onCompletion/onTimeout/onError never fire (Spring never adopted it), so it would
-     * otherwise sit in this list forever.
-     */
-    void unsubscribe(SseEmitter emitter) {
-        drop(emitter);
-    }
-
+    /** One send to one tab's emitter. */
     @FunctionalInterface
     interface Send {
         void to(SseEmitter emitter) throws IOException;
@@ -154,45 +136,12 @@ public class EventStream {
     public void onContextClosed() {
         closed = true;
         heartbeat.cancel(false);
-        for (SseEmitter emitter : List.copyOf(emitters)) {
-            drop(emitter);
-            completeQuietly(emitter);
-        }
+        subscribers.forEach(Subscriber::end);
     }
 
     private void enqueue(Send send) {
-        try {
-            fanOut.execute(() -> broadcast(send));
-        } catch (RejectedExecutionException _) {
-            // The application is shutting down; there is nobody left to tell.
-        }
-    }
-
-    private void broadcast(Send send) {
-        for (SseEmitter emitter : emitters) {
-            if (!isAllowed(emitter)) {
-                drop(emitter);
-                completeQuietly(emitter);
-                continue;
-            }
-            boolean delivered = false;
-            try {
-                send.to(emitter);
-                delivered = true;
-            } catch (IOException | RuntimeException e) {
-                // Not just IOException: send throws an unchecked IllegalStateException when the
-                // emitter completed after this loop took its snapshot of the list, which happens
-                // routinely on tab close. Either way this subscriber is finished — drop it, and
-                // never let it stop the event reaching the remaining tabs.
-                log.debug("Dropping an SSE subscriber after a failed send", e);
-                completeQuietly(emitter, e);
-            } finally {
-                // An Error still ends this task (the executor starts a fresh thread), but the subscriber
-                // that raised it is dropped too, so it cannot cut off the tabs after it on every event.
-                if (!delivered) {
-                    drop(emitter);
-                }
-            }
+        for (Subscriber subscriber : subscribers) {
+            subscriber.offer(send);
         }
     }
 
@@ -217,26 +166,100 @@ public class EventStream {
         emitter.send(SseEmitter.event().name(name).data(data));
     }
 
-    private void completeQuietly(SseEmitter emitter) {
-        try {
-            emitter.complete();
-        } catch (RuntimeException _) {
-            // Already gone; the emitter is off the list either way.
-        }
-    }
-
-    /** {@code completeWithError} throws in turn on an emitter that has already completed. */
-    private void completeQuietly(SseEmitter emitter, Exception cause) {
-        try {
-            emitter.completeWithError(cause);
-        } catch (RuntimeException _) {
-            // Already gone; the emitter is off the list either way.
-        }
-    }
-
     @PreDestroy
     void shutdown() {
         ticks.shutdownNow();
-        fanOut.shutdownNow();
+        subscribers.forEach(Subscriber::end);
+    }
+
+    /**
+     * One open tab: its sends wait in its own queue for its own sender. Only that sender touches the emitter, also to
+     * complete it, so a tab stuck in a send holds up neither a publisher nor whoever ends it.
+     */
+    private final class Subscriber implements Runnable {
+
+        private final SseEmitter emitter;
+        private final BooleanSupplier stillAllowed;
+        private final BlockingQueue<Send> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
+        private volatile boolean ended;
+        private volatile Exception failure;
+
+        Subscriber(SseEmitter emitter, BooleanSupplier stillAllowed) {
+            this.emitter = emitter;
+            this.stillAllowed = stillAllowed;
+        }
+
+        boolean allowed() {
+            try {
+                return stillAllowed.getAsBoolean();
+            } catch (RuntimeException _) {
+                return false;
+            }
+        }
+
+        void offer(Send send) {
+            if (!ended && !queue.offer(send)) {
+                log.debug("Dropping an SSE subscriber that fell {} sends behind", QUEUE_CAPACITY);
+                end();
+            }
+        }
+
+        /** Takes the tab off the stream; its sender completes it once a send it may be stuck in returns. */
+        void end() {
+            if (ended) {
+                return;
+            }
+            ended = true;
+            subscribers.remove(this);
+            queue.clear();
+            queue.offer(STOP);
+        }
+
+        private void fail(Exception cause) {
+            failure = cause;
+            end();
+        }
+
+        @Override
+        public void run() {
+            try {
+                while (!ended) {
+                    Send send = queue.take();
+                    if (send == STOP || ended) {
+                        return;
+                    }
+                    if (!allowed()) {
+                        end();
+                        return;
+                    }
+                    try {
+                        send.to(emitter);
+                    } catch (IOException | RuntimeException e) {
+                        // Not just IOException: send throws an unchecked IllegalStateException when the emitter
+                        // completed meanwhile, which happens routinely on tab close. Either way this tab is finished.
+                        log.debug("Dropping an SSE subscriber after a failed send", e);
+                        fail(e);
+                    }
+                }
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            } finally {
+                // An Error still ends this sender (and reaches the thread's handler), but its tab is ended too.
+                end();
+                complete();
+            }
+        }
+
+        private void complete() {
+            try {
+                if (failure != null) {
+                    emitter.completeWithError(failure);
+                } else {
+                    emitter.complete();
+                }
+            } catch (RuntimeException _) {
+                // Already gone; the tab is off the stream either way.
+            }
+        }
     }
 }
