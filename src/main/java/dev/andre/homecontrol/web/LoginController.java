@@ -8,6 +8,7 @@ import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.security.WrongPasswordException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,6 +35,15 @@ public class LoginController {
     public LoginController(LoginService loginService, LoginRateLimiter limiter) {
         this.loginService = loginService;
         this.limiter = limiter;
+    }
+
+    /**
+     * What a page asks when its live updates stopped: the login gate answers 401 when this browser's login is gone,
+     * and the request reaches this when the browser may still see the app.
+     */
+    @GetMapping("/session")
+    public ResponseEntity<Void> session() {
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/login")
