@@ -172,6 +172,27 @@ class YouTubeBrowserAuthorizationTest {
     }
 
     @Test
+    void aSignInCancelledWhileItsCodeIsExchangedStoresNothing() throws Exception {
+        var release = new CountDownLatch(1);
+        google.holdWhen("POST", "/oauth/token", request -> true, release,
+                FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
+        String state = start();
+        var completing = java.util.concurrent.CompletableFuture.runAsync(
+                () -> authorization.completeBrowser("browser-session", state, "code", null));
+        await().until(() -> google.count("/oauth/token") == 1);
+
+        try {
+            java.util.concurrent.CompletableFuture.runAsync(authorization::cancel).get(2, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+        }
+
+        completing.get(5, TimeUnit.SECONDS);
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.IDLE);
+        assertThat(tokens.hasRefreshToken()).isFalse();
+    }
+
+    @Test
     void aDifferentAccountClearsTheOldLibraryButPreservesDeviceSettings() {
         settings.put(YouTubeSettings.SOURCE_ID, new YouTubeSettings(clock.instant(), "old-channel", "Old account", true,
                 Map.of("PLold", "Old playlist"), Set.of("tv"), "remote"));
