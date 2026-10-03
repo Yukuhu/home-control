@@ -119,7 +119,16 @@ public class WebOsAdapter implements DeviceAdapter, AdapterDiscovery {
     static String name(SsdpService service) {
         return service.friendlyName()
                 .or(() -> Optional.ofNullable(service.headers().get("DLNADeviceName.lge.com"))
-                        .map(value -> URLDecoder.decode(value, StandardCharsets.UTF_8)))
+                        .map(WebOsAdapter::decoded))
                 .orElse("LG webOS TV");
+    }
+
+    /** LG sets escape the name; anything on the LAN can announce one that is not validly escaped, kept as it came. */
+    private static String decoded(String value) {
+        try {
+            return URLDecoder.decode(value, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException _) {
+            return value;
+        }
     }
 }
