@@ -117,7 +117,7 @@ public final class RequestLoginContext implements LoginContext {
     private Optional<String> token() {
         Cookie[] cookies = request.getCookies();
         return cookies == null ? Optional.empty() : Arrays.stream(cookies)
-                .filter(cookie -> RememberedLogins.COOKIE.equals(cookie.getName()))
+                .filter(cookie -> RememberedLogins.COOKIE_NAME.equals(cookie.getName()))
                 .map(Cookie::getValue)
                 .filter(value -> !value.isEmpty())
                 .findFirst();

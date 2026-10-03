@@ -118,14 +118,14 @@ class RequestLoginContextTest {
     }
 
     private static String rememberedToken(MockHttpServletResponse response) {
-        Cookie cookie = response.getCookie(RememberedLogins.COOKIE);
+        Cookie cookie = response.getCookie(RememberedLogins.COOKIE_NAME);
         assertThat(cookie).as("the remembered-login cookie").isNotNull();
         return cookie.getValue();
     }
 
     private MockHttpServletRequest afterARestart(String token) {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setCookies(new Cookie(RememberedLogins.COOKIE, token));
+        request.setCookies(new Cookie(RememberedLogins.COOKIE_NAME, token));
         return request;
     }
 
@@ -135,7 +135,7 @@ class RequestLoginContextTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         login.authenticate(PASSWORD, remembering(new MockHttpServletRequest(), response));
         String token = rememberedToken(response);
-        assertThat(response.getCookie(RememberedLogins.COOKIE).isHttpOnly()).isTrue();
+        assertThat(response.getCookie(RememberedLogins.COOKIE_NAME).isHttpOnly()).isTrue();
 
         MockHttpServletRequest request = afterARestart(token);
         LoginContext restarted = remembering(request, new MockHttpServletResponse());
@@ -168,12 +168,12 @@ class RequestLoginContextTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         login.authenticate(PASSWORD, remembering(request, loggedIn));
         String token = rememberedToken(loggedIn);
-        request.setCookies(new Cookie(RememberedLogins.COOKIE, token));
+        request.setCookies(new Cookie(RememberedLogins.COOKIE_NAME, token));
         MockHttpServletResponse loggedOut = new MockHttpServletResponse();
 
         login.logout(remembering(request, loggedOut));
 
-        assertThat(loggedOut.getCookie(RememberedLogins.COOKIE).getMaxAge()).isZero();
+        assertThat(loggedOut.getCookie(RememberedLogins.COOKIE_NAME).getMaxAge()).isZero();
         assertThat(login.resume(remembering(afterARestart(token), new MockHttpServletResponse()))).isFalse();
     }
 
@@ -215,7 +215,7 @@ class RequestLoginContextTest {
 
         login.authenticate(PASSWORD, remembering(request, response));
 
-        assertThat(response.getCookie(RememberedLogins.COOKIE).getSecure()).isTrue();
+        assertThat(response.getCookie(RememberedLogins.COOKIE_NAME).getSecure()).isTrue();
     }
 
     @Test
@@ -226,7 +226,7 @@ class RequestLoginContextTest {
         MockHttpServletResponse laptop = new MockHttpServletResponse();
         MockHttpServletRequest laptopRequest = new MockHttpServletRequest();
         login.authenticate(PASSWORD, remembering(laptopRequest, laptop));
-        laptopRequest.setCookies(new Cookie(RememberedLogins.COOKIE, rememberedToken(laptop)));
+        laptopRequest.setCookies(new Cookie(RememberedLogins.COOKIE_NAME, rememberedToken(laptop)));
         MockHttpServletResponse changed = new MockHttpServletResponse();
 
         login.changePassword(PASSWORD, "a new password!", "a new password!", remembering(laptopRequest, changed));
