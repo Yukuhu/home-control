@@ -22,6 +22,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -36,6 +38,8 @@ class TheSportsDbScheduleTest {
     private TheSportsDbSchedule schedule;
 
     private SportsTimeZones zones;
+    private SportsProperties properties;
+    private TheSportsDbKeys keys;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -51,7 +55,7 @@ class TheSportsDbScheduleTest {
         zones = mock(SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
 
-        SportsProperties properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
+        properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
                 new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
                 5242880, 3, true),
                 new SportsProperties.TheSportsDb(true, server.apiBase(), "123", Duration.ofHours(24),
@@ -59,7 +63,7 @@ class TheSportsDbScheduleTest {
 
         clock = MutableClock.at(Instant.parse("2026-09-19T14:00:00Z"));
         TheSportsDbClient client = new TheSportsDbClient(properties.theSportsDb());
-        TheSportsDbKeys keys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), properties);
+        keys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), properties);
         schedule = new TheSportsDbSchedule(client, keys, settingsService, properties, zones, clock);
     }
 
@@ -103,6 +107,19 @@ class TheSportsDbScheduleTest {
         schedule.events();
 
         assertThat(server.count("eventsday.php")).isEqualTo(2 * fetched);
+    }
+
+    @Test
+    void anUnexpectedFailureFailsOnlyItsCompetition() {
+        TheSportsDbClient failing = mock(TheSportsDbClient.class);
+        given(failing.eventsDay(any(), any(), eq("4331"))).willThrow(new IllegalStateException("an unexpected answer"));
+        given(failing.eventsDay(any(), any(), eq("4328"))).willReturn(List.of());
+        TheSportsDbSchedule withFailing = new TheSportsDbSchedule(failing, keys, settingsService, properties, zones, clock);
+
+        FeedResult result = withFailing.events();
+
+        assertThat(result.errors()).singleElement().asString().startsWith("German Bundesliga: ");
+        assertThat(result.succeeded()).isEqualTo(1);
     }
 
     @Test
