@@ -117,6 +117,17 @@ class LoginGatingTest extends FullAppTest {
                 .andExpect(content().string(containsString("name=\"password\"")));
     }
 
+    /** Deleting secrets.json would also delete the TV pairings and the keystore's password: never advised. */
+    @Test
+    void aForgottenPasswordIsResetWithTheSettingThatKeepsTheTvPairings() throws Exception {
+        storeAFirstSecret();
+
+        mockMvc.perform(get("/login")).andExpect(status().isOk())
+                .andExpect(content().string(containsString("<code>HOME_CONTROL_RESET_LOGIN=true</code>")))
+                .andExpect(content().string(containsString("docs/user/security.md")))
+                .andExpect(content().string(not(containsString("delete <code>secrets.json</code>"))));
+    }
+
     @Test
     void theRightPasswordOpensTheAppAndTheWrongOneDoesNot() throws Exception {
         storeAFirstSecret();
