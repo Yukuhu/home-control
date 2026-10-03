@@ -57,6 +57,7 @@ repository's Security tab.
 A pull request that changes only documentation builds and tests nothing, and `CI passed`
 passes for it. Documentation is what `scripts/code-changed.sh` lists: `docs/`, the Markdown
 files at the top of the repository, the licence, and the issue and pull request templates.
+A guide that a test reads is code all the same, so a change to it alone runs that test.
 A push to `main` always runs every job.
 
 After every pull request run, CI comments the results on the pull request: the test counts
