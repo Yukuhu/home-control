@@ -66,7 +66,7 @@ class PromptPairingSetupTest extends WebSliceTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(html).containsPattern(Pattern.compile(
-                "action=\"/setup/pair\">\\s*<input type=\"hidden\" name=\"adapter\" value=\"androidtv\""));
+                "action=\"/setup/pair\"[^>]*>\\s*<input type=\"hidden\" name=\"adapter\" value=\"androidtv\""));
     }
 
     @Test
