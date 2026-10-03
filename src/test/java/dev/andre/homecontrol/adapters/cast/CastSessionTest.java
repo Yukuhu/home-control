@@ -133,7 +133,8 @@ class CastSessionTest {
         await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
                 .until(() -> session.state().status() == DeviceStatus.CONNECTING);
         // Nothing is known about the receiver yet, so a Stop has nothing it could stop.
-        assertThatThrownBy(() -> session.execute(new Action.Stop()))
+        Action.Stop stop = new Action.Stop();
+        assertThatThrownBy(() -> session.execute(stop))
                 .isInstanceOf(DeviceOfflineException.class).hasMessage("Living Room TV is not connected");
 
         receiver.pushReceiverStatus();
