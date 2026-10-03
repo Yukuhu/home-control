@@ -28,6 +28,22 @@ class IcsParserTest {
     @Test
     void unfoldsContinuationLines() {
         assertThat(IcsParser.unfold("A:1\n  two\n\tthree\nB:2")).containsExactly("A:1 twothree", "B:2");
+    }
+
+    @Test
+    void unfoldsTheBytesSoAFoldInsideACharacterKeepsIt() {
+        // RFC 5545 folds at octets: the fold may fall between the two bytes of a "ü".
+        byte[] folded = "SUMMARY:M\u00fcnchen\r\n".getBytes(StandardCharsets.UTF_8);
+        byte[] body = new byte[folded.length + 3];
+        System.arraycopy(folded, 0, body, 0, 10);
+        body[10] = '\r';
+        body[11] = '\n';
+        body[12] = ' ';
+        System.arraycopy(folded, 10, body, 13, folded.length - 10);
+
+        assertThat(new String(IcsParser.unfold(body), StandardCharsets.UTF_8)).isEqualTo("SUMMARY:M\u00fcnchen\r\n");
+        assertThat(new String(IcsParser.unfold("A:1\n two\r\n\tthree\rB:2".getBytes(StandardCharsets.UTF_8)),
+                StandardCharsets.UTF_8)).isEqualTo("A:1twothree\rB:2");
         assertThat(IcsParser.unfold("A:1\r\n  two\r\nB:2")).containsExactly("A:1 two", "B:2");
         assertThat(IcsParser.unfold("A:1\r  two\rB:2")).containsExactly("A:1 two", "B:2");
     }

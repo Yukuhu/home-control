@@ -22,7 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class IcsFixtureContractTest {
 
     private static final ZoneId BERLIN = ZoneId.of("Europe/Berlin");
-    private static final List<String> VALID_FIXTURES = List.of("bundesliga.ics", "recurring.ics", "outlook.ics");
+    private static final List<String> VALID_FIXTURES = List.of("bundesliga.ics", "recurring.ics", "outlook.ics",
+            "bundesliga-folded.ics");
 
     private static String fixture(String name) {
         try (InputStream in = IcsFixtureContractTest.class.getResourceAsStream("/fixtures/ics/" + name)) {
@@ -49,9 +50,20 @@ class IcsFixtureContractTest {
         Path dir = Path.of("src/testFixtures/resources/fixtures/ics");
         try (Stream<Path> listing = Files.list(dir)) {
             List<String> names = listing.map(p -> p.getFileName().toString()).sorted().toList();
-            assertThat(names).containsExactlyInAnyOrder(
-                    "broken.ics", "bundesliga.ics", "not-a-calendar.html", "outlook.ics", "recurring.ics");
+            assertThat(names).containsExactlyInAnyOrder("broken.ics", "bundesliga.ics", "bundesliga-folded.ics",
+                    "not-a-calendar.html", "outlook.ics", "recurring.ics");
         }
+    }
+
+    @Test
+    void theFoldedFixtureIsAsRoughAsARealFeed() throws IOException {
+        byte[] raw;
+        try (InputStream in = IcsFixtureContractTest.class.getResourceAsStream("/fixtures/ics/bundesliga-folded.ics")) {
+            raw = in.readAllBytes();
+        }
+        String text = new String(raw, StandardCharsets.ISO_8859_1);
+        assertThat(text).as("CRLF line ends").contains("\r\n").doesNotContainPattern("[^\r]\n");
+        assertThat(text).as("a fold between the two bytes of a character").contains("\u00c3\r\n \u009c");
     }
 
     @Test
