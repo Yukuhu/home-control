@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ContentSources {
 
     private static final System.Logger LOG = System.getLogger(ContentSources.class.getName());
-    /** The failure last logged per source id. */
+    /** The failure last logged per source and call, until that call succeeds again. */
     private static final Map<String, String> FAILING = new ConcurrentHashMap<>();
 
     private final Map<String, ContentSource> byId = new LinkedHashMap<>();
@@ -36,30 +36,34 @@ public class ContentSources {
      * source cannot take search, the dashboard or the setup page down with it.
      */
     public static boolean available(ContentSource source) {
+        String call = source.id() + ".available()";
         try {
             boolean available = source.available();
-            FAILING.remove(source.id());
+            FAILING.remove(call);
             return available;
         } catch (RuntimeException e) {
-            reportOnce(source, e);
+            reportOnce(call, source, e);
             return false;
         }
     }
 
     /** A source's rails; none when asking for them fails, for the same reason as {@link #available}. */
     public static List<RailDescriptor> rails(ContentSource source) {
+        String call = source.id() + ".rails()";
         try {
-            return source.rails();
+            List<RailDescriptor> rails = source.rails();
+            FAILING.remove(call);
+            return rails;
         } catch (RuntimeException e) {
-            reportOnce(source, e);
+            reportOnce(call, source, e);
             return List.of();
         }
     }
 
     /** Every page view asks again; a failure is logged when it first happens or changes, not on every view. */
-    private static void reportOnce(ContentSource source, RuntimeException failure) {
+    private static void reportOnce(String call, ContentSource source, RuntimeException failure) {
         String message = String.valueOf(failure.getMessage());
-        if (!message.equals(FAILING.put(source.id(), message))) {
+        if (!message.equals(FAILING.put(call, message))) {
             LOG.log(System.Logger.Level.WARNING, "Leaving out the content source " + source.id() + ": " + message,
                     failure);
         }
