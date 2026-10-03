@@ -73,11 +73,23 @@ class DataDirectoryTest {
                 .isInstanceOfSatisfying(UnusableDataDirectoryException.class, failure -> {
                     assertThat(failure.directory()).isEqualTo(dir);
                     assertThat(failure.unusable()).isEqualTo(key);
-                    assertThat(failure).hasMessageContaining(dir.toString()).hasMessageContaining(key.toString())
-                            .hasMessageContaining("uid " + uid + ", gid " + gid);
-                    assertThat(failure.remedy()).contains("chown -R " + uid + ":" + gid).contains("--user 0:0")
-                            .contains("mounted at " + dir);
+                    assertThat(failure).hasMessageContaining(dir.toString()).hasMessageContaining(key.toString());
+                    // Whole ids: a gid of 1000 must not pass for 100.
+                    assertThat(failure.getMessage()).containsPattern("uid " + uid + ", gid " + gid + "\\b");
+                    assertThat(failure.remedy()).contains("chown -R " + uid + ":" + gid + " <the directory mounted at " + dir)
+                            .contains("--user 0:0");
                 });
+    }
+
+    @Test
+    void theIdsComeFromAFileTheProcessOwnsOrElseFromTheSystem() throws Exception {
+        Path owned = Files.writeString(dir.resolve("owned"), "");
+
+        assertThat(ProcessUser.of(owned)).isEqualTo(new ProcessUser(System.getProperty("user.name"),
+                ((Number) Files.getAttribute(owned, "unix:uid")).longValue(),
+                ((Number) Files.getAttribute(owned, "unix:gid")).longValue()));
+        assertThat(ProcessUser.of(dir.resolve("missing")).uid())
+                .isEqualTo(((Number) Files.getAttribute(owned, "unix:uid")).longValue());
     }
 
     @Test
