@@ -100,7 +100,7 @@ public final class FakeGoogleServer implements AutoCloseable {
         return this;
     }
 
-    /** Records each request {@code when} accepts at once, and answers it with {@code answer} once {@code release} opens. */
+    /** Records each request {@code when} accepts at once, and answers it with {@code answer} once released. */
     public FakeGoogleServer holdWhen(String method, String path, Predicate<Recorded> when, CountDownLatch release,
                                      Canned answer) {
         server.hold(method, path, request -> when.test(recorded(request)), release,

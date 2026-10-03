@@ -86,7 +86,8 @@
 </section>
 
 <div th:fragment="sessions" id="jellyfin-sessions">
-    <p class="error" role="alert" th:if="${jellyfinSessions.error()}" th:text="${jellyfinSessions.error()}">Could not reach Jellyfin</p>
+    <p class="error" role="alert" th:if="${jellyfinSessions.error()}" th:text="${jellyfinSessions.error()}">
+        Could not reach Jellyfin</p>
     <p class="hint" th:if="${jellyfinSessions.error() == null and #lists.isEmpty(jellyfinSessions.sessions())}">
         No Jellyfin app is open right now.</p>
     <form method="post" th:action="@{/setup/sources/jellyfin/links}"
@@ -96,7 +97,8 @@
             <span th:text="${jellyfinSession.label()}">SHIELD Android TV · Android TV · 192.168.1.50</span>
         <select name="device">
             <option value="" th:selected="${jellyfinSession.linkedDeviceId() == ''}">Not linked</option>
-            <option th:each="device : ${jellyfinSessions.devices()}" th:value="${device.id()}" th:text="${device.name()}"
+            <option th:each="device : ${jellyfinSessions.devices()}" th:value="${device.id()}"
+                    th:text="${device.name()}"
                     th:selected="${device.id() == jellyfinSession.linkedDeviceId()}">Living Room</option>
         </select>
         </label>

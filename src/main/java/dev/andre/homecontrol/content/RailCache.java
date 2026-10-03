@@ -211,7 +211,7 @@ public class RailCache implements SmartLifecycle {
         reschedule();
     }
 
-    /** A source said its rails changed (e.g. a new pin): pick up new rails and refetch that source, or that rail, now. */
+    /** A source said its rails changed (e.g. a new pin): pick up new rails and refetch the source, or its rail, now. */
     @EventListener
     public void onContentChanged(ContentChangedEvent event) {
         reconcile();

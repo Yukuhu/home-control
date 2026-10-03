@@ -122,7 +122,7 @@ public class JellyfinVlcExecutor implements RouteExecutor {
                     || source.path("RequiresClosing").asBoolean(false)
                     || source.path("IsInfiniteStream").asBoolean(false)) continue;
             // VLC, unlike the Cast renderer, can fetch the original container (including MKV).
-            URI stream = JellyfinStreams.staticStream(settings.deviceServerUrl(), "Audio".equals(type), id, "",
+            URI stream = JellyfinStreams.staticStream(settings.deviceServerUrl(), "Audio".equals(type), id, null,
                     sourceId, connection.token());
             // VLC's MediaWrapper.manageVLCMrl removes precisely this prefix.
             return new Launch(URI.create("vlc://" + stream), media(item));

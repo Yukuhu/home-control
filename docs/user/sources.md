@@ -95,8 +95,8 @@ call that runs once fails, the refresh fails and the Dashboard keeps the last go
 **Save** validates and encrypts the definition and never starts playback. Saving an enabled
 generated workflow can trigger its Dashboard catalog refresh, which requests the source; a
 single-tile Dashboard refresh stays local. Saving, switching off or removing one workflow
-refreshes only that workflow's tiles; the others keep theirs. The first Save creates the household login password,
-even for a public feed; later edits and Tests require login. Saved source URLs, header values,
+refreshes only that workflow's tiles; the others keep theirs. The first Save creates the
+household login password, even for a public feed; later edits and Tests require login. Saved source URLs, header values,
 and media templates are hidden on the edit page. Choose **Keep saved URL**, **Keep saved
 headers** or **Keep saved template** to retain them, or **Replace URL**, **Replace headers** or
 **Replace template** to enter new values. **Test** runs the calls once and shows up to five sample tiles with

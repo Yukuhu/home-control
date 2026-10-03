@@ -51,7 +51,8 @@ class JellyfinVlcExecutorTest {
         executor.execute(new JellyfinRoute.Vlc(ID), shield);
         // ApiKey, not the legacy api_key a server with legacy authorization switched off refuses.
         verify(commands).execute("shield", new Action.OpenAppLink(URI.create(
-                "vlc://https://nas.lan/jellyfin/Videos/" + ID + "/stream?static=true&mediaSourceId=source%2B1&ApiKey=secret%2B%26token")));
+                "vlc://https://nas.lan/jellyfin/Videos/" + ID
+                        + "/stream?static=true&mediaSourceId=source%2B1&ApiKey=secret%2B%26token")));
         verify(commands, times(1)).execute(anyString(), any());
     }
 

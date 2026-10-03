@@ -40,15 +40,16 @@ public class JellyfinSetupSection extends SetupSection {
 
     private final ObjectProvider<JellyfinSetupService> setup;
     private final ObjectProvider<LoginService> login;
-    private final ObjectProvider<JellyfinSessions> sessions;
+    private final ObjectProvider<JellyfinSessions> jellyfinSessions;
     private final ObjectProvider<DeviceQueries> devices;
 
     public JellyfinSetupSection(ObjectProvider<JellyfinSetupService> setup, ObjectProvider<LoginService> login,
-                               ObjectProvider<JellyfinSessions> sessions, ObjectProvider<DeviceQueries> devices) {
+                               ObjectProvider<JellyfinSessions> jellyfinSessions,
+                               ObjectProvider<DeviceQueries> devices) {
         super("jellyfin", "Jellyfin", Group.CONTENT_SOURCES, 10);
         this.setup = setup;
         this.login = login;
-        this.sessions = sessions;
+        this.jellyfinSessions = jellyfinSessions;
         this.devices = devices;
     }
 
@@ -78,15 +79,15 @@ public class JellyfinSetupSection extends SetupSection {
     public Sessions sessions() {
         Optional<JellyfinSettings> settings = Optional.ofNullable(setup.getIfAvailable())
                 .flatMap(JellyfinSetupService::settings);
-        JellyfinSessions jellyfinSessions = sessions.getIfAvailable();
-        if (settings.isEmpty() || jellyfinSessions == null) {
+        JellyfinSessions open = jellyfinSessions.getIfAvailable();
+        if (settings.isEmpty() || open == null) {
             return new Sessions(List.of(), null, List.of());
         }
         JellyfinSettings s = settings.get();
         Map<String, String> linkedBy = new HashMap<>();
         s.sessionLinks().forEach((deviceId, jellyfinDeviceId) -> linkedBy.put(jellyfinDeviceId, deviceId));
         try {
-            List<SessionOption> options = jellyfinSessions.controllable().stream()
+            List<SessionOption> options = open.controllable().stream()
                     .map(session -> new SessionOption(session.deviceId(),
                             session.deviceName() + " · " + session.client() + " · " + session.remoteAddress(),
                             linkedBy.getOrDefault(session.deviceId(), "")))

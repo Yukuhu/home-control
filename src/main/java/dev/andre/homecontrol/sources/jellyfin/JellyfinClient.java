@@ -108,10 +108,10 @@ public class JellyfinClient implements AutoCloseable {
         JsonNode info;
         try {
             info = send(serverUrl, signed(OutboundRequest.get(uri(serverUrl, "/System/Info/Public", Map.of())), null, null));
-        } catch (Redirected e) {
-            throw e; // Jellyfin at another address: the advice says which one to enter
         } catch (JellyfinException e) {
-            if (e.kind() == ContentSourceException.Kind.NOT_FOUND || e.kind() == ContentSourceException.Kind.BAD_RESPONSE) {
+            // A redirect may well be Jellyfin at another address: its own message says to enter the final one.
+            if (!(e instanceof Redirected) && (e.kind() == ContentSourceException.Kind.NOT_FOUND
+                    || e.kind() == ContentSourceException.Kind.BAD_RESPONSE)) {
                 throw notJellyfin(serverUrl);
             }
             throw e;
