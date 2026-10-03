@@ -68,7 +68,7 @@ public class SonosSession implements DeviceHandle, GroupListing {
     private final StatePublisher publisher;
     private final RendererStatePoller renderer;
 
-    // Immutable, replaced wholesale by each topology read (poll loop or a grouping command); never modified in place.
+    // Immutable, replaced wholesale by each topology read (the poll loop, or a command); never modified in place.
     @SuppressWarnings("java:S3077")
     private volatile ZoneGroupState topology;
     private volatile Instant topologyReadAt = Instant.EPOCH;

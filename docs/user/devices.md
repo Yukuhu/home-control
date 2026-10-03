@@ -206,13 +206,14 @@ not).
 - Pair a speaker on **Setup → Bluetooth speakers**: put it into pairing mode, **Scan for
   speakers**, then **Pair and add**.
 
-What works: direct audio links (`.mp3`, `.flac`, `.m4a`, `.ogg` …) and Jellyfin music; Pause,
-Play and Stop, the volume slider and mute; now playing (title, position, duration).
+What works: direct audio links (`.mp3`, `.flac`, `.m4a`, `.ogg` …), radio playlists (`.m3u`,
+`.pls`) and Jellyfin music; Pause, Play and Stop, the volume slider and mute; now playing (title,
+position, duration).
 
 Limits: audio only, no video; the *server* must be able to reach the stream URL (not the
 speaker); the speaker's hardware volume is not changed, only mpv's own; music stops the moment
-the speaker disconnects, so it never continues on the host's own audio output; one stream per
-speaker (no simultaneous playback on the same speaker).
+the speaker disconnects, or you disconnect it on the setup page, so it never continues on the
+host's own audio output; one stream per speaker (no simultaneous playback on the same speaker).
 
 See [Bluetooth speakers](bluetooth-speakers.md) for the full host checklist and every failure mode's fix.
 
