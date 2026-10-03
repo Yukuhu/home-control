@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -162,10 +163,12 @@ public class CalendarSchedule implements SportsFeed {
                     succeeded++;
                     IcsOccurrences.Result expanded = IcsOccurrences.expand(cached.calendar(), zones.effective(),
                             windowStart, windowEnd, properties.defaultEventDuration());
-                    for (IcsOccurrence occurrence : expanded.occurrences()) {
-                        SportsEvent event = toEvent(entry.id(), occurrence);
+                    for (SportsEvent event : toEvents(entry.id(), expanded.occurrences())) {
                         events.add(event);
                         byId.put(event.itemId(), event);
+                        if (event.formerItemId() != null) {
+                            byId.putIfAbsent(event.formerItemId(), event); // pins and links made under the former id
+                        }
                     }
                 }
                 if (cached != null && cached.error() != null) {
@@ -258,18 +261,49 @@ public class CalendarSchedule implements SportsFeed {
     }
 
 
+    /**
+     * One calendar's events. A feed that reuses a UID for different events, against RFC 5545, would give them one id:
+     * each after the first keeps its former id, which includes its start, instead.
+     */
+    static List<SportsEvent> toEvents(String calendarId, List<IcsOccurrence> occurrences) {
+        Set<String> taken = new HashSet<>();
+        List<SportsEvent> events = new ArrayList<>(occurrences.size());
+        for (IcsOccurrence occurrence : occurrences) {
+            SportsEvent event = toEvent(calendarId, occurrence);
+            if (!taken.add(event.itemId()) && event.formerItemId() != null) {
+                event = new SportsEvent(event.formerItemId(), event.competitionKey(), event.title(), event.startsAt(),
+                        event.endsAt(), event.allDayDate(), event.artwork(), event.status(), null);
+                taken.add(event.itemId());
+            }
+            events.add(event);
+        }
+        return events;
+    }
+
+    /**
+     * The event's id comes from its UID and, for a repeating one, the start the occurrence has in its series: a kick-off
+     * that moves keeps its id, and with it its pinned link. Without a UID nothing else names the event.
+     */
     public static SportsEvent toEvent(String calendarId, IcsOccurrence occurrence) {
         String stripped = occurrence.summary() == null ? "" : occurrence.summary().strip();
         String title = stripped.isBlank() ? "Event" : stripped;
         if (title.length() > 200) {
             title = title.substring(0, 199) + "…";
         }
-        String hashInput = occurrence.uid() != null
+        String formerItemId = "ics:" + calendarId + ":" + hashHex16(formerIdentity(occurrence));
+        String itemId = occurrence.uid() == null ? formerItemId
+                : "ics:" + calendarId + ":" + hashHex16("uid|" + occurrence.uid()
+                        + (occurrence.recurrenceId() == null ? "" : "|" + occurrence.recurrenceId().getEpochSecond()));
+        return new SportsEvent(itemId, SportsSettings.calendarKey(calendarId), title, occurrence.startsAt(),
+                occurrence.endsAt(), occurrence.allDayDate(), null, SportsEvent.Status.SCHEDULED,
+                itemId.equals(formerItemId) ? null : formerItemId);
+    }
+
+    /** What the id was made of before it came from the UID: the UID and the start, so a moved kick-off got a new one. */
+    private static String formerIdentity(IcsOccurrence occurrence) {
+        return occurrence.uid() != null
                 ? occurrence.uid() + "|" + occurrence.startsAt().getEpochSecond()
                 : "no-uid|" + occurrence.summary() + "|" + occurrence.startsAt().getEpochSecond();
-        String itemId = "ics:" + calendarId + ":" + hashHex16(hashInput);
-        return new SportsEvent(itemId, SportsSettings.calendarKey(calendarId), title, occurrence.startsAt(),
-                occurrence.endsAt(), occurrence.allDayDate(), null, SportsEvent.Status.SCHEDULED);
     }
 
     private static String hashHex16(String input) {

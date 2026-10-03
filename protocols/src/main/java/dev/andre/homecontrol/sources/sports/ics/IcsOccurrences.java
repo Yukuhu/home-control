@@ -127,6 +127,8 @@ public final class IcsOccurrences {
         private final Duration length;
         private final Set<Instant> exInstants = new HashSet<>();
         private final Set<LocalDate> exDates = new HashSet<>();
+        /** For an override: the start of the occurrence it replaces. */
+        private final Instant replaces;
         private int produced;
 
         Expansion(IcsEvent event, IcsRecurrence rule, Zones zones, Set<Instant> overridden, Window window,
@@ -138,6 +140,7 @@ public final class IcsOccurrences {
             this.out = out;
             this.zone = zones.zoneOf(event.start());
             this.first = Zones.local(event.start());
+            this.replaces = event.recurrenceId() == null ? null : zones.instant(event.recurrenceId());
             this.allDay = event.start() instanceof IcsTime.Date;
             this.days = allDay ? allDayLength(event, first) : 0;
             this.length = allDay ? null : timedLength(event, first.atZone(zone).toInstant(), zones, defaultDuration);
@@ -249,8 +252,9 @@ public final class IcsOccurrences {
             if (!end.isAfter(window.start()) || !start.isBefore(window.end())) {
                 return;
             }
+            Instant inSeries = replaces != null ? replaces : rule != null ? start : null;
             out.add(new IcsOccurrence(event.uid(), event.summary() == null ? "" : event.summary(), start, end,
-                    allDay ? occurrence.toLocalDate() : null));
+                    allDay ? occurrence.toLocalDate() : null, inSeries));
         }
     }
 }

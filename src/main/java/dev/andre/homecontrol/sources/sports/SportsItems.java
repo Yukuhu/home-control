@@ -39,6 +39,9 @@ public final class SportsItems {
     public static List<PlayableRef> playables(SportsEvent event, SportsSettings settings, PinnedLinks pinnedLinks) {
         Optional<PlayableRef.AppLink> pinned = pinnedLinks == null
                 ? Optional.empty() : pinnedLinks.linkFor("sports", event.itemId());
+        if (pinned.isEmpty() && pinnedLinks != null && event.formerItemId() != null) {
+            pinned = pinnedLinks.linkFor("sports", event.formerItemId()); // pinned before ids came from the UID
+        }
         if (pinned.isPresent()) {
             return List.of(pinned.get());
         }
