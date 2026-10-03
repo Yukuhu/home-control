@@ -60,6 +60,27 @@ class IcsOccurrencesEdgeCaseTest {
     }
 
     @Test
+    void theWeekStartDecidesWhichOccurrencesACountReaches() {
+        // RFC 5545's example, moved to 2026: from a Tuesday, four occurrences every other week on Tuesday and Sunday.
+        String rule = "RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=TU,SU;WKST=";
+
+        assertThat(startsOf(rule + "MO")).containsExactly(Instant.parse("2026-09-22T13:00:00Z"),
+                Instant.parse("2026-09-27T13:00:00Z"), Instant.parse("2026-10-06T13:00:00Z"),
+                Instant.parse("2026-10-11T13:00:00Z"));
+        assertThat(startsOf(rule + "SU")).containsExactly(Instant.parse("2026-09-22T13:00:00Z"),
+                Instant.parse("2026-10-04T13:00:00Z"), Instant.parse("2026-10-06T13:00:00Z"),
+                Instant.parse("2026-10-18T13:00:00Z"));
+    }
+
+    private static List<Instant> startsOf(String rule) {
+        IcsCalendar calendar = IcsParser.parse("BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:count@x\nSUMMARY:Counted\n"
+                + "DTSTART:20260922T130000Z\n" + rule + "\nEND:VEVENT\nEND:VCALENDAR\n");
+        return IcsOccurrences.expand(calendar, BERLIN, Instant.parse("2026-09-18T00:00:00Z"),
+                Instant.parse("2026-10-31T00:00:00Z"), DEFAULT_DURATION).occurrences().stream()
+                .map(IcsOccurrence::startsAt).toList();
+    }
+
+    @Test
     void anAllDayEventIsPlacedOnItsDateInTheHouseholdsZone() {
         // A calendar kept in New York: its "20 September" is still 20 September in the household in Berlin.
         IcsCalendar calendar = IcsParser.parse("""

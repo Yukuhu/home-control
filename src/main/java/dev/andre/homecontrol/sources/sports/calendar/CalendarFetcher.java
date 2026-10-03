@@ -56,7 +56,8 @@ public class CalendarFetcher implements AutoCloseable {
         int status = response.status();
         if (status == 200) {
             Charset charset = charsetOf(response.contentType());
-            // A feed folds at octets, inside a character as like as not: unfold before decoding, where that is safe.
+            // RFC 5545 folds lines at octets, so a fold can split a character: unfold before decoding, in a charset
+            // whose line breaks are single ASCII bytes.
             return new String(asciiLineBreaks(charset) ? IcsParser.unfold(response.body()) : response.body(), charset);
         }
         String host = response.uri().getHost();

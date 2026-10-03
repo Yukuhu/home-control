@@ -114,7 +114,8 @@ class TheSportsDbScheduleTest {
         TheSportsDbClient failing = mock(TheSportsDbClient.class);
         given(failing.eventsDay(any(), any(), eq("4331"))).willThrow(new IllegalStateException("an unexpected answer"));
         given(failing.eventsDay(any(), any(), eq("4328"))).willReturn(List.of());
-        TheSportsDbSchedule withFailing = new TheSportsDbSchedule(failing, keys, settingsService, properties, zones, clock);
+        TheSportsDbSchedule withFailing =
+                new TheSportsDbSchedule(failing, keys, settingsService, properties, zones, clock);
 
         FeedResult result = withFailing.events();
 
