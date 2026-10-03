@@ -207,10 +207,15 @@ public class SonosSession implements DeviceHandle, GroupListing {
     }
 
     /**
-     * Runs a transport command on the coordinator. Sonos answers 800 when the target is no longer the
-     * coordinator (grouping changed in the Sonos app since the last topology read): re-read once and retry.
+     * Runs a transport command on the coordinator. A room the last topology read put in another room's group is
+     * looked up again first: ungrouped in the Sonos app since, it would command its old coordinator, which still takes
+     * the command. Sonos answers 800 when the target is no longer the coordinator (grouped in the Sonos app since the
+     * last read): re-read once and retry.
      */
     private void onCoordinator(Consumer<ServiceEndpoint> command) {
+        if (otherCoordinator().isPresent()) {
+            commands.run(LOOK_UP_GROUPS, this::readTopology);
+        }
         try {
             command.accept(coordinatorAvTransport());
         } catch (RendererFaultException fault) {
@@ -224,16 +229,22 @@ public class SonosSession implements DeviceHandle, GroupListing {
 
     /** Transport commands must reach the group coordinator; a standalone room coordinates itself. */
     private ServiceEndpoint coordinatorAvTransport() {
-        ZoneGroupState current = topology;
-        if (current != null) {
-            Optional<ZoneGroupState.Member> coordinator = current.groupOf(settings.uuid())
-                    .flatMap(ZoneGroupState.Group::coordinatorMember)
-                    .filter(member -> !member.uuid().equals(settings.uuid()));
-            if (coordinator.isPresent()) {
-                return endpoint(coordinator.get().host(), coordinator.get().port(), AV_TRANSPORT_PATH, AV_TRANSPORT);
-            }
+        Optional<ZoneGroupState.Member> coordinator = otherCoordinator();
+        if (coordinator.isPresent()) {
+            return endpoint(coordinator.get().host(), coordinator.get().port(), AV_TRANSPORT_PATH, AV_TRANSPORT);
         }
         return own(AV_TRANSPORT_PATH, AV_TRANSPORT);
+    }
+
+    /** The coordinator of this room's group, when the last topology read named another room. */
+    private Optional<ZoneGroupState.Member> otherCoordinator() {
+        ZoneGroupState current = topology;
+        if (current == null) {
+            return Optional.empty();
+        }
+        return current.groupOf(settings.uuid())
+                .flatMap(ZoneGroupState.Group::coordinatorMember)
+                .filter(member -> !member.uuid().equals(settings.uuid()));
     }
 
     private ServiceEndpoint renderingControl() {
