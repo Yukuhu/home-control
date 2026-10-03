@@ -80,10 +80,15 @@ https://raw.githubusercontent.com/Yukuhu/home-control/main/casaos/docker-compose
 ```
 
 The manifest uses host networking so mDNS discovery works and persists `/data` at
-`/DATA/AppData/$AppID/data` on the CasaOS host. The important files are:
+`/DATA/AppData/$AppID/data` on the CasaOS host. Back up and move that directory as a whole: its files
+only work together. The important ones are:
 
 - `/DATA/AppData/$AppID/data/keystore.p12` — the Remote v2 client credential;
-- `/DATA/AppData/$AppID/data/devices.json` — the paired-device registry.
+- `/DATA/AppData/$AppID/data/devices.json` — the paired-device registry;
+- `/DATA/AppData/$AppID/data/secrets.json` — the keystore password, the LG and Samsung pairing keys and the
+  content sources' credentials, encrypted;
+- `/DATA/AppData/$AppID/data/secret.key` — the key that decrypts `secrets.json`, unless `HOME_CONTROL_SECRET` is
+  set (see [Security](docs/user/security.md)).
 
 An older CasaOS deployment that had no volume mapping cannot recover data from an
 already discarded anonymous container. Pair once after installing this manifest;
@@ -127,8 +132,9 @@ Every section this README used to hold now lives in one of these pages, under th
 
 ## Security
 
-A deployment with only devices has no login: anyone who can reach the port can control them. Do not expose Home
-Control to the internet without an authenticating reverse proxy in front of it. [Security](docs/user/security.md) has
+Until a login password is set, anyone who can reach the port can control the devices. The first content source asks
+for one, and **Setup → Account** sets one at any time. Do not expose Home Control to the internet without an
+authenticating reverse proxy in front of it. [Security](docs/user/security.md) has
 the details.
 
 ## License

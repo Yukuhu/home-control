@@ -8,7 +8,7 @@ Every setting, as a Spring property or an environment variable.
 | `home-control.data-dir` | `/data` in Docker | Where the keystore, device registry, secrets and settings live |
 | `home-control.discovery.enabled` | `true` | Turn mDNS off entirely |
 | `home-control.androidtv.enabled` | `true` | Turn Android TV off entirely; the setup page drops its pairing form (`HOME_CONTROL_ANDROIDTV_ENABLED`) |
-| `HOME_CONTROL_ANDROIDTV_KEYSTORE_PASSWORD` | `shield` | Keystore password |
+| `HOME_CONTROL_ANDROIDTV_KEYSTORE_PASSWORD` | empty | Keystore password. Empty means generated with the keystore and kept encrypted in `secrets.json`; set it only to the password an existing keystore was made with. `SHIELD_KEYSTORE_PASSWORD`, the old name, still works |
 | `home-control.androidtv.stale-timeout` | `10s` | No incoming message or successfully sent command for this long triggers a reconnect; commands can postpone device pings |
 | `home-control.androidtv.reconnect-max-delay` | `60s` | Upper bound on reconnect backoff |
 | `HOME_CONTROL_CAST_ENABLED` | `true` | Turn the Cast module off entirely; Android TV devices keep working |
