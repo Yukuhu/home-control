@@ -1,15 +1,18 @@
 package dev.andre.homecontrol.sources.pinned;
 
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.ContentSources;
 import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
+import dev.andre.homecontrol.storage.StorageException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -47,6 +50,30 @@ class PinnedContentSourceTest {
     void isUnavailableWithoutPins() {
         assertThat(source.available()).isFalse();
         assertThat(source.rails()).isEmpty();
+    }
+
+    /**
+     * A damaged or newer pinned.json says so on the Pinned rail, where its owner sees it, instead of failing the
+     * dashboard, the setup page, search and TMDB; and it is never written over.
+     */
+    @Test
+    void aDamagedPinsFileShowsItsProblemOnThePinnedRailAndIsLeftAlone() throws Exception {
+        Path file = dir.resolve("pinned.json");
+        Files.writeString(file, "{ not json");
+
+        assertThat(source.available()).isTrue();
+        assertThat(source.rails()).containsExactly(
+                new dev.andre.homecontrol.core.content.RailDescriptor("pinned", "pinned", "Pinned"));
+        assertThatThrownBy(() -> source.rail("pinned")).isInstanceOf(ContentSourceException.class)
+                .hasMessageContaining("pinned.json").hasMessageContaining("fix or delete it");
+        assertThat(source.search("any", 10)).isEmpty();
+        assertThat(shortcuts.all()).isEmpty();
+        assertThat(shortcuts.linkFor("tmdb", "movie-1")).isEmpty();
+        assertThat(shortcuts.problem()).hasValueSatisfying(problem -> assertThat(problem).contains("fix or delete it"));
+
+        assertThatThrownBy(() -> shortcuts.add("https://www.netflix.com/title/1", "Stranger Things"))
+                .isInstanceOf(StorageException.class);
+        assertThat(Files.readString(file)).isEqualTo("{ not json");
     }
 
     @Test

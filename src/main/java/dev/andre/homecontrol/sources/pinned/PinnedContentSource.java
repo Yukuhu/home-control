@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.pinned;
 
 import dev.andre.homecontrol.core.content.ContentSource;
+import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.content.Rail;
 import dev.andre.homecontrol.core.content.RailDescriptor;
 import dev.andre.homecontrol.core.playback.ContentItem;
@@ -34,9 +35,10 @@ public class PinnedContentSource implements ContentSource {
         return "Pinned";
     }
 
+    /** Also while pinned.json cannot be read: the Pinned rail is where its owner sees why. */
     @Override
     public boolean available() {
-        return !pins.all().isEmpty();
+        return !pins.all().isEmpty() || pins.problem().isPresent();
     }
 
     @Override
@@ -48,6 +50,10 @@ public class PinnedContentSource implements ContentSource {
     public Rail rail(String railId) {
         if (!RAIL.id().equals(railId)) {
             throw new IllegalArgumentException("Pinned has no rail '" + railId + "'");
+        }
+        Optional<String> problem = pins.problem();
+        if (problem.isPresent()) {
+            throw new ContentSourceException(ContentSourceException.Kind.BAD_RESPONSE, problem.get());
         }
         return new Rail(RAIL, pins.all().stream().map(PinnedContentSource::toItem).toList(), Instant.now());
     }

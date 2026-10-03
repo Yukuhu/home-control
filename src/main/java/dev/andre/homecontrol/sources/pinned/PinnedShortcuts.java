@@ -11,6 +11,7 @@ import dev.andre.homecontrol.core.playback.ContentItem;
 import dev.andre.homecontrol.core.playback.ContentKind;
 import dev.andre.homecontrol.core.playback.PlayableRef;
 import dev.andre.homecontrol.core.playback.ServiceLinks;
+import dev.andre.homecontrol.storage.StorageException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -56,18 +57,29 @@ public class PinnedShortcuts implements PinnedLinks {
         this.sources = sources;
     }
 
+    /** Why the pins cannot be read, if they cannot: pinned.json is damaged, or from a newer Home Control. */
+    public synchronized Optional<String> problem() {
+        try {
+            ensureLoaded();
+            return Optional.empty();
+        } catch (StorageException e) {
+            return Optional.of(e.getMessage());
+        }
+    }
+
+    /** None while the pins cannot be read; {@link #problem()} then says why, and every change is refused. */
     public synchronized List<Pin> all() {
-        return List.copyOf(ensureLoaded());
+        return List.copyOf(readable());
     }
 
     public synchronized Optional<Pin> find(String id) {
-        return ensureLoaded().stream().filter(pin -> pin.id().equals(id)).findFirst();
+        return readable().stream().filter(pin -> pin.id().equals(id)).findFirst();
     }
 
     @Override
     public synchronized Optional<PlayableRef.AppLink> linkFor(String sourceId, String itemId) {
         String key = sourceId + "/" + itemId;
-        return ensureLoaded().stream()
+        return readable().stream()
                 .filter(pin -> key.equals(pin.upgradeOf()))
                 .findFirst()
                 .map(pin -> ServiceLinks.appLink(pin.url()));
@@ -286,6 +298,15 @@ public class PinnedShortcuts implements PinnedLinks {
             }
         }
         throw new IllegalStateException("Could not generate a unique pin id");
+    }
+
+    /** The pins to show; none while the file cannot be read. Changes go through ensureLoaded, which refuses then. */
+    private List<Pin> readable() {
+        try {
+            return ensureLoaded();
+        } catch (StorageException _) {
+            return List.of();
+        }
     }
 
     private List<Pin> ensureLoaded() {

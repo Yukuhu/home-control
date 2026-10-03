@@ -115,6 +115,19 @@ class PinnedSetupControllerTest extends WebSliceTest {
     }
 
     @Test
+    void theSetupPageSaysWhenThePinsFileIsDamaged() throws Exception {
+        String problem = "Could not read pinned shortcuts in /data/pinned.json; fix or delete it";
+        given(pins.all()).willReturn(List.of());
+        given(pins.problem()).willReturn(Optional.of(problem));
+
+        String page = mockMvc.perform(get("/setup"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(section(page, "pinned")).contains(problem).doesNotContain("No pinned links yet.");
+    }
+
+    @Test
     void renameMoveAndRemoveReportRefusalsAndStorageFailures() throws Exception {
         willThrow(new IllegalArgumentException("A title needs 1 to 80 characters")).given(pins).rename("p-aaaaaaaaaaaa", "");
         willThrow(new IllegalArgumentException("No pinned link p-000000000000")).given(pins).move("p-000000000000", true);
