@@ -55,29 +55,43 @@ public final class RequestLoginContext implements LoginContext {
         return request.getSession(true).getId();
     }
 
-    /** Also remembers the login in a new token, replacing the one this browser had. */
+    /**
+     * Also remembers the login in a new token, replacing the one this browser had. The session keeps the token's hash,
+     * so that forgetting the token ends it as well.
+     */
     @Override
     public void startSession(String version) {
-        loggedInSession(version);
+        HttpSession session = loggedInSession(version);
+        session.removeAttribute(LoginService.TOKEN_ATTRIBUTE);
         if (remembers()) {
             token().ifPresent(remembered::forget);
-            remembered.remember(version).ifPresent(token -> setCookie(remembered.cookie(token)));
+            remembered.remember(version).ifPresent(token -> {
+                session.setAttribute(LoginService.TOKEN_ATTRIBUTE, RememberedLogins.hash(token));
+                setCookie(remembered.cookie(token, request.isSecure()));
+            });
         }
     }
 
+    /** Every session resumed from one token ends with it: two tabs reconnecting after a restart get one each. */
     @Override
     public void resumeSession(String version) {
-        loggedInSession(version);
+        HttpSession session = loggedInSession(version);
+        token().ifPresent(token -> session.setAttribute(LoginService.TOKEN_ATTRIBUTE, RememberedLogins.hash(token)));
     }
 
-    private void loggedInSession(String version) {
+    private HttpSession loggedInSession(String version) {
         HttpSession session = request.getSession(true);
         request.changeSessionId(); // no session fixation
         session.setAttribute(LoginService.SESSION_ATTRIBUTE, version);
+        return session;
     }
 
+    /** Forgets the token first: a request arriving meanwhile must not resume the login that is ending. */
     @Override
     public void endSession() {
+        if (remembers()) {
+            token().ifPresent(remembered::forget);
+        }
         HttpSession session = request.getSession(false);
         if (session != null) {
             try {
@@ -87,8 +101,7 @@ public final class RequestLoginContext implements LoginContext {
             }
         }
         if (remembers()) {
-            token().ifPresent(remembered::forget);
-            setCookie(remembered.expiredCookie());
+            setCookie(remembered.expiredCookie(request.isSecure()));
         }
     }
 

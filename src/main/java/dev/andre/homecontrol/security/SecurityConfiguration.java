@@ -41,8 +41,11 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public LoginService loginService(SecretStore store, Argon2PasswordHasher hasher, SecureRandom random) {
-        return new LoginService(store, hasher, random);
+    public LoginService loginService(SecretStore store, Argon2PasswordHasher hasher, SecureRandom random,
+                                     RememberedLogins remembered) {
+        LoginService login = new LoginService(store, hasher, random);
+        login.rememberedBy(remembered);
+        return login;
     }
 
     /** The cookie is Secure exactly when the session cookie is ({@code HOME_CONTROL_SECURE_COOKIE}). */
