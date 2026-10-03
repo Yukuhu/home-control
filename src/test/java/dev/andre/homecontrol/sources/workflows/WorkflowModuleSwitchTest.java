@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -121,7 +122,7 @@ class WorkflowModuleSwitchTest {
             assertThat(catalogs.publish(other, catalogs.begin(other.id()),
                     List.of(new WorkflowRunner.CatalogEntry("b".repeat(64), "Other", null, null)))).isTrue();
             cache.reconcile();
-            Map<String, Long> versions = new java.util.HashMap<>();
+            Map<String, Long> versions = new HashMap<>();
             cache.peek().forEach(row -> versions.put(row.railId(), row.version()));
 
             app.publishEvent(new ContentChangedEvent("workflows", changed.id()));
@@ -130,6 +131,8 @@ class WorkflowModuleSwitchTest {
             assertThat(catalogs.find(otherItem)).isPresent();
             assertThat(cache.peek()).filteredOn(row -> row.railId().equals(other.id()))
                     .singleElement().extracting(row -> row.version()).isEqualTo(versions.get(other.id()));
+            assertThat(cache.peek()).filteredOn(row -> row.railId().equals(changed.id()))
+                    .singleElement().extracting(row -> row.version()).isNotEqualTo(versions.get(changed.id()));
         });
     }
 

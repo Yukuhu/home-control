@@ -111,33 +111,47 @@ public class TmdbContentSource implements ContentSource {
         }
         List<JsonNode> candidates = collectTrendingCandidates(credential, prefs.locale());
         List<ContentItem> items = new ArrayList<>();
-        TmdbException firstFailure = null;
-        boolean anyLookupSucceeded = false;
-        for (int i = 0; i < candidates.size() && items.size() < properties.railSize(); i++) {
+        Lookups lookups = new Lookups(credential, prefs.region());
+        for (int i = 0; i < candidates.size() && items.size() < properties.railSize() && !lookups.stopped; i++) {
             JsonNode candidate = candidates.get(i);
             TmdbMediaRef ref = TmdbMediaRef.of(candidate, null).orElseThrow();
-            List<WatchProvider> watchProviders = null;
-            try {
-                watchProviders = providers.providers(credential, ref, prefs.region());
-                anyLookupSucceeded = true;
-            } catch (TmdbException e) {
-                if (firstFailure == null) {
-                    firstFailure = e;
-                }
-                if (STOPS_THE_LOOKUPS.contains(e.kind())) {
-                    break; // every further lookup would fail the same way, and each waits out its timeout
-                }
-            }
-            if (watchProviders != null) {
-                trendingItem(credential, candidate, ref, matcher.matches(watchProviders, configuredProviders))
-                        .ifPresent(items::add);
-            }
+            lookups.providers(ref).ifPresent(watchProviders ->
+                    trendingItem(credential, candidate, ref, matcher.matches(watchProviders, configuredProviders))
+                            .ifPresent(items::add));
         }
         // Only a failure of every lookup fails the rail; a failure means at least one lookup was attempted.
-        if (!anyLookupSucceeded && firstFailure != null) {
-            throw firstFailure;
+        if (!lookups.anySucceeded && lookups.firstFailure != null) {
+            throw lookups.firstFailure;
         }
         return new Rail(TRENDING, items, clock.instant());
+    }
+
+    /** One rail's lookups of where its candidates stream, and what they came to. */
+    private final class Lookups {
+        private final TmdbCredential credential;
+        private final String region;
+        private TmdbException firstFailure;
+        private boolean anySucceeded;
+        private boolean stopped;
+
+        Lookups(TmdbCredential credential, String region) {
+            this.credential = credential;
+            this.region = region;
+        }
+
+        /** Empty when the lookup failed; a failure that is not about this title stops the lookups. */
+        Optional<List<WatchProvider>> providers(TmdbMediaRef ref) {
+            try {
+                List<WatchProvider> found = TmdbContentSource.this.providers.providers(credential, ref, region);
+                anySucceeded = true;
+                return Optional.of(found);
+            } catch (TmdbException e) {
+                firstFailure = firstFailure == null ? e : firstFailure;
+                // Every further lookup would fail the same way, and each waits out its timeout.
+                stopped = STOPS_THE_LOOKUPS.contains(e.kind());
+                return Optional.empty();
+            }
+        }
     }
 
     /** The candidate as a rail item, when it streams on at least one of the household's services. */

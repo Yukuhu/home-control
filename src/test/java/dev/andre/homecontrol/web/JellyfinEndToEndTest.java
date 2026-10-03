@@ -126,7 +126,8 @@ class JellyfinEndToEndTest extends FullAppTest {
                 // The setup page does not wait for Jellyfin's open apps (up to 15 s for a sleeping NAS): it loads them
                 // afterwards, with Jellyfin's own error when it cannot.
                 int sessionLookups = jellyfin.requests("GET", "/Sessions").size();
-                assertThat(send(browser, page("/setup")).body()).contains("hx-get=\"/setup/sources/jellyfin/sessions\"");
+                assertThat(send(browser, page("/setup")).body())
+                        .contains("hx-get=\"/setup/sources/jellyfin/sessions\"");
                 assertThat(jellyfin.requests("GET", "/Sessions")).hasSize(sessionLookups);
                 assertThat(send(browser, get("/setup/sources/jellyfin/sessions")).body())
                         .contains("SHIELD Android TV · Android TV · 192.168.1.50")
