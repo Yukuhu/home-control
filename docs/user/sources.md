@@ -340,10 +340,10 @@ displayed code at [google.com/device](https://www.google.com/device) and grant a
 buttons require their matching Google client type; a Web client cannot request device codes.
 
 **HTTPS reverse proxy:** open Setup at the same external address you will use to sign in.
-Set `SERVER_FORWARD_HEADERS_STRATEGY=framework` so the displayed callback uses the proxy's
-external scheme, host and port, and `HOME_CONTROL_SECURE_COOKIE=true`. Configure the proxy to
-overwrite forwarded headers, and allow only that trusted proxy to reach the backend when
-forwarded-header support is enabled. Add the external hostname to `HOME_CONTROL_ALLOWED_HOSTS`.
+Set `HOME_CONTROL_TRUSTED_PROXIES` to the proxy's IP address so the displayed callback uses the
+external scheme, host and port the proxy reports in `X-Forwarded-Proto`, `X-Forwarded-Host` and
+`X-Forwarded-Port` (see [Security](security.md)), and `HOME_CONTROL_SECURE_COOKIE=true`. Add the
+external hostname to `HOME_CONTROL_ALLOWED_HOSTS`.
 Register the displayed callback in Google Cloud. A public HTTPS hostname may resolve only on
 your LAN: the browser needs to reach the callback, not Google's servers.
 
