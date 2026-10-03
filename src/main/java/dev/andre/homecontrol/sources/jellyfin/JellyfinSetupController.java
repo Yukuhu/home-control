@@ -8,6 +8,8 @@ import dev.andre.homecontrol.security.LoginContext;
 import dev.andre.homecontrol.security.LoginRequiredException;
 import dev.andre.homecontrol.security.PasswordRejectedException;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -15,7 +17,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Connects, tests and disconnects Jellyfin from the setup page; always a redirect back to it. */
+/**
+ * Connects, tests and disconnects Jellyfin from the setup page, always with a redirect back to it; and lists the open
+ * Jellyfin apps, which the page loads after it has rendered.
+ */
 @Controller
 @ConditionalOnModule(Module.JELLYFIN)
 public class JellyfinSetupController {
@@ -26,10 +31,18 @@ public class JellyfinSetupController {
 
     private final JellyfinSetupService setup;
     private final DeviceQueries devices;
+    private final JellyfinSetupSection section;
 
-    public JellyfinSetupController(JellyfinSetupService setup, DeviceQueries devices) {
+    public JellyfinSetupController(JellyfinSetupService setup, DeviceQueries devices, JellyfinSetupSection section) {
         this.devices = devices;
         this.setup = setup;
+        this.section = section;
+    }
+
+    @GetMapping("/setup/sources/jellyfin/sessions")
+    public String sessions(Model model) {
+        model.addAttribute("jellyfinSessions", section.sessions());
+        return "fragments/jellyfin-setup :: sessions";
     }
 
     @PostMapping("/setup/sources/jellyfin")
