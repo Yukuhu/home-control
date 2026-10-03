@@ -38,7 +38,8 @@ where the device supports one. The choice between Buttons and Touchpad is rememb
 browser.
 
 To install Home Control on a phone or tablet's home screen, open **Setup** and use the
-**Install on this phone or tablet** section — the exact wording depends on the browser. Over
+**Install app** link, which leads to **A home on your home screen** — the exact wording of the
+browser's own prompt depends on the browser. Over
 plain HTTP the installed icon opens the dashboard like a bookmark; offline support and the
 installed app's own icon need HTTPS, typically through a reverse proxy.
 
@@ -93,8 +94,8 @@ no pairing.
 
 LG and Samsung TVs are paired by accepting a request on the TV itself.
 
-- Open **Setup**. TVs found on the network appear under **Devices on this network**; press
-  **Pair**, or enter the TV's address under **Add a smart TV by address**.
+- Open **Setup**. TVs found on the network appear under **Find a device**; press **Pair**, or
+  enter the TV's address under **Add another smart TV by address**.
 - The TV shows a prompt ("allow Home Control"). Accept it with the TV remote. The setup page
   waits for your answer — up to 60 seconds for LG, 30 seconds for Samsung — and then opens the
   dashboard for the new TV. Declining shows "declined" and stores nothing.
@@ -146,8 +147,8 @@ reappearing, choose Allow once or pair the TV again from **Setup**.
 Speakers (and TVs or AV receivers with a DLNA renderer inside) are found over SSDP — UDP 1900
 multicast, so the container needs `network_mode: host`.
 
-- Open **Setup**. Renderers and Sonos rooms appear under **Devices on this network**; press
-  **Add**. No pairing is needed. A renderer inside a TV that is already registered (same address)
+- Open **Setup**. Renderers and Sonos rooms appear under **Ready to add (no pairing needed)**;
+  press **Add**. A renderer inside a TV that is already registered (same address)
   is merged into that TV automatically as soon as it is discovered — no Add needed.
 - Sonos rooms appear once by room name; the partner of a stereo pair, subs and surrounds are
   part of their room, not devices of their own. Any one announcing player lists the whole

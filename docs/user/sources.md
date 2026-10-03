@@ -220,10 +220,12 @@ player. [Jellyfin Android TV issue #5731](https://github.com/jellyfin/jellyfin-a
 reports this `PlayNow` crash on Shield with version 0.19.9. This is separate from app launch
 failure; remote reconnect messages alone do not identify a Jellyfin crash.
 
-A fourth option, a direct stream URL Jellyfin builds for the device to fetch itself, exists in
-the code (`JellyfinStreams`) but is groundwork for Wi-Fi/media-renderer speakers (sub-project I)
-— no device kind in this release advertises that capability, so Cast devices never use it (the
-receiver message always wins for them).
+A fourth option is a direct stream URL that Jellyfin builds for the device to fetch itself. Wi-Fi
+speakers and media renderers play it as "Stream directly to this device (DLNA/UPnP)", and a
+Bluetooth speaker plays audio items as "Play through the server on this Bluetooth speaker"; see
+[Wi-Fi speakers](devices.md#wi-fi-speakers-dlnaupnp-and-sonos) and
+[Bluetooth speakers](devices.md#bluetooth-speakers-optional). Cast devices never use it: the
+Jellyfin receiver message always wins for them.
 
 `GET /devices/<id>/route?source=jellyfin&item=<id>` reports which of these a device would use,
 without playing anything.
@@ -429,9 +431,9 @@ webOS a DAZN link opens in the TV's browser (webOS has no way to prefer an insta
 web link); Samsung Tizen refuses web links outright ("Samsung TVs cannot open web links …").
 
 **Security notes:** the server fetches every calendar link you add, so treat calendar URLs like
-any other credential; there is a known, accepted residual risk that a malicious calendar's DNS
-name could resolve to a blocked address between the address check and the actual connection
-(DNS rebinding) — the JDK's HTTP client does not support pinning the resolved address. Event
+any other credential. Which addresses a calendar may resolve to, and how the server keeps to the
+address it checked, is described under
+[What content sources may connect to](security.md#what-content-sources-may-connect-to). Event
 artwork from TheSportsDB loads directly from `r2.thesportsdb.com` in the browser (not proxied),
 so that host sees the browser's IP address for artwork requests. Sports settings (calendar
 labels/hosts, chosen competitions, the "where you watch it" mapping, but never a calendar URL or

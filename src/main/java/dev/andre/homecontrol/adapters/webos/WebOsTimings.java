@@ -7,7 +7,7 @@ import java.time.Duration;
  * connected TV is asked a cheap question, and how long the TV's pairing prompt may wait for an answer when
  * registering without a stored key. {@link WebOsSession} never takes that path — it goes unpaired instead of
  * calling {@code register} without a key — so registering with a stored key instead uses the connection's own
- * request timeout, straight from {@link WebOsProperties#requestTimeoutSeconds()}. Production builds them from
+ * request timeout, straight from {@link WebOsProperties#requestTimeout()}. Production builds them from
  * {@link WebOsProperties}; tests pass milliseconds.
  */
 record WebOsTimings(Duration reconnectInitialDelay, Duration reconnectMaxDelay, Duration wakeGrace,
