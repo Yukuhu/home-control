@@ -11,7 +11,8 @@ services:
     network_mode: host
     # The app runs as user 1000, who must own ./data. If `id -u` says otherwise for you, run
     # it as yourself: user: "1001:1001". A ./data that an older version wrote belongs to root;
-    # hand it over with `sudo chown -R 1000:1000 data`.
+    # hand it over with `sudo chown -R 1000:1000 data`, or to the uid:gid in `user:` if you set one.
+    # A start that cannot use ./data names the uid:gid it runs as.
     volumes:
       - ./data:/data
     # The Android TV keystore password is generated and kept encrypted in ./data/secrets.json. An install that

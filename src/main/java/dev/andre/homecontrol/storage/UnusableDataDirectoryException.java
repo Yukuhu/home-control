@@ -7,12 +7,14 @@ public final class UnusableDataDirectoryException extends RuntimeException {
 
     private final transient Path directory;
     private final transient Path unusable;
+    private final String owner;
 
-    public UnusableDataDirectoryException(Path directory, Path unusable, String user) {
-        super("The data directory " + directory + " cannot be used: this process, running as " + user
+    public UnusableDataDirectoryException(Path directory, Path unusable, ProcessUser user) {
+        super("The data directory " + directory + " cannot be used: this process, running as " + user.describe()
                 + ", may not read and write " + unusable);
         this.directory = directory;
         this.unusable = unusable;
+        this.owner = user.owner();
     }
 
     public Path directory() {
@@ -26,8 +28,8 @@ public final class UnusableDataDirectoryException extends RuntimeException {
     /** What to do about it, for whoever starts the app. */
     public String remedy() {
         return "The container image runs as user 1000, not as root as older versions did. "
-                + "Hand a directory that an older version wrote over to that user, on the host:\n\n"
-                + "    chown -R 1000:1000 <the directory mounted at " + directory + ">\n\n"
+                + "Hand a directory that an older version wrote over to the user this process runs as, on the host:\n\n"
+                + "    chown -R " + owner + " <the directory mounted at " + directory + ">\n\n"
                 + "To keep running as root instead, start the container with --user 0:0 "
                 + "(in a Compose file: user: \"0:0\").";
     }

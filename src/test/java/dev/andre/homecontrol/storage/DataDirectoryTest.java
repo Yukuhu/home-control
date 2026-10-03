@@ -65,27 +65,43 @@ class DataDirectoryTest {
         assumeFalse(runsAsRoot(), "root may read and write every file");
         Path key = Files.writeString(dir.resolve("secret.key"), "key");
         Files.setPosixFilePermissions(key, PosixFilePermissions.fromString("---------"));
+        // A file this process created belongs to the user and group it runs as.
+        Object uid = Files.getAttribute(key, "unix:uid");
+        Object gid = Files.getAttribute(key, "unix:gid");
 
         assertThatThrownBy(new DataDirectory(dir)::verifyUsable)
                 .isInstanceOfSatisfying(UnusableDataDirectoryException.class, failure -> {
                     assertThat(failure.directory()).isEqualTo(dir);
                     assertThat(failure.unusable()).isEqualTo(key);
                     assertThat(failure).hasMessageContaining(dir.toString()).hasMessageContaining(key.toString())
-                            .hasMessageContaining(System.getProperty("user.name"));
-                    assertThat(failure.remedy()).contains("chown -R 1000:1000").contains("--user 0:0")
+                            .hasMessageContaining("uid " + uid + ", gid " + gid);
+                    assertThat(failure.remedy()).contains("chown -R " + uid + ":" + gid).contains("--user 0:0")
                             .contains("mounted at " + dir);
                 });
     }
 
     @Test
+    void aUserWithoutANameIsNamedByItsIdsAndTheRemedyHandsTheDirectoryToThem() {
+        for (String unnamed : new String[] {null, "?"}) {
+            var failure = new UnusableDataDirectoryException(Path.of("/data"), Path.of("/data/secret.key"),
+                    new ProcessUser(unnamed, 1001, 1002));
+
+            assertThat(failure).hasMessage("The data directory /data cannot be used: this process, running as "
+                    + "uid 1001, gid 1002, may not read and write /data/secret.key");
+            assertThat(failure.remedy()).contains("chown -R 1001:1002 <the directory mounted at /data>");
+        }
+    }
+
+    @Test
     void aFailedStartSaysWhatIsWrongAndWhatToDoInsteadOfAStackTrace() {
-        var failure = new UnusableDataDirectoryException(Path.of("/data"), Path.of("/data/secret.key"), "ubuntu");
+        var failure = new UnusableDataDirectoryException(Path.of("/data"), Path.of("/data/secret.key"),
+                new ProcessUser("ubuntu", 1000, 1000));
 
         var analysis = new UnusableDataDirectoryFailureAnalyzer()
                 .analyze(new IllegalStateException("the context did not start", failure));
 
         assertThat(analysis.getDescription()).isEqualTo("The data directory /data cannot be used: "
-                + "this process, running as ubuntu, may not read and write /data/secret.key.");
+                + "this process, running as ubuntu (uid 1000, gid 1000), may not read and write /data/secret.key.");
         assertThat(analysis.getAction()).isEqualTo(failure.remedy());
         assertThat(analysis.getCause()).isSameAs(failure);
     }
