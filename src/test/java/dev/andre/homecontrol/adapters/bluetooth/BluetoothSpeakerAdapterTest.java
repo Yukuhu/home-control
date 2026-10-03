@@ -77,4 +77,19 @@ class BluetoothSpeakerAdapterTest {
             handle.close();
         }
     }
+
+    @Test
+    void theSetupPageFindsASpeakersOpenSessionUntilItCloses() {
+        Device device = speaker("AA:BB:CC:DD:EE:FF");
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true)
+                .uuids(BluetoothDeviceInfo.A2DP_SINK);
+        DeviceHandle replaced = adapter.connect(device, state -> { });
+        DeviceHandle replacement = adapter.connect(device, state -> { });
+
+        replaced.close();
+        assertThat(adapter.session(device.id())).get().isSameAs(replacement);
+
+        replacement.close();
+        assertThat(adapter.session(device.id())).isEmpty();
+    }
 }

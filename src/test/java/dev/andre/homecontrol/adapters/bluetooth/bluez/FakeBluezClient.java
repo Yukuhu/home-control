@@ -91,7 +91,11 @@ public final class FakeBluezClient implements BluezClient {
         delays.put(operation, delay);
     }
 
-    /** Runs {@code hook} once, when {@code operation} is next called and before it takes effect: what happens meanwhile. */
+    /**
+     * Runs {@code hook} once, when {@code operation} is next called and before it takes effect, to act in the middle of
+     * an operation (close a session while it connects). It runs on the caller's thread under this fake's lock, so it
+     * must not wait for another thread that calls the fake.
+     */
     public synchronized void whenCalled(String operation, Runnable hook) {
         hooks.put(operation, hook);
     }
