@@ -62,7 +62,7 @@ public final class DataDirectory {
             return;
         }
         firstUnusable().ifPresent(unusable -> {
-            throw new UnusableDataDirectoryException(path, unusable, System.getProperty("user.name"));
+            throw new UnusableDataDirectoryException(path, unusable, ProcessUser.current());
         });
     }
 

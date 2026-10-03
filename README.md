@@ -63,7 +63,8 @@ The image runs as user 1000, not as root. That user must own the directory mount
 - **A directory of the host** that does not exist yet is created by Docker as root. Create it
   yourself first. The `data` directory of this repository exists for that reason.
 - **Another user**: `user: "1001:1001"` in the Compose file, or `--user 1001:1001`, runs the
-  app as that user, who must then own the directory.
+  app as that user, who must then own the directory. A start that cannot use the directory names
+  the uid and gid it runs as, and the `chown` that hands the directory over.
 - **Root after all**: `user: "0:0"`, or `--user 0:0`.
 
 Two variants still run as root. The `-bluetooth` image does, because the host's D-Bus lets
