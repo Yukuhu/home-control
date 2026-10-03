@@ -247,19 +247,48 @@ class SonosSessionTest {
 
     @Test
     void aStaleCoordinatorIsLookedUpAgainWhenTheSpeakerSaysItIsNotOne() {
-        SonosSession session = new SonosSession(kitchen.device("sonos-" + KITCHEN),
-                new SonosTimings(Duration.ofMillis(100), Duration.ofMillis(100), Duration.ofHours(1),
-                        Duration.ofSeconds(1), Duration.ofMillis(50), Duration.ofMillis(200)),
-                SoapClient.httpClient(Duration.ofSeconds(1)), states, () -> { }, Clock.systemUTC());
-        sessions.add(session);
-        session.start();
-        await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
+        SonosSession session = connectedReadingTheTopologyHourly(kitchen);
         household.join(KITCHEN, LIVING); // grouped in the Sonos app; this session has not re-read the topology
 
         session.execute(new Action.Pause());
 
         assertThat(kitchen.calls("Pause")).hasSize(1);
         assertThat(living.commandNames()).containsExactly("Pause");
+    }
+
+    @Test
+    void aRoomUngroupedInTheSonosAppPausesItselfNotItsOldGroup() {
+        household.join(KITCHEN, LIVING);
+        SonosSession session = connectedReadingTheTopologyHourly(kitchen);
+        household.leave(KITCHEN); // Living Room still coordinates a group of its own, so it would take the Pause
+
+        session.execute(new Action.Pause());
+
+        assertThat(kitchen.calls("Pause")).hasSize(1);
+        assertThat(living.commandNames()).isEmpty();
+    }
+
+    @Test
+    void aRoomThatCoordinatesItselfSendsCommandsWithoutLookingUpTheGroups() {
+        SonosSession session = connectedReadingTheTopologyHourly(kitchen);
+        int lookups = kitchen.calls("GetZoneGroupState").size();
+
+        session.execute(new Action.Pause());
+
+        assertThat(kitchen.calls("Pause")).hasSize(1);
+        assertThat(kitchen.calls("GetZoneGroupState")).hasSize(lookups);
+    }
+
+    /** Only the connect reads the topology: whatever changes later, the session learns from a command. */
+    private SonosSession connectedReadingTheTopologyHourly(FakeSonosPlayer player) {
+        SonosSession session = new SonosSession(player.device("sonos-" + player.uuid()),
+                new SonosTimings(Duration.ofMillis(100), Duration.ofMillis(100), Duration.ofHours(1),
+                        Duration.ofSeconds(1), Duration.ofMillis(50), Duration.ofMillis(200)),
+                SoapClient.httpClient(Duration.ofSeconds(1)), states, () -> { }, Clock.systemUTC());
+        sessions.add(session);
+        session.start();
+        await().atMost(WAIT).until(() -> session.state().status() == DeviceStatus.CONNECTED);
+        return session;
     }
 
     @Test
