@@ -428,7 +428,8 @@ removed later. A calendar event keeps its pinned link when its kick-off moves: t
 the event (its calendar UID), not to its start time.
 
 **Time zone.** Setup → Sports lets you choose the time zone kick-off times are shown in; it
-defaults to the container's `TZ`. Set `TZ` in your Compose file, or choose a zone in setup if you
+defaults to the container's `TZ`. All-day events stay on their date in that zone, whatever zone
+their calendar was kept in. Set `TZ` in your Compose file, or choose a zone in setup if you
 cannot change the container's environment.
 
 **On each TV:** an Android TV app link opens the DAZN/Netflix/Prime Video app directly; on LG

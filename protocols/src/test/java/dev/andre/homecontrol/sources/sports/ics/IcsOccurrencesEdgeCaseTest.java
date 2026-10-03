@@ -60,6 +60,27 @@ class IcsOccurrencesEdgeCaseTest {
     }
 
     @Test
+    void anAllDayEventIsPlacedOnItsDateInTheHouseholdsZone() {
+        // A calendar kept in New York: its "20 September" is still 20 September in the household in Berlin.
+        IcsCalendar calendar = IcsParser.parse("""
+                BEGIN:VCALENDAR
+                X-WR-TIMEZONE:America/New_York
+                BEGIN:VEVENT
+                UID:matchday@x
+                SUMMARY:Matchday
+                DTSTART;VALUE=DATE:20260920
+                END:VEVENT
+                END:VCALENDAR
+                """);
+
+        IcsOccurrence matchday = IcsOccurrences.expand(calendar, BERLIN, Instant.parse("2026-09-18T00:00:00Z"),
+                Instant.parse("2026-09-30T00:00:00Z"), DEFAULT_DURATION).occurrences().getFirst();
+
+        assertThat(matchday.startsAt()).isEqualTo(Instant.parse("2026-09-19T22:00:00Z"));
+        assertThat(matchday.endsAt()).isEqualTo(Instant.parse("2026-09-20T22:00:00Z"));
+    }
+
+    @Test
     void anAllDayEventWithADurationSpansThoseDays() {
         IcsOccurrence stage = only(expand(
                 "BEGIN:VEVENT", "UID:tour@x", "SUMMARY:Stage race", "DTSTART;VALUE=DATE:20260919", "DURATION:P3D",
