@@ -43,8 +43,11 @@ class SportsPropertiesTest {
         assertThatThrownBy(() -> new SportsProperties(true, "", 30, 10, 10, tooShort, CALENDAR, THE_SPORTS_DB))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("home-control.sports.default-event-duration");
-        assertThatThrownBy(() -> new SportsProperties.Calendar(Duration.ofMinutes(-5), Duration.ofSeconds(5),
-                Duration.ofSeconds(15), 5_242_880, 3, false))
+        Duration negative = Duration.ofMinutes(-5);
+        Duration connectTimeout = Duration.ofSeconds(5);
+        Duration requestTimeout = Duration.ofSeconds(15);
+        assertThatThrownBy(() -> new SportsProperties.Calendar(negative, connectTimeout, requestTimeout, 5_242_880, 3,
+                false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("home-control.sports.calendar.refresh");
         assertThatThrownBy(() -> theSportsDb(Duration.ZERO, null))
@@ -56,8 +59,9 @@ class SportsPropertiesTest {
     void aSportsDurationUnderAMinuteNamesTheSport() {
         // A bare 90 in the map is 90 ms: the map's values are read without a unit of their own.
         Map<String, Duration> durations = Map.of("soccer", Duration.ofMillis(90));
+        Duration fixturesTtl = Duration.ofHours(24);
 
-        assertThatThrownBy(() -> theSportsDb(Duration.ofHours(24), durations))
+        assertThatThrownBy(() -> theSportsDb(fixturesTtl, durations))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("home-control.sports.thesportsdb.sport-durations.soccer")
                 .hasMessageContaining("90m");

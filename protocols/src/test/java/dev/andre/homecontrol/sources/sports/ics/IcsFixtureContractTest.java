@@ -62,8 +62,8 @@ class IcsFixtureContractTest {
             raw = in.readAllBytes();
         }
         String text = new String(raw, StandardCharsets.ISO_8859_1);
-        assertThat(text).as("CRLF line ends").contains("\r\n").doesNotContainPattern("[^\r]\n");
-        assertThat(text).as("a fold between the two bytes of a character").contains("\u00c3\r\n \u009c");
+        assertThat(text).as("CRLF line ends, and a fold between the two bytes of a character")
+                .contains("\r\n").doesNotContainPattern("[^\r]\n").contains("\u00c3\r\n \u009c");
     }
 
     @Test
