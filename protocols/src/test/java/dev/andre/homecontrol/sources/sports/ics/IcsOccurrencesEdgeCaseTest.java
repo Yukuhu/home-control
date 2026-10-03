@@ -28,6 +28,20 @@ class IcsOccurrencesEdgeCaseTest {
     }
 
     @Test
+    void theWeekStartDecidesWhichWeeksAnIntervalSkips() {
+        // RFC 5545's own example: every other week on Sunday and Monday, counted in weeks from Sunday or from Monday.
+        String[] fromSunday = {"BEGIN:VEVENT", "UID:alt@x", "SUMMARY:Alternating", "DTSTART:20260920T130000Z",
+                "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=SU,MO;WKST=SU", "END:VEVENT"};
+        String[] fromMonday = {"BEGIN:VEVENT", "UID:alt@x", "SUMMARY:Alternating", "DTSTART:20260920T130000Z",
+                "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=SU,MO;WKST=MO", "END:VEVENT"};
+
+        assertThat(expand(fromSunday).occurrences()).extracting(IcsOccurrence::startsAt).containsExactly(
+                Instant.parse("2026-09-20T13:00:00Z"), Instant.parse("2026-09-21T13:00:00Z"));
+        assertThat(expand(fromMonday).occurrences()).extracting(IcsOccurrence::startsAt).containsExactly(
+                Instant.parse("2026-09-20T13:00:00Z"), Instant.parse("2026-09-28T13:00:00Z"));
+    }
+
+    @Test
     void anAllDayEventWithADurationSpansThoseDays() {
         IcsOccurrence stage = only(expand(
                 "BEGIN:VEVENT", "UID:tour@x", "SUMMARY:Stage race", "DTSTART;VALUE=DATE:20260919", "DURATION:P3D",

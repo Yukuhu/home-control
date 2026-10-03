@@ -8,8 +8,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** The RRULE subset Home Control expands (see the plan's ICS subset rule 12). */
-public record IcsRecurrence(Frequency frequency, int interval, Integer count, IcsTime until, List<DayOfWeek> byDay) {
+/**
+ * The RRULE subset Home Control expands (see the plan's ICS subset rule 12). {@code weekStart} is the day weeks begin on
+ * when a weekly rule with an interval counts them (WKST, Monday unless given).
+ */
+public record IcsRecurrence(Frequency frequency, int interval, Integer count, IcsTime until, List<DayOfWeek> byDay,
+                            DayOfWeek weekStart) {
 
     public enum Frequency { DAILY, WEEKLY }
 
@@ -42,6 +46,7 @@ public record IcsRecurrence(Frequency frequency, int interval, Integer count, Ic
         private Integer count;
         private IcsTime until;
         private final Set<DayOfWeek> byDay = EnumSet.noneOf(DayOfWeek.class);
+        private DayOfWeek weekStart = DayOfWeek.MONDAY;
 
         /** Reads one {@code KEY=VALUE} part; false when it is outside the supported subset. */
         boolean read(String part) {
@@ -58,7 +63,7 @@ public record IcsRecurrence(Frequency frequency, int interval, Integer count, Ic
                     case "COUNT" -> count(value);
                     case "UNTIL" -> until(value);
                     case "BYDAY" -> byDay(value);
-                    case "WKST" -> DAYS.containsKey(value);
+                    case "WKST" -> weekStart(value);
                     default -> false;
                 };
             } catch (NumberFormatException | IcsFormatException _) {
@@ -89,6 +94,15 @@ public record IcsRecurrence(Frequency frequency, int interval, Integer count, Ic
             return true;
         }
 
+        private boolean weekStart(String value) {
+            DayOfWeek day = DAYS.get(value);
+            if (day == null) {
+                return false;
+            }
+            weekStart = day;
+            return true;
+        }
+
         private boolean byDay(String value) {
             for (String token : value.split(",")) {
                 DayOfWeek day = DAYS.get(token.strip());
@@ -105,7 +119,7 @@ public record IcsRecurrence(Frequency frequency, int interval, Integer count, Ic
                     || (!byDay.isEmpty() && frequency != Frequency.WEEKLY)) {
                 return Optional.empty();
             }
-            return Optional.of(new IcsRecurrence(frequency, interval, count, until, List.copyOf(byDay)));
+            return Optional.of(new IcsRecurrence(frequency, interval, count, until, List.copyOf(byDay), weekStart));
         }
     }
 }
