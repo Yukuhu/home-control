@@ -22,6 +22,8 @@ import java.util.Set;
 public final class IcsOccurrences {
 
     static final int MAX_STEPS = 50_000;
+    /** All of one calendar's events together: a feed of thousands of runaway rules costs this much, not each. */
+    static final int MAX_STEPS_PER_CALENDAR = 250_000;
 
     public record Result(List<IcsOccurrence> occurrences, int unsupportedRules, int unknownZones) {
         public Result {
@@ -36,8 +38,7 @@ public final class IcsOccurrences {
                                 Duration defaultDuration) {
         Zones zones = new Zones(IcsZones.resolve(calendar.timeZone()).orElse(fallback));
         Map<String, Set<Instant>> overridden = overriddenStarts(calendar, zones);
-        Window window = new Window(windowStart, windowEnd);
-        List<IcsOccurrence> out = new ArrayList<>();
+        Pass pass = new Pass(new Window(windowStart, windowEnd));
         int unsupported = 0;
         for (IcsEvent event : calendar.events()) {
             if ("CANCELLED".equals(event.status())) {
@@ -53,8 +54,9 @@ public final class IcsOccurrences {
                 rule = parsed.orElse(null);
             }
             Set<Instant> skip = master && event.uid() != null ? overridden.getOrDefault(event.uid(), Set.of()) : Set.of();
-            new Expansion(event, rule, zones, skip, window, defaultDuration, out).run();
+            new Expansion(event, rule, zones, skip, pass, defaultDuration).run();
         }
+        List<IcsOccurrence> out = pass.out();
         out.sort(Comparator.comparing(IcsOccurrence::startsAt).thenComparing(IcsOccurrence::summary));
         return new Result(out, unsupported, zones.unknown.size());
     }
@@ -72,6 +74,31 @@ public final class IcsOccurrences {
 
     /** Occurrences are kept when they end after {@code start} and begin before {@code end}. */
     private record Window(Instant start, Instant end) {
+    }
+
+    /** One calendar's expansion: its window, what it found, and the steps it has left. */
+    private static final class Pass {
+
+        private final Window window;
+        private final List<IcsOccurrence> out = new ArrayList<>();
+        private int stepsLeft = MAX_STEPS_PER_CALENDAR;
+
+        Pass(Window window) {
+            this.window = window;
+        }
+
+        Window window() {
+            return window;
+        }
+
+        List<IcsOccurrence> out() {
+            return out;
+        }
+
+        /** Takes one step; false once the calendar's budget is spent. */
+        boolean step() {
+            return stepsLeft-- > 0;
+        }
     }
 
     private static final class Zones {
@@ -118,8 +145,7 @@ public final class IcsOccurrences {
         private final IcsEvent event;
         private final IcsRecurrence rule;
         private final Set<Instant> overridden;
-        private final Window window;
-        private final List<IcsOccurrence> out;
+        private final Pass pass;
         private final ZoneId zone;
         private final LocalDateTime first;
         private final boolean allDay;
@@ -131,13 +157,12 @@ public final class IcsOccurrences {
         private final Instant replaces;
         private int produced;
 
-        Expansion(IcsEvent event, IcsRecurrence rule, Zones zones, Set<Instant> overridden, Window window,
-                  Duration defaultDuration, List<IcsOccurrence> out) {
+        Expansion(IcsEvent event, IcsRecurrence rule, Zones zones, Set<Instant> overridden, Pass pass,
+                  Duration defaultDuration) {
             this.event = event;
             this.rule = rule;
             this.overridden = overridden;
-            this.window = window;
-            this.out = out;
+            this.pass = pass;
             this.zone = zones.zoneOf(event.start());
             this.first = Zones.local(event.start());
             this.replaces = event.recurrenceId() == null ? null : zones.instant(event.recurrenceId());
@@ -199,7 +224,7 @@ public final class IcsOccurrences {
             int steps = 0;
             for (long week = 0; ; week += rule.interval()) {
                 for (DayOfWeek day : days) {
-                    if (++steps > MAX_STEPS) {
+                    if (++steps > MAX_STEPS || !pass.step()) {
                         return;
                     }
                     LocalDateTime candidate = weekStart.plusWeeks(week).plusDays(daysInto(firstDay, day))
@@ -222,7 +247,7 @@ public final class IcsOccurrences {
         private void byFixedSteps() {
             long stepDays = rule.frequency() == IcsRecurrence.Frequency.DAILY ? rule.interval() : 7L * rule.interval();
             for (long n = 1; n <= MAX_STEPS; n++) {
-                if (!accept(first.plusDays(stepDays * n))) {
+                if (!pass.step() || !accept(first.plusDays(stepDays * n))) {
                     return;
                 }
             }
@@ -236,7 +261,7 @@ public final class IcsOccurrences {
             if (rule.until() != null && pastUntil(candidate, start)) {
                 return false;
             }
-            if (!start.isBefore(window.end())) {
+            if (!start.isBefore(pass.window().end())) {
                 return false;
             }
             produced++;
@@ -258,11 +283,11 @@ public final class IcsOccurrences {
                 return;
             }
             Instant end = allDay ? occurrence.plusDays(days).atZone(zone).toInstant() : start.plus(length);
-            if (!end.isAfter(window.start()) || !start.isBefore(window.end())) {
+            if (!end.isAfter(pass.window().start()) || !start.isBefore(pass.window().end())) {
                 return;
             }
             Instant inSeries = replaces != null ? replaces : rule != null ? start : null;
-            out.add(new IcsOccurrence(event.uid(), event.summary() == null ? "" : event.summary(), start, end,
+            pass.out().add(new IcsOccurrence(event.uid(), event.summary() == null ? "" : event.summary(), start, end,
                     allDay ? occurrence.toLocalDate() : null, inSeries));
         }
     }
