@@ -118,15 +118,15 @@ public class SportsCalendars {
         throw new IllegalStateException("Could not generate a calendar id");
     }
 
-    /** The user's label, else the calendar's own name, else the host. */
-    private static String resolvedLabel(String label, IcsCalendar parsed, URI uri) {
+    /** The user's label, else the calendar's own name, else the host; at most the 80 characters the store keeps. */
+    static String resolvedLabel(String label, IcsCalendar parsed, URI uri) {
         if (!label.isEmpty()) {
             return label;
         }
         if (parsed.name() != null && !parsed.name().isBlank()) {
             return cut(parsed.name());
         }
-        return uri.getHost();
+        return cut(uri.getHost());
     }
 
     private static String cut(String value) {

@@ -119,6 +119,20 @@ class JsonFileSportsStoreTest {
     }
 
     @Test
+    void anOverlongCalendarLabelIsCutNotTheCalendarDropped() throws IOException {
+        // Written by a version that took the host as the label without cutting it.
+        String label = "a".repeat(70) + ".calendar.example.org";
+        Files.writeString(file(), """
+                {"version":1,"calendars":[{"id":"c-3f9a1c2b7d4e","label":"%s","host":"%s"}],
+                 "theSportsDb":{"key":"free","competitions":[]}}""".formatted(label, label));
+
+        SportsSettings settings = new JsonFileSportsStore(file()).load();
+
+        assertThat(settings.calendars()).singleElement()
+                .satisfies(entry -> assertThat(entry.label()).isEqualTo(label.substring(0, 80)));
+    }
+
+    @Test
     void invalidTimeZonesAreDropped() throws IOException {
         Files.writeString(file(), "{\"version\":1,\"timeZone\":\"Mars/Base\",\"calendars\":[],\"theSportsDb\":{\"key\":\"free\",\"competitions\":[]}}");
 
