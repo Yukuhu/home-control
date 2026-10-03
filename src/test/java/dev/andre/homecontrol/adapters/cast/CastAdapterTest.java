@@ -5,12 +5,15 @@ import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.discovery.MdnsBrowser;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetAddress;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,6 +38,27 @@ class CastAdapterTest {
 
     private final CastAdapter adapter = new CastAdapter(new CastDiscovery(new MdnsBrowser(false), event -> { }),
             PROPERTIES);
+
+    @Test
+    void aReceiverThatAnnouncesItselfIsReconnectedAtOnce() throws Exception {
+        // Retries a minute apart: only the announcement can bring the receiver back within the test.
+        CastProperties slowRetries = new CastProperties(true, Duration.ofSeconds(1), Duration.ofSeconds(3),
+                Duration.ofMinutes(1), Duration.ofMinutes(1), Duration.ofSeconds(2), Duration.ofSeconds(5),
+                Duration.ofSeconds(1));
+        CastDiscovery discovery = new CastDiscovery(new MdnsBrowser(false), event -> { });
+        CastAdapter withDiscovery = new CastAdapter(discovery, slowRetries);
+        try (FakeCastReceiver receiver = new FakeCastReceiver();
+             DeviceHandle handle = withDiscovery.connect(CastSessionTest.device(receiver.port()), state -> { })) {
+            await().until(() -> handle.state().status() == DeviceStatus.CONNECTED);
+            receiver.dropConnection();
+            await().until(() -> handle.state().status() == DeviceStatus.DISCONNECTED);
+
+            discovery.resolved(new MdnsBrowser.MdnsService(CastDiscovery.SERVICE_TYPE, "Chromecast-1",
+                    List.of(InetAddress.getByName("127.0.0.1")), receiver.port(), Map.of("fn", "Living Room TV")));
+
+            await().atMost(Duration.ofSeconds(10)).until(() -> handle.state().status() == DeviceStatus.CONNECTED);
+        }
+    }
 
     @Test
     void isThePairingFreeCastAdapter() {

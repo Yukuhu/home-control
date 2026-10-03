@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.adapters.androidtv;
 
 import dev.andre.homecontrol.adapters.androidtv.protocol.ClientCertificate;
+import dev.andre.homecontrol.adapters.support.SessionRegistry;
 import dev.andre.homecontrol.core.AdapterDiscovery;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Capability;
@@ -28,12 +29,16 @@ public class AndroidTvAdapter implements DeviceAdapter, AdapterDiscovery {
     private final CertificateStore certificates;
     private final AndroidTvProperties properties;
     private final MdnsDiscovery discovery;
+    private final SessionRegistry<AndroidTvSession> sessions = new SessionRegistry<>();
 
     public AndroidTvAdapter(CertificateStore certificates, AndroidTvProperties properties,
                             MdnsDiscovery discovery) {
         this.certificates = certificates;
         this.properties = properties;
         this.discovery = discovery;
+        // A device that announces itself is back: reconnect now instead of waiting out the backoff.
+        discovery.onAnnounced(found -> sessions.matching(session -> session.host().equalsIgnoreCase(found.host()))
+                .forEach(AndroidTvSession::reconnectNow));
     }
 
     /** A wrong keystore password must stop startup loudly, not look like "no devices paired". */
@@ -78,7 +83,8 @@ public class AndroidTvAdapter implements DeviceAdapter, AdapterDiscovery {
             onChange.accept(unpaired);
             return new UnpairedHandle(unpaired);
         }
-        AndroidTvSession session = new AndroidTvSession(device, credential.get(), properties, onChange);
+        AndroidTvSession session = sessions.open(device.id(),
+                onClose -> new AndroidTvSession(device, credential.get(), properties, onChange, onClose));
         session.start();
         return session;
     }

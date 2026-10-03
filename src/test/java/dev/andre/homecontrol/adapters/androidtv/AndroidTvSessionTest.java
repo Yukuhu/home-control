@@ -415,6 +415,31 @@ class AndroidTvSessionTest {
     }
 
     @Test
+    void anAnnouncementDoesNotHurryTheUnpairedLatch() {
+        // A booting device can announce itself before it takes this client's certificate. An attempt at each
+        // announcement would count a verdict each, and five latch a pairing that is fine.
+        fakeDevice.closeNextConnections(5);
+        Device device = AndroidTvSettings.device("shield-3", "Booting Shield", "127.0.0.1", fakeDevice.port(),
+                null, Instant.now());
+        AndroidTvTimings minuteApart = new AndroidTvTimings(Duration.ofSeconds(10), Duration.ofMinutes(1),
+                Duration.ofMinutes(1));
+
+        try (AndroidTvSession booting = new AndroidTvSession(device, ClientCertificate.generate("shield-remote"),
+                minuteApart, state -> {
+        }, null)) {
+            booting.start();
+            await().until(() -> fakeDevice.connections() == 1 && booting.state().status() == DeviceStatus.DISCONNECTED);
+
+            for (int i = 0; i < 5; i++) {
+                booting.reconnectNow();
+            }
+
+            await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
+                    .until(() -> fakeDevice.connections() == 1 && booting.state().status() != DeviceStatus.UNPAIRED);
+        }
+    }
+
+    @Test
     void latchesWhenRemoteRejectsAfterTlsBeforeConfiguration() {
         // On real hardware a certificate alert can reach the reader only after the
         // client-side TLS handshake appears successful. Hold the fake before Configure

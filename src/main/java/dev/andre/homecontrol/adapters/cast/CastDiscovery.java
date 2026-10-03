@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 /** Finds Cast receivers ({@code _googlecast._tcp}) through the shared mDNS browser. */
 public class CastDiscovery {
@@ -25,6 +27,7 @@ public class CastDiscovery {
     private static final Logger log = LoggerFactory.getLogger(CastDiscovery.class);
 
     private final Map<String, DiscoveredDevice> found = new ConcurrentHashMap<>();
+    private final List<Consumer<DiscoveredDevice>> announcements = new CopyOnWriteArrayList<>();
     private final ApplicationEventPublisher events;
 
     public CastDiscovery(MdnsBrowser browser, ApplicationEventPublisher events) {
@@ -46,6 +49,11 @@ public class CastDiscovery {
         return List.copyOf(found.values());
     }
 
+    /** {@code listener} hears every receiver that announces itself, a known one too: it may be back from an outage. */
+    public void onAnnounced(Consumer<DiscoveredDevice> listener) {
+        announcements.add(listener);
+    }
+
     void resolved(MdnsBrowser.MdnsService service) {
         toDevice(service).ifPresent(device -> {
             DiscoveredDevice previous = found.put(service.name(), device);
@@ -53,6 +61,7 @@ public class CastDiscovery {
                 log.info("Discovered Cast receiver {} at {}:{}", device.name(), device.host(), device.port());
                 events.publishEvent(new DeviceDiscoveredEvent(device));
             }
+            announcements.forEach(listener -> listener.accept(device));
         });
     }
 

@@ -19,6 +19,9 @@ generated with it and kept encrypted in `data/secrets.json`, unless you set
 directory mounted persistently. LG and Samsung TVs' pairing keys are kept in `data/secrets.json`
 too.
 
+A Shield that was switched off or lost the network is reconnected as soon as it announces
+itself over mDNS again, instead of at the next retry, which can be up to a minute away.
+
 Each device's current foreground package is shown on its chip in the device strip as
 connection context. Remote v2 does not expose a reliable way to derive a launchable deep link
 from that package — see [Opening links on a device](#opening-links-on-a-device) for how to start an app
@@ -92,7 +95,8 @@ no pairing.
   shown yet.
 - A receiver whose address changed (DHCP renewal, a new access point) is picked up
   automatically the next time it announces itself over mDNS: the paired device is reconnected
-  at the new address, with nothing to redo in Setup.
+  at the new address, with nothing to redo in Setup. One that comes back after an outage is
+  reconnected as soon as it announces itself, instead of at the next retry.
 - Switch the whole Cast module off with `HOME_CONTROL_CAST_ENABLED=false`. Timings live under
   `home-control.cast.*` in `application.yaml`.
 
