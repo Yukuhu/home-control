@@ -182,8 +182,9 @@ public class AndroidTvSession implements DeviceHandle {
 
     private RemoteConnection requireConnected() {
         Optional<RemoteConnection> current = connection.current();
-        if (current.isEmpty() || publisher.current().status() != DeviceStatus.CONNECTED) {
-            if (publisher.current().status() == DeviceStatus.UNPAIRED) {
+        DeviceStatus status = publisher.current().status();
+        if (current.isEmpty() || status != DeviceStatus.CONNECTED) {
+            if (status == DeviceStatus.UNPAIRED) {
                 throw new DeviceOfflineException(device.name() + " must be paired again before it can be controlled");
             }
             throw DeviceCalls.notConnected(device.name());

@@ -268,12 +268,13 @@ class SsapConnectionTest {
     void fallsBackToThePlainPortOnFirmwareWithoutTls() throws IOException {
         SsapConnection opened = open();
 
-        assertThat(opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1))).isEqualTo(FakeSsapServer.CLIENT_KEY);
+        assertThat(opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1)))
+                .isEqualTo(FakeSsapServer.CLIENT_KEY);
         assertThat(server.connections()).isEqualTo(1);
     }
 
     @Test
-    void fallsBackToTlsWhenThePlainPortIsClosed() throws IOException {
+    void connectsOverTlsWhenThePlainPortIsClosed() throws IOException {
         try (FakeSsapServer tls = new FakeSsapServer(true)) {
             connection = SsapConnection.open(http, "127.0.0.1",
                     options(FakeWebSocketServer.closedPort(), tls.port()), reason -> { });
