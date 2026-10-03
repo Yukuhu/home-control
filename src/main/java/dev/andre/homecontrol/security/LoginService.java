@@ -29,6 +29,8 @@ public class LoginService {
     public static final int MIN_PASSWORD_LENGTH = 10;
     public static final int MAX_PASSWORD_LENGTH = 1024;
     static final String SESSION_ATTRIBUTE = LoginService.class.getName() + ".version";
+    /** The hash of the remembered-login token a session was made with, if any (see {@link RememberedLogins}). */
+    static final String TOKEN_ATTRIBUTE = LoginService.class.getName() + ".token";
     /** What the Account section calls each kind of account credential, by the first part of its name. */
     private static final Map<String, String> ACCOUNTS = Map.of("jellyfin", "Jellyfin", "youtube", "YouTube",
             "tmdb", "TMDB", "sports", "Sports", "workflow", "Workflows");
@@ -46,6 +48,7 @@ public class LoginService {
     /** Each verification holds ~19 MiB; two at a time bounds memory under a login flood. */
     private final Semaphore verifications = new Semaphore(2);
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
+    private volatile RememberedLogins remembered;
     private final ExecutorService hashing;
 
     public LoginService(SecretStore store, Argon2PasswordHasher hasher, SecureRandom random) {
@@ -57,6 +60,11 @@ public class LoginService {
         this.hasher = hasher;
         this.random = random;
         this.hashing = hashing;
+    }
+
+    /** A session made with a remembered login lasts only while its token is remembered. */
+    public void rememberedBy(RememberedLogins remembered) {
+        this.remembered = remembered;
     }
 
     public boolean loginRequired() {
@@ -77,7 +85,10 @@ public class LoginService {
             return false;
         }
         try {
-            return login.get().version().equals(session.getAttribute(SESSION_ATTRIBUTE));
+            // A session from before logins were remembered has no token, and lasts as it always did.
+            return login.get().version().equals(session.getAttribute(SESSION_ATTRIBUTE))
+                    && (!(session.getAttribute(TOKEN_ATTRIBUTE) instanceof String token)
+                    || remembered == null || remembered.remembersHash(token));
         } catch (IllegalStateException _) {
             return false;
         }

@@ -36,6 +36,7 @@ class RequestLoginContextTest {
                 new SecretKeySource(null, dir.resolve("secret.key"), random), random);
         login = new LoginService(store, new Argon2PasswordHasher(random), random);
         remembered = new RememberedLogins(dir.resolve("logins.json"), Clock.systemUTC(), random, false);
+        login.rememberedBy(remembered);
     }
 
     private LoginContext context(MockHttpServletRequest request) {
@@ -174,6 +175,47 @@ class RequestLoginContextTest {
 
         assertThat(loggedOut.getCookie(RememberedLogins.COOKIE).getMaxAge()).isZero();
         assertThat(login.resume(remembering(afterARestart(token), new MockHttpServletResponse()))).isFalse();
+    }
+
+    /** Two tabs reconnecting at once after a restart each resume a session of their own from the one token. */
+    @Test
+    void loggingOutEndsEverySessionResumedFromTheSameLogin() {
+        passwordSet();
+        MockHttpServletResponse loggedIn = new MockHttpServletResponse();
+        login.authenticate(PASSWORD, remembering(new MockHttpServletRequest(), loggedIn));
+        String token = rememberedToken(loggedIn);
+        MockHttpServletRequest firstTab = afterARestart(token);
+        MockHttpServletRequest secondTab = afterARestart(token);
+        login.resume(remembering(firstTab, new MockHttpServletResponse()));
+        login.resume(remembering(secondTab, new MockHttpServletResponse()));
+        LoginContext second = remembering(secondTab, new MockHttpServletResponse());
+        BooleanSupplier secondStream = second.whileLoggedIn();
+
+        login.logout(remembering(firstTab, new MockHttpServletResponse()));
+
+        assertThat(second.loggedIn()).isFalse();
+        assertThat(secondStream.getAsBoolean()).isFalse();
+    }
+
+    @Test
+    void aSessionFromBeforeLoginsWereRememberedStaysLoggedIn() {
+        passwordSet();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.getSession(true).setAttribute(LoginService.SESSION_ATTRIBUTE, store.login().orElseThrow().version());
+
+        assertThat(remembering(request, new MockHttpServletResponse()).loggedIn()).isTrue();
+    }
+
+    @Test
+    void overHttpsTheLoginCookieIsSecureLikeTheSessionCookie() {
+        passwordSet();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSecure(true);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        login.authenticate(PASSWORD, remembering(request, response));
+
+        assertThat(response.getCookie(RememberedLogins.COOKIE).getSecure()).isTrue();
     }
 
     @Test

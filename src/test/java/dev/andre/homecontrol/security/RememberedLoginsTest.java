@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -15,6 +16,7 @@ import java.time.Instant;
 import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /** Logins that outlive the server's sessions: a token in the browser, only its hash in logins.json. */
 class RememberedLoginsTest {
@@ -70,6 +72,22 @@ class RememberedLoginsTest {
     }
 
     @Test
+    void aTokenIsForgottenEvenWhenTheFileCannotBeWritten() throws Exception {
+        assumeFalse("root".equals(System.getProperty("user.name")), "root may write everywhere");
+        RememberedLogins logins = logins();
+        String token = logins.remember("v1").orElseThrow();
+        Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            logins.forget(token);
+
+            assertThat(logins.versionOf(token)).isEmpty();
+            assertThat(logins.remembers(token)).isFalse();
+        } finally {
+            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
+        }
+    }
+
+    @Test
     void aLoginIsRememberedForThirtyDaysFromWhenItWasMade() throws Exception {
         RememberedLogins logins = logins();
         String old = logins.remember("v1").orElseThrow();
@@ -108,12 +126,13 @@ class RememberedLoginsTest {
     void theCookieLastsAsLongAsTheLoginAndScriptsCannotReadIt() {
         RememberedLogins logins = logins();
 
-        assertThat(logins.cookie("abc").toString())
+        assertThat(logins.cookie("abc", false).toString())
                 .startsWith("HOME_CONTROL_LOGIN=abc; Path=/; Max-Age=2592000; Expires=")
                 .endsWith("; HttpOnly; SameSite=Lax")
                 .doesNotContain("Secure");
-        assertThat(logins(true).cookie("abc").toString()).contains("; Secure;");
-        assertThat(logins.expiredCookie().toString()).startsWith("HOME_CONTROL_LOGIN=; Path=/; Max-Age=0;");
+        assertThat(logins(true).cookie("abc", false).toString()).as("HOME_CONTROL_SECURE_COOKIE").contains("; Secure;");
+        assertThat(logins.cookie("abc", true).toString()).as("a request over HTTPS").contains("; Secure;");
+        assertThat(logins.expiredCookie(false).toString()).startsWith("HOME_CONTROL_LOGIN=; Path=/; Max-Age=0;");
     }
 
     @Test

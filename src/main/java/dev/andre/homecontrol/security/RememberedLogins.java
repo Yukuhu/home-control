@@ -21,9 +21,11 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -48,6 +50,8 @@ public class RememberedLogins {
     private final SecureRandom random;
     private final boolean secureCookie;
     private final AtomicBoolean warned = new AtomicBoolean();
+    /** Hashes of tokens a browser logged out with: never let in again, even if the file kept them. */
+    private final Set<String> forgotten = new HashSet<>();
 
     /** One remembered browser: its token's hash, the password version it logged in with, and its end. */
     record Login(String hash, String version, Instant expires) {
@@ -85,17 +89,33 @@ public class RememberedLogins {
 
     /** The password version a still valid token logged in with. */
     public synchronized Optional<String> versionOf(String token) {
-        String hash = hash(token);
+        return valid(hash(token)).map(Login::version);
+    }
+
+    /** Whether a token still logs a browser in, whatever password version it was made with. */
+    public synchronized boolean remembers(String token) {
+        return remembersHash(hash(token));
+    }
+
+    /** As {@link #remembers(String)}, for a session that keeps the hash of the token it was made from. */
+    synchronized boolean remembersHash(String hash) {
+        return valid(hash).isPresent();
+    }
+
+    private Optional<Login> valid(String hash) {
+        if (forgotten.contains(hash)) {
+            return Optional.empty();
+        }
         Instant now = clock.instant();
         return current().stream()
                 .filter(login -> login.hash().equals(hash) && login.expires().isAfter(now))
-                .map(Login::version)
                 .findFirst();
     }
 
-    /** A browser logged out: its token logs nobody in any more. */
+    /** A browser logged out: its token logs nobody in any more, even if the file cannot be written. */
     public synchronized void forget(String token) {
         String hash = hash(token);
+        forgotten.add(hash);
         List<Login> remembered = current();
         if (remembered.stream().noneMatch(login -> login.hash().equals(hash))) {
             return;
@@ -103,25 +123,28 @@ public class RememberedLogins {
         try {
             file.write(remembered.stream().filter(login -> !login.hash().equals(hash)).toList());
         } catch (StorageException e) {
-            log.warn("Could not forget a remembered login", e);
+            log.warn("Could not forget a remembered login on disk; it stays forgotten until the server restarts", e);
         }
     }
 
     /** Forgets every login. Exists for the shared test context. */
     public synchronized void clear() {
         file.delete();
+        forgotten.clear();
     }
 
-    ResponseCookie cookie(String token) {
-        return base(token).maxAge(LIFETIME).build();
+    /** Secure when {@code HOME_CONTROL_SECURE_COOKIE} says so, or, as for the session cookie, over HTTPS. */
+    ResponseCookie cookie(String token, boolean secureRequest) {
+        return base(token, secureRequest).maxAge(LIFETIME).build();
     }
 
-    ResponseCookie expiredCookie() {
-        return base("").maxAge(Duration.ZERO).build();
+    ResponseCookie expiredCookie(boolean secureRequest) {
+        return base("", secureRequest).maxAge(Duration.ZERO).build();
     }
 
-    private ResponseCookie.ResponseCookieBuilder base(String value) {
-        return ResponseCookie.from(COOKIE, value).path("/").httpOnly(true).secure(secureCookie).sameSite("Lax");
+    private ResponseCookie.ResponseCookieBuilder base(String value, boolean secureRequest) {
+        return ResponseCookie.from(COOKIE, value).path("/").httpOnly(true)
+                .secure(secureCookie || secureRequest).sameSite("Lax");
     }
 
     private List<Login> current() {
@@ -167,7 +190,7 @@ public class RememberedLogins {
         return root;
     }
 
-    private static String hash(String token) {
+    static String hash(String token) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(token.getBytes(StandardCharsets.UTF_8)));
