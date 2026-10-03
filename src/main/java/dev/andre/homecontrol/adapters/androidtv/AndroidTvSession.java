@@ -14,6 +14,7 @@ import dev.andre.homecontrol.adapters.support.StatePublisher;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceHandle;
+import dev.andre.homecontrol.core.DeviceOfflineException;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.KeyPress;
@@ -182,6 +183,9 @@ public class AndroidTvSession implements DeviceHandle {
     private RemoteConnection requireConnected() {
         Optional<RemoteConnection> current = connection.current();
         if (current.isEmpty() || publisher.current().status() != DeviceStatus.CONNECTED) {
+            if (publisher.current().status() == DeviceStatus.UNPAIRED) {
+                throw new DeviceOfflineException(device.name() + " must be paired again before it can be controlled");
+            }
             throw DeviceCalls.notConnected(device.name());
         }
         return current.get();
