@@ -80,10 +80,16 @@ public class WorkflowConfiguration {
         @Order(Ordered.HIGHEST_PRECEDENCE)
         public void changed(ContentChangedEvent event) {
             if (!WorkflowContentSource.SOURCE_ID.equals(event.sourceId())) return;
-            catalogs.invalidate();
             // Resolve only on the event: source/cache construction otherwise forms a dependency cycle.
             RailCache cache = rails.getIfAvailable();
-            if (cache != null) cache.invalidateSource(WorkflowContentSource.SOURCE_ID);
+            if (event.railId() == null) {
+                catalogs.invalidate();
+                if (cache != null) cache.invalidateSource(WorkflowContentSource.SOURCE_ID);
+                return;
+            }
+            // A workflow's rail id is its id: the others keep their last good tiles and Play targets.
+            catalogs.invalidate(event.railId());
+            if (cache != null) cache.invalidateRail(WorkflowContentSource.SOURCE_ID, event.railId());
         }
     }
 }
