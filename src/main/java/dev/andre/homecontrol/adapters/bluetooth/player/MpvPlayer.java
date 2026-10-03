@@ -54,6 +54,8 @@ public final class MpvPlayer implements AutoCloseable {
     // Written only under this player's monitor (play, stop); lock-free readers use a single snapshot of it.
     @SuppressWarnings("java:S3077")
     private volatile Running running;
+    /** Under this player's monitor: once its session has closed, no play starts another mpv. */
+    private boolean closed;
 
     public MpvPlayer(MpvLauncher launcher, Path socket, Duration startTimeout, Duration loadTimeout, Duration commandTimeout) {
         this.launcher = launcher;
@@ -98,6 +100,9 @@ public final class MpvPlayer implements AutoCloseable {
     }
 
     public synchronized void play(URI url, String audioDevice, int volume, boolean muted) throws IOException, MpvException {
+        if (closed) {
+            throw new IOException("the player is closed");
+        }
         stop();
         Path runtimeDir = socket.getParent();
         Files.createDirectories(runtimeDir, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
@@ -240,8 +245,10 @@ public final class MpvPlayer implements AutoCloseable {
         }
     }
 
+    /** Stops playback for good: a play that reaches the player afterwards, still running for the closed session, fails. */
     @Override
-    public void close() {
+    public synchronized void close() {
+        closed = true;
         stop();
     }
 

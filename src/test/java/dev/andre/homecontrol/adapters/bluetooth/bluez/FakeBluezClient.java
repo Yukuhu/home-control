@@ -28,6 +28,7 @@ public final class FakeBluezClient implements BluezClient {
     private final Map<String, BluezFailure> failAlways = new LinkedHashMap<>();
     private final Map<String, String> failAlwaysDetail = new LinkedHashMap<>();
     private final Map<String, Duration> delays = new LinkedHashMap<>();
+    private final Map<String, Runnable> hooks = new LinkedHashMap<>();
 
     private volatile boolean closed;
 
@@ -88,6 +89,11 @@ public final class FakeBluezClient implements BluezClient {
 
     public synchronized void delay(String operation, Duration delay) {
         delays.put(operation, delay);
+    }
+
+    /** Runs {@code hook} once, when {@code operation} is next called and before it takes effect: what happens meanwhile. */
+    public synchronized void whenCalled(String operation, Runnable hook) {
+        hooks.put(operation, hook);
     }
 
     public synchronized List<String> calls() {
@@ -247,6 +253,10 @@ public final class FakeBluezClient implements BluezClient {
     }
 
     private void maybeFail(String operation) throws BluezException {
+        Runnable hook = hooks.remove(operation);
+        if (hook != null) {
+            hook.run();
+        }
         Duration delay = delays.get(operation);
         if (delay != null) {
             sleep(delay);
