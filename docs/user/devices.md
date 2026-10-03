@@ -39,9 +39,9 @@ browser.
 
 To install Home Control on a phone or tablet's home screen, open **Setup** and use the
 **Install app** link, which leads to **A home on your home screen** — the exact wording of the
-browser's own prompt depends on the browser. Over
-plain HTTP the installed icon opens the dashboard like a bookmark; offline support and the
-installed app's own icon need HTTPS, typically through a reverse proxy.
+browser's own prompt depends on the browser. Over plain HTTP the installed icon opens the
+dashboard like a bookmark; offline support and the installed app's own icon need HTTPS,
+typically through a reverse proxy.
 
 The **Setup** page groups devices, content connections, dashboard preferences, and app
 installation with section navigation. Forms stack on smaller screens and have visible labels.
