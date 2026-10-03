@@ -395,6 +395,30 @@ class RailCacheTest {
         assertThat(a().version()).isGreaterThan(loading);
     }
 
+    /**
+     * An open dashboard keeps the versions it saw before the server restarted, and takes only newer ones: a restarted
+     * cache must count on from above anything the one before it could have reached.
+     */
+    @Test
+    void aRestartedCacheCountsOnFromAboveTheVersionsBeforeIt() {
+        cache.snapshots();
+        for (int refresh = 0; refresh < 500; refresh++) {
+            cache.refresh("stub", "a");
+            executor.runAll();
+        }
+        long beforeTheRestart = a().version();
+        clock.advance(Duration.ofSeconds(1));
+        RailCache restarted = new RailCache(new ContentSources(List.of(source)), preferences, events::add, clock,
+                properties, executor);
+        try {
+            restarted.snapshots();
+
+            assertThat(restarted.snapshot("stub", "a").orElseThrow().version()).isGreaterThan(beforeTheRestart);
+        } finally {
+            restarted.stop();
+        }
+    }
+
     @Test
     void peekNeitherReconcilesNorLoads() {
         assertThat(cache.peek()).isEmpty();

@@ -43,7 +43,12 @@ public class RailCache implements SmartLifecycle {
     private final ContentProperties.Rails properties;
     private final ExecutorService fetches;
     private final Semaphore permits;
-    private final AtomicLong versions = new AtomicLong();
+    /**
+     * Starts at the clock's milliseconds times a thousand, so a restarted cache counts on from above anything the one
+     * before it reached: an open dashboard keeps the versions it saw and takes only newer ones. Still below 2^53, where
+     * a browser's numbers stop being exact, for another two centuries.
+     */
+    private final AtomicLong versions;
 
     /** Guarded by {@code this}; iteration order is display order. */
     private Map<String, Entry> entries = new LinkedHashMap<>();
@@ -77,6 +82,7 @@ public class RailCache implements SmartLifecycle {
         this.properties = properties.rails();
         this.fetches = fetches;
         this.permits = new Semaphore(this.properties.maxConcurrentFetches());
+        this.versions = new AtomicLong(clock.millis() * 1000);
     }
 
     public List<RailSnapshot> snapshots() {
