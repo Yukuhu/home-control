@@ -45,19 +45,10 @@
         <h3>Jellyfin apps</h3>
         <p class="hint">Home Control finds the Jellyfin app on a device by its network address. Link it
             here when Jellyfin sees a different address (for example behind Docker networking).</p>
-        <p class="error" role="alert" th:if="${jellyfin.sessionsError()}" th:text="${jellyfin.sessionsError()}">Could not reach Jellyfin</p>
-        <form method="post" th:action="@{/setup/sources/jellyfin/links}" th:each="jellyfinSession : ${jellyfin.sessions()}">
-            <input type="hidden" name="session" th:value="${jellyfinSession.jellyfinDeviceId()}">
-            <label>
-                <span th:text="${jellyfinSession.label()}">SHIELD Android TV · Android TV · 192.168.1.50</span>
-            <select name="device">
-                <option value="" th:selected="${jellyfinSession.linkedDeviceId() == ''}">Not linked</option>
-                <option th:each="device : ${jellyfin.devices()}" th:value="${device.id()}" th:text="${device.name()}"
-                        th:selected="${device.id() == jellyfinSession.linkedDeviceId()}">Living Room</option>
-            </select>
-            </label>
-            <button type="submit">Link</button>
-        </form>
+        <div id="jellyfin-sessions" th:attr="hx-get=@{/setup/sources/jellyfin/sessions}" hx-trigger="load"
+             hx-swap="outerHTML">
+            <p class="hint">Asking Jellyfin which apps are open…</p>
+        </div>
     </th:block>
 
     <h3 th:text="${jellyfin.configured()} ? 'Reconnect' : 'Connect'">Connect</h3>
@@ -93,3 +84,22 @@
         <button type="submit" class="primary" th:text="${jellyfin.configured()} ? 'Reconnect' : 'Connect'">Connect</button>
     </form>
 </section>
+
+<div th:fragment="sessions" id="jellyfin-sessions">
+    <p class="error" role="alert" th:if="${jellyfinSessions.error()}" th:text="${jellyfinSessions.error()}">Could not reach Jellyfin</p>
+    <p class="hint" th:if="${jellyfinSessions.error() == null and #lists.isEmpty(jellyfinSessions.sessions())}">
+        No Jellyfin app is open right now.</p>
+    <form method="post" th:action="@{/setup/sources/jellyfin/links}"
+          th:each="jellyfinSession : ${jellyfinSessions.sessions()}">
+        <input type="hidden" name="session" th:value="${jellyfinSession.jellyfinDeviceId()}">
+        <label>
+            <span th:text="${jellyfinSession.label()}">SHIELD Android TV · Android TV · 192.168.1.50</span>
+        <select name="device">
+            <option value="" th:selected="${jellyfinSession.linkedDeviceId() == ''}">Not linked</option>
+            <option th:each="device : ${jellyfinSessions.devices()}" th:value="${device.id()}" th:text="${device.name()}"
+                    th:selected="${device.id() == jellyfinSession.linkedDeviceId()}">Living Room</option>
+        </select>
+        </label>
+        <button type="submit">Link</button>
+    </form>
+</div>

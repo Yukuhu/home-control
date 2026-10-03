@@ -147,7 +147,8 @@ On the setup page, under **Jellyfin**, give:
 
 A **Jellyfin apps** list lets you link a device's own Jellyfin app session to a paired device
 when Jellyfin cannot be matched to it automatically (see
-[Docker-networked Jellyfin](#docker-networked-jellyfin)).
+[Docker-networked Jellyfin](#docker-networked-jellyfin)). It loads after the setup page itself,
+so a NAS that is still waking up does not hold the page; it lists only apps open right now.
 
 Jellyfin 10.9 or newer is required. Turn the whole module off with
 `HOME_CONTROL_JELLYFIN_ENABLED=false` — this does not remove a stored token; disconnect Jellyfin

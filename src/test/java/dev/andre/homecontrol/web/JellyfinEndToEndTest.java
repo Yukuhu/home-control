@@ -123,6 +123,18 @@ class JellyfinEndToEndTest extends FullAppTest {
                 assertThat(connected.statusCode()).isEqualTo(302);
                 assertThat(send(browser, page("/setup")).body()).contains("Connected to nas");
 
+                // The setup page does not wait for Jellyfin's open apps (up to 15 s for a sleeping NAS): it loads them
+                // afterwards, with Jellyfin's own error when it cannot.
+                int sessionLookups = jellyfin.requests("GET", "/Sessions").size();
+                assertThat(send(browser, page("/setup")).body()).contains("hx-get=\"/setup/sources/jellyfin/sessions\"");
+                assertThat(jellyfin.requests("GET", "/Sessions")).hasSize(sessionLookups);
+                assertThat(send(browser, get("/setup/sources/jellyfin/sessions")).body())
+                        .contains("SHIELD Android TV · Android TV · 192.168.1.50")
+                        .contains("value=\"" + SHIELD_JELLYFIN_DEVICE + "\"");
+                jellyfin.respondJson("GET", "/Sessions", 500, "{}");
+                assertThat(send(browser, get("/setup/sources/jellyfin/sessions")).body()).contains("role=\"alert\"");
+                jellyfin.respond("GET", "/Sessions", 200, "sessions.json");
+
                 // From now on everything is gated for other clients, images and SSE included.
                 assertThat(send(stranger, get("/rails")).statusCode()).isEqualTo(401);
                 assertThat(send(stranger, get("/events")).statusCode()).isEqualTo(401);
