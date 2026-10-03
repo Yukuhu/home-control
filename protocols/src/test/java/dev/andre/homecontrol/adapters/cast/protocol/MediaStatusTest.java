@@ -70,6 +70,15 @@ class MediaStatusTest {
                 .isEqualTo("c++.mp4");
     }
 
+    /** A phone may cast a file whose name has a bare % in it; every later status of that cast must still read. */
+    @Test
+    void aFileNameThatIsNotValidlyEscapedIsShownAsItIs() {
+        assertThat(new MediaStatus(1, "PLAYING", 0, "http://nas/films/100%.mp4", null, null, null).displayTitle())
+                .isEqualTo("100%.mp4");
+        assertThat(new MediaStatus(1, "PLAYING", 0, "http://nas/films/a%zz.mkv", null, null, null).displayTitle())
+                .isEqualTo("a%zz.mkv");
+    }
+
     @Test
     void loadingAndUnknownStatesAreBuffering() {
         assertThat(status("LOADING").state()).isEqualTo(MediaStatus.PlayerState.BUFFERING);

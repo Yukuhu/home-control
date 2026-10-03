@@ -62,10 +62,19 @@ public record MediaStatus(long mediaSessionId, String playerState, double curren
             String path = contentId.split("[?#]", 2)[0];
             String name = path.substring(path.lastIndexOf('/') + 1);
             if (!name.isBlank()) {
-                // A path "+" is a literal plus; URLDecoder would read it as a form-encoded space.
-                return URLDecoder.decode(name.replace("+", "%2B"), StandardCharsets.UTF_8);
+                return decoded(name);
             }
         }
         return "Unknown media";
+    }
+
+    /** A file name as a person reads it; one that is not validly escaped (a bare %) as it came. */
+    private static String decoded(String name) {
+        try {
+            // A path "+" is a literal plus; URLDecoder would read it as a form-encoded space.
+            return URLDecoder.decode(name.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException _) {
+            return name;
+        }
     }
 }
