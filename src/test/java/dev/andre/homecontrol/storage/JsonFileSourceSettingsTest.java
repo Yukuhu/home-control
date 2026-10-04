@@ -3,6 +3,9 @@ package dev.andre.homecontrol.storage;
 import dev.andre.homecontrol.core.content.SourcePreferences;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -233,5 +236,40 @@ class JsonFileSourceSettingsTest {
         assertThatThrownBy(settings::preferences)
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining("preferences");
+    }
+
+    @ParameterizedTest(name = "{1}")
+    @CsvSource(delimiter = '|', value = {
+            "{\"railOrder\":\"jellyfin/resume\"}| expected a JSON array of strings",
+            "{\"hiddenRails\":[\"jellyfin/resume\", 3]}| expected an array of strings",
+            "{\"refreshMinutes\":[10]}| expected an object of integers"})
+    void preferencesOfTheWrongShapeNameWhatIsWrong(String preferences, String reason) throws IOException {
+        Path file = dir.resolve("sources.json");
+        Files.writeString(file, "{\"version\":2,\"sources\":{},\"preferences\":" + preferences + "}");
+        JsonFileSourceSettings settings = new JsonFileSourceSettings(file);
+
+        assertThatThrownBy(settings::preferences)
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining("fix or delete the \"preferences\" object")
+                .hasStackTraceContaining(reason);
+    }
+
+    @Test
+    void preferencesWithoutIntervalsReadAsNone() throws IOException {
+        Path file = dir.resolve("sources.json");
+        Files.writeString(file, """
+                {"version":2,"sources":{},"preferences":{"refreshMinutes":null,"locale":"de-DE","region":"DE"}}""");
+
+        assertThat(new JsonFileSourceSettings(file).preferences())
+                .hasValueSatisfying(preferences -> assertThat(preferences.refreshMinutes()).isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"version\":1,\"sources\":[]}", "{\"version\":2,\"sources\":[]}"})
+    void sourcesThatAreNoObjectHoldNoSettings(String document) throws IOException {
+        Path file = dir.resolve("sources.json");
+        Files.writeString(file, document);
+
+        assertThat(probe(new JsonFileSourceSettings(file), "jellyfin")).isEmpty();
     }
 }
