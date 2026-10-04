@@ -24,6 +24,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.net.URI;
@@ -33,6 +36,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -435,6 +439,42 @@ class TizenSessionTest {
         tv.setAuthorization(FakeTizenServer.Authorization.ALLOW);
         await().atMost(Duration.ofSeconds(10)).until(() -> session.state().status() == DeviceStatus.CONNECTED);
         assertThat(stored("token")).isEqualTo(FakeTizenServer.TOKEN);
+    }
+
+    @Test
+    void anUnpairedTvRefusesCommandsUntilItIsPairedAgain() {
+        start(Map.of());
+        awaitStatus(DeviceStatus.UNPAIRED);
+        var home = new Action.PressKey(RemoteKey.HOME);
+
+        assertThatThrownBy(() -> session.execute(home))
+                .isInstanceOf(DeviceOfflineException.class)
+                .hasMessage("Samsung TV must be paired again before it can be controlled");
+    }
+
+    static Stream<Arguments> whatATizenTvCannotDo() {
+        return Stream.of(
+                Arguments.of(new Action.SetVolume(30), "Samsung TV only takes volume up, down and mute keys"),
+                Arguments.of(new Action.Mute(true), "Samsung TV only takes volume up, down and mute keys"),
+                Arguments.of(new Action.CastMessage("CC1AD845", "urn:x-cast:com.example", Map.of()),
+                        "Samsung TV is not a Cast receiver"),
+                Arguments.of(new Action.PlayMedia(URI.create("http://nas/film.mp4"), "video/mp4", "Film", null),
+                        "Samsung TV cannot play a direct stream"),
+                Arguments.of(new Action.Pause(), "Samsung TV cannot pause a direct stream"),
+                Arguments.of(new Action.Resume(), "Samsung TV cannot resume a direct stream"),
+                Arguments.of(new Action.JoinGroup("kitchen"), "Samsung TV cannot be grouped"),
+                Arguments.of(new Action.LeaveGroup(), "Samsung TV cannot be grouped"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("whatATizenTvCannotDo")
+    void refusesWhatTheTvCannotDoWithAReason(Action action, String reason) {
+        start(PAIRED);
+        connected();
+
+        assertThatThrownBy(() -> session.execute(action))
+                .isInstanceOf(UnsupportedActionException.class)
+                .hasMessage(reason);
     }
 
     @Test

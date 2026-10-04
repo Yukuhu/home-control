@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -156,6 +157,33 @@ class SonosSessionTest {
     }
 
     @Test
+    void aGroupMemberResumesAndStopsThroughItsCoordinator() {
+        household.join(KITCHEN, LIVING);
+        SonosSession session = connected(kitchen);
+        session.execute(song);
+        session.execute(new Action.Pause());
+
+        session.execute(new Action.Resume());
+        assertThat(living.commandNames()).last().isEqualTo("Play");
+        session.execute(new Action.Stop());
+        assertThat(living.commandNames()).last().isEqualTo("Stop");
+        assertThat(kitchen.commandNames()).isEmpty();
+    }
+
+    @Test
+    void muteStaysWithTheSpeaker() {
+        household.join(KITCHEN, LIVING);
+        SonosSession session = connected(kitchen);
+
+        session.execute(new Action.Mute(true));
+        assertThat(kitchen.muted()).isTrue();
+        assertThat(living.muted()).isFalse();
+
+        session.execute(new Action.Mute(false));
+        assertThat(kitchen.muted()).isFalse();
+    }
+
+    @Test
     void joinsAndLeavesGroups() {
         SonosSession session = connected(kitchen);
         assertThat(session.feature(GroupListing.class)).containsSame(session);
@@ -220,6 +248,13 @@ class SonosSessionTest {
         assertThatThrownBy(() -> session.execute(video))
                 .isInstanceOf(UnsupportedActionException.class)
                 .hasMessage("Living Room cannot play video/mp4");
+        var castLoad = new Action.CastLoad("CC1AD845", Map.of());
+        assertThatThrownBy(() -> session.execute(castLoad))
+                .isInstanceOf(UnsupportedActionException.class)
+                .hasMessage("Living Room is a Sonos speaker and is not a Cast receiver");
+        var castMessage = new Action.CastMessage("CC1AD845", "urn:x-cast:com.example", Map.of());
+        assertThatThrownBy(() -> session.execute(castMessage))
+                .hasMessage("Living Room is a Sonos speaker and is not a Cast receiver");
     }
 
     @Test

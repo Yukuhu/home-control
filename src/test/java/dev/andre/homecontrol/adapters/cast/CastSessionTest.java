@@ -21,6 +21,9 @@ import dev.andre.homecontrol.testsupport.RecordingStateListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -31,6 +34,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.CONNECTION;
 import static dev.andre.homecontrol.adapters.cast.protocol.CastNamespaces.MEDIA;
@@ -240,6 +244,27 @@ class CastSessionTest {
         var appLink = new Action.OpenAppLink(URI.create("https://youtube.com"));
         assertThatThrownBy(() -> session.execute(appLink))
                 .isInstanceOf(UnsupportedActionException.class);
+    }
+
+    static Stream<Arguments> whatACastReceiverCannotDo() {
+        return Stream.of(
+                Arguments.of(new Action.SelectInput("HDMI_1"), "Living Room TV is a Cast receiver and has no inputs"),
+                Arguments.of(new Action.PlayMedia(URI.create("http://nas/film.mp4"), "video/mp4", "Film", null),
+                        "Living Room TV cannot play a direct stream"),
+                Arguments.of(new Action.Pause(), "Living Room TV cannot pause a direct stream"),
+                Arguments.of(new Action.Resume(), "Living Room TV cannot resume a direct stream"),
+                Arguments.of(new Action.JoinGroup("kitchen"), "Living Room TV cannot be grouped"),
+                Arguments.of(new Action.LeaveGroup(), "Living Room TV cannot be grouped"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("whatACastReceiverCannotDo")
+    void refusesWhatACastReceiverCannotDoWithAReason(Action action, String reason) {
+        start(receiver.port());
+
+        assertThatThrownBy(() -> session.execute(action))
+                .isInstanceOf(UnsupportedActionException.class)
+                .hasMessage(reason);
     }
 
     @Test
