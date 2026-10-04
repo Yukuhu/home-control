@@ -194,4 +194,60 @@ class JellyfinSessionsTest {
         assertThatThrownBy(() -> sessions.playNow(ITEM_ID, "../y", 0)).isInstanceOf(IllegalArgumentException.class);
         assertThat(fake.requests()).isEmpty();
     }
+
+    @Test
+    void sessionsWithoutAnIdAndHomeControlsOwnAreNeverOffered() throws IOException {
+        connected(Map.of());
+        fake.respondJson("GET", "/Sessions", 200, """
+                [
+                  {"Id":"", "DeviceId":"shield", "SupportsMediaControl":true},
+                  {"Id":"own", "DeviceId":"hc-test-device", "SupportsMediaControl":true}
+                ]
+                """);
+
+        assertThat(sessions.controllable()).isEmpty();
+    }
+
+    @Test
+    void withoutAConnectionThereAreNoSessionsToAsk() {
+        given(setup.settings()).willReturn(Optional.empty());
+        given(setup.connection()).willReturn(Optional.empty());
+        Device shield = device("Shield", "192.168.1.50");
+
+        assertThatThrownBy(() -> sessions.sessionFor(shield))
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin is not connected");
+        assertThatThrownBy(sessions::controllable)
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin is not connected");
+    }
+
+    @Test
+    void aPlayNowTheServerRefusesForAnotherReasonKeepsItsReason() throws IOException {
+        connected(Map.of());
+        fake.respondJson("POST", "/Sessions/1d2c3b4a59687f6e5d4c3b2a19081726/Playing", 401, "{}");
+
+        assertThatThrownBy(() -> sessions.playNow("1d2c3b4a59687f6e5d4c3b2a19081726", ITEM_ID, 0))
+                .isInstanceOf(JellyfinException.class)
+                .hasMessageNotContaining("closed its session")
+                .extracting(e -> ((JellyfinException) e).kind())
+                .isEqualTo(ContentSourceException.Kind.UNAUTHORIZED);
+    }
+
+    @Test
+    void aBlankLinkIsNoLinkAndABlankAddressMatchesNothing() {
+        Instant now = Instant.parse("2026-09-16T08:00:00Z");
+        List<JellyfinSession> found = List.of(
+                session("s1", "d1", "Living Room", "192.168.1.50", now),
+                session("s2", "d2", "Kitchen", "", now));
+
+        assertThat(JellyfinSessions.match("Shield", Set.of("192.168.1.50"), found, " "))
+                .map(JellyfinSession::id).contains("s1");
+        assertThat(JellyfinSessions.match("Shield", Set.of(""), found, null)).isEmpty();
+    }
+
+    @Test
+    void normalizesUnusualAddresses() {
+        assertThat(JellyfinSessions.normalizeAddress(null)).isEmpty();
+        assertThat(JellyfinSessions.normalizeAddress("[fe80::1")).isEqualTo("fe80::1");
+        assertThat(JellyfinSessions.normalizeAddress("::ffff:abcd")).isEqualTo("::ffff:abcd");
+    }
 }

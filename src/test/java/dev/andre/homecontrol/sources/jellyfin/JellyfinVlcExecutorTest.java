@@ -16,6 +16,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import dev.andre.homecontrol.core.content.ContentSourceException;
+import java.io.IOException;
+import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -145,5 +148,140 @@ class JellyfinVlcExecutorTest {
         assertThatThrownBy(() -> executor.execute(route, shield)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(commands);
         verify(devices, never()).state(anyString());
+    }
+
+    @Test
+    void theStartupTimeoutMustBePositive() {
+        assertThatThrownBy(() -> new JellyfinVlcExecutor(setup, client, devices, commands, Duration.ZERO))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Startup timeout must be positive");
+    }
+
+    @Test
+    void anotherJellyfinRouteIsRefused() {
+        var route = new JellyfinRoute.App(ID, 0);
+
+        assertThatThrownBy(() -> executor.execute(route, shield))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("VLC needs an Android TV device");
+        verifyNoInteractions(commands, client);
+    }
+
+    @Test
+    void anUnconfiguredOrDisconnectedJellyfinCannotPrepareAStream() {
+        String prepare = "Could not prepare the Jellyfin stream for VLC; check the Jellyfin connection and media availability";
+        DelegatedRoute route = new JellyfinRoute.Vlc(ID);
+        when(setup.connection()).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> executor.execute(route, shield))
+                .isInstanceOf(ActionFailedException.class).hasMessage(prepare);
+
+        when(setup.settings()).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> executor.execute(route, shield))
+                .isInstanceOf(ActionFailedException.class).hasMessage(prepare);
+        verifyNoInteractions(commands, client);
+    }
+
+    @Test
+    void aJellyfinServerThatRefusesTheItemCannotPrepareAStream() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenThrow(new JellyfinException(
+                ContentSourceException.Kind.NOT_FOUND, "Jellyfin has no such item"));
+        DelegatedRoute route = new JellyfinRoute.Vlc(ID);
+
+        assertThatThrownBy(() -> executor.execute(route, shield))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessage("Could not prepare the Jellyfin stream for VLC; check the Jellyfin connection and media availability");
+        verifyNoInteractions(commands);
+    }
+
+    @Test
+    void aLookupThatFailsUnexpectedlyCannotPrepareAStream() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenAnswer(_ -> {
+            throw new IOException("stream closed");
+        });
+        DelegatedRoute route = new JellyfinRoute.Vlc(ID);
+
+        assertThatThrownBy(() -> executor.execute(route, shield))
+                .isInstanceOf(ActionFailedException.class).hasMessage("Could not prepare the Jellyfin stream for VLC");
+        verifyNoInteractions(commands);
+    }
+
+    @Test
+    void onlyVideoAndAudioItemsOpenInVlc() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree("{\"MediaType\":\"Photo\"}"));
+        DelegatedRoute route = new JellyfinRoute.Vlc(ID);
+
+        assertThatThrownBy(() -> executor.execute(route, shield))
+                .isInstanceOf(ActionFailedException.class).hasMessage("VLC can open Jellyfin video and audio items only");
+        verifyNoInteractions(commands);
+    }
+
+    @Test
+    void anAudioItemOpensItsAudioStreamAndItsTitleWithoutALength() {
+        when(client.get(any(), eq("/Items/" + ID), anyMap())).thenReturn(json.readTree(
+                "{\"Type\":\"Movie\",\"MediaType\":\"Audio\",\"Name\":\"Radio play\"}"));
+
+        executor.execute(new JellyfinRoute.Vlc(ID), shield);
+
+        var sent = ArgumentCaptor.forClass(Action.class);
+        verify(commands).execute(eq("shield"), sent.capture());
+        Action.OpenAppLink link = (Action.OpenAppLink) sent.getValue();
+        assertThat(link.uri()).hasToString("vlc://https://nas.lan/jellyfin/Audio/" + ID
+                + "/stream?static=true&mediaSourceId=source%2B1&ApiKey=secret%2B%26token");
+        assertThat(link.media()).isEqualTo(new LaunchedMedia("org.videolan.vlc", "Radio play", null));
+    }
+
+    @Test
+    void skipsSourcesVlcCannotOpenAsIsAndUsesTheFirstThatItCan() {
+        when(client.post(any(), anyString(), anyMap(), any())).thenReturn(json.readTree("""
+                {"MediaSources":[
+                  {"Id":"","SupportsDirectPlay":true},
+                  {"Id":"closing","SupportsDirectPlay":true,"RequiresClosing":true},
+                  {"Id":"endless","SupportsDirectPlay":true,"IsInfiniteStream":true},
+                  {"Id":"file","SupportsDirectPlay":true}
+                ]}
+                """));
+
+        executor.execute(new JellyfinRoute.Vlc(ID), shield);
+
+        var sent = ArgumentCaptor.forClass(Action.class);
+        verify(commands).execute(eq("shield"), sent.capture());
+        assertThat(((Action.OpenAppLink) sent.getValue()).uri().toString()).contains("mediaSourceId=file&");
+    }
+
+    @Test
+    void aDeviceThatMustBePairedAgainCannotOpenVlc() {
+        when(devices.state("shield")).thenReturn(DeviceState.initial().withStatus(DeviceStatus.UNPAIRED));
+        DelegatedRoute route = new JellyfinRoute.Vlc(ID);
+
+        assertThatThrownBy(() -> executor.execute(route, shield))
+                .isInstanceOf(ActionFailedException.class).hasMessage("Shield must be paired before VLC can start");
+        verifyNoInteractions(commands);
+    }
+
+    @Test
+    void wakesASleepingDeviceEvenAfterAWakeThatWasLostThenSendsTheLinkOnce() {
+        DeviceState off = DeviceState.initial().withStatus(DeviceStatus.CONNECTED).withPower(false);
+        DeviceState on = off.withPower(true);
+        when(devices.state("shield")).thenReturn(DeviceState.initial(), off, on);
+        doThrow(new DeviceOfflineException("Shield is not connected"))
+                .when(commands).execute("shield", new Action.PressKey(RemoteKey.WAKEUP));
+        var patient = new JellyfinVlcExecutor(setup, client, devices, commands, Duration.ofSeconds(10));
+
+        patient.execute(new JellyfinRoute.Vlc(ID), shield);
+
+        verify(commands, times(1)).execute("shield", new Action.PressKey(RemoteKey.WAKEUP));
+        verify(commands, times(1)).execute(eq("shield"), isA(Action.OpenAppLink.class));
+    }
+
+    @Test
+    void anInterruptedStartSendsNothing() {
+        DelegatedRoute route = new JellyfinRoute.Vlc(ID);
+        Thread.currentThread().interrupt();
+        try {
+            assertThatThrownBy(() -> executor.execute(route, shield))
+                    .isInstanceOf(ActionFailedException.class).hasMessage("VLC startup was interrupted");
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            verifyNoInteractions(commands);
+        } finally {
+            Thread.interrupted();
+        }
     }
 }

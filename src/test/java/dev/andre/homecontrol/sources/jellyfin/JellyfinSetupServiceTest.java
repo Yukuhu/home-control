@@ -23,6 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.Map;
+import java.net.URI;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -287,6 +289,114 @@ class JellyfinSetupServiceTest {
         assertThat(setup.settings().orElseThrow().sessionLinks()).containsExactlyEntriesOf(Map.of("bedroom", "jf-1"));
 
         setup.link("jf-1", "");
+        assertThat(setup.settings().orElseThrow().sessionLinks()).isEmpty();
+    }
+
+    private RequestLoginContext browser() {
+        return new RequestLoginContext(new MockHttpServletRequest(), loginService);
+    }
+
+    @Test
+    void aConnectRequestPrintsNoSecret() {
+        var request = new JellyfinSetupService.ConnectRequest("http://nas:8096", null, JellyfinSettings.AuthMode.API_KEY,
+                "andre", "user pw", "api-key-123", "household pw 1", "household pw 1");
+
+        assertThat(request.toString()).contains("http://nas:8096", "API_KEY", "andre")
+                .doesNotContain("user pw", "api-key-123", "household pw 1");
+    }
+
+    @Test
+    void withoutAModeTheLoginIsAPasswordLoginAndADeviceAddressIsKeptApart() {
+        var request = new JellyfinSetupService.ConnectRequest(fake.url() + "/", "http://jellyfin.lan:8096/", null,
+                "andre", null, null, LOGIN_PASSWORD, LOGIN_PASSWORD);
+
+        JellyfinSettings result = setup.connect(request, browser());
+
+        assertThat(result.authMode()).isEqualTo(JellyfinSettings.AuthMode.PASSWORD);
+        assertThat(result.deviceServerUrl()).isEqualTo(URI.create("http://jellyfin.lan:8096"));
+        assertThat(result.serverUrl()).isNotEqualTo(result.deviceServerUrl());
+        assertThat(fake.last("POST", "/Users/AuthenticateByName").body()).contains("\"Pw\":\"\"");
+    }
+
+    @Test
+    void aBlankUserNameOrApiKeyIsRefusedBeforeJellyfinIsAsked() {
+        var noUser = new JellyfinSetupService.ConnectRequest(fake.url() + "/", null, JellyfinSettings.AuthMode.PASSWORD,
+                " ", "user pw", null, LOGIN_PASSWORD, LOGIN_PASSWORD);
+        assertThatThrownBy(() -> setup.connect(noUser, browser()))
+                .isInstanceOf(JellyfinException.class).hasMessage("Enter the Jellyfin user name");
+
+        var noKey = new JellyfinSetupService.ConnectRequest(fake.url() + "/", null, JellyfinSettings.AuthMode.API_KEY,
+                "andre", null, " ", LOGIN_PASSWORD, LOGIN_PASSWORD);
+        assertThatThrownBy(() -> setup.connect(noKey, browser()))
+                .isInstanceOf(JellyfinException.class).hasMessage("Enter the Jellyfin API key")
+                .extracting(e -> ((JellyfinException) e).kind()).isEqualTo(ContentSourceException.Kind.INVALID_INPUT);
+
+        assertThat(fake.requests("GET", "/Users")).isEmpty();
+        assertThat(setup.settings()).isEmpty();
+    }
+
+    @Test
+    void aLoginWithoutATokenOrUserIsNotKept() {
+        fake.respondJson("POST", "/Users/AuthenticateByName", 200, "{\"AccessToken\":\"\",\"User\":{\"Id\":\"u1\"}}");
+        assertThatThrownBy(() -> setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), browser()))
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin did not return a usable login")
+                .extracting(e -> ((JellyfinException) e).kind()).isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
+
+        fake.respondJson("POST", "/Users/AuthenticateByName", 200, "{\"AccessToken\":\"tok\",\"User\":{}}");
+        assertThatThrownBy(() -> setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), browser()))
+                .hasMessage("Jellyfin did not return a usable login");
+        assertThat(setup.settings()).isEmpty();
+        assertThat(secretStore.secret(JellyfinSettings.TOKEN_SECRET)).isEmpty();
+    }
+
+    @Test
+    void aUserWithoutACastReceiverGetsTheDefaultOne() {
+        fake.respondJson("POST", "/Users/AuthenticateByName", 200,
+                "{\"AccessToken\":\"tok\",\"User\":{\"Id\":\"" + FakeJellyfinServer.USER_ID + "\"}}");
+
+        JellyfinSettings result = setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), browser());
+
+        assertThat(result.castReceiverId()).isEqualTo(JellyfinSettings.DEFAULT_CAST_RECEIVER_ID);
+        assertThat(result.userName()).as("the name the user typed").isEqualTo("andre");
+    }
+
+    @Test
+    void reconnectingWithANewPasswordTokenRevokesTheOldOne() {
+        LoginContext household = browser();
+        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), household);
+        fake.respondJson("POST", "/Users/AuthenticateByName", 200,
+                "{\"AccessToken\":\"new-token\",\"User\":{\"Id\":\"" + FakeJellyfinServer.USER_ID + "\",\"Name\":\"andre\"}}");
+
+        setup.connect(passwordRequest(null, null), household);
+
+        assertThat(fake.last("POST", "/Sessions/Logout").header("authorization"))
+                .contains("Token=\"" + FakeJellyfinServer.ACCESS_TOKEN + "\"");
+        assertThat(secretStore.secret(JellyfinSettings.TOKEN_SECRET)).contains("new-token");
+    }
+
+    @Test
+    void linkingAndCheckingNeedAConnection() {
+        assertThatThrownBy(() -> setup.link("jf-1", "shield"))
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin is not connected");
+        assertThatThrownBy(() -> setup.check())
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin is not connected");
+
+        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), browser());
+        loginService.removeSecrets(List.of(JellyfinSettings.TOKEN_SECRET));
+
+        assertThatThrownBy(() -> setup.check())
+                .isInstanceOf(JellyfinException.class)
+                .hasMessage("The Jellyfin token is missing; reconnect Jellyfin")
+                .extracting(e -> ((JellyfinException) e).kind()).isEqualTo(ContentSourceException.Kind.UNAUTHORIZED);
+    }
+
+    @Test
+    void linkingToNoDeviceUnlinksTheApp() {
+        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), browser());
+        setup.link("jf-1", "shield");
+
+        setup.link("jf-1", null);
+
         assertThat(setup.settings().orElseThrow().sessionLinks()).isEmpty();
     }
 }

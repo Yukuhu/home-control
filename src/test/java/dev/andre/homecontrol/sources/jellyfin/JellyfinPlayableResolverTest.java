@@ -314,4 +314,39 @@ class JellyfinPlayableResolverTest {
     void resolvesOnlyJellyfinItems() {
         assertThat(resolver.resolves(new PlayableRef.AppLink(URI.create("https://x"), "web"))).isFalse();
     }
+
+    @Test
+    void settingsWithoutATokenAreNotConnected() {
+        given(setup.settings()).willReturn(Optional.of(settings()));
+        given(setup.connection()).willReturn(Optional.empty());
+
+        assertThat(resolver.resolve(WANTED, item(WANTED), device("Kitchen", "10.0.0.9"),
+                Set.of(Capability.MEDIA_RENDERER)).notes()).containsExactly("Jellyfin is not connected");
+    }
+
+    @Test
+    void anItemThatNamesNoServerIsTakenAsThisServers() throws IOException {
+        connected();
+        JellyfinPlayable.Item unnamed = new JellyfinPlayable.Item(null, ITEM_ID, 0);
+        JellyfinPlayable.Item blank = new JellyfinPlayable.Item(" ", ITEM_ID, 0);
+        Device kitchen = device("Kitchen", "10.0.0.9");
+
+        assertThat(resolver.resolve(unnamed, item(unnamed), kitchen, Set.of(Capability.MEDIA_RENDERER)).playables())
+                .hasSize(1);
+        assertThat(resolver.resolve(blank, item(blank), kitchen, Set.of(Capability.MEDIA_RENDERER)).playables())
+                .hasSize(1);
+    }
+
+    @Test
+    void aStreamQuestionJellyfinCannotAnswerIsANote() throws IOException {
+        connected();
+        fake.respondJson("POST", "/Items/" + ITEM_ID + "/PlaybackInfo", 500, "{}");
+
+        PlayableResolver.Resolution resolution = resolver.resolve(WANTED, item(WANTED), device("Kitchen", "10.0.0.9"),
+                Set.of(Capability.MEDIA_RENDERER));
+
+        assertThat(resolution.playables()).isEmpty();
+        assertThat(resolution.notes()).anySatisfy(note ->
+                assertThat(note).startsWith("could not ask Jellyfin how to stream the item ("));
+    }
 }
