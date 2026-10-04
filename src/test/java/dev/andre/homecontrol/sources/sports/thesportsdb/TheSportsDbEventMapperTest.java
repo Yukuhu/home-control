@@ -215,4 +215,47 @@ class TheSportsDbEventMapperTest {
                 "{\"idEvent\":\"1\",\"idLeague\":\"4331\",\"strEvent\":\"A vs B\",\"strTimestamp\":\"2026-09-19T10:00:00Z\"}");
         assertThat(map(node, "9999")).isEmpty();
     }
+
+    private static JsonNode event(String fields) {
+        return MAPPER.readTree("{\"idEvent\":\"1\",\"idLeague\":\"4331\",\"strEvent\":\"A vs B\"," + fields + "}");
+    }
+
+    @Test
+    void anEventWithoutAPlainNumericIdOrAHomeTeamIsSkipped() {
+        assertThat(map(MAPPER.readTree("{\"idLeague\":\"4331\",\"strEvent\":\"A vs B\",\"strTimestamp\":\"2026-09-19T10:00:00Z\"}"),
+                "4331")).isEmpty();
+        assertThat(map(MAPPER.readTree("{\"idEvent\":\"12a\",\"idLeague\":\"4331\",\"strEvent\":\"A vs B\","
+                + "\"strTimestamp\":\"2026-09-19T10:00:00Z\"}"), "4331")).isEmpty();
+        assertThat(map(MAPPER.readTree("{\"idEvent\":\"1\",\"idLeague\":\"4331\",\"strHomeTeam\":\"\",\"strAwayTeam\":\"B\","
+                + "\"strTimestamp\":\"2026-09-19T10:00:00Z\"}"), "4331")).isEmpty();
+    }
+
+    @Test
+    void timestampsInUtcWithoutAnOffsetOrWithALowerCaseZoneLetterAreRead() {
+        assertThat(map(event("\"strTimestamp\":\"2026-09-19T10:00:00z\""), "4331").orElseThrow().startsAt())
+                .isEqualTo(Instant.parse("2026-09-19T10:00:00Z"));
+        assertThat(map(event("\"strTimestamp\":\"2026-09-19T10:00:00\""), "4331").orElseThrow().startsAt())
+                .isEqualTo(Instant.parse("2026-09-19T10:00:00Z"));
+    }
+
+    @Test
+    void aMissingMidnightOrUnreadableKickOffTimeMakesAnAllDayEvent() {
+        for (String time : List.of("\"00:00\"", "\"25:61:00\"", "\"ab:cd\"", "\"7:5\"", "1500")) {
+            SportsEvent event = map(event("\"dateEvent\":\"2026-09-19\",\"strTime\":" + time), "4331").orElseThrow();
+            assertThat(event.allDay()).as(time).isTrue();
+            assertThat(event.startsAt()).as(time).isEqualTo(Instant.parse("2026-09-18T22:00:00Z"));
+        }
+        assertThat(map(event("\"dateEvent\":\"2026-09-19\",\"strTime\":\"18:45:00+01:00\""), "4331").orElseThrow()
+                .startsAt()).isEqualTo(Instant.parse("2026-09-19T18:45:00Z"));
+    }
+
+    @Test
+    void aPosterStandsInForAMissingThumbAndAnUnreadableAddressForTheBadge() {
+        assertThat(map(event("\"strTimestamp\":\"2026-09-19T10:00:00Z\",\"strPoster\":\"https://cdn.example.org/poster.jpg\""),
+                "4331").orElseThrow().artwork()).hasToString("https://cdn.example.org/poster.jpg");
+        assertThat(map(event("\"strTimestamp\":\"2026-09-19T10:00:00Z\",\"strThumb\":\"https://bad host/x.jpg\""),
+                "4331").orElseThrow().artwork()).isEqualTo(BADGE);
+        assertThat(map(event("\"strTimestamp\":\"2026-09-19T10:00:00Z\",\"strThumb\":\"https:///images/x.jpg\""),
+                "4331").orElseThrow().artwork()).hasToString("https:///images/x.jpg");
+    }
 }

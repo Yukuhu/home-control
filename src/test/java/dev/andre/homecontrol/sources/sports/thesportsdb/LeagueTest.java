@@ -43,4 +43,12 @@ class LeagueTest {
         League league = League.of(node("{\"idLeague\":\"1\",\"strLeague\":\"" + longName + "\"}")).orElseThrow();
         assertThat(league.name()).hasSize(120);
     }
+
+    @Test
+    void aBadgeThatIsNoTextOrNoAddressIsDropped() {
+        assertThat(League.of(node("{\"idLeague\":\"1\",\"strLeague\":\"X\",\"strBadge\":42}")).orElseThrow().badge())
+                .isNull();
+        assertThat(League.of(node("{\"idLeague\":\"1\",\"strLeague\":\"X\",\"strBadge\":\"https://bad host/y.png\"}"))
+                .orElseThrow().badge()).isNull();
+    }
 }

@@ -88,4 +88,37 @@ class JsonFileSportsStoreEdgeCaseTest {
                 .isInstanceOf(StorageException.class)
                 .hasMessageStartingWith("Could not write sports settings to ");
     }
+
+    @Test
+    void calendarsWithoutAUsableIdLabelOrHostAreSkippedAndARepeatedIdKeepsTheFirst() throws IOException {
+        Files.writeString(file(), """
+                {"version":1,"calendars":[
+                  {"id":"c-3f9a1c2b7d4e","label":"Bundesliga","host":"calendar.example.org"},
+                  {"id":"c-3f9a1c2b7d4e","label":"Duplicate","host":"calendar.example.org"},
+                  {"id":"not-an-id","label":"Broken","host":"calendar.example.org"},
+                  {"id":"c-00000000000a","label":"","host":"calendar.example.org"},
+                  {"id":"c-00000000000b","label":"No host","host":" "},
+                  {"id":"c-00000000000c","label":"Long host","host":"%s"}
+                ]}
+                """.formatted("h".repeat(300)));
+
+        assertThat(new JsonFileSportsStore(file()).load().calendars()).extracting(SportsSettings.CalendarEntry::label)
+                .containsExactly("Bundesliga");
+    }
+
+    @Test
+    void aCompetitionWithoutAUsableNameIsNamedByItsLeagueAndOddFieldsAreDropped() throws IOException {
+        Files.writeString(file(), """
+                {"version":1,"theSportsDb":{"competitions":[
+                  {"leagueId":"4331","name":" ","sport":42,"country":"%s","badge":"https://bad host/badge.png"}
+                ]}}
+                """.formatted("c".repeat(300)));
+
+        SportsSettings.CompetitionEntry competition = new JsonFileSportsStore(file()).load().competitions().getFirst();
+
+        assertThat(competition.name()).isEqualTo("Competition 4331");
+        assertThat(competition.sport()).isNull();
+        assertThat(competition.country()).isNull();
+        assertThat(competition.badge()).isNull();
+    }
 }

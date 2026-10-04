@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import dev.andre.homecontrol.storage.StorageException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -299,5 +300,51 @@ class SportsCalendarsTest {
                 throw new java.io.UncheckedIOException(e);
             }
         }
+    }
+
+    @Test
+    void aMissingLabelIsTheCalendarsOwnNameAndABlankNameFallsBackToTheHost() {
+        String url = server.url("/private/token-abc123/bl.ics").toString();
+
+        SportsSettings.CalendarEntry entry = calendars.add(
+                new SportsCalendars.AddCalendar(url, null, "household password", "household password"), http);
+
+        assertThat(entry.label()).isEqualTo("Bundesliga 2026/27");
+        assertThat(SportsCalendars.resolvedLabel("", new IcsCalendar("  ", null, List.of(), 0),
+                URI.create("https://calendar.example.org/games.ics"))).isEqualTo("calendar.example.org");
+    }
+
+    @Test
+    void aCalendarWhoseSettingsCannotBeSavedLeavesNoLinkBehind() {
+        SportsSettingsService failing = mock(SportsSettingsService.class);
+        given(failing.current()).willReturn(SportsSettings.empty());
+        given(failing.update(any())).willThrow(new StorageException("disk full"));
+        SportsCalendars unsaved = new SportsCalendars(failing, fetcher, schedule, secrets, login, properties,
+                Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC), random);
+        var request = new SportsCalendars.AddCalendar(server.url("/private/token-abc123/bl.ics").toString(), "",
+                "household password", "household password");
+
+        assertThatThrownBy(() -> unsaved.add(request, http)).isInstanceOf(StorageException.class);
+        verify(login).removeSecrets(List.of("sports.calendar.c-000000000001"));
+    }
+
+    @Test
+    void anIdThatKeepsCollidingIsGivenUp() {
+        settingsService.update(s -> s.withCalendars(List.of(
+                new SportsSettings.CalendarEntry("c-000000000000", "Existing", "127.0.0.1", null, Instant.EPOCH))));
+        SecureRandom stuck = new SecureRandom() {
+            @Override
+            public void nextBytes(byte[] bytes) {
+                Arrays.fill(bytes, (byte) 0);
+            }
+        };
+        SportsCalendars colliding = new SportsCalendars(settingsService, fetcher, schedule, secrets, login, properties,
+                Clock.fixed(Instant.parse("2026-09-16T10:00:00Z"), ZoneOffset.UTC), stuck);
+        var request = new SportsCalendars.AddCalendar(server.url("/private/token-abc123/bl.ics").toString(), "",
+                "household password", "household password");
+
+        assertThatThrownBy(() -> colliding.add(request, http))
+                .isInstanceOf(IllegalStateException.class).hasMessage("Could not generate a calendar id");
+        assertThat(settingsService.current().calendars()).hasSize(1);
     }
 }

@@ -28,12 +28,15 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 
 class SportsCompetitionsTest {
 
@@ -204,5 +207,38 @@ class SportsCompetitionsTest {
     void personalKeyToStringIsRedacted() {
         SportsCompetitions.PersonalKey key = new SportsCompetitions.PersonalKey("9876543210", "pw", "pw");
         assertThat(key).hasToString("PersonalKey[redacted]");
+    }
+
+    @Test
+    void aMissingIdCountryOrKeyIsRefusedBeforeTheServerIsAsked() {
+        assertThatThrownBy(() -> competitions.add(null))
+                .hasMessage("Enter the competition's TheSportsDB id (digits only)");
+        assertThatThrownBy(() -> competitions.search(null, null)).hasMessage("Enter a country such as Germany");
+        assertThatThrownBy(() -> competitions.search("c".repeat(61), null))
+                .hasMessage("Keep the country under 60 characters");
+        assertThatThrownBy(() -> competitions.usePersonalKey(
+                new SportsCompetitions.PersonalKey(null, "household password", "household password"), http))
+                .hasMessage("That does not look like a TheSportsDB API key");
+        assertThat(server.count("lookupleague.php")).isZero();
+        assertThat(server.count("search_all_leagues.php")).isZero();
+    }
+
+    @Test
+    void aKeyCheckThatFailsForAnotherReasonKeepsItsReason() {
+        server.respondJson("lookupleague.php", Map.of("id", "4328"), 503, "{}");
+
+        assertThatThrownBy(() -> competitions.usePersonalKey(
+                new SportsCompetitions.PersonalKey("9876543210", "household password", "household password"), http))
+                .isInstanceOf(TheSportsDbException.class)
+                .hasMessage("TheSportsDB had a server error (HTTP 503)");
+        assertThat(settingsService.current().keyKind()).isEqualTo(SportsSettings.KeyKind.FREE);
+    }
+
+    @Test
+    void theFreeKeyNeedsNoSecretRemoved() {
+        competitions.useFreeKey();
+
+        verify(login, never()).removeSecrets(any());
+        assertThat(settingsService.current().keyKind()).isEqualTo(SportsSettings.KeyKind.FREE);
     }
 }

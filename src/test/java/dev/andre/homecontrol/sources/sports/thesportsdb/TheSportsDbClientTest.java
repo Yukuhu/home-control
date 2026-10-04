@@ -234,4 +234,42 @@ class TheSportsDbClientTest {
         assertThat(e.getMessage()).doesNotContain(FakeTheSportsDbServer.PERSONAL_KEY, "/api/v1/json");
         assertThat(e).hasNoCause();
     }
+
+    @Test
+    void aMissingKeyOrAnotherStatusIsNamedAndAForbiddenOneIsTheKey() {
+        assertThatThrownBy(() -> client.lookupLeague(null, "4331"))
+                .isInstanceOf(TheSportsDbException.class)
+                .hasMessage("That does not look like a TheSportsDB API key");
+
+        server.respondJson("lookupleague.php", Map.of("id", "e403"), 403, "{}");
+        assertThatThrownBy(() -> client.lookupLeague("123", "e403"))
+                .hasFieldOrPropertyWithValue("kind", ContentSourceException.Kind.UNAUTHORIZED)
+                .hasMessage("TheSportsDB rejected the API key");
+
+        server.respondJson("lookupleague.php", Map.of("id", "e418"), 418, "{}");
+        assertThatThrownBy(() -> client.lookupLeague("123", "e418"))
+                .hasMessage("TheSportsDB answered HTTP 418");
+    }
+
+    @Test
+    void aLookupWithoutLeaguesFindsNothingAndASearchWithoutCountriesOrSportListsNothingOrEverySport() {
+        server.respondJson("lookupleague.php", Map.of("id", "4331"), 200, "{\"leagues\":[]}");
+        assertThat(client.lookupLeague("123", "4331")).isEmpty();
+
+        server.respondJson("search_all_leagues.php", Map.of("c", "Nowhere"), 200, "{\"countries\":null}");
+        assertThat(client.searchLeagues("123", "Nowhere", " ")).isEmpty();
+        assertThat(server.last("search_all_leagues.php").query()).isEqualTo(Map.of("c", "Nowhere"));
+    }
+
+    @Test
+    void aSearchListsAtMostFiftyLeagues() {
+        StringBuilder many = new StringBuilder("{\"countries\":[");
+        for (int i = 1; i <= 60; i++) {
+            many.append(i == 1 ? "" : ",").append("{\"idLeague\":\"").append(i).append("\",\"strLeague\":\"League ")
+                    .append(i).append("\"}");
+        }
+        server.respondJson("search_all_leagues.php", Map.of("c", "Everywhere"), 200, many.append("]}").toString());
+
+        assertThat(client.searchLeagues("123", "Everywhere", null)).hasSize(50);
+    }
 }

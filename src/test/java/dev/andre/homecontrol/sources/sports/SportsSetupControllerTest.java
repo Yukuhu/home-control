@@ -219,4 +219,50 @@ class SportsSetupControllerTest extends WebSliceTest {
 
         assertThat(body).doesNotContain("id=\"sports-providers\"");
     }
+
+    @Test
+    void removalAndSavingFailuresAreFlashed() throws Exception {
+        willThrow(new IllegalArgumentException("No calendar c-000000000000")).given(sportsCalendars).remove("c-000000000000");
+        mockMvc.perform(post("/setup/sources/sports/calendars/c-000000000000/remove"))
+                .andExpect(redirectedUrl("/setup#sports"))
+                .andExpect(flash().attribute("sportsError", "No calendar c-000000000000"));
+
+        willThrow(new StorageException("disk full", null)).given(sportsCalendars).remove("c-3f9a1c2b7d4e");
+        mockMvc.perform(post("/setup/sources/sports/calendars/c-3f9a1c2b7d4e/remove"))
+                .andExpect(flash().attribute("sportsError", "Could not save sports settings"));
+
+        willThrow(new StorageException("disk full", null)).given(sportsSettings).update(any());
+        mockMvc.perform(post("/setup/sources/sports/time-zone").param("timeZone", "Europe/London"))
+                .andExpect(flash().attribute("sportsError", "Could not save sports settings"));
+        mockMvc.perform(post("/setup/sources/sports/providers").param("provider:thesportsdb:4331", "dazn"))
+                .andExpect(redirectedUrl("/setup#sports-providers"))
+                .andExpect(flash().attribute("sportsError", "Could not save sports settings"));
+    }
+
+    @Test
+    void aTimeZoneThatIsNotSentMeansTheDefault() throws Exception {
+        mockMvc.perform(post("/setup/sources/sports/time-zone"))
+                .andExpect(flash().attribute("sportsMessage", "Times are shown in Europe/Berlin (default)"));
+    }
+
+    @Test
+    void fieldsOtherThanProvidersAreNotRead() throws Exception {
+        given(sportsSettings.update(any())).willAnswer(invocation -> {
+            java.util.function.UnaryOperator<SportsSettings> op = invocation.getArgument(0);
+            return op.apply(SportsSettings.empty());
+        });
+
+        mockMvc.perform(post("/setup/sources/sports/providers").param("other", "x"))
+                .andExpect(flash().attribute("sportsError", "Nothing to save"));
+    }
+
+    @Test
+    void aFailedAddKeepsTheLabelThatWasTyped() throws Exception {
+        willThrow(new IllegalStateException("Too many calendars")).given(sportsCalendars).add(any(), any());
+
+        mockMvc.perform(post("/setup/sources/sports/calendars").param("url", "https://calendar.example.org/x.ics")
+                        .param("label", "Bundesliga"))
+                .andExpect(flash().attribute("sportsError", "Too many calendars"))
+                .andExpect(flash().attribute("sportsForm", java.util.Map.of("label", "Bundesliga")));
+    }
 }
