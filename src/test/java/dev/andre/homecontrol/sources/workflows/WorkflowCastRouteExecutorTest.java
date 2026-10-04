@@ -199,4 +199,23 @@ class WorkflowCastRouteExecutorTest {
         doThrow(new UnsupportedActionException("unsupported")).when(commands).execute(any(), any());
         assertThatThrownBy(() -> executor.execute(route, tv)).isInstanceOf(UnsupportedActionException.class);
     }
+
+    @Test void anotherSourcesRouteIsRefusedWithoutFetchingOrSending() {
+        DelegatedRoute other = new DelegatedRoute() {
+            @Override public String source() { return "Other"; }
+            @Override public String key() { return "other"; }
+            @Override public String describe() { return "Other route"; }
+        };
+
+        assertThatThrownBy(() -> executor.execute(other, tv))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Not a workflow route");
+        verifyNoInteractions(runner, commands);
+    }
+
+    @Test void aWorkflowRouteNamesItsSourceAndWhatItDoes() {
+        assertThat(route.source()).isEqualTo("Workflows");
+        assertThat(route.key()).isEqualTo(WorkflowCastRoute.ROUTE_KEY);
+        assertThat(route.describe()).isEqualTo("Cast with the Default Media Receiver");
+        assertThat(new WorkflowCastRef(ID, 1, "single").kindLabel()).isEqualTo("workflow Cast");
+    }
 }

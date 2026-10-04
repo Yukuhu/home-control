@@ -16,10 +16,16 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 
 @Timeout(20)
 class WorkflowCallsTest {
@@ -208,5 +214,80 @@ class WorkflowCallsTest {
             assertThatThrownBy(() -> new WorkflowCalls(http).run(entryCalls, plan, known, run, "News"))
                     .hasMessage("Call images · entry \"News\": server returned HTTP 404");
         }
+    }
+
+    /** A client whose fetches wait for {@code release}, whatever the run's deadline says. */
+    private static WorkflowHttpClient heldClient(CountDownLatch release) {
+        WorkflowHttpClient held = mock(WorkflowHttpClient.class);
+        given(held.fetch(any(), anyLong())).willAnswer(_ -> {
+            release.await(10, TimeUnit.SECONDS);
+            return "{}".getBytes(StandardCharsets.UTF_8);
+        });
+        return held;
+    }
+
+    @Test void aRunThatOutlastsItsBudgetIsStoppedWithoutWaitingForItsCalls() {
+        var release = new CountDownLatch(1);
+        try {
+            var draft = WorkflowFixtures.singleWith(List.of(call("slow", "https://api.example/slow")));
+            var engine = new WorkflowCalls(heldClient(release));
+            var plan = WorkflowPlan.of(draft);
+            var run = new WorkflowCalls.Run(Duration.ofMillis(200), 4);
+
+            assertThatThrownBy(() -> engine.run(draft.calls(), plan, Map.of(), run, null))
+                    .isInstanceOf(WorkflowException.class)
+                    .hasMessage("Fetch JSON: the workflow took too long; try again later");
+        } finally { release.countDown(); }
+    }
+
+    @Test void anInterruptedRunStopsAndKeepsTheInterrupt() throws Exception {
+        var release = new CountDownLatch(1);
+        try {
+            var draft = WorkflowFixtures.singleWith(List.of(call("slow", "https://api.example/slow")));
+            var engine = new WorkflowCalls(heldClient(release));
+            var plan = WorkflowPlan.of(draft);
+            var failure = new AtomicReference<Throwable>();
+            var stillInterrupted = new AtomicReference<Boolean>();
+            Thread running = Thread.ofPlatform().start(() -> {
+                try {
+                    engine.run(draft.calls(), plan, Map.of(), new WorkflowCalls.Run(Duration.ofSeconds(10), 4), null);
+                } catch (RuntimeException e) {
+                    failure.set(e);
+                }
+                stillInterrupted.set(Thread.currentThread().isInterrupted());
+            });
+            await().until(() -> running.getState() == Thread.State.TIMED_WAITING);
+
+            running.interrupt();
+            running.join(5000);
+
+            assertThat(failure.get()).isInstanceOf(WorkflowException.class)
+                    .hasMessage("Fetch JSON: request interrupted");
+            assertThat(stillInterrupted.get()).isTrue();
+        } finally { release.countDown(); }
+    }
+
+    @Test void anUnexpectedFailureInACallSaysNothingAboutIt() {
+        WorkflowHttpClient broken = mock(WorkflowHttpClient.class);
+        given(broken.fetch(any(), anyLong())).willThrow(new IllegalStateException("internal detail"));
+        var draft = WorkflowFixtures.singleWith(List.of(call("main", "https://api.example/main")));
+        var engine = new WorkflowCalls(broken);
+        var plan = WorkflowPlan.of(draft);
+        var run = new WorkflowCalls.Run(Duration.ofSeconds(5), 4);
+
+        assertThatThrownBy(() -> engine.run(draft.calls(), plan, Map.of(), run, null))
+                .isInstanceOf(WorkflowException.class)
+                .hasMessage("Fetch JSON: request failed");
+    }
+
+    @Test void aRunWithoutCallsKeepsWhatItWasGiven() {
+        var known = Map.of("id", new WorkflowJson.Value("news", false));
+        var draft = WorkflowFixtures.singleWith(List.of());
+
+        var outcome = new WorkflowCalls(mock(WorkflowHttpClient.class)).run(List.of(), WorkflowPlan.of(draft), known,
+                new WorkflowCalls.Run(Duration.ofSeconds(1), 1), null);
+
+        assertThat(outcome.values()).isEqualTo(known);
+        assertThat(outcome.responses()).isEmpty();
     }
 }

@@ -1,6 +1,10 @@
 package dev.andre.homecontrol.sources.workflows;
 
+import dev.andre.homecontrol.core.playback.ContentKind;
 import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -112,5 +116,54 @@ class WorkflowMigrationTest {
         var draft = codec.decode(GENERATED_V1.replace("\"scope\":\"ROOT\"", "\"scope\":\"OTHER\"")
                 .replace("{C}", "{A}").replace("&token={A}", "")).draft();
         assertThat(draft.calls().getFirst().variables()).isEmpty();
+    }
+
+    private static WorkflowMigration.V1Draft v1Draft(WorkflowMigration.V1Fetch fetch, List<WorkflowMigration.V1Variable> variables) {
+        return new WorkflowMigration.V1Draft("Radio", true, Mode.SINGLE, ContentKind.TRACK,
+                fetch, null, new Tile("Radio", null, null), variables,
+                new Cast("https://media.example/radio.mp3", "audio/mpeg"));
+    }
+
+    @Test void anIncompleteV1DefinitionIsRefused() {
+        var fetch = new WorkflowMigration.V1Fetch("https://api.example/radio", List.of());
+        List<WorkflowMigration.V1Definition> incomplete = List.of(
+                new WorkflowMigration.V1Definition(1, "w-0123456789ab", 1, null),
+                new WorkflowMigration.V1Definition(1, "w-0123456789ab", 1, v1Draft(null, List.of())),
+                new WorkflowMigration.V1Definition(1, "w-0123456789ab", 1, v1Draft(fetch, null)),
+                new WorkflowMigration.V1Definition(1, "w-0123456789ab", 1,
+                        v1Draft(new WorkflowMigration.V1Fetch("https://api.example/radio", null), List.of())));
+
+        assertThatThrownBy(() -> WorkflowMigration.toV2(null)).hasMessage("Workflow: definition could not be parsed");
+        for (var definition : incomplete) {
+            assertThatThrownBy(() -> WorkflowMigration.toV2(definition))
+                    .isInstanceOf(WorkflowException.class).hasMessage("Workflow: definition could not be parsed");
+        }
+    }
+
+    @Test void aHeaderWithoutAValueAndAnEmptyVariableSlotSurviveTheMigrationAsSuch() {
+        var variables = new ArrayList<WorkflowMigration.V1Variable>();
+        variables.add(null);
+        variables.add(new WorkflowMigration.V1Variable("C", "ROOT", "/token", true));
+        var headers = new ArrayList<Header>();
+        headers.add(new Header("X-Empty", null));
+
+        var migrated = WorkflowMigration.toV2(new WorkflowMigration.V1Definition(1, "w-0123456789ab", 4,
+                v1Draft(new WorkflowMigration.V1Fetch("https://api.example/radio", headers), variables)));
+
+        var main = migrated.draft().calls().getFirst();
+        assertThat(main.headers()).containsExactly(new Header("X-Empty", null));
+        assertThat(main.variables()).containsExactly(new Variable("C", "/token", true));
+        assertThat(migrated.draft().listing()).isNull();
+    }
+
+    @Test void v1PartsPrintNoSettings() {
+        var fetch = new WorkflowMigration.V1Fetch("https://api.example/radio?key=secret", List.of());
+        var variable = new WorkflowMigration.V1Variable("secret", "ROOT", "/secret", true);
+        var listing = new WorkflowMigration.V1Listing("/items", "/id", "/title", null, null);
+
+        assertThat(List.of(new WorkflowMigration.V1Definition(1, "w-0123456789ab", 1, v1Draft(fetch, List.of(variable))),
+                v1Draft(fetch, List.of(variable)), fetch, listing, variable))
+                .extracting(Object::toString)
+                .containsExactly("V1Definition", "V1Draft", "V1Fetch", "V1Listing", "V1Variable");
     }
 }

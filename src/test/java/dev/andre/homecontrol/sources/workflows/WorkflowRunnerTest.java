@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static dev.andre.homecontrol.sources.workflows.WorkflowDraft.*;
 
 class WorkflowRunnerTest {
     private static final WorkflowProperties PROPERTIES =
@@ -208,4 +209,50 @@ class WorkflowRunnerTest {
     }
 
     private static byte[] bytes(String body) { return body.getBytes(StandardCharsets.UTF_8); }
+
+    private static WorkflowDefinition withListing(Listing listing) {
+        var base = WorkflowFixtures.generated();
+        return new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, WorkflowIntegrationFixture.ID, 1,
+                new WorkflowDraft(base.name(), true, base.mode(), base.kind(), base.calls(), listing, null, base.cast()));
+    }
+
+    @Test void tileSubtitlesAndArtworkCanComeFromEntryValues() {
+        var client = mock(WorkflowHttpClient.class);
+        var definition = withListing(new Listing("main", "/items", "/id", "/title", new Field(null, "sub"),
+                new Field(null, "art"), List.of(new Variable("A", "/id", false), new Variable("sub", "/sub", false),
+                        new Variable("art", "/art", false))));
+        when(client.fetch(any(), anyLong())).thenReturn(bytes("{\"token\":\"t\",\"items\":["
+                + "{\"id\":\"n1\",\"title\":\"One\",\"sub\":\"Evening news\",\"art\":\"https://cdn.example.org/n1.png\"},"
+                + "{\"id\":\"n2\",\"title\":\"Two\",\"sub\":\"" + "s".repeat(241) + "\",\"art\":\"http://cdn.example.org/n2.png\"},"
+                + "{\"id\":\"n3\",\"title\":\"Three\"}]}"));
+        var runner = new WorkflowRunner(client, PROPERTIES);
+
+        var refresh = runner.refresh(definition, runner.refreshRun());
+
+        assertThat(refresh.entries()).extracting(WorkflowRunner.CatalogEntry::subtitle)
+                .containsExactly("Evening news", null, null);
+        assertThat(refresh.entries()).extracting(WorkflowRunner.CatalogEntry::artwork)
+                .containsExactly(URI.create("https://cdn.example.org/n1.png"), null, null);
+        assertThat(refresh.artworkOmitted()).as("n2's artwork was not a public HTTPS address").isTrue();
+        assertThat(refresh.problems()).containsExactly("Entry \"Three\": mapping sub has no scalar value");
+    }
+
+    @Test void artworkReadByPointerCountsAsOmittedOnlyWhenTheEntryHadSome() {
+        var client = mock(WorkflowHttpClient.class);
+        var definition = withListing(new Listing("main", "/items", "/id", "/title", new Field("/sub", null),
+                new Field("/art", null), List.of(new Variable("A", "/id", false))));
+        when(client.fetch(any(), anyLong())).thenReturn(
+                bytes("{\"token\":\"t\",\"items\":[{\"id\":\"n1\",\"title\":\"One\",\"sub\":\"Live\",\"art\":null}]}"),
+                bytes("{\"token\":\"t\",\"items\":[{\"id\":\"n1\",\"title\":\"One\",\"art\":\"http://cdn.example.org/a.png\"}]}"));
+        var runner = new WorkflowRunner(client, PROPERTIES);
+
+        var withoutArtwork = runner.refresh(definition, runner.refreshRun());
+        assertThat(withoutArtwork.entries().getFirst().subtitle()).isEqualTo("Live");
+        assertThat(withoutArtwork.artworkOmitted()).isFalse();
+
+        var unsafeArtwork = runner.refresh(definition, runner.refreshRun());
+        assertThat(unsafeArtwork.entries().getFirst().artwork()).isNull();
+        assertThat(unsafeArtwork.artworkOmitted()).isTrue();
+        assertThat(unsafeArtwork.problems()).isEmpty();
+    }
 }
