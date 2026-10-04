@@ -156,6 +156,7 @@ sonar {
         property("sonar.gradle.scanAll", "true")
         property("sonar.javascript.lcov.reportPaths",
             "build/reports/browser-coverage/lcov.info,build/reports/pr-summary/lcov.info")
+        property("sonar.python.coverage.reportPaths", "build/reports/dependency-checksums/coverage.xml")
         // The Dockerfile names each base image by tag and digest: the digest pins it, and the tag is how Dependabot
         // knows which newer digest to propose. docker:S8431 asks for one of the two, which would stop the updates.
         property("sonar.issue.ignore.multicriteria", "tagAndDigest")
@@ -210,6 +211,7 @@ tasks.named<Test>("test") {
     // The deployment tests read these files from the repository rather than the classpath. As
     // inputs, a change to one of them alone runs the tests again instead of reusing a result.
     inputs.files(
+        "build.gradle.kts",
         ".github/workflows/ci.yml",
         ".github/workflows/dependency-checksums.yml",
         ".github/actions/smoke-image/action.yml",

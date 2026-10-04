@@ -167,6 +167,14 @@ npm ci --prefix scripts/pr-summary
 npm test --prefix scripts/pr-summary
 ```
 
+CI also measures the Python suite with coverage.py and sends its XML report to SonarCloud.
+To reproduce that coverage check locally, create a virtual environment, install
+`scripts/dependency-checksums/requirements.txt` with `pip install --require-hashes --no-deps -r`,
+then run `python -m coverage run --rcfile=scripts/dependency-checksums/.coveragerc -m unittest discover
+-s scripts/dependency-checksums -p 'test_*.py'` and
+`python -m coverage xml --rcfile=scripts/dependency-checksums/.coveragerc` from the repository root.
+Only the measurement tool is an extra dependency; the helpers and their tests use the Python standard library.
+
 For a dependency update outside the supported automatic scope, use the manual checksum-generation and review
 commands above, then run `scripts/gradle.sh build` without generation enabled. Keep generation out of build and
 test jobs: only verification against committed metadata may unblock them.

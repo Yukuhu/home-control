@@ -35,6 +35,23 @@ class DependencyVerificationWorkflowTest {
     }
 
     @Test
+    void pythonCoverageReachesTheSonarJob() throws IOException {
+        var checksumSteps = (List<?>) job(jobs(), "checksums").get("steps");
+        var upload = checksumSteps.stream().map(step -> (Map<?, ?>) step)
+                .filter(step -> step.get("with") instanceof Map<?, ?> with
+                        && "checksum-coverage".equals(with.get("name")))
+                .findFirst();
+        assertThat(upload).as("checksums uploads its Python coverage report").isPresent();
+        var report = (Map<?, ?>) upload.orElseThrow().get("with");
+        assertThat(report.get("path")).isEqualTo("build/reports/dependency-checksums/coverage.xml");
+        assertThat(report.get("if-no-files-found")).isEqualTo("error");
+        var sonarSteps = (List<?>) job(jobs(), "sonar").get("steps");
+        assertThat(sonarSteps.toString()).contains("checksum-coverage", "build/reports/dependency-checksums");
+        assertThat(Files.readString(Path.of("build.gradle.kts")))
+                .contains("sonar.python.coverage.reportPaths", "build/reports/dependency-checksums/coverage.xml");
+    }
+
+    @Test
     void checksumGateVerifiesTheMergeCommitAndPatchesThePrHead() throws IOException {
         Map<String, Object> checksums = job(jobs(), "checksums");
         var steps = (List<?>) checksums.get("steps");
@@ -49,8 +66,8 @@ class DependencyVerificationWorkflowTest {
         var publishingSteps = (List<?>) publisher.get("steps");
         var trusted = publishingSteps.stream().map(step -> (Map<?, ?>) step)
                 .filter(step -> "trusted".equals(step.get("id"))).findFirst().orElseThrow();
-        assertThat(((Map<?, ?>) trusted.get("with")).get("ref").toString())
-                .isEqualTo("${{ github.event.pull_request.base.sha }}");
+        assertThat(((Map<?, ?>) trusted.get("with")).get("ref"))
+                .hasToString("${{ github.event.pull_request.base.sha }}");
         assertThat(checksums.toString()).doesNotContain("CHECKSUM_APP_PRIVATE_KEY", "create-github-app-token");
         assertThat(publisher.get("permissions").toString()).doesNotContain("write");
     }

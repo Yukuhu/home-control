@@ -204,8 +204,8 @@ receive an unattended strict CI run, and a repeat check must make no further com
 
 ## Implementation evidence (2026-10-04)
 
-- Full `scripts/gradle.sh build`: passed; 3,920 tests, zero failures/errors.
-- Python tooling: 27 tests passed, including real temporary git remotes and the isolated interpreter CLI.
+- Full `scripts/gradle.sh build`: passed; 3,921 tests, zero failures/errors after the Sonar follow-up.
+- Python tooling: 37 tests passed, including real temporary git remotes, CLI entry points, and GitHub adapter errors; 91% branch-inclusive coverage after the Sonar follow-up.
 - PR summary: 63 tests passed.
 - Real #191 candidate: verified five new hashes after completing its omitted JUnit BOM `.module` file.
 - App variable/secrets and installation permissions were configured and authenticated before implementation.

@@ -1,10 +1,16 @@
 """Metadata integrity tests; repository bytes are controlled, validation is real."""
 import hashlib
+from contextlib import redirect_stderr
+import io
+import json
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 
 from verify import Download, Repository, VerificationError, verify_metadata
+import verify
 
 NS = 'https://schema.gradle.org/dependency-verification'
 OLD = ('org.example', 'library', '1.0', 'library-1.0.jar')
@@ -70,6 +76,32 @@ class VerificationTest(unittest.TestCase):
         self.assertFalse(result.changed)
         self.assertEqual(result.xml, self.head)
 
+    def test_local_cli_verifies_caller_selected_files_and_writes_report(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {name: root / (name + '.xml') for name in ('head', 'base', 'candidate', 'output', 'report')}
+            paths['head'].write_bytes(self.head)
+            paths['base'].write_bytes(self.head)
+            paths['candidate'].write_bytes(metadata([(OLD, digest(b'old')), (NEW, digest(b'new'))]))
+            argv = ['verify.py']
+            for name, path in paths.items():
+                argv.extend(['--' + name, str(path)])
+            with patch('sys.argv', argv), patch('verify.Repository', return_value=FakeRepository({NEW: b'new'})):
+                verify.main()
+            report = json.loads(paths['report'].read_text())
+            self.assertTrue(report['changed'])
+            self.assertEqual(report['additions'][0]['sha256'], digest(b'new'))
+            self.assertIn(digest(b'new').encode(), paths['output'].read_bytes())
+            paths['candidate'].write_bytes(b'invalid')
+            paths['output'].unlink()
+            stderr = io.StringIO()
+            with patch('sys.argv', argv), redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as error:
+                    verify.main()
+            self.assertEqual(error.exception.code, 1)
+            self.assertIn('Malformed verification XML', stderr.getvalue())
+            self.assertFalse(paths['output'].exists())
+
     def test_base_additions_are_preserved_without_downloads(self):
         base = metadata([(OLD, digest(b'old')), (NEW, digest(b'new'))])
         result = self.verify(base, base=base)
@@ -88,8 +120,9 @@ class VerificationTest(unittest.TestCase):
         for candidate in (metadata([]), metadata([(OLD, digest(b'changed'))])):
             with self.subTest(candidate=candidate), self.assertRaises(VerificationError):
                 self.verify(candidate)
+        conflicting_base = metadata([(OLD, digest(b'conflict'))])
         with self.assertRaises(VerificationError):
-            self.verify(self.head, base=metadata([(OLD, digest(b'conflict'))]))
+            self.verify(self.head, base=conflicting_base)
 
     def test_rejects_alternative_hashes_and_duplicate_artifacts(self):
         extra_hash = self.head.replace(b'</artifact>', b'<sha256 value="' + digest(b'other').encode() + b'" /></artifact>')
@@ -103,8 +136,9 @@ class VerificationTest(unittest.TestCase):
         for before, after in [(b'<verify-metadata>true', b'<verify-metadata>false'),
                               (b'</configuration>', b'<trusted-artifacts /></configuration>'),
                               (b'</artifact>', b'<ignored-keys /></artifact>')]:
+            candidate = self.head.replace(before, after)
             with self.subTest(after=after), self.assertRaises(VerificationError):
-                self.verify(self.head.replace(before, after))
+                self.verify(candidate)
 
     def test_rejects_unsafe_xml_and_paths(self):
         candidates = [b'<bad', b'<!DOCTYPE x []>' + self.head, b'x' * (5 * 1024 * 1024 + 1)]
@@ -119,8 +153,9 @@ class VerificationTest(unittest.TestCase):
 
     def test_rejects_incorrect_repository_bytes(self):
         candidate = metadata([(OLD, digest(b'old')), (NEW, digest(b'new'))])
+        repository = FakeRepository({NEW: b'changed'})
         with self.assertRaisesRegex(VerificationError, 'mismatch'):
-            self.verify(candidate, FakeRepository({NEW: b'changed'}))
+            self.verify(candidate, repository)
 
     def test_pom_marker_completes_gradle_module_omitted_by_generation(self):
         pom = ('org.junit', 'junit-bom', '5.14.4', 'junit-bom-5.14.4.pom')
@@ -131,8 +166,9 @@ class VerificationTest(unittest.TestCase):
         self.assertIn(b'junit-bom-5.14.4.module', result.xml)
         self.assertIn(digest(b'module bytes').encode(), result.xml)
         self.assertEqual(len(result.additions), 2)
+        missing_module = FakeRepository({pom: pom_bytes})
         with self.assertRaises(VerificationError):
-            self.verify(candidate, FakeRepository({pom: pom_bytes}))
+            self.verify(candidate, missing_module)
 
     def test_protoc_completes_all_published_platforms(self):
         group = ('com.google.protobuf', 'protoc', '4.99.0')
@@ -143,10 +179,33 @@ class VerificationTest(unittest.TestCase):
         self.assertEqual(len(result.additions), 3)
         for name in names:
             self.assertIn(name.encode(), result.xml)
+        missing_platforms = FakeRepository({group + (names[0],): names[0].encode()}, names)
         with self.assertRaises(VerificationError):
-            self.verify(candidate, FakeRepository({group + (names[0],): names[0].encode()}, names))
+            self.verify(candidate, missing_platforms)
 
 class RepositoryTest(unittest.TestCase):
+    def test_download_reads_bytes_and_rejects_oversized_responses(self):
+        repo = Repository()
+        response = io.BytesIO(b'downloaded')
+        response.url = 'https://repo.maven.apache.org/maven2/example'
+        with patch.object(repo.opener, 'open', return_value=response):
+            self.assertEqual(repo._read(response.url), b'downloaded')
+        response = io.BytesIO(b'oversized')
+        response.url = 'https://repo.maven.apache.org/maven2/example'
+        with patch.object(repo.opener, 'open', return_value=response):
+            with self.assertRaisesRegex(VerificationError, 'size limit'):
+                repo._read(response.url, limit=3)
+
+    def test_transient_http_failure_retries_before_success(self):
+        repo = Repository()
+        unavailable = HTTPError('https://repo.maven.apache.org', 503, 'unavailable', {}, None)
+        self.addCleanup(unavailable.close)
+        response = io.BytesIO(b'retry succeeded')
+        response.url = 'https://repo.maven.apache.org/maven2/example'
+        with patch.object(repo.opener, 'open', side_effect=[unavailable, response]) as request, patch('verify.time.sleep'):
+            self.assertEqual(repo._read(response.url), b'retry succeeded')
+            self.assertEqual(request.call_count, 2)
+
     def test_central_first_and_only_404_falls_back(self):
         repo = Repository()
         with patch.object(repo, '_read', return_value=b'bytes') as read:

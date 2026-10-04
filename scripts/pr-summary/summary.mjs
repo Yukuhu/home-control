@@ -291,9 +291,11 @@ function compose(model, { traces, limit }) {
         || (model.documentationOnly && check.result === "skipped"));
     const attempt = model.runAttempt > 1 ? `, attempt ${model.runAttempt}` : "";
     const run = `run #${model.runNumber}${attempt}`;
+    let heading = passed ? "## ✅ CI passed" : "## ❌ CI failed";
+    if (updating) heading = "## 🔄 Updating dependency checksums";
     const lines = [
         MARKER,
-        updating ? "## 🔄 Updating dependency checksums" : passed ? "## ✅ CI passed" : "## ❌ CI failed",
+        heading,
         `${code(model.headSha.slice(0, 7))} · ${link(run, model.runUrl)} · ${duration(model.durationSeconds)}`,
         ...(model.documentationOnly ? ["", "Only documentation changed, so nothing was built or tested."] : []),
         "",

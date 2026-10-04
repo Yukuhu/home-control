@@ -20,7 +20,7 @@ What runs on every push and pull request, and how releases are made.
 | Browser tests (Chromium) | Runs the Playwright tests in Chromium, records their JavaScript coverage for SonarCloud, and tests the pull request summary script. |
 | Browser tests (Firefox) | Runs the Playwright tests in Firefox. |
 | Browser tests (WebKit) | Runs the Playwright tests in WebKit. |
-| SonarCloud quality gate | Scans the results of `Build and test` and `Browser tests (Chromium)`; on pull requests it waits for the quality gate. |
+| SonarCloud quality gate | Scans the Java, browser, PR-summary, and Python checksum-tooling coverage reports; on pull requests it waits for the quality gate. |
 | Dependency vulnerabilities | Submits the resolved dependency graph so that Dependabot alerts cover it, and reviews the dependencies a pull request changes. The release does not wait for it. |
 | Scan the code (…) | Runs CodeQL on the application, the scripts and the workflow, one job for each language, and reports what it finds as code scanning alerts. It fails if a scan cannot run, not if it finds something. The release does not wait for it. |
 | Summarise the run on the pull request | Writes one comment per pull request with the run's results, replaced on every run. |
@@ -37,8 +37,10 @@ troubleshooting, and [ADR 0008](../adr/0008-automatic-dependency-checksums.md) f
 
 ## CI quality gate
 
-The `SonarCloud quality gate` job scans the results of the `Build and test` and
-`Browser tests (Chromium)` jobs with SonarCloud. The browser tests run in one job for each
+The `SonarCloud quality gate` job scans the results of `Build and test`,
+`Browser tests (Chromium)`, and `Verify dependency checksums` with SonarCloud. The checksum
+job exports Python branch coverage with a hash-pinned coverage.py tool and an 80% minimum.
+The browser tests run in one job for each
 browser; the scan waits for Chromium alone, the one browser that records which JavaScript
 ran. On pull requests, it waits for the quality gate, so a failed scan, failed gate, or
 missing `SONAR_TOKEN` fails the job. Main-branch
