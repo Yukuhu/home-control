@@ -256,6 +256,65 @@ class RemoteConnectionTest {
     }
 
     @Test
+    void theCertificateTheDevicePresentedPinsTheNextConnection() throws Exception {
+        String pin = ClientCertificate.fingerprintOf(connection.serverCertificate());
+        connection.close(); // the fake serves one connection at a time
+
+        try (RemoteConnection pinned = RemoteConnection.connect("127.0.0.1", device.port(),
+                ClientCertificate.generate("shield-remote"), 10_000, listener, pin)) {
+            assertThat(ClientCertificate.fingerprintOf(pinned.serverCertificate())).isEqualTo(pin);
+        }
+    }
+
+    @Test
+    void aMessageThatIsNoRemoteMessageEndsTheConnectionAsAnError() throws Exception {
+        // A length prefix of three, then a field tag whose varint never ends within the message.
+        device.pushRaw(new byte[]{3, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF});
+
+        await().untilAtomic(disconnect, org.hamcrest.Matchers.is(DisconnectCause.ERROR));
+    }
+
+    @Test
+    void aListenerKeepingTheDefaultsIgnoresTheDevicesEvents() throws Exception {
+        connection.close(); // the fake serves one connection at a time
+
+        try (RemoteConnection quiet = RemoteConnection.connect("127.0.0.1", device.port(),
+                ClientCertificate.generate("shield-remote"), 10_000, new RemoteListener() { })) {
+            // The device has read from this connection once it reports the key: its pushes now reach it.
+            quiet.sendKey(RemoteKeyCode.KEYCODE_HOME, RemoteDirection.SHORT);
+            assertThat(device.nextKeyPress()).isEqualTo(RemoteKeyCode.KEYCODE_HOME_VALUE);
+
+            device.pushPower(true);
+            device.pushCurrentApp("com.netflix.ninja");
+            device.pushVolume(4, 25, false);
+            device.pushPing(7);
+
+            // Messages are read in order: the pong shows the events before it were handled.
+            assertThat(device.nextPong()).isEqualTo(7);
+        }
+    }
+
+    @Test
+    void withoutAStaleTimeoutAQuietConnectionIsKept() throws Exception {
+        connection.close(); // the fake serves one connection at a time
+        AtomicReference<DisconnectCause> quietDisconnect = new AtomicReference<>();
+        RemoteListener quietListener = new RemoteListener() {
+            @Override
+            public void onDisconnected(DisconnectCause cause) {
+                quietDisconnect.set(cause);
+            }
+        };
+
+        try (var _ = RemoteConnection.connect("127.0.0.1", device.port(),
+                ClientCertificate.generate("shield-remote"), 0, quietListener)) {
+            await().until(() -> device.connections() == 2);
+
+            await().during(Duration.ofMillis(600)).atMost(Duration.ofSeconds(3))
+                    .untilAtomic(quietDisconnect, org.hamcrest.Matchers.nullValue());
+        }
+    }
+
+    @Test
     void reportsWhenTheDeviceHangsUp() throws Exception {
         device.hangUp();
 

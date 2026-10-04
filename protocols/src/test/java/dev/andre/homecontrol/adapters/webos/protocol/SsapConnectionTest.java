@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -25,6 +26,7 @@ class SsapConnectionTest {
     private final HttpClient http = InsecureTls.httpClient(Duration.ofSeconds(2));
     private FakeSsapServer server;
     private SsapConnection connection;
+    private final List<FakeWebSocketServer> scriptedTvs = new CopyOnWriteArrayList<>();
 
     static SsapOptions options(int port, int securePort) {
         return new SsapOptions(port, securePort, Duration.ofSeconds(2), Duration.ofSeconds(2));
@@ -41,6 +43,7 @@ class SsapConnectionTest {
             connection.close();
         }
         server.close();
+        scriptedTvs.forEach(FakeWebSocketServer::close);
     }
 
     private SsapConnection open() throws IOException {
@@ -306,10 +309,144 @@ class SsapConnectionTest {
     }
 
     @Test
+    void aTvThatNeverAnswersTheRegistrationTimesOut() throws IOException {
+        SsapConnection opened = openScripted((tv, text) -> { });
+
+        assertThatThrownBy(() -> opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1)))
+                .isInstanceOf(IOException.class)
+                .isNotInstanceOf(SsapException.class)
+                .hasMessage("The TV did not answer the registration within 2 seconds");
+    }
+
+    @Test
+    void aRegistrationWithoutAClientKeyIsRefused() throws IOException {
+        SsapConnection opened = openScripted((tv, text) ->
+                tv.send("{\"type\":\"registered\",\"id\":\"register_0\",\"payload\":{}}"));
+
+        assertThatThrownBy(() -> opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1)))
+                .isInstanceOf(SsapException.class)
+                .hasMessage("The TV registered this client without a client key");
+    }
+
+    @Test
+    void anErrorForAStoredKeyRejectsTheKey() throws IOException {
+        SsapConnection opened = openScripted((tv, text) ->
+                tv.send("{\"type\":\"error\",\"id\":\"register_0\",\"error\":\"401 insufficient permissions\"}"));
+
+        assertThatThrownBy(() -> opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1)))
+                .isInstanceOfSatisfying(SsapPairingException.class,
+                        e -> assertThat(e.reason()).isEqualTo(SsapPairingException.Reason.KEY_REJECTED))
+                .hasMessage("401 insufficient permissions");
+    }
+
+    @Test
+    void anUnexpectedRegistrationAnswerIsRefused() throws IOException {
+        SsapConnection opened = openScripted((tv, text) -> tv.send("{\"type\":\"hello\",\"id\":\"register_0\"}"));
+
+        assertThatThrownBy(() -> opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1)))
+                .isInstanceOf(SsapException.class)
+                .hasMessage("Unexpected registration answer of type hello");
+    }
+
+    @Test
+    void theTvHangingUpDuringRegistrationIsAnIOException() throws IOException {
+        SsapConnection opened = openScripted((tv, text) -> tv.reset());
+
+        assertThatThrownBy(() -> opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(5)))
+                .isInstanceOf(IOException.class)
+                .isNotInstanceOf(SsapException.class)
+                .hasMessage("The TV closed the connection during registration");
+    }
+
+    @Test
+    void aRequestWaitingWhenTheTvHangsUpFailsAsClosed() throws Exception {
+        SsapConnection opened = open();
+        opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
+        server.ignoreRequests(SsapUris.SYSTEM_INFO);
+        CompletableFuture<Throwable> waiting = CompletableFuture.supplyAsync(() -> {
+            try {
+                opened.request(SsapUris.SYSTEM_INFO, SsapMessages.empty());
+                return null;
+            } catch (IOException e) {
+                return e;
+            }
+        });
+        assertThat(server.nextRequest(SsapUris.SYSTEM_INFO)).isNotNull();
+
+        server.resetConnections();
+
+        assertThat(waiting.get(5, TimeUnit.SECONDS))
+                .isInstanceOf(IOException.class)
+                .isNotInstanceOf(DeviceTimeoutException.class)
+                .hasMessageStartingWith("The TV closed the connection:");
+    }
+
+    @Test
+    void aSubscriberThatFailsKeepsTheConnection() throws Exception {
+        SsapConnection opened = open();
+        opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
+        BlockingQueue<String> apps = new LinkedBlockingQueue<>();
+
+        opened.subscribe(SsapUris.FOREGROUND_APP, payload -> {
+            apps.add(payload.path("appId").asString(""));
+            throw new IllegalStateException("broken subscriber");
+        });
+        server.changeForegroundApp("netflix");
+
+        assertThat(apps.poll(5, TimeUnit.SECONDS)).isEqualTo("com.webos.app.home");
+        assertThat(apps.poll(5, TimeUnit.SECONDS)).isEqualTo("netflix");
+        assertThat(opened.request(SsapUris.SYSTEM_INFO, SsapMessages.empty()).path("modelName").asString())
+                .isEqualTo("OLED55C9PLA");
+    }
+
+    @Test
+    void aTvThatOffersNoPointerSocketIsRefusedWithAReason() throws IOException {
+        server.offerPointerSocket("");
+        SsapConnection opened = open();
+        opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> opened.button("UP"))
+                .isInstanceOf(SsapException.class)
+                .hasMessage("The TV did not offer a pointer input socket");
+    }
+
+    @Test
+    void aPointerSocketWithoutAPortIsOpenedOnTheTvsPortWithItsQuery() throws Exception {
+        server.offerPointerSocket("ws://tv.invalid" + FakeSsapServer.POINTER_PATH + "?session=1");
+        SsapConnection opened = open();
+        opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
+
+        opened.button("HOME");
+
+        assertThat(server.nextButton()).isEqualTo("type:button\nname:HOME\n\n");
+    }
+
+    @Test
+    void anAnswerWithAFalseReturnValueIsRefusedWithTheTvsText() {
+        JsonNode refused = SsapMessages.JSON.readTree(
+                "{\"type\":\"response\",\"payload\":{\"returnValue\":false,\"errorText\":\"busy\"}}");
+        JsonNode silent = SsapMessages.JSON.readTree("{\"type\":\"response\",\"payload\":{\"returnValue\":false}}");
+
+        assertThatThrownBy(() -> SsapConnection.payloadOf("ssap://audio/setVolume", refused))
+                .isInstanceOf(SsapException.class)
+                .hasMessage("ssap://audio/setVolume failed: busy");
+        assertThatThrownBy(() -> SsapConnection.payloadOf("ssap://audio/setVolume", silent))
+                .hasMessage("ssap://audio/setVolume failed: the TV refused");
+    }
+
+    @Test
     void aHostNoUrlCanCarryIsUnreachable() throws IOException {
         var options = options(server.port(), FakeWebSocketServer.closedPort());
 
         assertThatThrownBy(() -> SsapConnection.open(http, "lg_tv.fritz.box", options, reason -> { }))
                 .isInstanceOf(IOException.class);
+    }
+
+    private SsapConnection openScripted(FakeWebSocketServer.Handler tv) throws IOException {
+        FakeWebSocketServer scripted = FakeWebSocketServer.plain(tv);
+        scriptedTvs.add(scripted);
+        connection = SsapConnection.open(http, "127.0.0.1",
+                options(scripted.port(), FakeWebSocketServer.closedPort()), reason -> { });
+        return connection;
     }
 }

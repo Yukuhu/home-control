@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.adapters.cast.protocol;
 
+import com.google.protobuf.ByteString;
 import dev.andre.homecontrol.adapters.cast.protocol.channel.CastMessage;
 import dev.andre.homecontrol.testsupport.TestTls;
 import tools.jackson.databind.JsonNode;
@@ -171,6 +172,28 @@ public class FakeCastReceiver implements AutoCloseable {
                 .setPayloadType(CastMessage.PayloadType.STRING)
                 .setPayloadUtf8("{not json")
                 .build());
+    }
+
+    /** A binary message, as the device-authentication namespace sends; home-control never uses one. */
+    public void sendBinaryPayload(String namespace) throws IOException {
+        CastFraming current = framing;
+        if (current == null) {
+            throw new IOException("No sender is connected to the fake receiver");
+        }
+        current.write(CastMessage.newBuilder()
+                .setProtocolVersion(CastMessage.ProtocolVersion.CASTV2_1_0)
+                .setSourceId(CastNamespaces.PLATFORM_RECEIVER_ID)
+                .setDestinationId("*")
+                .setNamespace(namespace)
+                .setPayloadType(CastMessage.PayloadType.BINARY)
+                .setPayloadBinary(ByteString.copyFrom(new byte[]{1, 2, 3}))
+                .build());
+    }
+
+    /** The platform receiver closes the sender's virtual connection, as a receiver does before it goes away. */
+    public void closeVirtualConnection() throws IOException {
+        send(CastNamespaces.CONNECTION, CastNamespaces.PLATFORM_RECEIVER_ID, CastNamespaces.SENDER_ID,
+                CastPayloads.close());
     }
 
     /** A frame header announcing more than {@link CastFraming#MAX_MESSAGE_BYTES}; no body follows. */

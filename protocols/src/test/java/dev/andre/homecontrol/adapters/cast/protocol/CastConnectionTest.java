@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.ServerSocket;
 import java.time.Duration;
 import java.util.List;
@@ -158,6 +159,98 @@ class CastConnectionTest {
         await().until(() -> messages.stream().anyMatch(message -> message.requestId() == reply.requestId()));
         assertThat(messages).hasSize(1);
         assertThat(disconnects).isEmpty();
+    }
+
+    @Test
+    void disconnectClosesTheVirtualConnectionToAnApp() throws Exception {
+        connection.connect("web-5");
+        await().until(() -> receiver.virtualConnections().contains("web-5"));
+
+        connection.disconnect("web-5");
+
+        await().until(() -> !receiver.virtualConnections().contains("web-5"));
+        assertThat(receiver.received(CONNECTION, "CLOSE")).singleElement()
+                .satisfies(close -> assertThat(close.destinationId()).isEqualTo("web-5"));
+        assertThat(disconnects).isEmpty();
+    }
+
+    @Test
+    void aBinaryMessageIsSkippedAndTheConnectionSurvives() throws Exception {
+        await().until(() -> receiver.virtualConnections().contains(PLATFORM_RECEIVER_ID));
+
+        receiver.sendBinaryPayload("urn:x-cast:com.google.cast.tp.deviceauth");
+        CastIncoming reply = connection.request(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus(), Duration.ofSeconds(3));
+
+        assertThat(reply.type()).isEqualTo("RECEIVER_STATUS");
+        await().until(() -> messages.stream().anyMatch(message -> message.requestId() == reply.requestId()));
+        assertThat(messages).hasSize(1);
+        assertThat(disconnects).isEmpty();
+    }
+
+    @Test
+    void theReceiverClosingTheVirtualConnectionEndsItAsClosed() throws Exception {
+        await().until(() -> receiver.virtualConnections().contains(PLATFORM_RECEIVER_ID));
+
+        receiver.closeVirtualConnection();
+
+        await().until(() -> !disconnects.isEmpty());
+        assertThat(disconnects).containsExactly(CastDisconnectCause.CLOSED);
+        assertThat(messages).isEmpty();
+        assertThatThrownBy(() -> connection.send(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus()))
+                .hasMessage("The Cast connection is closed");
+    }
+
+    @Test
+    void aListenerThatFailsDoesNotEndTheConnection() throws Exception {
+        List<CastIncoming> heard = new CopyOnWriteArrayList<>();
+        CastConnection.Listener failing = new CastConnection.Listener() {
+            @Override
+            public void onMessage(CastIncoming message) {
+                heard.add(message);
+                throw new IllegalStateException("broken listener");
+            }
+
+            @Override
+            public void onDisconnected(CastDisconnectCause cause) {
+                disconnects.add(cause);
+            }
+        };
+        connection.close(); // the fake serves one sender at a time
+        try (CastConnection other = CastConnection.open("127.0.0.1", receiver.port(), Duration.ofMillis(200),
+                Duration.ofSeconds(1), failing)) {
+            CastIncoming first = other.request(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus(), Duration.ofSeconds(3));
+            CastIncoming second = other.request(RECEIVER, PLATFORM_RECEIVER_ID, CastPayloads.getStatus(), Duration.ofSeconds(3));
+
+            assertThat(second.requestId()).isGreaterThan(first.requestId());
+            await().until(() -> heard.size() == 2);
+            assertThat(disconnects).isEmpty();
+        }
+    }
+
+    @Test
+    void aWaiterRegisteredAfterTheConnectionClosedFailsAtOnce() {
+        connection.close();
+
+        CastConnection.Waiter waiter = connection.expect(message -> true);
+
+        assertThatThrownBy(() -> waiter.await(Duration.ofSeconds(5)))
+                .isInstanceOf(IOException.class)
+                .isNotInstanceOf(DeviceTimeoutException.class)
+                .hasMessage("The Cast connection is closed");
+    }
+
+    @Test
+    void anInterruptedWaitKeepsTheInterrupt() {
+        CastConnection.Waiter waiter = connection.expect(message -> false);
+        Thread.currentThread().interrupt();
+        try {
+            assertThatThrownBy(() -> waiter.await(Duration.ofSeconds(5)))
+                    .isInstanceOf(InterruptedIOException.class)
+                    .hasMessage("Interrupted while waiting for the Cast receiver");
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
     }
 
     @Test

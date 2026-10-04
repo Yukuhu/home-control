@@ -5,10 +5,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -143,5 +146,117 @@ class TextWebSocketTest {
         assertThatThrownBy(() -> TextWebSocket.connect(http, closed, Duration.ofSeconds(2), listener))
                 .isInstanceOf(IOException.class)
                 .satisfies(e -> assertThat(e.getMessage()).doesNotContain("secret"));
+    }
+
+    @Test
+    void aTvThatNeverFinishesTheHandshakeFailsWithoutTheQuery() throws IOException {
+        try (ServerSocket silent = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            URI uri = URI.create("ws://127.0.0.1:" + silent.getLocalPort() + "/api/v2?token=secret");
+
+            assertThatThrownBy(() -> TextWebSocket.connect(http, uri, Duration.ofMillis(200), listener))
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining("ws://127.0.0.1:" + silent.getLocalPort() + "/api/v2")
+                    .satisfies(e -> assertThat(e.getMessage()).doesNotContain("secret"));
+        }
+        assertThat(closes).isEmpty();
+    }
+
+    @Test
+    void anInterruptedOpeningGivesUpAndKeepsTheInterrupt() throws IOException {
+        try (ServerSocket silent = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            URI uri = URI.create("ws://127.0.0.1:" + silent.getLocalPort() + "/");
+            Thread.currentThread().interrupt();
+            try {
+                assertThatThrownBy(() -> TextWebSocket.connect(http, uri, Duration.ofSeconds(2), listener))
+                        .isInstanceOf(IOException.class)
+                        .hasMessageStartingWith("Interrupted while opening");
+                assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            } finally {
+                Thread.interrupted();
+            }
+        }
+    }
+
+    @Test
+    void binaryFramesAreSkippedAndTheNextTextStillArrives() throws Exception {
+        server.close();
+        server = FakeWebSocketServer.plain((connection, text) -> {
+            connection.sendFrame(0x2, new byte[]{1, 2, 3});
+            connection.send(text);
+        });
+        try (TextWebSocket socket = connect()) {
+            socket.send("after the binary frame");
+
+            assertThat(texts.poll(5, TimeUnit.SECONDS)).isEqualTo("after the binary frame");
+            assertThat(socket.isOpen()).isTrue();
+        }
+    }
+
+    @Test
+    void aCloseFromTheTvNamesItsCodeAndReason() throws Exception {
+        server.close();
+        server = FakeWebSocketServer.plain((connection, text) -> connection.sendFrame(0x8,
+                new byte[]{0x0F, (byte) 0xA0, 'b', 'y', 'e'}));
+        try (TextWebSocket socket = connect()) {
+            socket.send("hang up");
+
+            assertThat(closes.poll(5, TimeUnit.SECONDS)).isEqualTo("closed by the device (4000, bye)");
+            assertThat(socket.isOpen()).isFalse();
+        }
+    }
+
+    @Test
+    void aCloseWithoutAReasonNamesOnlyItsCode() throws Exception {
+        server.close();
+        server = FakeWebSocketServer.plain((connection, text) -> connection.closeNormally());
+        try (TextWebSocket socket = connect()) {
+            socket.send("hang up");
+
+            assertThat(closes.poll(5, TimeUnit.SECONDS)).isEqualTo("closed by the device (1000)");
+        }
+    }
+
+    @Test
+    void aSendTheTvStopsReadingTimesOutAndLosesTheConnection() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        server.close();
+        // The fake reads frames on the thread that runs the handler: holding it fills the socket buffers.
+        server = FakeWebSocketServer.plain((connection, text) -> awaitQuietly(release));
+        try (TextWebSocket socket = TextWebSocket.connect(http, URI.create(server.url("/")),
+                Duration.ofMillis(300), listener)) {
+            String chunk = "x".repeat(TextWebSocket.MAX_MESSAGE_CHARS);
+            IOException failure = null;
+            for (int i = 0; i < 128 && failure == null; i++) {
+                try {
+                    socket.send(chunk);
+                } catch (IOException e) {
+                    failure = e;
+                }
+            }
+
+            assertThat(failure).isNotNull().hasMessage("Sending timed out");
+            assertThat(closes.poll(5, TimeUnit.SECONDS)).isEqualTo("Sending timed out");
+            assertThat(socket.isOpen()).isFalse();
+            assertThatThrownBy(() -> socket.send("late")).hasMessage("The connection is closed");
+            assertThat(closes.poll(200, TimeUnit.MILLISECONDS)).isNull();
+        } finally {
+            release.countDown();
+        }
+    }
+
+    @Test
+    void theQueryIsLeftOutOfAnAddressWithoutAPort() {
+        assertThat(TextWebSocket.withoutQuery(URI.create("wss://tv.local/api/v2/channels/samsung.remote.control?token=1")))
+                .isEqualTo("wss://tv.local/api/v2/channels/samsung.remote.control");
+        assertThat(TextWebSocket.withoutQuery(URI.create("ws://10.0.0.5:3000?token=1")))
+                .isEqualTo("ws://10.0.0.5:3000");
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(30, TimeUnit.SECONDS);
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

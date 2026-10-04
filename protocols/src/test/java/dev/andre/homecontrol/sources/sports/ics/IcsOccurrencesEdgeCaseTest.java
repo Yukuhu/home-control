@@ -134,4 +134,23 @@ class IcsOccurrencesEdgeCaseTest {
                 tuple("Series", Instant.parse("2026-09-20T10:00:00Z")),
                 tuple("Moved", Instant.parse("2026-09-20T15:00:00Z")));
     }
+
+    @Test
+    void anUntilWithoutAZoneIsReadInTheEventsOwnTime() {
+        List<Instant> starts = expand("BEGIN:VEVENT", "UID:local-until@x", "SUMMARY:Local",
+                "DTSTART;TZID=Europe/Berlin:20260920T150000", "RRULE:FREQ=DAILY;UNTIL=20260922T150000", "END:VEVENT")
+                .occurrences().stream().map(IcsOccurrence::startsAt).sorted().toList();
+
+        assertThat(starts).containsExactly(Instant.parse("2026-09-20T13:00:00Z"),
+                Instant.parse("2026-09-21T13:00:00Z"), Instant.parse("2026-09-22T13:00:00Z"));
+    }
+
+    @Test
+    void aWeekdaySeriesThatWouldStepPastItsLimitStops() {
+        // Seven steps a week since 1800: the series' own step limit runs out long before the window.
+        IcsOccurrences.Result result = expand("BEGIN:VEVENT", "UID:every-day@x", "SUMMARY:Every day",
+                "DTSTART:18000106T120000Z", "RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR,SA,SU", "END:VEVENT");
+
+        assertThat(result.occurrences()).isEmpty();
+    }
 }

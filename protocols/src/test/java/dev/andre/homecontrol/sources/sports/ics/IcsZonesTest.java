@@ -49,4 +49,11 @@ class IcsZonesTest {
         assertThat(IcsZones.resolve("")).isEmpty();
         assertThat(IcsZones.resolve(null)).isEmpty();
     }
+
+    @Test
+    void quotesAroundAnIdAreDroppedButALoneQuoteIsNoZone() {
+        assertThat(IcsZones.resolve(" \"Europe/Berlin\" ")).contains(ZoneId.of("Europe/Berlin"));
+        assertThat(IcsZones.resolve("\"\"")).isEmpty();
+        assertThat(IcsZones.resolve("\"")).isEmpty();
+    }
 }

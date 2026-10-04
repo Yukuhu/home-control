@@ -70,4 +70,31 @@ class DeviceDescriptionsTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining(location.toString());
     }
+
+    @Test
+    void aServiceUrlThatIsNoUriOrMissingIsLeftEmpty() {
+        byte[] xml = ("<root><device><friendlyName> </friendlyName></device><serviceList><service>"
+                + "<serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>"
+                + "<controlURL>/control path with spaces</controlURL><SCPDURL></SCPDURL>"
+                + "</service></serviceList></root>").getBytes(StandardCharsets.UTF_8);
+
+        DeviceDescription description = DeviceDescriptions.parse(xml, URI.create("http://10.0.0.1:1400/d.xml"));
+
+        assertThat(description.friendlyName()).isNull();
+        DeviceDescription.Service service = description.services().getFirst();
+        assertThat(service.controlUrl()).isNull();
+        assertThat(service.eventSubUrl()).isNull();
+        assertThat(service.scpdUrl()).isNull();
+    }
+
+    @Test
+    void aUrlBaseReplacesTheLocationForRelativeUrls() {
+        byte[] xml = ("<root><URLBase>http://10.0.0.2:8080/</URLBase><device><friendlyName>Box</friendlyName></device>"
+                + "<serviceList><service><controlURL>ctl</controlURL></service></serviceList></root>")
+                .getBytes(StandardCharsets.UTF_8);
+
+        DeviceDescription description = DeviceDescriptions.parse(xml, URI.create("http://10.0.0.1:1400/d.xml"));
+
+        assertThat(description.services().getFirst().controlUrl()).isEqualTo(URI.create("http://10.0.0.2:8080/ctl"));
+    }
 }
