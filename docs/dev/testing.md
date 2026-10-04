@@ -114,42 +114,62 @@ their SHA-256 checksums. Run `scripts/gradle.sh build` again without the generat
 
 ### Dependabot updates
 
-Dependabot does not update Gradle verification metadata
-([upstream request](https://github.com/dependabot/dependabot-core/issues/1996)). A dependency update therefore
-needs a maintainer to review and commit its new checksums before strict CI can pass.
+Dependabot updates the Gradle version catalog. CI completes verification metadata automatically on the same
+pull request, using two jobs in `.github/workflows/ci.yml`:
 
-CI's `Verify dependency checksums` job resolves all dependency configurations, and the formatter Spotless fetches when
-`spotlessJava` runs, before the jar, unit tests, source image and browser jobs start. It checks out the same merge
-revision those builds test. For Dependabot, it downloads into a fresh cache and, if verification fails, generates
-candidate metadata and uploads a patch and the head SHA as an artifact. It then reports that checksum review is
-required; the dependent builds stay skipped and `CI passed` stays blocked. There is one CI workflow, and candidate
-preparation does not run the test suite.
+1. `Verify dependency checksums` checks committed metadata strictly. When a Dependabot update needs new hashes,
+   it generates candidate metadata in an isolated cache, uploads it with the PR/head/base/merge identities, and
+   lets only the update job proceed. Application builds wait.
+2. `Update dependency checksums` runs trusted helpers from the base commit on a fresh runner. It checks each
+   new artifact against a fresh Maven Central download, falling back to the Gradle Plugin Portal only on 404.
+   POM-advertised Gradle module metadata is included even when generation omits it. Existing hashes and verification settings cannot change. Protobuf updates include all published protoc
+   platforms. Metadata already verified on the base is retained.
+3. The job commits only `gradle/verification-metadata.xml` to the existing PR branch using the checksum App.
+   Its push starts a new CI run, which verifies the committed metadata strictly before running the normal tests.
 
-This job has a read-only token, saves no dependency cache, and does not commit or approve the checksums.
-Other Gradle failures remain failures and do not trigger checksum generation. When the committed metadata
-passes verification, the usual builds and tests run with strict verification.
+The preparation runner has no publishing credential. The update runner never runs dependency code, Gradle, or
+scripts from the PR. Only same-repository Dependabot PRs changing `gradle/libs.versions.toml` and optionally
+verification metadata qualify for automatic writes. There is no separate checksum workflow or PR.
 
-The patch is based on the PR head, so it also works for branches opened before the checksum gate was added.
-It includes metadata already reviewed on `main` where necessary. `head-sha.txt` records the patch baseline;
-`tested-sha.txt` records the merge revision whose dependencies were resolved.
+Generated commits include `[dependabot skip]` so Dependabot can replace them during a rebase. A stale head is
+never overwritten; a later run handles the updated PR. Repeating an already verified run makes no commit.
+A repeated missing-checksum failure immediately after the App updated the same base/catalog fails visibly
+instead of making an endless sequence of commits. Only verified committed metadata can make `CI passed` green.
 
-To complete an update:
+#### One-time App setup
 
-1. Check out the Dependabot PR with `gh pr checkout <number>` and download the matching workflow artifact
-   with `gh run download <run-id> --name dependency-checksums-<number>-<head-sha> --dir /tmp/checksum-review`.
-2. Confirm `git rev-parse HEAD` matches the artifact's `head-sha.txt`. If Dependabot rebased the PR, use the
-   new run instead. Read `verification-metadata.patch` and compare every new checksum with fresh Maven
-   Central or Gradle Plugin Portal artifacts, or confirm an inherited checksum is already reviewed on `main`.
-   Investigate any added checksum for an already trusted artifact.
-3. After review, run `git apply --check /tmp/checksum-review/verification-metadata.patch`, then
-   `git apply /tmp/checksum-review/verification-metadata.patch`. For protobuf updates, add the other
-   published `protoc` platform checksums as described above.
-4. Run `scripts/gradle.sh build` without the generation flag, commit only the reviewed metadata, and push
-   the commit to the dependency PR. The normal CI run now verifies it and must pass before merging.
+Install the private `yukuhu-home-control-checksums` GitHub App on this repository with **Contents: read and write**
+and **Pull requests: read-only**. It needs no webhook, OAuth callback, or main-branch rules bypass.
 
-You can also generate the candidate locally with the command above. Never add the generation flag to the
-build and test jobs or automatically commit the preparation job's downloads: neither would verify newly fetched bytes
-against a previously reviewed value.
+- Repository variable: `CHECKSUM_APP_CLIENT_ID` (the App's client ID).
+- Actions secret: `CHECKSUM_APP_PRIVATE_KEY` (the complete downloaded PEM private key).
+- Dependabot secret: `CHECKSUM_APP_PRIVATE_KEY` (the same key).
+
+Dependabot-triggered runs use Dependabot secrets; App-triggered and maintainer runs use Actions secrets.
+The pinned `actions/create-github-app-token` action creates a short-lived repository-scoped token only after
+candidate validation. Publishing authenticates normal git commands through `gh auth setup-git`.
+
+The workflow and its base-branch helpers must be deployed together. Update an older open dependency PR with
+that base, using `gh pr update-branch <number>`; rerunning a historical workflow run uses the historical code.
+
+#### Troubleshooting and local checks
+
+Read the failing job's log for the rejected artifact or credential error. The candidate artifact and the
+verified report identify the exact PR revision. A checksum mismatch for an already trusted artifact is never
+accepted automatically. The trust policy is documented in [ADR 0008](../adr/0008-automatic-dependency-checksums.md).
+
+Run the tooling tests with:
+
+```bash
+python3 -m unittest discover -s scripts/dependency-checksums -p 'test_*.py' -v
+scripts/gradle.sh test --tests 'dev.andre.homecontrol.deployment.DependencyVerificationWorkflowTest'
+npm ci --prefix scripts/pr-summary
+npm test --prefix scripts/pr-summary
+```
+
+For a dependency update outside the supported automatic scope, use the manual checksum-generation and review
+commands above, then run `scripts/gradle.sh build` without generation enabled. Keep generation out of build and
+test jobs: only verification against committed metadata may unblock them.
 
 ## Fakes and fixtures
 

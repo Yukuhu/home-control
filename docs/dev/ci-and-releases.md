@@ -10,7 +10,8 @@ What runs on every push and pull request, and how releases are made.
 | --- | --- |
 | Find out what changed | Decides with `scripts/code-changed.sh` whether a pull request changes anything besides documentation; if it does not, the jobs that build and test are left out. A push to `main` runs them all. |
 | Check commit messages | On a pull request, checks with `scripts/check-commits.sh` that every commit message follows Conventional Commits, from which releases and the changelog are made. |
-| Verify dependency checksums | Resolves all dependency configurations, and the formatter Spotless fetches, before the builds and browser tests. For an unreviewed Dependabot update, uploads a checksum review patch and blocks the builds until reviewed metadata is committed. |
+| Verify dependency checksums | Resolves all dependency configurations, and the formatter Spotless fetches, before the builds and browser tests. For a Dependabot update needing metadata, prepares a candidate and waits for an automatic commit and strict rerun. |
+| Update dependency checksums | Independently verifies new hashes on a fresh runner, commits metadata to the existing Dependabot PR, and triggers strict CI on that commit. |
 | Build the jar | Builds the one jar of the run and works out its version; every image that is tested or published is built from it. |
 | Build and test | Runs `./gradlew build` with every module's tests and uploads their results and reports, with one coverage report for all modules. |
 | Build the self-contained image | Builds `Dockerfile` from source, as `docker compose up --build` does, without pushing it. |
@@ -27,11 +28,12 @@ What runs on every push and pull request, and how releases are made.
 | Release the Bluetooth image | After the release, publishes and attests the tested `-bluetooth` images, if they passed their smoke tests. |
 | CI passed | The one check `main` requires: it passes only if every job it needs passed or was left out on purpose. |
 
-The checksum gate in CI prepares a review artifact for Dependabot's Gradle updates. It uses a fresh cache
-and read-only permissions; candidate preparation resolves artifacts without running builds or tests. The
-jar, unit tests, source image and browser jobs wait for verification to pass. A maintainer must review and
-commit new checksums before those jobs start and `CI passed` can pass. See
-[Dependabot updates](testing.md#dependabot-updates) for the review and commit steps.
+The checksum gate prepares candidates for Dependabot's Gradle updates in a read-only job with an isolated
+cache. A separate job in the same workflow validates the new hashes against canonical repository downloads
+and commits metadata to the original dependency branch with a GitHub App token. That push starts a new run;
+only strict verification of committed metadata unblocks builds and `CI passed`. Stale runs do not overwrite
+the branch or its current PR summary. See [Dependabot updates](testing.md#dependabot-updates) for setup and
+troubleshooting, and [ADR 0008](../adr/0008-automatic-dependency-checksums.md) for the trust policy.
 
 ## CI quality gate
 
