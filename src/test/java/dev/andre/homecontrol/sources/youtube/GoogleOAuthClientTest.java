@@ -207,4 +207,126 @@ class GoogleOAuthClientTest {
                 .doesNotContain("1//0gFixtureRefreshTokenGranted-0001");
         assertThat(granted.accessToken().toString()).doesNotContain("ya29.a0AfB_byFixtureAccessTokenGranted0001");
     }
+
+    @Test
+    void aDeviceCodeAnswerWithoutTheCodesIsABadResponse() throws IOException {
+        start();
+        fake.respond("POST", "/oauth/device/code", FakeGoogleServer.Canned.json(200, "{\"device_code\":\"dc\"}"));
+
+        assertThatThrownBy(() -> client.requestDeviceCode("cid"))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("Google did not return a device code")
+                .extracting(e -> ((YouTubeException) e).kind())
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
+    }
+
+    @Test
+    void aDeviceCodeWithoutAVerificationUrlUsesGooglesDevicePage() throws IOException {
+        start();
+        fake.respond("POST", "/oauth/device/code", FakeGoogleServer.Canned.json(200,
+                "{\"device_code\":\"dc\",\"user_code\":\"ABCD-EFGH\"}"));
+
+        GoogleOAuthClient.DeviceCode code = client.requestDeviceCode("cid");
+
+        assertThat(code.verificationUrl()).isEqualTo(GoogleOAuthClient.DEFAULT_VERIFICATION_URL);
+        assertThat(code.expiresAt()).isEqualTo(Instant.parse("2026-09-16T10:30:00Z"));
+        assertThat(code.interval()).isEqualTo(Duration.ofSeconds(5));
+    }
+
+    @Test
+    void aPollAnsweredWithoutAnErrorCodeNamesTheStatus() throws IOException {
+        start();
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.json(502, "<html>Bad gateway</html>"),
+                FakeGoogleServer.Canned.json(400, "{}"));
+
+        assertThatThrownBy(() -> client.poll("cid", "csecret", "dc"))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("Google answered HTTP 502")
+                .extracting(e -> ((YouTubeException) e).kind())
+                .isEqualTo(ContentSourceException.Kind.SERVER_ERROR);
+        assertThatThrownBy(() -> client.poll("cid", "csecret", "dc"))
+                .hasMessage("Google answered HTTP 400")
+                .extracting(e -> ((YouTubeException) e).kind())
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
+    }
+
+    @Test
+    void aRejectedClientEndsThePollWithoutEchoingGoogle() throws IOException {
+        start();
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.json(401,
+                "{\"error\":\"invalid_client\",\"error_description\":\"The OAuth client was not found.\"}"));
+
+        assertThatThrownBy(() -> client.poll("cid", "csecret", "dc"))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("Google rejected the client ID or client secret.")
+                .extracting(e -> ((YouTubeException) e).kind())
+                .isEqualTo(ContentSourceException.Kind.UNAUTHORIZED);
+    }
+
+    @Test
+    void aRefreshRefusedForAnotherReasonNamesTheError() throws IOException {
+        start();
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.json(400, "{\"error\":\"unsupported_grant_type\"}"),
+                FakeGoogleServer.Canned.json(503, "unavailable"));
+
+        assertThatThrownBy(() -> client.refresh("cid", "csecret", "rt"))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("Google refused the request (unsupported_grant_type)")
+                .extracting(e -> ((YouTubeException) e).kind())
+                .isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
+        assertThatThrownBy(() -> client.refresh("cid", "csecret", "rt"))
+                .hasMessage("Google answered HTTP 503")
+                .extracting(e -> ((YouTubeException) e).kind())
+                .isEqualTo(ContentSourceException.Kind.SERVER_ERROR);
+    }
+
+    @Test
+    void aBrowserCodeExchangeNeedsTheReadOnlyScopeAndARefreshToken() throws IOException {
+        start();
+        URI callback = URI.create("https://home.example.com/setup/sources/youtube/callback");
+        fake.respond("POST", "/oauth/token",
+                FakeGoogleServer.Canned.json(200, "{\"access_token\":\"at\",\"refresh_token\":\"rt\","
+                        + "\"scope\":\"openid " + GoogleOAuthClient.SCOPE + "\"}"),
+                FakeGoogleServer.Canned.json(200, "{\"access_token\":\"at\",\"refresh_token\":\"rt\","
+                        + "\"scope\":\"openid email\"}"),
+                FakeGoogleServer.Canned.json(200, "{\"access_token\":\"at\"}"));
+
+        GoogleOAuthClient.TokenPoll.Granted granted = client.exchangeCode("cid", "csecret", "code", callback, "verifier");
+        assertThat(granted.refreshToken()).isEqualTo("rt");
+        assertThat(granted.accessToken().value()).isEqualTo("at");
+        assertThat(granted.accessToken().expiresAt()).isEqualTo(Instant.parse("2026-09-16T11:00:00Z"));
+        assertThat(fake.requests("/oauth/token").getFirst().body())
+                .contains("grant_type=authorization_code", "code_verifier=verifier",
+                        "redirect_uri=https%3A%2F%2Fhome.example.com%2Fsetup%2Fsources%2Fyoutube%2Fcallback");
+
+        assertThatThrownBy(() -> client.exchangeCode("cid", "csecret", "code", callback, "verifier"))
+                .hasMessageContaining("YouTube read-only access was not granted")
+                .extracting(e -> ((YouTubeException) e).kind())
+                .isEqualTo(ContentSourceException.Kind.UNAUTHORIZED);
+        assertThatThrownBy(() -> client.exchangeCode("cid", "csecret", "code", callback, "verifier"))
+                .hasMessageContaining("Google did not return offline access");
+    }
+
+    @Test
+    void aGrantWithoutAnAccessTokenIsABadResponse() throws IOException {
+        start();
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.json(200, "{\"refresh_token\":\"rt\"}"));
+
+        assertThatThrownBy(() -> client.poll("cid", "csecret", "dc"))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("Google did not return an access token");
+    }
+
+    @Test
+    void theBrowserConsentPageAsksForOfflineReadOnlyAccessWithPkce() throws IOException {
+        start();
+
+        URI url = client.authorizationUrl("cid", URI.create("https://home.example.com/cb"), "the-state", "the-challenge");
+
+        assertThat(url.getHost()).isEqualTo("accounts.google.com");
+        assertThat(url.getPath()).isEqualTo("/o/oauth2/v2/auth");
+        assertThat(url.getQuery()).contains("client_id=cid", "redirect_uri=https://home.example.com/cb",
+                "response_type=code", "access_type=offline", "state=the-state", "code_challenge=the-challenge",
+                "code_challenge_method=S256", "scope=" + GoogleOAuthClient.SCOPE);
+    }
 }

@@ -19,8 +19,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
@@ -186,5 +188,110 @@ class YouTubeSetupControllerTest extends WebSliceTest {
         mockMvc.perform(post("/setup/sources/youtube/lounge").param("device", "living").param("enabled", "true"))
                 .andExpect(redirectedUrl("/setup#youtube"))
                 .andExpect(flash().attribute("youtubeError", "Only Cast devices can use YouTube Cast"));
+    }
+
+    @Test
+    void aFailedBrowserConnectKeepsOnlyTheClientIdAndIsNeverCached() throws Exception {
+        willThrow(new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Google browser sign-in needs an HTTPS domain"))
+                .given(youTubeSetup).connectBrowser(any(), any(), any());
+
+        FlashMap flashMap = mockMvc.perform(post("/setup/sources/youtube/browser/connect")
+                        .param("clientId", "web-client.apps.googleusercontent.com")
+                        .param("clientSecret", "secret-value"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/setup#youtube"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("Referrer-Policy", "no-referrer"))
+                .andExpect(flash().attribute("youtubeError", "Google browser sign-in needs an HTTPS domain"))
+                .andReturn().getFlashMap();
+
+        assertThat(flashMap.get("youtubeForm")).isEqualTo(Map.of("clientId", "web-client.apps.googleusercontent.com"));
+    }
+
+    @Test
+    void aFailedConnectWithoutAClientIdKeepsAnEmptyOne() throws Exception {
+        willThrow(new PasswordRejectedException("The two passwords do not match"))
+                .given(youTubeSetup).connectBrowser(any(), any(), any());
+        mockMvc.perform(post("/setup/sources/youtube/browser/connect"))
+                .andExpect(flash().attribute("youtubeError", "The two passwords do not match"))
+                .andExpect(flash().attribute("youtubeForm", Map.of("clientId", "")));
+
+        willThrow(new LoginRequiredException()).given(youTubeSetup).connect(any(), any());
+        mockMvc.perform(post("/setup/sources/youtube/connect"))
+                .andExpect(flash().attribute("youtubeError", "Log in first"))
+                .andExpect(flash().attribute("youtubeForm", Map.of("clientId", "")));
+    }
+
+    @Test
+    void aBrowserConnectLoggedOutShowsWhy() throws Exception {
+        willThrow(new LoginRequiredException()).given(youTubeSetup).connectBrowser(any(), any(), any());
+
+        mockMvc.perform(post("/setup/sources/youtube/browser/connect").param("clientId", "x"))
+                .andExpect(redirectedUrl("/setup#youtube"))
+                .andExpect(flash().attribute("youtubeError", "Log in first"));
+    }
+
+    @Test
+    void aFailedBrowserAuthorizationIsShownAndNeverCached() throws Exception {
+        willThrow(new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Connect a client first"))
+                .given(youTubeSetup).authorizeBrowser(any(), any());
+
+        mockMvc.perform(post("/setup/sources/youtube/browser/authorize"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/setup#youtube"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("Referrer-Policy", "no-referrer"))
+                .andExpect(flash().attribute("youtubeError", "Connect a client first"));
+    }
+
+    @Test
+    void aHeadRequestToTheCallbackNeverUsesTheGrant() throws Exception {
+        mockMvc.perform(head("/setup/sources/youtube/callback").param("state", "s").param("code", "c"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/setup#youtube"))
+                .andExpect(header().string("Cache-Control", "no-store"));
+
+        verify(youTubeSetup, never()).completeBrowser(any(), any(), any(), any());
+    }
+
+    @Test
+    void aCallbackThatDidNotConnectIsShownAsAnError() throws Exception {
+        given(youTubeSetup.completeBrowser(any(), any(), any(), any())).willReturn(new YouTubeAuthorizationService.Status(
+                YouTubeAuthorizationService.State.FAILED, null, null, null, "Google sign-in was cancelled"));
+
+        mockMvc.perform(get("/setup/sources/youtube/callback").param("state", "s").param("error", "access_denied"))
+                .andExpect(redirectedUrl("/setup#youtube"))
+                .andExpect(flash().attribute("youtubeError", "Google sign-in was cancelled"));
+    }
+
+    @Test
+    void failuresOfTheOtherActionsAreShown() throws Exception {
+        willThrow(new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Could not cancel"))
+                .given(youTubeSetup).cancel();
+        mockMvc.perform(post("/setup/sources/youtube/cancel"))
+                .andExpect(flash().attribute("youtubeError", "Could not cancel"));
+
+        given(youTubeSetup.check()).willThrow(new YouTubeException(ContentSourceException.Kind.UNAUTHORIZED,
+                "Google refused the saved authorization"));
+        mockMvc.perform(post("/setup/sources/youtube/test"))
+                .andExpect(flash().attribute("youtubeError", "Google refused the saved authorization"));
+
+        willThrow(new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Could not reach Google"))
+                .given(youTubeSetup).disconnect();
+        mockMvc.perform(post("/setup/sources/youtube/disconnect"))
+                .andExpect(flash().attribute("youtubeError", "Could not reach Google"));
+
+        given(youTubeSetup.loadPlaylists()).willThrow(new YouTubeException(ContentSourceException.Kind.RATE_LIMITED,
+                "The YouTube quota for today is used up"));
+        mockMvc.perform(post("/setup/sources/youtube/playlists/load"))
+                .andExpect(flash().attribute("youtubeError", "The YouTube quota for today is used up"));
+
+        mockMvc.perform(post("/setup/sources/youtube/watch-later").param("enabled", "false"))
+                .andExpect(flash().attribute("youtubeMessage", "Watch Later hidden"));
+        willThrow(new YouTubeException(ContentSourceException.Kind.INVALID_INPUT, "Connect YouTube first"))
+                .given(youTubeSetup).setWatchLater(true);
+        mockMvc.perform(post("/setup/sources/youtube/watch-later").param("enabled", "true"))
+                .andExpect(redirectedUrl("/setup#youtube"))
+                .andExpect(flash().attribute("youtubeError", "Connect YouTube first"));
     }
 }

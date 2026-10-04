@@ -156,4 +156,46 @@ class YouTubePlaylistsTest {
         assertThat(fake.requests("/youtube/v3/playlistItems").stream().filter(r -> other.equals(r.query().get("playlistId"))))
                 .hasSize(2);
     }
+
+    @Test
+    void playlistsWithAMalformedIdAreLeftOut() {
+        fake.respond("GET", "/youtube/v3/playlists", FakeGoogleServer.Canned.json(200, """
+                {"items":[
+                  {"id":"PL../../etc","snippet":{"title":"Odd"},"contentDetails":{"itemCount":1}},
+                  {"id":"","snippet":{"title":"Empty"}},
+                  {"id":"PLgood_id-1","contentDetails":{"itemCount":3}}
+                ]}
+                """));
+
+        assertThat(playlists.mine()).containsExactly(new YouTubePlaylists.PlaylistSummary("PLgood_id-1", "PLgood_id-1", 3));
+        assertThat(playlists.loadedList()).hasSize(1);
+    }
+
+    @Test
+    void aWatchLaterFailureOtherThanNotFoundIsReportedAndNotRemembered() {
+        fake.respond("GET", "/youtube/v3/playlistItems", FakeGoogleServer.Canned.json(500, "{}"),
+                FakeGoogleServer.Canned.fixture(200, "playlist-items-playlist.json"));
+
+        assertThatThrownBy(playlists::watchLater)
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("YouTube is having problems (HTTP 500)");
+        assertThat(playlists.watchLater()).as("asked again at once").extracting(YouTubeVideo::id)
+                .containsExactly("Wq9Ze2Lr5tA", "Kz1aT5nM3pQ");
+    }
+
+    @Test
+    void clearingForgetsLoadedPlaylistsMemosAndAnUnavailableWatchLater() {
+        playlists.mine();
+        playlists.items(EVENING);
+        assertThatThrownBy(playlists::watchLater).isInstanceOf(ContentSourceException.class);
+
+        playlists.clear();
+
+        assertThat(playlists.loadedList()).isEmpty();
+        fake.respond("GET", "/youtube/v3/playlistItems", FakeGoogleServer.Canned.fixture(200, "playlist-items-playlist.json"));
+        assertThat(playlists.watchLater()).hasSize(2);
+        playlists.items(EVENING);
+        assertThat(fake.requests("/youtube/v3/playlistItems").stream()
+                .filter(r -> EVENING.equals(r.query().get("playlistId")))).hasSize(2);
+    }
 }

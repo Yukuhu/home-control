@@ -21,6 +21,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,6 +35,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doAnswer;
 
 class YouTubeAuthorizationServiceTest {
 
@@ -375,5 +378,182 @@ class YouTubeAuthorizationServiceTest {
 
         assertThat(fake.count("/oauth/device/code")).isEqualTo(2);
         assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.PENDING);
+    }
+
+    @Test
+    void startWithAClientIdButNoSecretIsRefusedBeforeAskingGoogle() {
+        given(secrets.secret(YouTubeSettings.CLIENT_SECRET)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authorization.start()).hasMessage("Save the OAuth client ID and secret first");
+        assertThat(fake.count("/oauth/device/code")).isZero();
+    }
+
+    @Test
+    void aGoogleServerErrorKeepsPolling() {
+        YouTubeAuthorizationService failing = withPoll(service -> {
+            throw new YouTubeException(ContentSourceException.Kind.SERVER_ERROR, "Google answered HTTP 503");
+        });
+        failing.start();
+
+        clock.advance(Duration.ofSeconds(5));
+
+        assertThat(failing.pollOnce()).isTrue();
+        assertThat(failing.status().state()).isEqualTo(YouTubeAuthorizationService.State.PENDING);
+        assertThat(failing.status().userCode()).isEqualTo("GQVQ-JKEC");
+        assertThat(failing.status().message()).isEqualTo("Could not reach Google; still trying");
+    }
+
+    @Test
+    void aPollGoogleRefusesEndsWithItsReason() {
+        YouTubeAuthorizationService refused = withPoll(service -> {
+            throw new YouTubeException(ContentSourceException.Kind.UNAUTHORIZED,
+                    "Google rejected the client ID or client secret.");
+        });
+        refused.start();
+
+        clock.advance(Duration.ofSeconds(5));
+
+        assertThat(refused.pollOnce()).isFalse();
+        assertThat(refused.status().state()).isEqualTo(YouTubeAuthorizationService.State.FAILED);
+        assertThat(refused.status().message()).isEqualTo("Google rejected the client ID or client secret.");
+        clock.advance(Duration.ofSeconds(5));
+        assertThat(refused.pollOnce()).as("nothing left to poll").isFalse();
+    }
+
+    @Test
+    void aFailedResultWithoutADescriptionNamesOnlyTheError() {
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.json(400, "{\"error\":\"invalid_scope\"}"));
+        authorization.start();
+
+        clock.advance(Duration.ofSeconds(5));
+        authorization.pollOnce();
+
+        assertThat(authorization.status().message()).isEqualTo("Google refused the authorization (invalid_scope)");
+    }
+
+    @Test
+    void aPollThatFailsAfterACancelLeavesTheCancel() {
+        YouTubeAuthorizationService cancelled = withPoll(service -> {
+            service.cancel();
+            throw new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Could not reach Google");
+        });
+        cancelled.start();
+
+        clock.advance(Duration.ofSeconds(5));
+
+        assertThat(cancelled.pollOnce()).isFalse();
+        assertThat(cancelled.status().state()).isEqualTo(YouTubeAuthorizationService.State.IDLE);
+        assertThat(cancelled.status().message()).isNull();
+    }
+
+    @Test
+    void aPollThatFailsAfterARestartKeepsTheNewCode() {
+        AtomicInteger polls = new AtomicInteger();
+        YouTubeAuthorizationService restarted = withPoll(service -> {
+            if (polls.incrementAndGet() == 1) {
+                service.start();
+            }
+            throw new YouTubeException(ContentSourceException.Kind.UNAUTHORIZED, "refused");
+        });
+        restarted.start();
+
+        clock.advance(Duration.ofSeconds(5));
+
+        assertThat(restarted.pollOnce()).as("the new code is still pending").isTrue();
+        assertThat(restarted.status().state()).isEqualTo(YouTubeAuthorizationService.State.PENDING);
+        assertThat(restarted.status().message()).isNull();
+        assertThat(fake.count("/oauth/device/code")).isEqualTo(2);
+    }
+
+    @Test
+    void anAnswerForACodeCancelledMeanwhileChangesNothing() {
+        YouTubeAuthorizationService cancelled = withPoll(service -> {
+            service.cancel();
+            return new GoogleOAuthClient.TokenPoll.Denied();
+        });
+        cancelled.start();
+
+        clock.advance(Duration.ofSeconds(5));
+
+        assertThat(cancelled.pollOnce()).isFalse();
+        assertThat(cancelled.status().state()).isEqualTo(YouTubeAuthorizationService.State.IDLE);
+    }
+
+    @Test
+    void anAnswerForAReplacedCodeKeepsTheNewCodePending() {
+        AtomicInteger polls = new AtomicInteger();
+        YouTubeAuthorizationService restarted = withPoll(service -> {
+            if (polls.incrementAndGet() == 1) {
+                service.start();
+            }
+            return new GoogleOAuthClient.TokenPoll.Denied();
+        });
+        restarted.start();
+
+        clock.advance(Duration.ofSeconds(5));
+
+        assertThat(restarted.pollOnce()).isTrue();
+        assertThat(restarted.status().state()).isEqualTo(YouTubeAuthorizationService.State.PENDING);
+    }
+
+    @Test
+    void aCancelWhileTheConnectHookRunsKeepsTheCancel() {
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
+        authorization.onConnected(authorization::cancel);
+        authorization.start();
+        clock.advance(Duration.ofSeconds(5));
+
+        authorization.pollOnce();
+
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.IDLE);
+        verify(secrets).putSecrets(any());
+    }
+
+    @Test
+    void aFailingConnectHookStillConnects() {
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
+        AtomicInteger laterHooks = new AtomicInteger();
+        authorization.onConnected(() -> {
+            throw new IllegalStateException("the channel lookup failed");
+        });
+        authorization.onConnected(laterHooks::incrementAndGet);
+        authorization.start();
+        clock.advance(Duration.ofSeconds(5));
+
+        authorization.pollOnce();
+
+        assertThat(laterHooks).hasValue(1);
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.CONNECTED);
+        assertThat(authorization.status().message()).isEqualTo("YouTube connected");
+    }
+
+    @Test
+    void backgroundPollingCarriesOnAfterAFailedTick() {
+        fake.respond("POST", "/oauth/token", FakeGoogleServer.Canned.fixture(200, "oauth-token-granted.json"));
+        // The first read is start()'s; the second, the first tick's, fails.
+        given(secrets.secret(YouTubeSettings.CLIENT_ID)).willReturn(Optional.of("cid"))
+                .willThrow(new IllegalStateException("the secrets file cannot be read"))
+                .willReturn(Optional.of("cid"));
+        GoogleOAuthClient oauth = new GoogleOAuthClient(new YouTubeHttp(fake.properties()),
+                URI.create(fake.base() + "/oauth"), clock);
+        try (YouTubeAuthorizationService background = new YouTubeAuthorizationService(oauth, secrets, tokens,
+                sourceSettings, clock, true)) {
+            background.start();
+            clock.advance(Duration.ofSeconds(5));
+
+            await().atMost(Duration.ofSeconds(10)).until(() ->
+                    background.status().state() == YouTubeAuthorizationService.State.CONNECTED);
+        }
+        assertThat(fake.count("/oauth/token")).isEqualTo(1);
+    }
+
+    /** A service whose token polls {@code poll} answers; it may call back into the service, as a racing request would. */
+    private YouTubeAuthorizationService withPoll(Function<YouTubeAuthorizationService, Object> poll) {
+        GoogleOAuthClient oauth = spy(new GoogleOAuthClient(new YouTubeHttp(fake.properties()),
+                URI.create(fake.base() + "/oauth"), clock));
+        AtomicReference<YouTubeAuthorizationService> service = new AtomicReference<>();
+        doAnswer(call -> poll.apply(service.get())).when(oauth).poll(any(), any(), any());
+        service.set(new YouTubeAuthorizationService(oauth, secrets, tokens, sourceSettings, clock, false));
+        return service.get();
     }
 }

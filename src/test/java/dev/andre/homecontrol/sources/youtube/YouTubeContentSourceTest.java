@@ -230,4 +230,44 @@ class YouTubeContentSourceTest {
         assertThat(items.getFirst().playables()).containsExactly(
                 new PlayableRef.AppLink(YouTubeVideo.watchUrl("aqz-KE-bpKQ"), "youtube"));
     }
+
+    @Test
+    void theWatchLaterRailExistsOnlyWhileItIsSwitchedOn() {
+        given(setup.connected()).willReturn(true);
+        given(setup.settings()).willReturn(settingsWith(false, Map.of()));
+        assertThatThrownBy(() -> source.rail("watch-later"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("YouTube has no rail watch-later");
+
+        given(setup.settings()).willReturn(settingsWith(true, Map.of()));
+        fake.playlist(YouTubePlaylists.WATCH_LATER_ID, "playlist-items-playlist.json");
+        Rail rail = source.rail("watch-later");
+
+        assertThat(rail.descriptor()).isEqualTo(new RailDescriptor("youtube", "watch-later", "Watch Later"));
+        assertThat(rail.items()).extracting(i -> i.id()).containsExactly("Wq9Ze2Lr5tA", "Kz1aT5nM3pQ");
+        assertThat(known.find("Kz1aT5nM3pQ")).isPresent();
+    }
+
+    @Test
+    void aPlaylistRailThatFailsForAnotherReasonPassesTheFailureOn() {
+        given(setup.connected()).willReturn(true);
+        given(setup.settings()).willReturn(settingsWith(false, Map.of(EVENING, "Watch this evening")));
+        fake.respond("GET", "/youtube/v3/playlistItems", FakeGoogleServer.Canned.json(503, "{}"));
+
+        var eveningRail = YouTubePlaylists.railId(EVENING);
+        assertThatThrownBy(() -> source.rail(eveningRail))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("YouTube is having problems (HTTP 503)");
+    }
+
+    @Test
+    void aVideoYouTubeCannotFindIsNoItemButOtherFailuresAreReported() {
+        fake.respond("GET", "/youtube/v3/videos", FakeGoogleServer.Canned.json(404, "{}"));
+        assertThat(source.item("Zz9Ze2Lr5tA")).isEmpty();
+
+        fake.respond("GET", "/youtube/v3/videos", FakeGoogleServer.Canned.fixture(403, "error-quota-exceeded.json"));
+        assertThatThrownBy(() -> source.item("Zz9Ze2Lr5tA"))
+                .isInstanceOf(YouTubeException.class)
+                .extracting(e -> ((YouTubeException) e).kind())
+                .isEqualTo(ContentSourceException.Kind.QUOTA_EXHAUSTED);
+    }
 }

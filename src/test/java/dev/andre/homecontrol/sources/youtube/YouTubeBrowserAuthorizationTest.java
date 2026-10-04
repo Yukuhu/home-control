@@ -30,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -257,5 +258,110 @@ class YouTubeBrowserAuthorizationTest {
 
         assertThat(result).isEqualTo(callback);
         assertThat(YouTubeOAuthCallback.supported(result)).isTrue();
+    }
+
+    @Test
+    void aBrowserSignInPastItsTimeShowsAsExpired() {
+        start();
+        clock.advance(Duration.ofMinutes(10));
+
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.EXPIRED);
+        assertThat(authorization.status().message()).isEqualTo("Sign-in expired. Start again.");
+    }
+
+    @Test
+    void aBrowserSignInNeedsTheClientIdAndSecret() {
+        secrets.removeSecrets(List.of(YouTubeSettings.CLIENT_SECRET));
+        assertThatThrownBy(() -> authorization.startBrowser(callback, "browser-session"))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("Save the OAuth client ID and secret first");
+
+        secrets.removeSecrets(List.of(YouTubeSettings.CLIENT_ID));
+        assertThatThrownBy(() -> authorization.startBrowser(callback, "browser-session"))
+                .hasMessage("Save the OAuth client ID and secret first");
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.IDLE);
+    }
+
+    @Test
+    void aCallbackFromAnotherBrowserOrWithoutItsStateIsRefusedAndLeavesTheSignIn() {
+        String refused = "This sign-in request is no longer valid. Start again from Setup in the same browser.";
+        assertThatThrownBy(() -> authorization.completeBrowser("browser-session", "state", "code", null))
+                .as("no sign-in was started").hasMessage(refused);
+        String state = start();
+
+        assertThatThrownBy(() -> authorization.completeBrowser(null, state, "code", null)).hasMessage(refused);
+        assertThatThrownBy(() -> authorization.completeBrowser("other-browser", state, "code", null)).hasMessage(refused);
+        assertThatThrownBy(() -> authorization.completeBrowser("browser-session", null, "code", null)).hasMessage(refused);
+        assertThatThrownBy(() -> authorization.completeBrowser("browser-session", state + "x", "code", null))
+                .hasMessage(refused);
+
+        assertThat(google.count("/oauth/token")).isZero();
+        authorization.completeBrowser("browser-session", state, "code", null);
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.CONNECTED);
+    }
+
+    @Test
+    void consentDeniedOnTheGooglePageEndsAsDenied() {
+        authorization.completeBrowser("browser-session", start(), null, "access_denied");
+
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.DENIED);
+        assertThat(authorization.status().message())
+                .isEqualTo("Access was denied on the Google page. Start again to retry.");
+        assertThat(google.count("/oauth/token")).isZero();
+    }
+
+    @Test
+    void anotherErrorFromTheGooglePageEndsAsFailed() {
+        authorization.completeBrowser("browser-session", start(), "code", "server_error");
+
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.FAILED);
+        assertThat(authorization.status().message())
+                .isEqualTo("Google could not complete sign-in. Check your OAuth client settings and try again.");
+        assertThat(google.count("/oauth/token")).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 4097})
+    void aBlankOrOverlongCodeFailsWithoutCallingGoogle(int length) {
+        authorization.completeBrowser("browser-session", start(), length == 0 ? " " : "c".repeat(length), null);
+
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.FAILED);
+        assertThat(authorization.status().message())
+                .isEqualTo("Google did not return an authorization code. Start again.");
+        assertThat(google.count("/oauth/token")).isZero();
+    }
+
+    @Test
+    void aClientRemovedDuringConsentFailsWithoutExchangingTheCode() {
+        String state = start();
+        secrets.removeSecrets(List.of(YouTubeSettings.CLIENT_SECRET));
+
+        authorization.completeBrowser("browser-session", state, "code", null);
+
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.FAILED);
+        assertThat(authorization.status().message())
+                .isEqualTo("The OAuth client was removed meanwhile. Save it again and start again.");
+        assertThat(google.count("/oauth/token")).isZero();
+    }
+
+    @Test
+    void anExchangeThatFailsAfterACancelLeavesTheCancel() throws Exception {
+        var release = new CountDownLatch(1);
+        google.holdWhen("POST", "/oauth/token", request -> true, release,
+                FakeGoogleServer.Canned.json(400, "{\"error\":\"invalid_grant\"}"));
+        String state = start();
+        var completing = CompletableFuture.runAsync(
+                () -> authorization.completeBrowser("browser-session", state, "code", null));
+        await().until(() -> google.count("/oauth/token") == 1);
+
+        try {
+            CompletableFuture.runAsync(authorization::cancel).get(2, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+        }
+
+        completing.get(5, TimeUnit.SECONDS);
+        assertThat(authorization.status().state()).isEqualTo(YouTubeAuthorizationService.State.IDLE);
+        assertThat(authorization.status().message()).isNull();
     }
 }

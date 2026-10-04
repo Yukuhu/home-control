@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -249,5 +250,74 @@ class YouTubeSearchTest {
 
         search.search("bunny", 10);
         assertThat(fake.requests("/youtube/v3/search")).hasSize(2);
+    }
+
+    @Test
+    void unescapesEveryNamedEntityAndLeavesImpossibleCharactersAlone() {
+        assertThat(YouTubeSearch.unescapeHtml("&lt;b&gt; &quot;x&quot; &apos;y&#39;")).isEqualTo("<b> \"x\" 'y'");
+        assertThat(YouTubeSearch.unescapeHtml("&#X41;&#x62;")).isEqualTo("Ab");
+        assertThat(YouTubeSearch.unescapeHtml("&#1114112; &#xFFFFFF;")).isEqualTo("&#1114112; &#xFFFFFF;");
+    }
+
+    @Test
+    void theCacheKeepsTheFiftyMostRecentQueries() {
+        QuotaLedger roomy = new QuotaLedger(tempDir.resolve("roomy-quota.json"), clock, 10000, 100);
+        GoogleTokens tokens = mock(GoogleTokens.class);
+        given(tokens.accessToken()).willReturn("ya29.t");
+        YouTubeSearch roomySearch = new YouTubeSearch(new YouTubeApiClient(new YouTubeHttp(fake.properties()),
+                URI.create(fake.base() + "/youtube/v3"), tokens, roomy), known, fake.properties(), clock);
+        for (int i = 0; i <= 50; i++) {
+            roomySearch.search("query " + i, 5);
+        }
+        assertThat(fake.requests("/youtube/v3/search")).hasSize(51);
+
+        roomySearch.search("query 50", 5);
+        assertThat(fake.requests("/youtube/v3/search")).as("still cached").hasSize(51);
+        roomySearch.search("query 0", 5);
+        assertThat(fake.requests("/youtube/v3/search")).as("the oldest was dropped").hasSize(52);
+    }
+
+    @Test
+    void concurrentIdenticalSearchesShareOneFailure() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger calls = new AtomicInteger();
+        YouTubeApiClient failing = new YouTubeApiClient(null, URI.create("http://unused"), null, null) {
+            @Override
+            public JsonNode get(QuotaLedger.Call call, String resource, Map<String, String> query) {
+                calls.incrementAndGet();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException _) {
+                    Thread.currentThread().interrupt();
+                }
+                throw new YouTubeException(ContentSourceException.Kind.SERVER_ERROR, "YouTube is having problems (HTTP 503)");
+            }
+        };
+        YouTubeSearch failingSearch = new YouTubeSearch(failing, known, fake.properties(), clock);
+        int callers = 3;
+        ExecutorService pool = Executors.newFixedThreadPool(callers);
+        List<Thread> callerThreads = new CopyOnWriteArrayList<>();
+        try {
+            List<Future<List<YouTubeVideo>>> futures = new ArrayList<>();
+            for (int i = 0; i < callers; i++) {
+                futures.add(pool.submit(() -> {
+                    callerThreads.add(Thread.currentThread());
+                    return failingSearch.search("bunny", 10);
+                }));
+            }
+            await().atMost(Duration.ofSeconds(5)).until(() -> callerThreads.size() == callers
+                    && callerThreads.stream().allMatch(YouTubeSearchTest::parkedInSearch));
+            release.countDown();
+
+            for (Future<List<YouTubeVideo>> future : futures) {
+                assertThatThrownBy(() -> future.get(5, TimeUnit.SECONDS))
+                        .isInstanceOf(ExecutionException.class)
+                        .cause().isInstanceOf(YouTubeException.class)
+                        .hasMessage("YouTube is having problems (HTTP 503)");
+            }
+            assertThat(calls.get()).isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+        }
     }
 }
