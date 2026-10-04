@@ -122,6 +122,18 @@ class VerificationTest(unittest.TestCase):
         with self.assertRaisesRegex(VerificationError, 'mismatch'):
             self.verify(candidate, FakeRepository({NEW: b'changed'}))
 
+    def test_pom_marker_completes_gradle_module_omitted_by_generation(self):
+        pom = ('org.junit', 'junit-bom', '5.14.4', 'junit-bom-5.14.4.pom')
+        module = pom[:3] + ('junit-bom-5.14.4.module',)
+        pom_bytes = b'<project><!-- do_not_remove: published-with-gradle-metadata --></project>'
+        candidate = metadata([(OLD, digest(b'old')), (pom, digest(pom_bytes))])
+        result = self.verify(candidate, FakeRepository({pom: pom_bytes, module: b'module bytes'}))
+        self.assertIn(b'junit-bom-5.14.4.module', result.xml)
+        self.assertIn(digest(b'module bytes').encode(), result.xml)
+        self.assertEqual(len(result.additions), 2)
+        with self.assertRaises(VerificationError):
+            self.verify(candidate, FakeRepository({pom: pom_bytes}))
+
     def test_protoc_completes_all_published_platforms(self):
         group = ('com.google.protobuf', 'protoc', '4.99.0')
         names = ['protoc-4.99.0-linux-x86_64.exe', 'protoc-4.99.0-osx-aarch_64.exe', 'protoc-4.99.0-windows-x86_64.exe']

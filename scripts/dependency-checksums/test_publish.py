@@ -86,6 +86,13 @@ class PublishTest(unittest.TestCase):
     def publish(self):
         return commit(self.args, self.api)
 
+    def test_cli_loads_only_trusted_helpers_in_isolated_python(self):
+        script = Path(__file__).with_name('publish.py').resolve()
+        (self.root / 'verify.py').write_text('raise RuntimeError("untrusted import")')
+        result = subprocess.run(['python3', '-I', str(script), '--help'], cwd=self.root, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('prepare', result.stdout)
+
     def test_publishes_one_metadata_commit_to_same_branch(self):
         self.assertEqual(self.prepare()['state'], 'ready')
         result = self.publish()

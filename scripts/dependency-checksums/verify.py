@@ -217,6 +217,7 @@ def verify_metadata(head_xml, base_xml, candidate_xml, repository):
             raise VerificationError(f'Trusted checksum removed or changed: {key[-1]}')
     accepted = dict(trusted)
     additions = []
+    module_companions = set()
     for key, attrs in candidate.items():
         if key in trusted:
             continue
@@ -224,6 +225,12 @@ def verify_metadata(head_xml, base_xml, candidate_xml, repository):
         if sha256(download.body) != attrs['value']:
             raise VerificationError(f'Checksum mismatch: {key[-1]}')
         accept(accepted, additions, key, download)
+        if key[3] == f'{key[1]}-{key[2]}.pom' and b'do_not_remove: published-with-gradle-metadata' in download.body:
+            module_companions.add(key[:3] + (f'{key[1]}-{key[2]}.module',))
+    # Gradle's generation can omit a module fetched while resolving an imported BOM.
+    for key in sorted(module_companions):
+        if key not in accepted:
+            accept(accepted, additions, key, repository.fetch(*key))
     new_protoc_versions = {key[2] for key in candidate if key[:2] == ('com.google.protobuf', 'protoc')
                           and not any(old[:3] == key[:3] for old in trusted)}
     for version in sorted(new_protoc_versions):

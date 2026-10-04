@@ -7,7 +7,10 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 
+# -I removes working-directory/PYTHONPATH imports; add only this trusted script directory.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from verify import MAX_XML, Repository, VerificationError, sha256, verify_metadata
 
 META = 'gradle/verification-metadata.xml'

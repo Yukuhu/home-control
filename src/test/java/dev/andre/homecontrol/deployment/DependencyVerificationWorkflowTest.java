@@ -15,17 +15,17 @@ class DependencyVerificationWorkflowTest {
     @Test
     void strictGradleJobsWaitForChecksumVerification() throws IOException {
         Map<String, Object> jobs = jobs();
-        for (String job : List.of("jar", "test", "image", "e2e-chromium", "e2e-firefox", "e2e-webkit")) {
+        for (String job : List.of("jar", "test", "image", "e2e-chromium", "e2e-firefox", "e2e-webkit", "dependencies")) {
             assertThat(needs(job(jobs, job))).as("%s waits for checksum verification", job).contains("checksums");
-            assertThat(job(jobs, job).get("if").toString()).doesNotContain("always()", "!cancelled()");
+            assertThat(job(jobs, job).get("if").toString()).contains("needs.checksums.outputs.state == 'verified'").doesNotContain("always()", "!cancelled()");
         }
     }
 
     @Test
     void checksumFailureBlocksTheRequiredGateAndAppearsInTheSummary() throws IOException {
         Map<String, Object> jobs = jobs();
-        assertThat(needs(job(jobs, "ci-passed"))).contains("checksums");
-        assertThat(needs(job(jobs, "pr-summary"))).contains("checksums");
+        assertThat(needs(job(jobs, "ci-passed"))).contains("checksums", "checksum-update");
+        assertThat(needs(job(jobs, "pr-summary"))).contains("checksums", "checksum-update");
         assertThat(job(jobs, "checksums")).doesNotContainEntry("continue-on-error", true);
     }
 
@@ -42,9 +42,39 @@ class DependencyVerificationWorkflowTest {
                 .filter(step -> step.getOrDefault("uses", null) instanceof String uses && uses.startsWith("actions/checkout@"))
                 .findFirst().orElseThrow();
         assertThat(((Map<?, ?>) checkout.get("with")).containsKey("ref")).isFalse();
-        var patch = steps.stream().map(step -> (Map<?, ?>) step)
-                .filter(step -> "patch".equals(step.get("id"))).findFirst().orElseThrow();
-        assertThat(patch.get("run").toString()).contains("git diff \"$DEPENDENCY_HEAD\" -- gradle/verification-metadata.xml");
+        assertThat(checksums.get("outputs")).isInstanceOf(Map.class);
+        Map<String, Object> publisher = job(jobs(), "checksum-update");
+        assertThat(needs(publisher)).contains("checksums");
+        assertThat(publisher.get("if").toString()).contains("needs.checksums.outputs.state == 'candidate'");
+        var publishingSteps = (List<?>) publisher.get("steps");
+        var trusted = publishingSteps.stream().map(step -> (Map<?, ?>) step)
+                .filter(step -> "trusted".equals(step.get("id"))).findFirst().orElseThrow();
+        assertThat(((Map<?, ?>) trusted.get("with")).get("ref").toString())
+                .isEqualTo("${{ github.event.pull_request.base.sha }}");
+        assertThat(checksums.toString()).doesNotContain("CHECKSUM_APP_PRIVATE_KEY", "create-github-app-token");
+        assertThat(publisher.get("permissions").toString()).doesNotContain("write");
+    }
+
+    @Test
+    void requiredGateOnlyPassesVerifiedCodeOrDocumentation() throws Exception {
+        var steps = (List<?>) job(jobs(), "ci-passed").get("steps");
+        String script = ((Map<?, ?>) steps.getLast()).get("run").toString();
+        for (String state : List.of("verified", "candidate", "")) {
+            for (String code : List.of("true", "false")) {
+                String needs = """
+                        {"changes":{"result":"success","outputs":{"code":"%s"}},
+                         "checksums":{"result":"success","outputs":{"state":"%s"}},
+                         "checksum-update":{"result":"skipped","outputs":{}}}
+                        """.formatted(code, state);
+                var process = new ProcessBuilder("bash", "-e", "-c", script).redirectErrorStream(true);
+                process.environment().put("NEEDS_JSON", needs);
+                Process running = process.start();
+                String output = new String(running.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                int status = running.waitFor();
+                assertThat(status).as("code=%s state=%s: %s", code, state, output)
+                        .isEqualTo(code.equals("false") || state.equals("verified") ? 0 : 1);
+            }
+        }
     }
 
     private static Map<String, Object> jobs() throws IOException {
