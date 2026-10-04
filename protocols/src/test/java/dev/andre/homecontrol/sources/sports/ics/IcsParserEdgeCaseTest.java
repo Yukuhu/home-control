@@ -5,6 +5,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Content-line, component-nesting and property edge cases of the RFC 5545 subset reader. */
 class IcsParserEdgeCaseTest {
@@ -150,5 +152,23 @@ class IcsParserEdgeCaseTest {
     @Test
     void aNullDurationIsNull() {
         assertThat(IcsParser.parseDuration(null)).isNull();
+    }
+
+    @Test
+    void noTextIsNotACalendar() {
+        assertThatThrownBy(() -> IcsParser.parse(null)).isInstanceOf(IcsFormatException.class);
+    }
+
+    @Test
+    void aFoldAfterABareCarriageReturnIsRemovedToo() {
+        byte[] folded = "SUMMARY:Bay\r ern\rDESCRIPTION:x\r".getBytes(StandardCharsets.UTF_8);
+
+        assertThat(new String(IcsParser.unfold(folded), StandardCharsets.UTF_8))
+                .isEqualTo("SUMMARY:Bayern\rDESCRIPTION:x\r");
+    }
+
+    @Test
+    void aContinuationBeforeTheFirstLineIsDropped() {
+        assertThat(IcsParser.unfold(" stray\nSUMMARY:Bay\n ern")).containsExactly("SUMMARY:Bayern");
     }
 }

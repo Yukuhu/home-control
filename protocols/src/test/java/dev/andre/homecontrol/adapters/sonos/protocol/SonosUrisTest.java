@@ -36,4 +36,17 @@ class SonosUrisTest {
         URI aac = URI.create("http://radio.example.org/live");
         assertThat(SonosUris.forPlayback(aac, "audio/aac")).isEqualTo(aac);
     }
+
+    @Test
+    void aStreamWithoutAPathIsRadioAtTheRoot() {
+        assertThat(SonosUris.forPlayback(URI.create("http://radio.example.org:8000"), " Audio/MPEG "))
+                .isEqualTo(URI.create("x-rincon-mp3radio://radio.example.org:8000/"));
+    }
+
+    @Test
+    void aStreamOfUnknownTypePlaysAsItIs() {
+        URI live = URI.create("http://radio.example.org/live");
+
+        assertThat(SonosUris.forPlayback(live, null)).isEqualTo(live);
+    }
 }

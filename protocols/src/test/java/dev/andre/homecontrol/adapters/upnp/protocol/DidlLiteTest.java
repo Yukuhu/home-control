@@ -46,4 +46,20 @@ class DidlLiteTest {
         assertThat(DidlLite.title("<DIDL-Lite")).isEmpty();
         assertThat(DidlLite.title("<!DOCTYPE x><x/>")).isEmpty();
     }
+
+    @Test
+    void blankTitlesAreSkippedForTheFirstReadableOne() {
+        String didl = "<DIDL-Lite xmlns:dc=\"http://purl.org/dc/elements/1.1/\"><item><dc:title> </dc:title></item>"
+                + "<item><dc:title>Second</dc:title></item></DIDL-Lite>";
+
+        assertThat(DidlLite.title(didl)).contains("Second");
+    }
+
+    @Test
+    void anItemWithABlankTitleAndArtistLeavesTheArtistOut() {
+        String xml = DidlLite.item(URI.create("http://h/a.mp3"), "audio/mpeg", " ", " ", "*");
+
+        assertThat(xml).contains("<dc:title>Home Control</dc:title>").doesNotContain("upnp:artist");
+        assertThat(DidlLite.upnpClass(null)).isEqualTo(DidlLite.upnpClass("application/octet-stream"));
+    }
 }

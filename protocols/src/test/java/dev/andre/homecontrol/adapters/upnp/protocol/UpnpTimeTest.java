@@ -23,4 +23,11 @@ class UpnpTimeTest {
         assertThat(UpnpTime.seconds("3:07")).isNull();
         assertThat(UpnpTime.seconds("0:00:05.1/0")).isNull();
     }
+
+    @Test
+    void numbersTooLongToBeTimesAreNull() {
+        assertThat(UpnpTime.seconds("1234567890:00:00")).isNull();
+        assertThat(UpnpTime.seconds("0:00:05.1234567890/4")).isNull();
+        assertThat(UpnpTime.seconds("0:00:05.1/1234567890")).isNull();
+    }
 }
