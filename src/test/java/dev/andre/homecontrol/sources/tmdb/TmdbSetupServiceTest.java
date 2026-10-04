@@ -23,6 +23,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -184,5 +185,17 @@ class TmdbSetupServiceTest {
         loginService.removeSecrets(java.util.List.of(TmdbSettings.CREDENTIAL_SECRET));
 
         assertThat(setup.credential()).isEmpty();
+    }
+
+    @Test
+    void aStoredCredentialThatNoLongerParsesIsNoCredentialAndARequestPrintsNoSecret() {
+        setup.connect(new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD),
+                new RequestLoginContext(new MockHttpServletRequest(), loginService));
+
+        secretStore.putSecrets(Map.of(TmdbSettings.CREDENTIAL_SECRET, "not a credential"));
+
+        assertThat(setup.credential()).isEmpty();
+        assertThat(new TmdbSetupService.ConnectRequest(FakeTmdbServer.READ_TOKEN, LOGIN_PASSWORD, LOGIN_PASSWORD))
+                .hasToString("ConnectRequest[redacted]");
     }
 }

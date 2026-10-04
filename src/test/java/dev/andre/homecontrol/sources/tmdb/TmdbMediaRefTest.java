@@ -41,4 +41,12 @@ class TmdbMediaRefTest {
         JsonNode stringId = JSON.readTree("{\"media_type\":\"movie\",\"id\":\"7\"}");
         assertThat(TmdbMediaRef.of(stringId, null)).isEmpty();
     }
+
+    @Test
+    void aResultWithoutAPositiveIdIsNoReference() {
+        assertThat(TmdbMediaRef.of(JSON.readTree("{\"media_type\":\"movie\",\"id\":0}"), null)).isEmpty();
+        assertThat(TmdbMediaRef.of(JSON.readTree("{\"media_type\":\"tv\",\"id\":-5}"), null)).isEmpty();
+        assertThat(TmdbMediaRef.of(JSON.readTree("{\"media_type\":\"tv\",\"id\":1.5}"), null)).isEmpty();
+        assertThat(TmdbMediaRef.of(JSON.readTree("{\"id\":4}"), null)).as("no type and no hint").isEmpty();
+    }
 }
