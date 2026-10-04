@@ -44,6 +44,20 @@ class CastDiscoveryTest {
     }
 
     @Test
+    void capabilitiesThatAreNoNumberDoNotMakeAGroup() throws Exception {
+        assertThat(CastDiscovery.toDevice(service("Chromecast-abc", "10.0.0.9", Map.of("ca", "lots"))))
+                .hasValueSatisfying(device -> assertThat(device.host()).isEqualTo("10.0.0.9"));
+    }
+
+    @Test
+    void aReceiverWithoutAnAddressIsNoDevice() {
+        MdnsBrowser.MdnsService nowhere = new MdnsBrowser.MdnsService(CastDiscovery.SERVICE_TYPE, "Chromecast-abc",
+                List.of(), 8009, Map.of());
+
+        assertThat(CastDiscovery.toDevice(nowhere)).isEmpty();
+    }
+
+    @Test
     void publishesOnceForANewReceiverAndForgetsItWhenRemoved() throws Exception {
         MdnsBrowser.MdnsService kitchen = service("Chromecast-abc", "10.0.0.9", Map.of("fn", "Kitchen"));
 

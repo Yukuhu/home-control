@@ -31,6 +31,14 @@ class CastAdapterTest {
                 .hasMessage("cast port must be an integer between 1 and 65535");
     }
 
+    @Test
+    void validateAcceptsAPortInRange() {
+        Device device = new Device("x", "X", DeviceKind.CAST, "10.0.0.9",
+                Map.of("cast", Map.of("host", "10.0.0.9", "port", "8009")), Instant.now());
+
+        org.assertj.core.api.Assertions.assertThatCode(() -> adapter.validate(device)).doesNotThrowAnyException();
+    }
+
     /** heartbeat 1 s, stale 3 s, backoff 1–2 s, command 2 s, load 5 s, media poll 1 s. */
     private static final CastProperties PROPERTIES = new CastProperties(true, Duration.ofSeconds(1),
             Duration.ofSeconds(3), Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(2),
