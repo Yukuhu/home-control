@@ -278,8 +278,9 @@ def main():
     try:
         # This local verifier deliberately reads/writes caller-selected files; it has no elevated credential or agent/web input.
         result = verify_metadata(args.head.read_bytes(), args.base.read_bytes(), args.candidate.read_bytes(), Repository())  # NOSONAR(S8707)
-        args.output.write_bytes(result.xml)  # NOSONAR(S8707): Explicit local CLI output, not a path taken from candidate XML.
-        args.report.write_text(json.dumps({'changed': result.changed, 'additions': result.additions}, indent=2) + '\n')  # NOSONAR(S8707): Same local CLI contract.
+        # Explicit local CLI outputs, not paths taken from candidate XML.
+        args.output.write_bytes(result.xml)  # NOSONAR(S8707)
+        args.report.write_text(json.dumps({'changed': result.changed, 'additions': result.additions}, indent=2) + '\n')  # NOSONAR(S8707)
     except (VerificationError, OSError) as error:
         parser.exit(1, f'Checksum verification failed: {error}\n')
 
