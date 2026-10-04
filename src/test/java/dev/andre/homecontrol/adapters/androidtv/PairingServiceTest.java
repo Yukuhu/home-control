@@ -188,6 +188,19 @@ class PairingServiceTest {
     }
 
     @Test
+    void aCodeSubmittedAgainAfterItsCheckFailedFailsTheSameWay() throws Exception {
+        doThrow(new IllegalStateException("the registry is unwritable")).when(enrollment).adopt(any());
+        service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
+        String code = fakeDevice.awaitDisplayedCode();
+        assertThatThrownBy(() -> service.submit(code)).isInstanceOf(IllegalStateException.class);
+
+        assertThatThrownBy(() -> service.submit(code))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("the registry is unwritable");
+        verify(enrollment, times(1)).adopt(any());
+    }
+
+    @Test
     void aCodeSubmittedAgainAfterItsAnswerGetsTheSameAnswer() throws Exception {
         service.begin("127.0.0.1", fakeDevice.port(), "Living Room Shield");
         String code = fakeDevice.awaitDisplayedCode();

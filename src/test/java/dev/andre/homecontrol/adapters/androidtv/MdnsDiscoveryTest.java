@@ -35,6 +35,15 @@ class MdnsDiscoveryTest {
     }
 
     @Test
+    void aStandaloneDiscoveryWithMulticastOffStartsAndClosesQuietly() {
+        try (MdnsDiscovery discovery = new MdnsDiscovery(false)) {
+            discovery.start();
+
+            assertThat(discovery.devices()).isEmpty();
+        }
+    }
+
+    @Test
     void usesTheAndroidTvRemoteServiceType() {
         assertThat(MdnsDiscovery.SERVICE_TYPE).isEqualTo("_androidtvremote2._tcp.local.");
     }

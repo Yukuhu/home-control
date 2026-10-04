@@ -126,6 +126,28 @@ class MdnsBrowserTest {
         assertThat(seen).containsExactly("resolved x");
     }
 
+    @Test
+    void aListenerFailingOnARemovalDoesNotStopTheOthers() {
+        MdnsBrowser browser = new MdnsBrowser(false);
+        List<String> seen = new CopyOnWriteArrayList<>();
+        browser.browse("t", new MdnsBrowser.Listener() {
+            @Override
+            public void resolved(MdnsBrowser.MdnsService service) {
+                // this listener only exists to throw from removed()
+            }
+
+            @Override
+            public void removed(String serviceType, String name) {
+                throw new IllegalStateException("boom");
+            }
+        });
+        browser.browse("t", listener(seen));
+
+        browser.dispatchRemoved("t", "x");
+
+        assertThat(seen).containsExactly("removed x");
+    }
+
     private static MdnsBrowser.Listener listener(List<String> seen) {
         return new MdnsBrowser.Listener() {
             @Override

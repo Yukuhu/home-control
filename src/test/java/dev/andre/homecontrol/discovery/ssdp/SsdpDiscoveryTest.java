@@ -239,6 +239,65 @@ class SsdpDiscoveryTest {
         return discovery.services("urn:x:1").stream().map(SsdpService::usn).toList();
     }
 
+    @Test
+    void anotherControlPointsSearchIsNotAService() {
+        discovery.watch("urn:x:1");
+        byte[] search = SsdpMessage.search("urn:x:1", "239.255.255.250:1900", 1, "Other/1");
+
+        discovery.handle(SsdpMessage.parse(search, search.length).orElseThrow(), host(7));
+
+        assertThat(heard()).isEmpty();
+    }
+
+    @Test
+    void anAnnouncementWithoutAUsnIsIgnored() {
+        discovery.watch("urn:x:1");
+        String alive = "NOTIFY * HTTP/1.1\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\nCACHE-CONTROL: max-age=60\r\n\r\n";
+
+        discovery.handle(SsdpMessage.parse(alive.getBytes(StandardCharsets.US_ASCII), alive.length()).orElseThrow(),
+                host(7));
+
+        assertThat(heard()).isEmpty();
+    }
+
+    @Test
+    void aLocationThatIsNoUriKeepsTheServiceWithoutOne() {
+        discovery.watch("urn:x:1");
+        String alive = "NOTIFY * HTTP/1.1\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\nUSN: uuid:odd::urn:x:1\r\n"
+                + "LOCATION: http://10.0.0.7:1400/a description.xml\r\nCACHE-CONTROL: max-age=60\r\n\r\n";
+
+        discovery.handle(SsdpMessage.parse(alive.getBytes(StandardCharsets.US_ASCII), alive.length()).orElseThrow(),
+                host(7));
+
+        assertThat(discovery.services("urn:x:1")).singleElement()
+                .satisfies(service -> assertThat(service.location()).isNull());
+        assertThat(httpRequests).hasValue(0);
+    }
+
+    @Test
+    void aByeByeOfAServiceNeverHeardChangesNothing() {
+        discovery.watch("urn:x:1");
+        List<SsdpService> gone = new CopyOnWriteArrayList<>();
+        discovery.addListener("urn:x:1", new SsdpListener() {
+            @Override
+            public void alive(SsdpService service) {
+                // Only the byebye matters here.
+            }
+
+            @Override
+            public void byebye(SsdpService service) {
+                gone.add(service);
+            }
+        });
+        String byebye = "NOTIFY * HTTP/1.1\r\nNT: urn:x:1\r\nNTS: ssdp:byebye\r\nUSN: uuid:never::urn:x:1\r\n\r\n";
+
+        discovery.handle(SsdpMessage.parse(byebye.getBytes(StandardCharsets.US_ASCII), byebye.length()).orElseThrow(),
+                host(7));
+
+        assertThat(gone).isEmpty();
+        assertThat(heard()).isEmpty();
+    }
+
     /** One host on the LAN cannot fill discovery with announcements of services it invents. */
     @Test
     void oneHostKeepsAtMostItsShareOfTheServices() {

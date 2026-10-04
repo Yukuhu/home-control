@@ -4,6 +4,7 @@ import dev.andre.homecontrol.adapters.upnp.protocol.DidlLite;
 import dev.andre.homecontrol.adapters.upnp.protocol.ProtocolInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.ServiceEndpoint;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapClient;
+import dev.andre.homecontrol.adapters.upnp.protocol.SoapFault;
 import dev.andre.homecontrol.adapters.upnp.protocol.SoapRequest;
 import dev.andre.homecontrol.adapters.upnp.protocol.TransportInfo;
 import dev.andre.homecontrol.adapters.upnp.protocol.UpnpActions;
@@ -75,6 +76,28 @@ class RendererCommandsTest {
     }
 
     @Test
+    void aLockedTransportThatAlsoRefusesStopIsStillLoadedAgain() {
+        fake.fail("SetAVTransportURI", 701, "Transition not available", 1);
+        fake.fail("Stop", 701, "Transition not available", 1);
+
+        commands.playUri(av, ProtocolInfo.parseSink(AUDIO_SINK), song, DidlLite.DLNA_STREAMING);
+
+        assertThat(fake.commandNames()).containsExactly("SetAVTransportURI", "Stop", "SetAVTransportURI", "Play");
+        assertThat(fake.transportState()).isEqualTo("PLAYING");
+    }
+
+    @Test
+    void aLoadRefusedForAnotherReasonIsNotRetried() {
+        fake.fail("SetAVTransportURI", 714, "Illegal MIME-type", 1);
+        ProtocolInfo sink = ProtocolInfo.parseSink(AUDIO_SINK);
+
+        assertThatThrownBy(() -> commands.playUri(av, sink, song, DidlLite.DLNA_STREAMING))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessage("Kitchen Speaker refused to play the stream (UPnP error 714: Illegal MIME-type)");
+        assertThat(fake.commandNames()).containsExactly("SetAVTransportURI");
+    }
+
+    @Test
     void refusesAFormatTheRendererCannotPlay() {
         Action.PlayMedia film = new Action.PlayMedia(URI.create("http://h/film.mp4"), "video/mp4", "Film", null);
 
@@ -119,6 +142,24 @@ class RendererCommandsTest {
         fake.setVolume(30);
         assertThat(commands.volume(rc, 60)).isEqualTo(new VolumeReading(50, false));
         assertThat(commands.sink(cm).match("audio/flac")).contains("audio/flac");
+    }
+
+    @Test
+    void aMuteReportedAsTrueIsMutedAndAVolumeThatIsNoNumberIsAFault() throws Exception {
+        fake.setVolume(30);
+        fake.answerRaw("GetMute", 200, answer("GetMute", "<CurrentMute>true</CurrentMute>"));
+        assertThat(commands.volume(rc, 60)).isEqualTo(new VolumeReading(50, true));
+
+        fake.answerRaw("GetVolume", 200, answer("GetVolume", "<CurrentVolume>loud</CurrentVolume>"));
+        assertThatThrownBy(() -> commands.volume(rc, 60))
+                .isInstanceOf(SoapFault.class)
+                .hasMessage("Unreadable volume");
+    }
+
+    private static String answer(String action, String arguments) {
+        return "<?xml version=\"1.0\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body>"
+                + "<u:" + action + "Response xmlns:u=\"" + RENDERING_CONTROL + "\">" + arguments
+                + "</u:" + action + "Response></s:Body></s:Envelope>";
     }
 
     @Test
