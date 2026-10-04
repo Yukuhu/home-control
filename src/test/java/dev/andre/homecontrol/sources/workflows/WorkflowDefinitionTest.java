@@ -315,4 +315,103 @@ class WorkflowDefinitionTest {
     private static WorkflowDraft withListing(WorkflowDraft d, Listing listing) {
         return new WorkflowDraft(d.name(), d.enabled(), d.mode(), d.kind(), d.calls(), listing, d.tile(), d.cast());
     }
+
+    @Test void onlyAnObjectWithANumericSchemaVersionIsADefinition() {
+        for (String notADefinition : List.of("[]", "null", "{\"schemaVersion\":\"2\"}", "{}")) {
+            assertThatThrownBy(() -> codec.decode(notADefinition))
+                    .isInstanceOf(WorkflowException.class).hasMessage("Workflow: unsupported definition schema");
+        }
+        assertThatThrownBy(() -> codec.decode(null))
+                .isInstanceOf(WorkflowException.class).hasMessage("Workflow: definition exceeds storage limit");
+    }
+
+    @Test void nothingOrADefinitionWithoutAnIdIsNeverWritten() {
+        var draft = WorkflowFixtures.single(URI.create("https://api.example/catalog"));
+
+        assertThatThrownBy(() -> codec.encode(null)).hasMessage("Workflow: unsupported definition schema");
+        assertThatThrownBy(() -> codec.encode(new WorkflowDefinition(WorkflowDefinition.SCHEMA_VERSION, null, 1, draft)))
+                .hasMessage("Workflow: invalid definition ID");
+    }
+
+    @Test void aDraftWithoutCallsKeepsThemMissingAndItsPartsPrintNoSettings() {
+        var draft = new WorkflowDraft("News", true, Mode.GENERATED, ContentKind.VIDEO, null, null, null, null);
+        assertThat(draft.calls()).isNull();
+
+        var listing = new Listing("main", "/items", "/id", "/title", null, null, List.of());
+        assertThat(listing).hasToString("Listing");
+        assertThat(new Tile("Secret title", "Secret subtitle", "https://art.example.org/secret.png")).hasToString("Tile");
+    }
+
+    @Test void missingPartsAreRefusedAsWorkflowErrors() {
+        var single = WorkflowFixtures.single(URI.create("https://api.example/catalog"));
+        var generated = WorkflowFixtures.generated();
+        var main = single.calls().getFirst();
+        var l = generated.listing();
+
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(null)).hasMessage("Workflow: definition has no draft");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(new WorkflowDraft(single.name(), true, null,
+                single.kind(), single.calls(), null, single.tile(), single.cast()))).hasMessage("Workflow: mode is required");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(new WorkflowDraft(single.name(), true, single.mode(),
+                null, single.calls(), null, single.tile(), single.cast()))).hasMessage("Workflow: kind must be video or audio");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withCalls(single, null)))
+                .hasMessage("Workflow: at least one call is required");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withCalls(single,
+                List.of(new Call("main", CallScope.SHARED, main.url(), main.headers(), null)))))
+                .hasMessage("Workflow: mappings are required");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withListing(generated, new Listing(l.call(),
+                l.arrayPointer(), l.idPointer(), l.titlePointer(), null, null, null))))
+                .hasMessage("Workflow: mappings are required");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withCalls(single,
+                List.of(new Call(null, CallScope.SHARED, main.url(), main.headers(), main.variables())))))
+                .hasMessage("Workflow: invalid call name");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withCalls(single,
+                List.of(new Call("main", null, main.url(), main.headers(), main.variables())))))
+                .hasMessage("Workflow: call main: invalid scope");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withHeaders(single, null)))
+                .hasMessage("Workflow: call main: headers are required");
+    }
+
+    @Test void headerValuesMustExistAndUseOnlyKnownValues() {
+        var single = WorkflowFixtures.single(URI.create("https://api.example/catalog"));
+
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withHeaders(single, List.of(new Header("X-Test", null)))))
+                .hasMessage("Workflow: call main: invalid header value: X-Test");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withHeaders(single,
+                List.of(new Header("X-Test", "Bearer {Unknown}"))))).hasMessage("Workflow: call main: invalid header value: X-Test");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withHeaders(single, List.of(new Header("X-Test", "a\u0000b")))))
+                .hasMessage("Workflow: call main: invalid header value: X-Test");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withHeaders(single, List.of(new Header(null, "v")))))
+                .hasMessage("Workflow: call main: invalid header name");
+    }
+
+    @Test void eachModeHasItsOwnPresentation() {
+        var single = WorkflowFixtures.single(URI.create("https://api.example/catalog"));
+        var generated = WorkflowFixtures.generated();
+
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withTile(single, null)))
+                .hasMessage("Workflow: single mode requires a tile");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withTile(single, new Tile("News", null, "http://art.example.org/a.png"))))
+                .hasMessage("Workflow: invalid artwork URL");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withTile(generated, new Tile("News", null, null))))
+                .hasMessage("Workflow: generated mode cannot have a saved tile");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withCast(single, null)))
+                .hasMessage("Workflow: Cast action is required");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withCast(single, new Cast(single.cast().template(), null))))
+                .hasMessage("Workflow: invalid media type");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withVariables(single, List.of(new Variable("A", null, false)))))
+                .hasMessage("Workflow: mapping A pointer is required");
+        assertThatThrownBy(() -> WorkflowValidator.validateStored(withVariables(single, List.of(new Variable(null, "/id", false)))))
+                .hasMessage("Workflow: invalid mapping name");
+    }
+
+    @Test void aSaveNeedsEveryCallToBeUsedButAStoredDefinitionMayKeepAnUnusedOne() {
+        var single = WorkflowFixtures.single(URI.create("https://api.example/catalog"));
+        var calls = new ArrayList<>(single.calls());
+        calls.add(new Call("spare", CallScope.SHARED, "https://api.example/spare", List.of(), List.of()));
+        var withSpare = withCalls(single, calls);
+
+        WorkflowValidator.validateStored(withSpare);
+        assertThatThrownBy(() -> WorkflowValidator.validate(withSpare))
+                .hasMessage("Workflow: call spare: nothing uses this call");
+    }
 }

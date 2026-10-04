@@ -478,4 +478,39 @@ class WorkflowHttpClientTest {
             }
         }
     }
+
+    @Test void invalidRequestSettingsAndHeadersAreRefusedBeforeConnecting() throws Exception {
+        try (var server = new FakeWorkflowServer(); var client = client(Duration.ofSeconds(3))) {
+            String url = server.url("/feed").toString();
+            List<WorkflowDraft.Header> seventeen = new ArrayList<>();
+            for (int i = 0; i < 17; i++) seventeen.add(new WorkflowDraft.Header("X-H" + i, "v"));
+            var badHeaders = new ArrayList<WorkflowDraft.Header>();
+            badHeaders.add(null);
+
+            assertThatThrownBy(() -> client.fetch(null)).hasMessage("Fetch JSON: invalid request settings");
+            assertThatThrownBy(() -> client.fetch(new WorkflowHttpClient.Request(url, null)))
+                    .hasMessage("Fetch JSON: invalid request settings");
+            assertThatThrownBy(() -> client.fetch(new WorkflowHttpClient.Request(url, seventeen)))
+                    .hasMessage("Fetch JSON: invalid request settings");
+            for (var headers : List.of(badHeaders,
+                    List.of(new WorkflowDraft.Header(null, "v")),
+                    List.of(new WorkflowDraft.Header("Bad Header", "v")),
+                    List.of(new WorkflowDraft.Header("X-Value", null)),
+                    List.of(new WorkflowDraft.Header("X-Value", "a\u0000b")),
+                    List.of(new WorkflowDraft.Header("X-Value", "a\rb")),
+                    List.of(new WorkflowDraft.Header("Proxy-Anything", "v")))) {
+                assertThatThrownBy(() -> client.fetch(new WorkflowHttpClient.Request(url, headers)))
+                        .hasMessage("Fetch JSON: invalid request header");
+            }
+            assertThat(server.count("/feed")).isZero();
+        }
+    }
+
+    @Test void aMissingMediaAddressIsAnInvalidUrlAndARequestPrintsNothing() {
+        try (var client = client(Duration.ofSeconds(3))) {
+            assertThatThrownBy(() -> client.checkMedia(null)).hasMessage("Build media URL: invalid HTTP URL");
+        }
+        assertThat(new WorkflowHttpClient.Request("https://api.example/feed?token=secret",
+                List.of(new WorkflowDraft.Header("Authorization", "Bearer secret"))).toString()).isEqualTo("Request");
+    }
 }
