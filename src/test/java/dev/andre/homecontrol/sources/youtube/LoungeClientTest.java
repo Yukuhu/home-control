@@ -122,4 +122,47 @@ class LoungeClientTest {
                 .doesNotContain("8A3F2E1D0C9B8A77", "fixture-gsessionid-Qm9vYmFy")
                 .contains("4");
     }
+
+    static Stream<Arguments> otherFailures() {
+        Consumer<LoungeClient> token = c -> c.loungeToken(SCREEN);
+        Consumer<LoungeClient> bind = c -> c.bind(TOKEN, REMOTE);
+        Consumer<LoungeClient> play = c -> c.setPlaylist(TOKEN, SESSION, "aqz-KE-bpKQ");
+        return Stream.of(
+                Arguments.of("token not JSON", (Consumer<FakeGoogleServer>) f -> f.respond("POST",
+                        "/lounge/pairing/get_lounge_token_batch", FakeGoogleServer.Canned.json(200, "not json")),
+                        token, "lounge token: YouTube did not issue a lounge token for this screen"),
+                Arguments.of("bind 500", (Consumer<FakeGoogleServer>) f -> f.respond("POST", "/lounge/bc/bind",
+                        FakeGoogleServer.Canned.json(500, "{}")),
+                        bind, "bind: YouTube answered HTTP 500"),
+                Arguments.of("play 400", (Consumer<FakeGoogleServer>) f -> f.respond("POST", "/lounge/bc/bind",
+                        FakeGoogleServer.Canned.json(400, "{}")),
+                        play, "setPlaylist: YouTube dropped the lounge session (HTTP 400)"),
+                Arguments.of("play 500", (Consumer<FakeGoogleServer>) f -> f.respond("POST", "/lounge/bc/bind",
+                        FakeGoogleServer.Canned.json(500, "{}")),
+                        play, "setPlaylist: YouTube answered HTTP 500"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("otherFailures")
+    void otherFailuresNameTheStepToo(String name, Consumer<FakeGoogleServer> setup, Consumer<LoungeClient> call,
+                                     String message) {
+        failuresNameTheStep(name, setup, call, message);
+    }
+
+    @Test
+    void anAnswerHomeControlMayNotUseIsNamedSo() {
+        LoungeClient refusing = new LoungeClient(new YouTubeHttp(fake.properties(false)), fake.properties().loungeBaseUrl());
+
+        assertThatThrownBy(() -> refusing.loungeToken(SCREEN))
+                .isInstanceOf(LoungeException.class)
+                .hasMessage("lounge token: YouTube sent an answer that could not be used");
+        assertThat(fake.requests("/lounge/pairing/get_lounge_token_batch")).isEmpty();
+    }
+
+    @Test
+    void bracketsInsideAStringDoNotEndAChunk() {
+        String body = "40\n[[1,[\"c\",\"sid-1\",\"]\"]],[2,[\"S\",\"gs-[1]\"]]]\n";
+
+        assertThat(LoungeClient.parseBind(body)).isEqualTo(new LoungeClient.LoungeSession("sid-1", "gs-[1]", 2));
+    }
 }

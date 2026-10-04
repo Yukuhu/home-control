@@ -113,4 +113,36 @@ class YouTubeVideoMapperTest {
 
         assertThat(YouTubeVideoMapper.fromSearchResult(items.path(2))).isEmpty();
     }
+
+    private static JsonNode playlistItem(String title, String ownerId, String ownerTitle, String published) {
+        return MAPPER.readTree("""
+                {"snippet":{"title":"%s","videoOwnerChannelId":"%s","videoOwnerChannelTitle":"%s","channelTitle":"Playlist owner",
+                            "publishedAt":"%s"},
+                 "contentDetails":{"videoId":"Kz1aT5nM3pQ"}}
+                """.formatted(title, ownerId, ownerTitle, published));
+    }
+
+    @Test
+    void deletedVideosAndVideosWithoutAnOwnerAreLeftOut() {
+        assertThat(YouTubeVideoMapper.fromPlaylistItem(playlistItem("Deleted video", "UC1", "Someone", ""))).isEmpty();
+        assertThat(YouTubeVideoMapper.fromPlaylistItem(playlistItem("Private video", "UC1", "Someone", ""))).isEmpty();
+        assertThat(YouTubeVideoMapper.fromPlaylistItem(playlistItem("Something", " ", "Someone", ""))).isEmpty();
+    }
+
+    @Test
+    void aVideoWithoutItsOwnersNameOrADateIsNamedByThePlaylistsChannelAndUndated() {
+        YouTubeVideo video = YouTubeVideoMapper.fromPlaylistItem(playlistItem("Something", "UC1", "", "")).orElseThrow();
+
+        assertThat(video.channelTitle()).isEqualTo("Playlist owner");
+        assertThat(video.publishedAt()).isEqualTo(Instant.EPOCH);
+    }
+
+    @Test
+    void videoAndSearchResultsWithoutAValidIdAreLeftOut() {
+        assertThat(YouTubeVideoMapper.fromVideo(MAPPER.readTree("{\"id\":\"short\"}"))).isEmpty();
+        assertThat(YouTubeVideoMapper.fromSearchResult(MAPPER.readTree("{\"id\":{\"videoId\":\"bad id!\"}}"))).isEmpty();
+        assertThat(YouTubeVideoMapper.fromVideo(MAPPER.readTree(
+                "{\"id\":\"Kz1aT5nM3pQ\",\"snippet\":{\"publishedAt\":\"yesterday\"}}")).orElseThrow().publishedAt())
+                .isEqualTo(Instant.EPOCH);
+    }
 }
