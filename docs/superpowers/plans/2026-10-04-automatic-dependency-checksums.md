@@ -174,13 +174,13 @@ Node test suites. Python is CI tooling, not an application dependency.
 - [x] **Update documentation and ADR.** Replace normal manual-patch instructions with the automatic same-PR flow,
   its state transitions, error handling, and credential setup. Record the repository-origin trust policy and
   its integrity/provenance distinction. Keep manual commands only as troubleshooting, not a routine requirement.
-- [ ] **Run required final local validation:** `scripts/gradle.sh build`,
+- [x] **Run required final local validation:** `scripts/gradle.sh build`,
   `python3 -m unittest discover -s scripts/dependency-checksums -p 'test_*.py' -v`,
   `npm test --prefix scripts/pr-summary`, and `git diff --check`.
   The Gradle build must be green without any verification-generation flag. Browser functionality is unchanged;
   the subsequent live CI run must still execute its normal browser jobs.
-- [ ] **Commit documentation** using `docs: explain automatic dependency checksum updates`, staging exact paths.
-- [ ] **Provision the App during authorized implementation rollout.** Register/install the App and configure
+- [x] **Commit documentation** using `docs: explain automatic dependency checksum updates`, staging exact paths.
+- [x] **Provision the App during authorized implementation rollout.** Register/install the App and configure
   the named variable and secret stores using the user's GitHub workflow. Keep private-key contents out of
   chat, logs, and the repository. Select and verify the full token-action commit SHA before enabling the job.
   If GitHub requires an owner interaction, prepare the exact setup and report that requirement; never silently
@@ -209,4 +209,5 @@ receive an unattended strict CI run, and a repeat check must make no further com
 - PR summary: 63 tests passed.
 - Real #191 candidate: verified five new hashes after completing its omitted JUnit BOM `.module` file.
 - App variable/secrets and installation permissions were configured and authenticated before implementation.
-- Live rollout and final review remain outstanding.
+- Final independent review: no blocking findings; live rollout remains outstanding.
+- Real #191 strict-resolution replay: passed with the independently verified five-artifact update.
