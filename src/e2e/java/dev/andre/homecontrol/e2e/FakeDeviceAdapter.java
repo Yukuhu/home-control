@@ -11,13 +11,20 @@ import dev.andre.homecontrol.core.DeviceKind;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.DiscoveredDevice;
+import dev.andre.homecontrol.core.GroupListing;
+import dev.andre.homecontrol.core.GroupMember;
+import dev.andre.homecontrol.core.InputListing;
 import dev.andre.homecontrol.core.KeyPress;
+import dev.andre.homecontrol.core.SpeakerGroup;
+import dev.andre.homecontrol.core.SpeakerTopology;
+import dev.andre.homecontrol.core.TvInput;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -73,6 +80,10 @@ public class FakeDeviceAdapter implements DeviceAdapter, AdapterDiscovery {
         DeviceState initial = new DeviceState(DeviceStatus.CONNECTED, true, "com.example.launcher",
                 0, 0, false, Instant.now());
         onChange.accept(initial);
+        Set<Capability> capabilities = capabilities(device);
+        if (capabilities.contains(Capability.INPUTS) || capabilities.contains(Capability.GROUPING)) {
+            return new ListingHandle(device, failing, initial, capabilities);
+        }
         return new FakeHandle(device, failing, initial);
     }
 
@@ -112,7 +123,43 @@ public class FakeDeviceAdapter implements DeviceAdapter, AdapterDiscovery {
         pressDelays.put(press, duration);
     }
 
-    private final class FakeHandle implements DeviceHandle {
+    /**
+     * A device that lists two inputs ({@code INPUTS}) or is a speaker that can join the "Kitchen" group
+     * ({@code GROUPING}); with the adapter setting {@code group=joined} it already plays together with it.
+     */
+    private final class ListingHandle extends FakeHandle implements InputListing, GroupListing {
+        private final Device device;
+        private final Set<Capability> capabilities;
+
+        ListingHandle(Device device, Set<String> failing, DeviceState state, Set<Capability> capabilities) {
+            super(device, failing, state);
+            this.device = device;
+            this.capabilities = capabilities;
+        }
+
+        @Override
+        public List<TvInput> inputs() {
+            return capabilities.contains(Capability.INPUTS)
+                    ? List.of(new TvInput("HDMI_1", "HDMI 1"), new TvInput("HDMI_2", "Game console"))
+                    : List.of();
+        }
+
+        @Override
+        public Optional<SpeakerTopology> speakerTopology() {
+            if (!capabilities.contains(Capability.GROUPING)) {
+                return Optional.empty();
+            }
+            GroupMember self = new GroupMember(device.id(), device.name());
+            GroupMember kitchen = new GroupMember("kitchen-speaker", "Kitchen");
+            boolean joined = "joined".equals(device.adapterSettings(id()).get("group"));
+            return Optional.of(new SpeakerTopology(device.id(), joined
+                    ? List.of(new SpeakerGroup("kitchen-speaker", List.of(kitchen, self)))
+                    : List.of(new SpeakerGroup(device.id(), List.of(self)),
+                            new SpeakerGroup("kitchen-speaker", List.of(kitchen)))));
+        }
+    }
+
+    private class FakeHandle implements DeviceHandle {
         private final Device device;
         private final Set<String> failing;
         private final DeviceState state;
