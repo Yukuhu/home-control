@@ -54,6 +54,8 @@ public class FakeTizenServer implements AutoCloseable {
     private volatile String powerState = "on";
     private volatile boolean restAvailable = true;
     private volatile boolean dialAvailable = true;
+    /** An HTTP status the TV answers DIAL launches with instead of starting the app; 0 starts it. */
+    private volatile int dialRefusal;
     private volatile boolean issueTokens = true;
     private volatile int deviceInfoPadding;
     private volatile boolean stalling;
@@ -112,6 +114,11 @@ public class FakeTizenServer implements AutoCloseable {
 
     public void setDialAvailable(boolean available) {
         dialAvailable = available;
+    }
+
+    /** The TV answers every DIAL launch with {@code status} (a busy 503, say) instead of starting the app; 0 undoes it. */
+    public void refuseDialWith(int status) {
+        dialRefusal = status;
     }
 
     /** Older firmware accepts clients without ever issuing a token. */
@@ -252,6 +259,12 @@ public class FakeTizenServer implements AutoCloseable {
         if (!dialAvailable || !exchange.getRequestMethod().equals("POST")
                 || !exchange.getRequestURI().getPath().equals("/ws/apps/YouTube")) {
             respond(exchange, 404, "");
+            return;
+        }
+        int refusal = dialRefusal;
+        if (refusal != 0) {
+            exchange.getRequestBody().readAllBytes();
+            respond(exchange, refusal, "");
             return;
         }
         String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
