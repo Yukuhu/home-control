@@ -3,6 +3,7 @@ package dev.andre.homecontrol.device;
 import dev.andre.homecontrol.core.Capability;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceAdapter;
+import dev.andre.homecontrol.core.DeviceDiscoveredEvent;
 import dev.andre.homecontrol.core.DeviceHandle;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceKind;
@@ -182,6 +183,86 @@ class EnrollmentTest {
 
         assertThat(added.id()).isNotIn("a", "b");
         assertThat(wiring.registry().findById("a").orElseThrow().hasAdapter("cast")).isFalse();
+    }
+
+    @Test
+    void addingThroughAModuleThatIsSwitchedOffIsRefused() {
+        Wiring wiring = wire(HostAddresses::lookup, new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, false));
+
+        assertThatThrownBy(() -> wiring.enrollment().addDiscovered("cast", "10.0.0.9", 8009))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("The cast module is switched off");
+    }
+
+    @Test
+    void addingAReceiverThatIsNoLongerVisibleIsRefused() {
+        StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false);
+        Wiring wiring = wire(HostAddresses::lookup, cast);
+        cast.visible.add(new DiscoveredDevice("cast", "Kitchen", "10.0.0.9", 8009, Map.of()));
+
+        assertThatThrownBy(() -> wiring.enrollment().addDiscovered("cast", "10.0.0.9", 8010))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("That device is no longer visible on the network");
+        assertThat(wiring.registry().findAll()).isEmpty();
+    }
+
+    @Test
+    void aDeviceThatMustBePairedCannotBeAddedOrAddedTwice() {
+        StubAdapter webos = new StubAdapter("webos", DeviceKind.WEBOS, false, true);
+        StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false);
+        Wiring wiring = wire(HostAddresses::lookup, webos, cast);
+        webos.visible.add(new DiscoveredDevice("webos", "LG TV", "10.0.0.8", 3000, Map.of()));
+        cast.visible.add(new DiscoveredDevice("cast", "Kitchen", "10.0.0.9", 8009, Map.of()));
+
+        assertThatThrownBy(() -> wiring.enrollment().addDiscovered("webos", "10.0.0.8", 3000))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("LG TV has to be paired, not added");
+        wiring.enrollment().addDiscovered("cast", "10.0.0.9", 8009);
+        assertThatThrownBy(() -> wiring.enrollment().addDiscovered("cast", "10.0.0.9", 8009))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Kitchen is already added");
+    }
+
+    @Test
+    void mergingAConnectionTheTargetAlreadyHasIsRefused() {
+        Wiring wiring = wire(HostAddresses::lookup, new StubAdapter("cast", DeviceKind.CAST, true, false));
+        wiring.enrollment().adopt(device("kitchen", "cast", "10.0.0.9"));
+        wiring.enrollment().adopt(device("hall", "cast", "10.0.0.10"));
+
+        assertThatThrownBy(() -> wiring.enrollment().merge("kitchen", "hall"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("kitchen already has a cast connection");
+        assertThatThrownBy(() -> wiring.enrollment().merge("kitchen", "kitchen"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Pick two different devices to merge");
+        assertThat(wiring.registry().findAll()).hasSize(2);
+    }
+
+    @Test
+    void splittingAConnectionTheDeviceLacksOrItsOnlyOneIsRefused() {
+        Wiring wiring = wire(HostAddresses::lookup, new StubAdapter("cast", DeviceKind.CAST, true, false));
+        wiring.enrollment().adopt(device("kitchen", "cast", "10.0.0.9"));
+
+        assertThatThrownBy(() -> wiring.enrollment().split("kitchen", "upnp"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("kitchen has no upnp connection");
+        assertThatThrownBy(() -> wiring.enrollment().split("kitchen", "cast"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("kitchen has only one connection; there is nothing to split");
+    }
+
+    @Test
+    void anAnnouncedDeviceThatMustBePairedIsNotMergedAutomatically() {
+        StubAdapter webos = new StubAdapter("webos", DeviceKind.WEBOS, false, true);
+        Wiring wiring = wire(HostAddresses::lookup, webos);
+        wiring.enrollment().adopt(device("tv", "webos", "10.0.0.8"));
+
+        wiring.enrollment().onDiscovered(new DeviceDiscoveredEvent(
+                new DiscoveredDevice("webos", "LG TV", "10.0.0.8", 3000, Map.of())));
+        wiring.enrollment().onDiscovered(new DeviceDiscoveredEvent(
+                new DiscoveredDevice("cast", "Kitchen", "10.0.0.9", 8009, Map.of())));
+
+        assertThat(wiring.registry().findAll()).extracting(Device::id).containsExactly("tv");
     }
 
     /** One adapter's discovery failing must not take the setup page and every pairing down with it. */

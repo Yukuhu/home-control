@@ -197,6 +197,22 @@ class BluetoothSetupControllerTest extends WebSliceTest {
     }
 
     @Test
+    void aDisconnectOrAudioOutputThatFailsShowsTheReason() throws Exception {
+        willThrow(new BluetoothSetupException("BlueZ is not running")).given(bluetoothPairing)
+                .disconnect("bluetooth-aa-bb-cc-dd-ee-ff");
+        mockMvc.perform(post("/setup/bluetooth/disconnect").param("id", "bluetooth-aa-bb-cc-dd-ee-ff"))
+                .andExpect(redirectedUrl("/setup#bluetooth"))
+                .andExpect(flash().attribute("bluetoothError", "BlueZ is not running"));
+
+        willThrow(new BluetoothSetupException("An audio device id may only contain letters")).given(bluetoothPairing)
+                .setAudioDevice("bluetooth-aa-bb-cc-dd-ee-ff", "pulse x");
+        mockMvc.perform(post("/setup/bluetooth/audio-device").param("id", "bluetooth-aa-bb-cc-dd-ee-ff")
+                        .param("audioDevice", "pulse x"))
+                .andExpect(redirectedUrl("/setup#bluetooth"))
+                .andExpect(flash().attribute("bluetoothError", "An audio device id may only contain letters"));
+    }
+
+    @Test
     void unknownSpeakersAre404() throws Exception {
         willThrow(new DeviceNotFoundException("No Bluetooth speaker ghost")).given(bluetoothPairing).connect("ghost");
         mockMvc.perform(post("/setup/bluetooth/connect").param("id", "ghost"))
