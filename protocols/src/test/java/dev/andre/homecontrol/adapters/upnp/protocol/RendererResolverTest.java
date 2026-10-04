@@ -63,6 +63,40 @@ class RendererResolverTest {
     }
 
     @Test
+    void noLocationIsRefusedUnread() {
+        String host = renderer.host();
+
+        assertThatThrownBy(() -> resolver.resolve(null, host, FakeUpnpRenderer.UDN))
+                .isInstanceOf(IOException.class)
+                .hasMessage("No description address on the device's own host");
+        assertThat(renderer.requestedPaths()).isEmpty();
+    }
+
+    @Test
+    void withoutAnExpectedUdnAnyDescriptionOnTheHostIsAccepted() throws Exception {
+        renderer.overrideDescription(description().replace(FakeUpnpRenderer.UDN, "uuid:00000000-0000-0000-0000-000000000new"));
+
+        RendererResolver.Renderer found = resolver.resolve(renderer.location(), renderer.host(), null);
+
+        assertThat(found.avTransport().controlUrl().getPath()).isEqualTo("/upnp/control/AVTransport1");
+    }
+
+    @Test
+    void aDescriptionWithoutAUdnIsNotTheExpectedDevice() throws Exception {
+        renderer.overrideDescription(description().replace("<UDN>" + FakeUpnpRenderer.UDN + "</UDN>", ""));
+
+        assertThatThrownBy(this::resolve).isInstanceOf(IOException.class).hasMessageContaining("another device");
+    }
+
+    @Test
+    void anAvTransportOverHttpsLeavesNothingToControl() throws Exception {
+        renderer.overrideDescription(description().replace("<controlURL>/upnp/control/AVTransport1</controlURL>",
+                "<controlURL>https://" + renderer.host() + "/upnp/control/AVTransport1</controlURL>"));
+
+        assertThatThrownBy(this::resolve).isInstanceOf(IOException.class).hasMessage("No usable AVTransport service");
+    }
+
+    @Test
     void aDescriptionThatIsNotXmlIsUnreadable() {
         renderer.overrideDescription("<html>");
 

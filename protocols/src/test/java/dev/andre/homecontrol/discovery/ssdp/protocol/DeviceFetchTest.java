@@ -12,9 +12,12 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,6 +97,41 @@ class DeviceFetchTest {
         assertThat(DeviceFetch.isSafeToFetch(URI.create("http://speaker.lan:49152/d.xml"), "speaker.lan")).isFalse();
         assertThat(DeviceFetch.isSafeToFetch(URI.create("http://10.0.0.9/d.xml"), "10.0.0.9")).isFalse();
         assertThat(DeviceFetch.isSafeToFetch(URI.create("http://10.0.0.9:49152/d.xml"), (String) null)).isFalse();
+    }
+
+    @Test
+    void anIpLiteralIsNeverAName() {
+        assertThat(DeviceFetch.isIpLiteral("192.168.1.40")).isTrue();
+        assertThat(DeviceFetch.isIpLiteral("::1")).isTrue();
+        assertThat(DeviceFetch.isIpLiteral("fe80::1%2")).isTrue();
+        assertThat(DeviceFetch.isIpLiteral("2001:DB8::a:F")).isTrue();
+        assertThat(DeviceFetch.isIpLiteral("::ffff:192.168.1.40")).isTrue();
+        assertThat(DeviceFetch.isIpLiteral("192.168.1.256")).isFalse();
+        assertThat(DeviceFetch.isIpLiteral("speaker.lan")).isFalse();
+        assertThat(DeviceFetch.isIpLiteral("fe80::1%eth0")).isFalse();
+        assertThat(DeviceFetch.isIpLiteral("[::1]")).isFalse();
+        assertThat(DeviceFetch.isIpLiteral("")).isFalse();
+        assertThat(DeviceFetch.isIpLiteral(null)).isFalse();
+    }
+
+    @Test
+    void nothingIsSafeWithoutALocationOrAnAnnouncingAddress() throws Exception {
+        InetAddress sender = InetAddress.getByName("10.0.0.9");
+
+        assertThat(DeviceFetch.isSafeToFetch(null, sender)).isFalse();
+        assertThat(DeviceFetch.isSafeToFetch(URI.create("http://10.0.0.9:49152/d.xml"), (InetAddress) null)).isFalse();
+        assertThat(DeviceFetch.isSafeToFetch(URI.create("http://10.0.0.9:49152/d.xml"), sender)).isTrue();
+        // Looks like an IPv6 literal, yet is none: refused without a lookup.
+        assertThat(DeviceFetch.isSafeToFetch(URI.create("http://10.0.0.9:49152/d.xml"), "1:2")).isFalse();
+    }
+
+    @Test
+    void aContentLengthThatIsNoNumberIsUnknown() {
+        HttpHeaders garbled = HttpHeaders.of(Map.of("Content-Length", List.of("lots")), (name, value) -> true);
+        HttpHeaders declared = HttpHeaders.of(Map.of("Content-Length", List.of("42")), (name, value) -> true);
+
+        assertThat(DeviceFetch.contentLength(garbled)).isEmpty();
+        assertThat(DeviceFetch.contentLength(declared)).hasValue(42);
     }
 
     @Test

@@ -17,6 +17,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.Date;
@@ -106,6 +108,57 @@ class TlsSocketsTest {
         assertThatThrownBy(() -> TlsSockets.PAIRING_TRUST.checkServerTrusted(
                 new X509Certificate[0], "RSA"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void pairingBootstrapRefusesADeviceWithoutAnRsaKey() throws Exception {
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
+        generator.initialize(256);
+        KeyPair keyPair = generator.generateKeyPair();
+        X500Name subject = new X500Name("CN=device");
+        X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(new JcaX509v3CertificateBuilder(
+                subject, BigInteger.ONE,
+                Date.from(Instant.parse("2020-01-01T00:00:00Z")),
+                Date.from(Instant.parse("2040-01-01T00:00:00Z")),
+                subject, keyPair.getPublic())
+                .build(new JcaContentSignerBuilder("SHA256withECDSA").build(keyPair.getPrivate())));
+
+        assertThatThrownBy(() -> TlsSockets.PAIRING_TRUST.checkServerTrusted(new X509Certificate[]{certificate}, "EC"))
+                .isInstanceOf(CertificateException.class)
+                .hasMessage("The device did not provide an RSA certificate");
+    }
+
+    @Test
+    void aChainWhoseFirstEntryIsMissingIsRefused() {
+        assertThatThrownBy(() -> TlsSockets.PAIRING_TRUST.checkServerTrusted(new X509Certificate[]{null}, "RSA"))
+                .isInstanceOf(CertificateException.class)
+                .hasMessage("The peer did not provide a certificate");
+    }
+
+    @Test
+    void aMissingChainOrAuthenticationTypeIsRefused() {
+        X509Certificate[] chain = {client.certificate()};
+
+        assertThatThrownBy(() -> TlsSockets.PAIRING_TRUST.checkServerTrusted(null, "RSA"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> TlsSockets.PAIRING_TRUST.checkServerTrusted(chain, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> TlsSockets.PAIRING_TRUST.checkServerTrusted(chain, " "))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aClientIdentityThatIsNotTrulySelfSignedIsRefused() throws Exception {
+        X509Certificate[] chain = {dummySignatureIdentity().certificate()};
+
+        assertThatThrownBy(() -> TlsSockets.PAIRING_TRUST.checkClientTrusted(chain, "RSA"))
+                .isInstanceOf(CertificateException.class)
+                .hasMessage("The peer certificate is not correctly self-signed");
+    }
+
+    @Test
+    void theTrustManagerNamesNoAcceptedIssuers() {
+        assertThat(TlsSockets.PAIRING_TRUST.getAcceptedIssuers()).isEmpty();
     }
 
     private static ClientCertificate expiredIdentity() throws Exception {

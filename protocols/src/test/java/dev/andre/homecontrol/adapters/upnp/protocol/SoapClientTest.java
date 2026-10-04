@@ -199,6 +199,40 @@ class SoapClientTest {
     }
 
     @Test
+    void aMalformedActionOrArgumentNameIsRefusedBeforeSending() {
+        SoapRequest badAction = new SoapRequest(AV, "Play><evil/", Map.of("InstanceID", "0"));
+        SoapRequest badArgument = new SoapRequest(AV, "Play", Map.of("Instance ID", "0"));
+
+        assertThatThrownBy(() -> client.call(control(), badAction)).isInstanceOf(SoapFault.class);
+        assertThatThrownBy(() -> client.call(control(), badArgument))
+                .isInstanceOfSatisfying(SoapFault.class, fault -> assertThat(fault.errorCode()).isZero());
+        assertThat(method).isNull();
+    }
+
+    @Test
+    void aFaultWithoutAUpnpErrorUsesTheSoapFaultString() {
+        String fault = FRAME_START + "<s:Fault><faultcode>s:Server</faultcode><faultstring> Busy </faultstring></s:Fault>"
+                + FRAME_END;
+
+        SoapFault parsed = SoapClient.fault(fault.getBytes(StandardCharsets.UTF_8), "Play");
+
+        assertThat(parsed.errorCode()).isZero();
+        assertThat(parsed.description()).isEqualTo("Busy");
+    }
+
+    @Test
+    void aFaultThatSaysNothingOrHasNoNumericCodeNamesTheAction() {
+        String empty = FRAME_START + "<s:Fault/>" + FRAME_END;
+        String wordCode = FRAME_START + "<s:Fault><detail><UPnPError><errorCode>seven</errorCode>"
+                + "<errorDescription>Odd</errorDescription></UPnPError></detail></s:Fault>" + FRAME_END;
+
+        assertThat(SoapClient.fault(empty.getBytes(StandardCharsets.UTF_8), "Play").getMessage())
+                .contains("HTTP 500 for Play");
+        assertThat(SoapClient.fault(wordCode.getBytes(StandardCharsets.UTF_8), "Play").getMessage())
+                .contains("HTTP 500 for Play");
+    }
+
+    @Test
     void requestsNeverPrintTheirArguments() {
         assertThat(UpnpActions.setAvTransportUri(AV, "http://h/x?ApiKey=secret-key", "").toString())
                 .doesNotContain("secret-key")

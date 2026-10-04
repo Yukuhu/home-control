@@ -84,4 +84,16 @@ class PairingDigestTest {
                 CLIENT_MODULUS, EXPONENT, SERVER_MODULUS, EXPONENT, "ZZZZZZ"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void noCodeIsAMalformedCode() {
+        assertThatThrownBy(() -> PairingDigest.digest(CLIENT_MODULUS, EXPONENT, SERVER_MODULUS, EXPONENT, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Pairing code must be 6 hexadecimal characters");
+    }
+
+    @Test
+    void aZeroValueKeepsItsOnlyByte() {
+        assertThat(PairingDigest.unsignedBytes(BigInteger.ZERO)).containsExactly((byte) 0x00);
+    }
 }
