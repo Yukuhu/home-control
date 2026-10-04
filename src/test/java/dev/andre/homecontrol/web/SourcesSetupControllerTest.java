@@ -21,6 +21,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.times;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -173,6 +174,63 @@ class SourcesSetupControllerTest extends WebSliceTest {
         mockMvc.perform(post("/setup/sources/preferences/rails/visibility")
                         .param("rail", "unknown/rail").param("visible", "true"))
                 .andExpect(flash().attribute("sourcesError", "No rail unknown/rail"));
+    }
+
+    @Test
+    void showingASourceAgainSaysSo() throws Exception {
+        mockMvc.perform(post("/setup/sources/preferences/jellyfin/enabled").param("enabled", "true"))
+                .andExpect(redirectedUrl("/setup#sources"))
+                .andExpect(flash().attribute("sourcesMessage", "Jellyfin is shown on the dashboard"));
+    }
+
+    @Test
+    void anIntervalForAnUnknownSourceIsRejected() throws Exception {
+        mockMvc.perform(post("/setup/sources/preferences/nope/interval").param("minutes", "10"))
+                .andExpect(redirectedUrl("/setup#sources"))
+                .andExpect(flash().attribute("sourcesError", "No content source nope"));
+
+        verify(sourcePreferences, never()).update(any());
+    }
+
+    @Test
+    void anIntervalOutOfRangeShowsTheRule() throws Exception {
+        mockMvc.perform(post("/setup/sources/preferences/jellyfin/interval").param("minutes", "0"))
+                .andExpect(redirectedUrl("/setup#sources"))
+                .andExpect(flash().attribute("sourcesError", "Refresh every 1 to 1440 minutes"));
+    }
+
+    @Test
+    void movingAnUnknownRailOrTheFirstOneUpChangesNothing() throws Exception {
+        ArgumentCaptor<UnaryOperator<SourcePreferences>> captor = captor();
+
+        mockMvc.perform(post("/setup/sources/preferences/rails/move")
+                        .param("rail", "unknown/rail").param("direction", "down"))
+                .andExpect(flash().attribute("sourcesError", "No rail unknown/rail"));
+        verify(sourcePreferences, never()).update(any());
+
+        mockMvc.perform(post("/setup/sources/preferences/rails/move")
+                        .param("rail", "jellyfin/resume").param("direction", "up"))
+                .andExpect(flash().attribute("sourcesMessage", "Rail order saved"));
+        verify(sourcePreferences).update(captor.capture());
+        assertThat(captor.getValue().apply(SourcePreferences.defaults("de-DE", "DE")).railOrder())
+                .containsExactly("jellyfin/resume", "jellyfin/next-up", "jellyfin/latest");
+    }
+
+    @Test
+    void preferencesThatCannotBeSavedShowTheReasonInsteadOfAMessage() throws Exception {
+        willThrow(new IllegalArgumentException("At most 200 rails can be ordered")).given(sourcePreferences).update(any());
+
+        mockMvc.perform(post("/setup/sources/preferences/rails/move")
+                        .param("rail", "jellyfin/next-up").param("direction", "up"))
+                .andExpect(flash().attribute("sourcesError", "At most 200 rails can be ordered"))
+                .andExpect(flash().attributeCount(1));
+        mockMvc.perform(post("/setup/sources/preferences/rails/visibility")
+                        .param("rail", "jellyfin/resume").param("visible", "false"))
+                .andExpect(flash().attribute("sourcesError", "At most 200 rails can be ordered"));
+        mockMvc.perform(post("/setup/sources/preferences/jellyfin/enabled").param("enabled", "false"))
+                .andExpect(flash().attribute("sourcesError", "At most 200 rails can be ordered"));
+        mockMvc.perform(post("/setup/sources/preferences/jellyfin/interval").param("minutes", "10"))
+                .andExpect(flash().attribute("sourcesError", "At most 200 rails can be ordered"));
     }
 
     @Test

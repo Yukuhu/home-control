@@ -113,6 +113,46 @@ class RememberedLoginsTest {
     }
 
     @Test
+    void aLoginThatCannotBeStoredLastsOnlyUntilTheServerRestarts() throws Exception {
+        assumeFalse("root".equals(System.getProperty("user.name")), "root may write everywhere");
+        Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("r-xr-xr-x"));
+        try {
+            assertThat(logins().remember("v1")).isEmpty();
+        } finally {
+            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
+        }
+    }
+
+    @Test
+    void forgettingATokenThatWasNeverRememberedLeavesTheFileAlone() throws Exception {
+        RememberedLogins logins = logins();
+        logins.remember("v1");
+        String before = Files.readString(file);
+
+        assertThat(logins.forget("never-issued")).isTrue();
+
+        assertThat(Files.readString(file)).isEqualTo(before);
+    }
+
+    @Test
+    void entriesThatAreIncompleteOrHaveNoReadableEndLogNobodyIn() throws Exception {
+        String token = "a-token";
+        Files.writeString(file, "{\"version\":1,\"logins\":["
+                + "{\"hash\":\"" + sha256(token) + "\",\"version\":\"v1\",\"expires\":\"soon\"},"
+                + "{\"hash\":\"" + sha256(token) + "\",\"version\":\"\",\"expires\":\"2026-11-01T00:00:00Z\"},"
+                + "{\"hash\":\"\",\"version\":\"v1\",\"expires\":\"2026-11-01T00:00:00Z\"}]}");
+
+        assertThat(logins().remembers(token)).isFalse();
+    }
+
+    @Test
+    void aFileThatIsNoObjectRemembersNobody() throws Exception {
+        Files.writeString(file, "[]");
+
+        assertThat(logins().versionOf("any")).isEmpty();
+    }
+
+    @Test
     void aDamagedFileRemembersNobodyAndTheNextLoginReplacesIt() throws Exception {
         Files.writeString(file, "{ not json");
         RememberedLogins logins = logins();
