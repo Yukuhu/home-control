@@ -42,9 +42,9 @@ class DependencyVerificationWorkflowTest {
                         && "checksum-coverage".equals(with.get("name")))
                 .findFirst();
         assertThat(upload).as("checksums uploads its Python coverage report").isPresent();
-        var report = (Map<?, ?>) upload.orElseThrow().get("with");
-        assertThat(report.get("path")).isEqualTo("build/reports/dependency-checksums/coverage.xml");
-        assertThat(report.get("if-no-files-found")).isEqualTo("error");
+        var report = job(upload.orElseThrow(), "with");
+        assertThat(report).containsEntry("path", "build/reports/dependency-checksums/coverage.xml")
+                .containsEntry("if-no-files-found", "error");
         var sonarSteps = (List<?>) job(jobs(), "sonar").get("steps");
         assertThat(sonarSteps.toString()).contains("checksum-coverage", "build/reports/dependency-checksums");
         assertThat(Files.readString(Path.of("build.gradle.kts")))
@@ -102,7 +102,7 @@ class DependencyVerificationWorkflowTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> job(Map<String, Object> map, String name) {
+    private static Map<String, Object> job(Map<?, ?> map, String name) {
         return (Map<String, Object>) map.get(name);
     }
 

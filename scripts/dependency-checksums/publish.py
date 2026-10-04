@@ -126,7 +126,8 @@ def prepare(args, github=None, repository=None):
     result = verify_metadata(head_xml, base_xml, read_file(args.artifact / METADATA_FILE), repository or Repository())
     if not result.changed:
         return {'state': 'unchanged'}
-    args.output.mkdir(parents=True, exist_ok=True)  # NOSONAR(S8707): Output is a fixed CI runner path, never artifact input.
+    # Output is a fixed CI runner path, never artifact input.
+    args.output.mkdir(parents=True, exist_ok=True)  # NOSONAR(S8707)
     (args.output / METADATA_FILE).write_bytes(result.xml)
     prepared = dict(expected, branch=branch, catalog=catalog, metadata_sha256=sha256(result.xml), additions=result.additions)
     (args.output / 'prepared.json').write_text(json.dumps(prepared, indent=2) + '\n')
