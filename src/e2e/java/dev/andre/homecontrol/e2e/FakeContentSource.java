@@ -38,6 +38,8 @@ public class FakeContentSource implements ContentSource {
     static final List<String> FLAKY_RAIL_IDS = List.of("flaky", "flaky-2", "flaky-3", "flaky-4", "flaky-5");
 
     private final Map<String, ContentItem> items = new LinkedHashMap<>();
+    /** Found by search and id only, never in a rail: items no device can open, so the sheet offers to pin a link. */
+    private final Map<String, ContentItem> unlinked = new LinkedHashMap<>();
     private final ContentItem launcherBase;
     private final ObjectProvider<PinnedLinks> pinnedLinks;
     /** One flag per flaky rail id; each starts broken so a fresh test sees the failure by default. */
@@ -56,6 +58,10 @@ public class FakeContentSource implements ContentSource {
         items.put(clip1.id(), clip1);
         items.put(clip2.id(), clip2);
         launcherBase = new ContentItem(LAUNCHER_ID, "e2e", ContentKind.MOVIE, "Launcher Film", "On Netflix", null, List.of());
+        unlinked.put("unlinked-1", new ContentItem("unlinked-1", "e2e", ContentKind.MOVIE, "Indie Gem", "2019", null,
+                List.of()));
+        unlinked.put("event-1", new ContentItem("event-1", "e2e", ContentKind.LIVE_EVENT, "Cup Final", "Today", null,
+                List.of()));
     }
 
     /** Recomputed on every call, like a real streaming source: a pinned upgrade wins, else the app home. */
@@ -115,7 +121,7 @@ public class FakeContentSource implements ContentSource {
         if (LAUNCHER_ID.equals(itemId)) {
             return Optional.of(launcher());
         }
-        return Optional.ofNullable(items.get(itemId));
+        return Optional.ofNullable(items.getOrDefault(itemId, unlinked.get(itemId)));
     }
 
     @Override
@@ -123,6 +129,7 @@ public class FakeContentSource implements ContentSource {
         String needle = query.toLowerCase(Locale.ROOT);
         List<ContentItem> candidates = new ArrayList<>(items.values());
         candidates.add(launcher());
+        candidates.addAll(unlinked.values());
         return candidates.stream()
                 .filter(item -> item.title().toLowerCase(Locale.ROOT).contains(needle))
                 .limit(limit)
