@@ -121,4 +121,28 @@ class YouTubeSettingsTest {
 
         assertThat(withAdded.loungeDevices()).containsExactly("attic", "basement", "kitchen", "living-room");
     }
+
+    @Test
+    void missingVersionOneDataAndOddEntriesReadAsNothing() {
+        assertThat(YouTubeSettings.fromVersionOne(null)).isEqualTo(YouTubeSettings.EMPTY);
+
+        Map<String, String> flat = new java.util.HashMap<>();
+        flat.put("connectedAt", "yesterday");
+        flat.put("playlist.../etc", "Odd");
+        flat.put("lounge.devices", "tv,, ,kitchen");
+        YouTubeSettings settings = YouTubeSettings.fromVersionOne(flat);
+
+        assertThat(settings.connectedAt()).isNull();
+        assertThat(settings.playlists()).isEmpty();
+        assertThat(settings.loungeDevices()).containsExactly("kitchen", "tv");
+    }
+
+    @Test
+    void missingPlaylistsAndDevicesAreEmptyAndALoungeRemoteCanBeSet() {
+        YouTubeSettings bare = new YouTubeSettings(null, null, null, false, null, null, null);
+
+        assertThat(bare.playlists()).isEmpty();
+        assertThat(bare.loungeDevices()).isEmpty();
+        assertThat(bare.withLoungeRemoteId("remote-1").loungeRemoteId()).isEqualTo("remote-1");
+    }
 }
