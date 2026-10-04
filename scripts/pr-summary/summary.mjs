@@ -16,6 +16,7 @@ const REPORT_READ_BATCH_SIZE = 4;
 // runs several times is named "<job> on <architecture>" or "<job> (<language>)" there.
 export const CHECKS = [
     { key: "checksums", job: "Verify dependency checksums", label: "Dependency checksums" },
+    { key: "checksum-update", job: "Update dependency checksums", label: "Update dependency checksums" },
     { key: "jar", job: "Build the jar", label: "Jar" },
     { key: "test", job: "Build and test", label: "Unit and integration tests", suite: "test" },
     { key: "e2e-chromium", job: "Browser tests (Chromium)", label: "Browser tests (Chromium)", suite: "e2e-chromium" },
@@ -284,13 +285,15 @@ function tests(heading, kind, model, { traces, limit }) {
 
 function compose(model, { traces, limit }) {
     // Only when nothing but documentation changed are checks left out on purpose.
-    const passed = model.checks.every((check) => check.result === "success"
+    const updating = model.checksumState === "candidate"
+        && !model.checks.some((check) => check.result === "failure" || check.result === "cancelled");
+    const passed = model.checksumState !== "candidate" && model.checks.every((check) => check.result === "success"
         || (model.documentationOnly && check.result === "skipped"));
     const attempt = model.runAttempt > 1 ? `, attempt ${model.runAttempt}` : "";
     const run = `run #${model.runNumber}${attempt}`;
     const lines = [
         MARKER,
-        passed ? "## ✅ CI passed" : "## ❌ CI failed",
+        updating ? "## 🔄 Updating dependency checksums" : passed ? "## ✅ CI passed" : "## ❌ CI failed",
         `${code(model.headSha.slice(0, 7))} · ${link(run, model.runUrl)} · ${duration(model.durationSeconds)}`,
         ...(model.documentationOnly ? ["", "Only documentation changed, so nothing was built or tested."] : []),
         "",
@@ -298,6 +301,16 @@ function compose(model, { traces, limit }) {
         "|---|---|",
         ...model.checks.map((check) => `| ${check.label} | ${row(check, model)} |`),
     ];
+    if (model.checksumState === "candidate") {
+        const update = model.checksumUpdate;
+        if (update?.state === "committed") {
+            lines.push("", `Committed verified checksums as ${code(update.commit_sha)}. A new CI run checks this commit.`);
+        } else if (update?.state === "superseded") {
+            lines.push("", "The PR changed during verification; this run did not update its branch.");
+        } else {
+            lines.push("", "CI verifies the new artifacts and commits their checksums to this PR. See the update job for progress or failure details.");
+        }
+    }
     lines.push(...tests("Failed tests", "failures", model, { traces, limit }),
         ...tests("Passed only on a retry", "flaky", model, { traces, limit }));
     const sonar = model.checks.find((check) => check.key === "sonar");
@@ -343,7 +356,10 @@ export function buildModel({ env, suites, gate, now }) {
         sonarUrl: `https://sonarcloud.io/summary/new_code?id=${encodeURIComponent(env.SONAR_PROJECT_KEY)}`
             + `&pullRequest=${encodeURIComponent(env.PR_NUMBER)}`,
         gate,
-        checks: CHECKS.map(({ key, job, label, suite }) => ({
+        checksumState: needs.checksums?.outputs?.state,
+        checksumUpdate: needs["checksum-update"]?.outputs,
+        checks: CHECKS.filter(({ key }) => key !== "checksum-update"
+            || (needs[key] && needs[key].result !== "skipped")).map(({ key, job, label, suite }) => ({
             key,
             label,
             result: needs[key]?.result ?? "skipped",
