@@ -109,7 +109,7 @@ class PairingSessionTest {
 
     @Test
     void aDeviceThatHangsUpDuringTheExchangeEndsTheStart() throws Exception {
-        try (ScriptedDevice hangsUp = new ScriptedDevice(stream -> { })) {
+        try (FakeScriptedPairingDevice hangsUp = new FakeScriptedPairingDevice(stream -> { })) {
             PairingSession pairing = new PairingSession("127.0.0.1", hangsUp.port(), credential);
 
             assertThatThrownBy(pairing::start)
@@ -121,7 +121,7 @@ class PairingSessionTest {
 
     @Test
     void aDeviceThatAnswersWithAnotherMessageIsAProtocolError() throws Exception {
-        try (ScriptedDevice confused = new ScriptedDevice(stream -> write(stream, PairingMessage.newBuilder()
+        try (FakeScriptedPairingDevice confused = new FakeScriptedPairingDevice(stream -> write(stream, PairingMessage.newBuilder()
                 .setProtocolVersion(2)
                 .setStatus(PairingMessage.Status.STATUS_OK)
                 .setPairingOption(PairingOption.getDefaultInstance())
@@ -144,10 +144,10 @@ class PairingSessionTest {
     }
 
     /** A pairing device that reads the client's first message, answers it with {@code answer}, then hangs up. */
-    private static final class ScriptedDevice implements AutoCloseable {
+    private static final class FakeScriptedPairingDevice implements AutoCloseable {
         private final SSLServerSocket listener;
 
-        ScriptedDevice(Consumer<MessageStream> answer) throws Exception {
+        FakeScriptedPairingDevice(Consumer<MessageStream> answer) throws Exception {
             listener = (SSLServerSocket) TlsSockets.context(ClientCertificate.generate("scripted-device"))
                     .getServerSocketFactory().createServerSocket(0);
             listener.setWantClientAuth(true);
