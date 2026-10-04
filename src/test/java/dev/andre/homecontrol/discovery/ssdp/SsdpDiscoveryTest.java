@@ -263,8 +263,15 @@ class SsdpDiscoveryTest {
     @Test
     void aLocationThatIsNoUriKeepsTheServiceWithoutOne() {
         discovery.watch("urn:x:1");
-        String alive = "NOTIFY * HTTP/1.1\r\nNT: urn:x:1\r\nNTS: ssdp:alive\r\nUSN: uuid:odd::urn:x:1\r\n"
-                + "LOCATION: http://10.0.0.7:1400/a description.xml\r\nCACHE-CONTROL: max-age=60\r\n\r\n";
+        String alive = """
+                NOTIFY * HTTP/1.1\r
+                NT: urn:x:1\r
+                NTS: ssdp:alive\r
+                USN: uuid:odd::urn:x:1\r
+                LOCATION: http://10.0.0.7:1400/a description.xml\r
+                CACHE-CONTROL: max-age=60\r
+                \r
+                """;
 
         discovery.handle(SsdpMessage.parse(alive.getBytes(StandardCharsets.US_ASCII), alive.length()).orElseThrow(),
                 host(7));
