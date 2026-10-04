@@ -352,4 +352,53 @@ class CalendarScheduleTest {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
+
+    @Test
+    void anEventWithoutATitleOrUidIsNamedAndIdentifiedByWhatItHas() {
+        Instant start = Instant.parse("2026-09-19T13:30:00Z");
+        IcsOccurrence untitled = new IcsOccurrence(null, null, start, start.plus(Duration.ofHours(2)), null, null);
+        IcsOccurrence blank = new IcsOccurrence(null, "  ", start, start.plus(Duration.ofHours(2)), null, null);
+
+        SportsEvent event = CalendarSchedule.toEvent("c-1", untitled);
+
+        assertThat(event.title()).isEqualTo("Event");
+        assertThat(CalendarSchedule.toEvent("c-1", blank).title()).isEqualTo("Event");
+        assertThat(event.formerItemId()).as("its id is the former one").isNull();
+        assertThat(event.itemId()).startsWith("ics:c-1:")
+                .isNotEqualTo(CalendarSchedule.toEvent("c-1",
+                        new IcsOccurrence(null, null, start.plusSeconds(60), start.plus(Duration.ofHours(2)), null, null))
+                        .itemId());
+    }
+
+    @Test
+    void aVeryLongTitleIsShortened() {
+        Instant start = Instant.parse("2026-09-19T13:30:00Z");
+        IcsOccurrence long200 = new IcsOccurrence("u@x", "a".repeat(250), start, start.plus(Duration.ofHours(2)), null, null);
+
+        assertThat(CalendarSchedule.toEvent("c-1", long200).title()).hasSize(200).endsWith("…");
+    }
+
+    @Test
+    void aCalendarThatFailedBeforeItEverLoadedShowsItsError() {
+        server.respond("/weekly.ics", 404, "text/plain", "");
+
+        FeedStatus status = schedule.status("c-00000000000a").orElseThrow();
+
+        assertThat(status.fetchedAt()).isNull();
+        assertThat(status.events()).isZero();
+        assertThat(status.error()).isEqualTo("127.0.0.1 has no calendar at that link");
+        assertThat(schedule.status("c-not-configured")).isEmpty();
+    }
+
+    @Test
+    void aStatusAfterANewDownloadExpandsThatDownload() throws Exception {
+        schedule.events();
+        IcsCalendar parsed = IcsParser.parse(fixture("bundesliga.ics"));
+        schedule.prime("c-3f9a1c2b7d4e", parsed);
+
+        FeedStatus status = schedule.status("c-3f9a1c2b7d4e").orElseThrow();
+
+        assertThat(status.events()).isPositive();
+        assertThat(status.fetchedAt()).isEqualTo(clock.instant());
+    }
 }
