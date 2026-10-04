@@ -90,6 +90,52 @@ class CertificateStoreTest {
     }
 
     @Test
+    void aKeystoreThatCannotBeWrittenIsAStorageFailure() throws Exception {
+        Path notADirectory = Files.writeString(dir.resolve("not-a-directory"), "a file");
+        CertificateStore store = new CertificateStore(notADirectory.resolve("keystore.p12"), "secret".toCharArray());
+        ClientCertificate credential = TestCredentials.clientCertificate();
+
+        assertThatThrownBy(() -> store.save("living", credential))
+                .isInstanceOf(StorageException.class)
+                .hasMessageStartingWith("Could not write keystore")
+                .hasMessageContaining("check file permissions");
+    }
+
+    @Test
+    void deletingWithAWrongPasswordIsAStorageFailure() {
+        Path file = dir.resolve("keystore.p12");
+        new CertificateStore(file, "correct".toCharArray()).loadOrCreate("shield");
+
+        CertificateStore wrongPassword = new CertificateStore(file, "wrong".toCharArray());
+        assertThatThrownBy(() -> wrongPassword.delete("shield"))
+                .isInstanceOf(StorageException.class)
+                .hasMessageStartingWith("Could not delete credential shield from keystore " + file);
+    }
+
+    @Test
+    void aKeystoreOpensOnlyWithItsPassword() {
+        Path file = dir.resolve("keystore.p12");
+        new CertificateStore(file, "correct".toCharArray()).loadOrCreate("shield");
+
+        assertThat(CertificateStore.opens(file, "correct".toCharArray())).isTrue();
+        assertThat(CertificateStore.opens(file, "wrong".toCharArray())).isFalse();
+        assertThat(CertificateStore.opens(dir.resolve("missing.p12"), "correct".toCharArray())).isFalse();
+    }
+
+    @Test
+    void reprotectingMovesTheKeystoreAndItsKeysToTheNewPassword() {
+        Path file = dir.resolve("keystore.p12");
+        ClientCertificate created = new CertificateStore(file, "old".toCharArray()).loadOrCreate("shield");
+
+        assertThat(CertificateStore.reprotect(file, "wrong".toCharArray(), "new".toCharArray())).isFalse();
+        assertThat(CertificateStore.reprotect(file, "old".toCharArray(), "new".toCharArray())).isTrue();
+
+        assertThat(CertificateStore.opens(file, "old".toCharArray())).isFalse();
+        assertThat(new CertificateStore(file, "new".toCharArray()).load("shield"))
+                .hasValueSatisfying(loaded -> assertThat(loaded.certificate()).isEqualTo(created.certificate()));
+    }
+
+    @Test
     void verifyReadableAcceptsAMissingKeystoreWithoutCreatingIt() {
         Path file = dir.resolve("keystore.p12");
 

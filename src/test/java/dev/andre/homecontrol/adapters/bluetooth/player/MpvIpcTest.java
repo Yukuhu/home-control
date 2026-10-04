@@ -9,8 +9,10 @@ import tools.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -19,6 +21,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -248,6 +251,108 @@ class MpvIpcTest {
                     .isInstanceOf(IllegalArgumentException.class);
         } finally {
             ipc.close();
+        }
+    }
+
+    @Test
+    void sendsWholeAndDecimalNumbers() throws Exception {
+        MpvIpc ipc = MpvIpc.connect(socket(), Duration.ofSeconds(1), () -> true, listener());
+        try {
+            ipc.command(Duration.ofSeconds(1), "set_property", "volume", 30L);
+            assertThat(fake.volume()).isEqualTo(30.0);
+            ipc.command(Duration.ofSeconds(1), "set_property", "volume", 42.5);
+            assertThat(fake.volume()).isEqualTo(42.5);
+        } finally {
+            ipc.close();
+        }
+    }
+
+    @Test
+    void aProcessThatDiesWhileTheWaitRunsOutIsReportedAsExited() {
+        Path missing = dir.resolve("never.sock");
+        Duration timeout = Duration.ofMillis(200);
+        long aliveUntil = System.nanoTime() + timeout.toNanos();
+
+        assertThatThrownBy(() -> MpvIpc.connect(missing, timeout, () -> System.nanoTime() < aliveUntil, listener()))
+                .isInstanceOf(IOException.class)
+                .hasMessage("mpv exited before opening its control socket");
+    }
+
+    @Test
+    void linesThatAreNotJsonAndAFailingListenerAreSkipped() throws Exception {
+        Path rawSocket = dir.resolve("raw.sock");
+        List<String> heard = new CopyOnWriteArrayList<>();
+        MpvIpc.EventListener failingOnce = new MpvIpc.EventListener() {
+            @Override
+            public void onEvent(JsonNode event) {
+                heard.add(event.path("event").asString(""));
+                if (heard.size() == 1) {
+                    throw new IllegalStateException("listener bug");
+                }
+            }
+
+            @Override
+            public void onClosed() {
+                throw new IllegalStateException("close listener bug");
+            }
+        };
+        try (var _ = rawMpv(rawSocket, channel -> write(channel,
+                "not json\n{\"event\":\"start-file\"}\n{\"request_id\":\"x\"}\n{\"event\":\"idle\"}\n"))) {
+            MpvIpc ipc = MpvIpc.connect(rawSocket, Duration.ofSeconds(2), () -> true, failingOnce);
+
+            await().atMost(Duration.ofSeconds(2)).until(() -> heard.size() == 2);
+            assertThat(heard).containsExactly("start-file", "idle");
+            ipc.close();
+            assertThat(ipc.open()).isFalse();
+        }
+    }
+
+    @Test
+    void aLineOverOneMebibyteEndsTheConnection() throws Exception {
+        Path rawSocket = dir.resolve("long.sock");
+        CountDownLatch closed = new CountDownLatch(1);
+        MpvIpc.EventListener closing = new MpvIpc.EventListener() {
+            @Override
+            public void onEvent(JsonNode event) {
+                // Nothing complete arrives.
+            }
+
+            @Override
+            public void onClosed() {
+                closed.countDown();
+            }
+        };
+        try (var _ = rawMpv(rawSocket, channel -> write(channel, "x".repeat(1024 * 1024 + 1)))) {
+            MpvIpc ipc = MpvIpc.connect(rawSocket, Duration.ofSeconds(2), () -> true, closing);
+
+            assertThat(closed.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(ipc.open()).isFalse();
+        }
+    }
+
+    /** A control socket that runs {@code script} on the first connection and then keeps it open. */
+    private static ServerSocketChannel rawMpv(Path path, Consumer<SocketChannel> script)
+            throws IOException {
+        ServerSocketChannel server = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
+        server.bind(UnixDomainSocketAddress.of(path));
+        Thread.ofVirtual().start(() -> {
+            try {
+                script.accept(server.accept());
+            } catch (IOException _) {
+                // The test closed the server.
+            }
+        });
+        return server;
+    }
+
+    private static void write(SocketChannel channel, String text) {
+        try {
+            ByteBuffer bytes = ByteBuffer.wrap(text.getBytes(StandardCharsets.UTF_8));
+            while (bytes.hasRemaining()) {
+                channel.write(bytes);
+            }
+        } catch (IOException _) {
+            // The client went away.
         }
     }
 

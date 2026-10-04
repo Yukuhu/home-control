@@ -10,6 +10,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.file.Files;
@@ -124,6 +125,36 @@ class JsonFileDeviceRegistryTest {
                 .isInstanceOf(StorageException.class)
                 .hasMessageContaining(file.toString())
                 .hasMessageContaining("fix or delete it");
+    }
+
+    @ParameterizedTest(name = "{1}")
+    @CsvSource(delimiter = '|', value = {
+            "null| record is null",
+            "{\"id\":\"tv\",\"host\":\"10.0.0.9\",\"kind\":\"WEBOS\",\"lastSeen\":\"2026-08-29T18:00:00Z\"}| name is required",
+            "{\"id\":\"tv\",\"name\":\"TV\",\"host\":\" \",\"kind\":\"WEBOS\",\"lastSeen\":\"2026-08-29T18:00:00Z\"}| host is required",
+            "{\"id\":\"tv\",\"name\":\"TV\",\"host\":\"10.0.0.9\",\"lastSeen\":\"2026-08-29T18:00:00Z\"}| kind is required",
+            "{\"id\":\"tv\",\"name\":\"TV\",\"host\":\"10.0.0.9\",\"kind\":\"WEBOS\"}| lastSeen is required"})
+    void aRecordMissingWhatEveryDeviceHasNamesTheField(String record, String reason) throws Exception {
+        Path file = dir.resolve("devices.json");
+        Files.writeString(file, "{\"version\":3,\"devices\":[" + record + "]}");
+
+        var registry = new JsonFileDeviceRegistry(file);
+        assertThatThrownBy(registry::findAll)
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining(file.toString())
+                .hasStackTraceContaining("invalid device record at index 0: " + reason);
+    }
+
+    @Test
+    void devicesThatAreNoListAreAPathBearingStorageFailure() throws Exception {
+        Path file = dir.resolve("devices.json");
+        Files.writeString(file, "{\"version\":3,\"devices\":{}}");
+
+        var registry = new JsonFileDeviceRegistry(file);
+        assertThatThrownBy(registry::findAll)
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining(file.toString())
+                .hasStackTraceContaining("devices must be a JSON array");
     }
 
     @Test
