@@ -78,7 +78,20 @@ jobs:
           persist-credentials: false
 
       - name: Test checksum verification and publication
-        run: python3 -m unittest discover -s scripts/dependency-checksums -p 'test_*.py' -v
+        run: |
+          python3 -m venv "$RUNNER_TEMP/checksum-tests"
+          "$RUNNER_TEMP/checksum-tests/bin/python" -m pip install --require-hashes --no-deps \
+            -r scripts/dependency-checksums/requirements.txt
+          "$RUNNER_TEMP/checksum-tests/bin/python" -m coverage run --rcfile=scripts/dependency-checksums/.coveragerc \
+            -m unittest discover -s scripts/dependency-checksums -p 'test_*.py' -v
+          "$RUNNER_TEMP/checksum-tests/bin/python" -m coverage xml --rcfile=scripts/dependency-checksums/.coveragerc
+
+      - name: Upload checksum tooling coverage for SonarCloud
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: checksum-coverage
+          path: build/reports/dependency-checksums/coverage.xml
+          if-no-files-found: error
 
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
@@ -607,6 +620,11 @@ jobs:
         with:
           name: pr-summary-coverage
           path: build/reports/pr-summary
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: checksum-coverage
+          path: build/reports/dependency-checksums
 
       - name: Analyze both test suites and gate pull requests
         env:

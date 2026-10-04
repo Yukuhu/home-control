@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import re
 import time
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import build_opener, HTTPRedirectHandler, Request
 import xml.etree.ElementTree as ET
@@ -20,7 +20,7 @@ PORTAL = 'https://plugins.gradle.org/m2/'
 HOSTS = {'repo.maven.apache.org', 'plugins.gradle.org', 'plugins-artifacts.gradle.org'}
 MAX_XML = 5 * 1024 * 1024
 MAX_ARTIFACT = 512 * 1024 * 1024
-IDENTIFIER = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_.+\-]*\Z')
+IDENTIFIER = re.compile(r'\w[\w.+\-]*\Z', re.ASCII)
 SHA256 = re.compile(r'[a-f0-9]{64}\Z')
 
 class VerificationError(ValueError):
@@ -78,7 +78,7 @@ class Repository:
             except HTTPError as error:
                 if error.code not in (429, 500, 502, 503, 504):
                     raise
-            except (URLError, TimeoutError, OSError):
+            except OSError:
                 pass
             if attempt < 2:
                 time.sleep(attempt + 1)
@@ -129,13 +129,7 @@ class Links(HTMLParser):
 def tag(name):
     return f'{{{NS}}}{name}'
 
-def parse(data):
-    if len(data) > MAX_XML or b'<!DOCTYPE' in data.upper() or b'<!ENTITY' in data.upper() or b'\x00' in data:
-        raise VerificationError('Unsafe or oversized verification XML')
-    try:
-        root = ET.fromstring(data)
-    except ET.ParseError as error:
-        raise VerificationError('Malformed verification XML') from error
+def validate_configuration(root):
     if root.tag != tag('verification-metadata') or [child.tag for child in root] != [tag('configuration'), tag('components')]:
         raise VerificationError('Unexpected verification metadata structure')
     config = root[0]
@@ -145,6 +139,25 @@ def parse(data):
         raise VerificationError('Verification configuration changed')
     if root[1].attrib:
         raise VerificationError('Unexpected components attributes')
+
+def parse_artifact(identity, artifact):
+    if artifact.tag != tag('artifact') or set(artifact.attrib) != {'name'} or len(artifact) != 1:
+        raise VerificationError('Unexpected artifact structure or alternate hashes')
+    key = identity + (artifact.get('name'),)
+    coordinate(key)
+    checksum = artifact[0]
+    if checksum.tag != tag('sha256') or len(checksum) or not set(checksum.attrib) <= {'value', 'origin'} or not SHA256.fullmatch(checksum.get('value', '')):
+        raise VerificationError('Unexpected artifact checksum')
+    return key, dict(checksum.attrib)
+
+def parse(data):
+    if len(data) > MAX_XML or b'<!DOCTYPE' in data.upper() or b'<!ENTITY' in data.upper() or b'\x00' in data:
+        raise VerificationError('Unsafe or oversized verification XML')
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError as error:
+        raise VerificationError('Malformed verification XML') from error
+    validate_configuration(root)
     components, artifacts = set(), {}
     for component in root[1]:
         if component.tag != tag('component') or set(component.attrib) != {'group', 'name', 'version'}:
@@ -154,17 +167,25 @@ def parse(data):
             raise VerificationError('Duplicate or empty component')
         components.add(identity)
         for artifact in component:
-            if artifact.tag != tag('artifact') or set(artifact.attrib) != {'name'} or len(artifact) != 1:
-                raise VerificationError('Unexpected artifact structure or alternate hashes')
-            key = identity + (artifact.get('name'),)
-            coordinate(key)
-            checksum = artifact[0]
-            if checksum.tag != tag('sha256') or len(checksum) or not set(checksum.attrib) <= {'value', 'origin'} or not SHA256.fullmatch(checksum.get('value', '')):
-                raise VerificationError('Unexpected artifact checksum')
+            key, attributes = parse_artifact(identity, artifact)
             if key in artifacts:
                 raise VerificationError('Duplicate artifact')
-            artifacts[key] = dict(checksum.attrib)
+            artifacts[key] = attributes
     return root.attrib, artifacts
+
+def insert_before_closing(text, end, block, indentation):
+    line = text.rfind('\n', 0, end) + 1
+    start = line if text[line:end].isspace() else end
+    return text[:start] + block + indentation + text[end:]
+
+def append_component_artifacts(text, identity, artifacts):
+    # Match parsed attributes independently of their order/quotes, retaining the original bytes.
+    for match in re.finditer(r'<component\s[^>]*>.*?</component>', text, re.S):
+        element = ET.fromstring(match.group())
+        if tuple(element.get(n) for n in ('group', 'name', 'version')) == identity:
+            end = match.end() - len('</component>')
+            return insert_before_closing(text, end, artifacts, '      ')
+    raise VerificationError('Cannot locate the existing component')
 
 def render_additions(head, trusted, accepted):
     """Insert additions while keeping the committed file's existing bytes and hashes."""
@@ -179,34 +200,15 @@ def render_additions(head, trusted, accepted):
             f'            <sha256 value={quoteattr(attrs["value"])} origin={quoteattr(attrs.get("origin", "Verified metadata from base"))} />\n'
             '         </artifact>\n' for name, attrs in additions)
         if any(key[:3] == (group, module, version) for key in trusted):
-            # Find the matching element by parsed attributes, independent of attribute order/quotes.
-            found = False
-            for match in re.finditer(r'<component\s[^>]*>.*?</component>', text, re.S):
-                element = ET.fromstring(match.group())
-                if tuple(element.get(n) for n in ('group', 'name', 'version')) == (group, module, version):
-                    end = match.end() - len('</component>')
-                    line = text.rfind('\n', 0, end) + 1
-                    start = line if text[line:end].isspace() else end
-                    text = text[:start] + artifacts + '      ' + text[end:]
-                    found = True
-                    break
-            if not found:
-                raise VerificationError('Cannot locate the existing component')
+            text = append_component_artifacts(text, (group, module, version), artifacts)
         else:
             block = (f'      <component group={quoteattr(group)} name={quoteattr(module)} version={quoteattr(version)}>\n'
                      + artifacts + '      </component>\n')
             end = text.index('</components>')
-            line = text.rfind('\n', 0, end) + 1
-            start = line if text[line:end].isspace() else end
-            text = text[:start] + block + '   ' + text[end:]
+            text = insert_before_closing(text, end, block, '   ')
     return text.encode('utf-8')
 
-def verify_metadata(head_xml, base_xml, candidate_xml, repository):
-    head_attrs, head = parse(head_xml)
-    base_attrs, base = parse(base_xml)
-    candidate_attrs, candidate = parse(candidate_xml)
-    if head_attrs != base_attrs or head_attrs != candidate_attrs:
-        raise VerificationError('Verification root attributes changed')
+def trusted_metadata(head, base, candidate):
     trusted = dict(head)
     for key, attrs in base.items():
         if key in trusted and trusted[key]['value'] != attrs['value']:
@@ -215,8 +217,9 @@ def verify_metadata(head_xml, base_xml, candidate_xml, repository):
     for key, attrs in trusted.items():
         if key not in candidate or candidate[key]['value'] != attrs['value']:
             raise VerificationError(f'Trusted checksum removed or changed: {key[-1]}')
-    accepted = dict(trusted)
-    additions = []
+    return trusted
+
+def verify_candidate_artifacts(candidate, trusted, accepted, additions, repository):
     module_companions = set()
     for key, attrs in candidate.items():
         if key in trusted:
@@ -231,14 +234,29 @@ def verify_metadata(head_xml, base_xml, candidate_xml, repository):
     for key in sorted(module_companions):
         if key not in accepted:
             accept(accepted, additions, key, repository.fetch(*key))
-    new_protoc_versions = {key[2] for key in candidate if key[:2] == ('com.google.protobuf', 'protoc')
-                          and not any(old[:3] == key[:3] for old in trusted)}
-    for version in sorted(new_protoc_versions):
+
+def complete_protoc_platforms(candidate, trusted, accepted, additions, repository):
+    compiler = ('com.google.protobuf', 'protoc')
+    candidate_versions = {key[2] for key in candidate if key[:2] == compiler}
+    trusted_versions = {key[2] for key in trusted if key[:2] == compiler}
+    for version in sorted(candidate_versions - trusted_versions):
         for artifact in repository.protoc_artifacts(version):
             key = ('com.google.protobuf', 'protoc', version, artifact)
             coordinate(key)
             if key not in accepted:
                 accept(accepted, additions, key, repository.fetch(*key))
+
+def verify_metadata(head_xml, base_xml, candidate_xml, repository):
+    head_attrs, head = parse(head_xml)
+    base_attrs, base = parse(base_xml)
+    candidate_attrs, candidate = parse(candidate_xml)
+    if head_attrs != base_attrs or head_attrs != candidate_attrs:
+        raise VerificationError('Verification root attributes changed')
+    trusted = trusted_metadata(head, base, candidate)
+    accepted = dict(trusted)
+    additions = []
+    verify_candidate_artifacts(candidate, trusted, accepted, additions, repository)
+    complete_protoc_platforms(candidate, trusted, accepted, additions, repository)
     output = render_additions(head_xml, head, accepted) if set(accepted) != set(head) else head_xml
     _, rendered = parse(output)
     if {k: v['value'] for k, v in rendered.items()} != {k: v['value'] for k, v in accepted.items()}:
@@ -258,9 +276,10 @@ def main():
         parser.add_argument('--' + name, type=Path, required=True)
     args = parser.parse_args()
     try:
-        result = verify_metadata(args.head.read_bytes(), args.base.read_bytes(), args.candidate.read_bytes(), Repository())
-        args.output.write_bytes(result.xml)
-        args.report.write_text(json.dumps({'changed': result.changed, 'additions': result.additions}, indent=2) + '\n')
+        # This local verifier deliberately reads/writes caller-selected files; it has no elevated credential or agent/web input.
+        result = verify_metadata(args.head.read_bytes(), args.base.read_bytes(), args.candidate.read_bytes(), Repository())  # NOSONAR(S8707)
+        args.output.write_bytes(result.xml)  # NOSONAR(S8707): Explicit local CLI output, not a path taken from candidate XML.
+        args.report.write_text(json.dumps({'changed': result.changed, 'additions': result.additions}, indent=2) + '\n')  # NOSONAR(S8707): Same local CLI contract.
     except (VerificationError, OSError) as error:
         parser.exit(1, f'Checksum verification failed: {error}\n')
 

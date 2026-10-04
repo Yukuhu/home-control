@@ -13,7 +13,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from verify import MAX_XML, Repository, VerificationError, sha256, verify_metadata
 
-META = 'gradle/verification-metadata.xml'
+METADATA_FILE = 'verification-metadata.xml'
+META = 'gradle/' + METADATA_FILE
 CATALOG = 'gradle/libs.versions.toml'
 SUBJECT = 'build(deps): update dependency verification metadata [dependabot skip]'
 BOT = 'yukuhu-home-control-checksums[bot]'
@@ -26,7 +27,8 @@ class GitHub:
             raise VerificationError('GitHub CLI is not installed')
 
     def api(self, endpoint):
-        result = subprocess.run([self.executable, 'api', '--hostname', 'github.com', endpoint], capture_output=True, text=True, timeout=60)
+        # Endpoints use fixed prefixes and validated repo/PR IDs; no shell or agent-provided options.
+        result = subprocess.run([self.executable, 'api', '--hostname', 'github.com', endpoint], capture_output=True, text=True, timeout=60)  # NOSONAR(S8705)
         if result.returncode:
             raise VerificationError(f'GitHub API request failed: {endpoint}')
         return json.loads(result.stdout)
@@ -43,7 +45,8 @@ class GitHub:
             raise VerificationError('Could not configure git authentication through gh')
 
 def git(checkout, *args):
-    result = subprocess.run(['git', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false',
+    # CI supplies the checkout as one -C value; commands are fixed and revision inputs validated.
+    result = subprocess.run(['git', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false',  # NOSONAR(S8705)
                              '-C', str(checkout), *args], capture_output=True, timeout=120)
     if result.returncode:
         raise VerificationError(f'Git {args[0]} failed; the branch may have changed or access was denied')
@@ -120,11 +123,11 @@ def prepare(args, github=None, repository=None):
             and f'Checksum-Base: {args.base}' in message.splitlines()
             and f'Checksum-Catalog: {catalog}' in message.splitlines()):
         raise VerificationError('This App already updated checksums for these inputs; refusing a commit loop')
-    result = verify_metadata(head_xml, base_xml, read_file(args.artifact / 'verification-metadata.xml'), repository or Repository())
+    result = verify_metadata(head_xml, base_xml, read_file(args.artifact / METADATA_FILE), repository or Repository())
     if not result.changed:
         return {'state': 'unchanged'}
-    args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / 'verification-metadata.xml').write_bytes(result.xml)
+    args.output.mkdir(parents=True, exist_ok=True)  # NOSONAR(S8707): Output is a fixed CI runner path, never artifact input.
+    (args.output / METADATA_FILE).write_bytes(result.xml)
     prepared = dict(expected, branch=branch, catalog=catalog, metadata_sha256=sha256(result.xml), additions=result.additions)
     (args.output / 'prepared.json').write_text(json.dumps(prepared, indent=2) + '\n')
     return {'state': 'ready'}
@@ -141,7 +144,7 @@ def commit(args, github=None):
         return {'state': 'superseded'}
     if branch != prepared['branch']:
         raise VerificationError('PR branch changed during verification')
-    data = read_file(args.prepared / 'verification-metadata.xml')
+    data = read_file(args.prepared / METADATA_FILE)
     if sha256(data) != prepared['metadata_sha256']:
         raise VerificationError('Verified metadata changed before commit')
     tracked_file(args.checkout, args.head, META)
@@ -196,7 +199,7 @@ def main():
                 for name, value in result.items():
                     output.write(f'{name}={value}\n')
         print(json.dumps(result))
-    except (VerificationError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
+    except (OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f'Checksum update failed: {error}\n')
 
 if __name__ == '__main__':

@@ -1,6 +1,8 @@
 """Use real git remotes to test the PR update and races; only GitHub/network are fake."""
 import argparse
 import copy
+from contextlib import redirect_stderr, redirect_stdout
+import io
 import json
 import os
 from pathlib import Path
@@ -9,7 +11,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from publish import prepare, commit, VerificationError, SUBJECT, BOT
+import publish
+from publish import prepare, commit, GitHub, VerificationError, SUBJECT, BOT
 from test_verify import metadata, digest, FakeRepository, OLD, NEW
 
 META = 'gradle/verification-metadata.xml'
@@ -155,8 +158,58 @@ class PublishTest(unittest.TestCase):
         self.args.head = new
         self.manifest['head'] = new
         self.api.data['head']['sha'] = new
+        git(self.repo, 'checkout', 'main')
+        git(self.repo, 'reset', '--hard', self.base)
+        git(self.repo, 'merge', '--no-ff', new, '-m', 'Merge changed head')
+        self.args.tested = self.manifest['tested'] = git(self.repo, 'rev-parse', 'HEAD')
+        git(self.repo, 'checkout', '--detach', new)
         self.write_artifact()
-        with self.assertRaises(VerificationError): self.prepare()
+        with self.assertRaisesRegex(VerificationError, 'allow only version catalog and metadata'):
+            self.prepare()
+
+    def cli(self, command):
+        argv = ['publish.py', command, '--repository', self.args.repository, '--pr', str(self.args.pr),
+                '--head', self.head, '--checkout', str(self.repo)]
+        if command == 'prepare':
+            argv += ['--base', self.base, '--tested', self.tested, '--run-attempt', '1',
+                     '--artifact', str(self.artifact), '--output', str(self.output)]
+        else:
+            argv += ['--prepared', str(self.output)]
+        stdout = io.StringIO()
+        with patch('sys.argv', argv), patch('publish.GitHub', return_value=self.api), \
+                patch('publish.Repository', return_value=self.repository), redirect_stdout(stdout):
+            publish.main()
+        return json.loads(stdout.getvalue())
+
+    def test_cli_prepares_and_commits_with_machine_readable_outputs(self):
+        output = self.root / 'github-output'
+        with patch.dict(os.environ, {'GITHUB_OUTPUT': str(output)}):
+            self.assertEqual(self.cli('prepare'), {'state': 'ready'})
+            result = self.cli('commit')
+        self.assertEqual(result['state'], 'committed')
+        self.assertIn('state=ready\nstate=committed\n', output.read_text())
+        self.assertIn('commit_sha=' + result['commit_sha'], output.read_text())
+        self.assertEqual(git(self.remote, 'rev-parse', f'refs/heads/{self.branch}'), result['commit_sha'])
+
+    def test_invalid_cli_repository_is_rejected_before_github_or_git(self):
+        self.args.repository = 'owner/repo;--exec=malicious'
+        stderr = io.StringIO()
+        with patch.object(self.api, 'pull') as request, redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as error:
+                self.cli('prepare')
+        self.assertEqual(error.exception.code, 1)
+        self.assertIn('Invalid repository', stderr.getvalue())
+        request.assert_not_called()
+
+    def test_invalid_revision_is_rejected_before_github_or_git(self):
+        for name in ('head', 'base', 'tested'):
+            with self.subTest(name=name):
+                args = copy.copy(self.args)
+                setattr(args, name, '--output=/tmp/injected')
+                with patch.object(self.api, 'pull') as request:
+                    with self.assertRaisesRegex(VerificationError, 'Invalid commit SHA'):
+                        prepare(args, self.api, self.repository)
+                    request.assert_not_called()
 
     def test_rejects_metadata_changed_after_verification(self):
         self.prepare()
@@ -205,6 +258,45 @@ class PublishTest(unittest.TestCase):
         self.write_artifact()
         with self.assertRaisesRegex(VerificationError, 'already updated'):
             self.prepare()
+
+class GitHubTest(unittest.TestCase):
+    def setUp(self):
+        with patch('publish.shutil.which', return_value='/custom/bin/gh'):
+            self.github = GitHub()
+
+    def test_cli_is_located_and_missing_cli_fails_clearly(self):
+        self.assertEqual(self.github.executable, '/custom/bin/gh')
+        with patch('publish.shutil.which', return_value=None):
+            with self.assertRaisesRegex(VerificationError, 'not installed'):
+                GitHub()
+
+    def test_pull_and_bot_id_use_json_from_github(self):
+        responses = [subprocess.CompletedProcess([], 0, '{"state":"open"}'),
+                     subprocess.CompletedProcess([], 0, '{"id":1234}')]
+        with patch('publish.subprocess.run', side_effect=responses) as run:
+            self.assertEqual(self.github.pull('Yukuhu/home-control', 191), {'state':'open'})
+            self.assertEqual(self.github.bot_id(), 1234)
+        self.assertEqual(run.call_args_list[0].args[0],
+                         ['/custom/bin/gh', 'api', '--hostname', 'github.com',
+                          'repos/Yukuhu/home-control/pulls/191'])
+        self.assertEqual(run.call_args_list[1].args[0][-1], 'users/' + BOT)
+
+    def test_api_failure_does_not_echo_sensitive_subprocess_output(self):
+        response = subprocess.CompletedProcess([], 1, 'sensitive stdout', 'sensitive stderr')
+        with patch('publish.subprocess.run', return_value=response):
+            with self.assertRaisesRegex(VerificationError, 'GitHub API request failed') as error:
+                self.github.pull('Yukuhu/home-control', 191)
+        self.assertNotIn('sensitive', str(error.exception))
+
+    def test_git_credentials_are_configured_by_gh_and_errors_propagate(self):
+        success = subprocess.CompletedProcess([], 0)
+        with patch('publish.subprocess.run', return_value=success) as run:
+            self.github.setup_git()
+        self.assertEqual(run.call_args.args[0], ['/custom/bin/gh', 'auth', 'setup-git', '--hostname', 'github.com'])
+        failure = subprocess.CompletedProcess([], 1)
+        with patch('publish.subprocess.run', return_value=failure):
+            with self.assertRaisesRegex(VerificationError, 'configure git authentication'):
+                self.github.setup_git()
 
 if __name__ == '__main__':
     unittest.main()
