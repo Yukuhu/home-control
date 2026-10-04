@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -388,6 +389,83 @@ class YouTubeSetupServiceTest {
         assertThat(service.settings().loungeDevices()).containsExactly("kitchen");
 
         assertThat(service.setLounge("kitchen", false)).isEqualTo("Kitchen");
+        assertThat(service.settings().loungeDevices()).isEmpty();
+    }
+
+    @Test
+    void aMissingClientIdOrSecretIsRefused() {
+        var noClientId = new YouTubeSetupService.ConnectRequest(null, "GOCSPX-abc", "pw-1234567890", "pw-1234567890");
+        assertThatThrownBy(() -> service.connect(noClientId, httpRequest))
+                .hasMessage("That does not look like an OAuth client ID (it ends in .apps.googleusercontent.com)");
+
+        var noSecret = new YouTubeSetupService.ConnectRequest(VALID_CLIENT_ID, null, "pw-1234567890", "pw-1234567890");
+        assertThatThrownBy(() -> service.connect(noSecret, httpRequest)).hasMessage("Enter the client secret");
+        verifyNoInteractions(login, authorization);
+    }
+
+    @Test
+    void aClientSecretLongerThanTwoHundredCharactersIsRefused() {
+        var tooLong = new YouTubeSetupService.ConnectRequest(VALID_CLIENT_ID, "s".repeat(201), "pw-1234567890",
+                "pw-1234567890");
+        assertThatThrownBy(() -> service.connect(tooLong, httpRequest))
+                .isInstanceOf(YouTubeException.class)
+                .hasMessage("That client secret is too long");
+        verifyNoInteractions(login);
+
+        service.connect(new YouTubeSetupService.ConnectRequest(VALID_CLIENT_ID, "s".repeat(200), "pw-1234567890",
+                "pw-1234567890"), httpRequest);
+        verify(login).storeSecrets(Map.of(YouTubeSettings.CLIENT_ID, VALID_CLIENT_ID,
+                YouTubeSettings.CLIENT_SECRET, "s".repeat(200)), "pw-1234567890", "pw-1234567890", httpRequest);
+    }
+
+    @Test
+    void authorizeStartsANewCodeAndCancelEndsIt() {
+        var pending = new YouTubeAuthorizationService.Status(YouTubeAuthorizationService.State.PENDING, "GQVQ-JKEC",
+                URI.create("https://www.google.com/device"), Instant.parse("2026-09-16T10:30:00Z"), null);
+        given(authorization.start()).willReturn(pending);
+
+        assertThat(service.authorize()).isEqualTo(pending);
+
+        service.cancel();
+        verify(authorization).cancel();
+    }
+
+    @Test
+    void playlistsLoadOnlyWhileTheYouTubeModuleHasThem() {
+        assertThat(service.loadPlaylists()).isEmpty();
+
+        YouTubePlaylists p = mock(YouTubePlaylists.class);
+        given(playlists.getIfAvailable()).willReturn(p);
+        var evening = new YouTubePlaylists.PlaylistSummary("PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG", "Watch this evening", 2);
+        given(p.mine()).willReturn(List.of(evening));
+
+        assertThat(service.loadPlaylists()).containsExactly(evening);
+    }
+
+    @Test
+    void choosingNoPlaylistsClearsThemAndAnyChoiceNeedsThemLoaded() {
+        service.save(service.settings().withPlaylists(Map.of("PLa", "Music")));
+
+        service.choosePlaylists(null);
+        assertThat(service.settings().playlists()).isEmpty();
+
+        var one = List.of("PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG");
+        assertThatThrownBy(() -> service.choosePlaylists(one))
+                .as("no playlists bean").hasMessage("Load your playlists again, then choose");
+        var withNull = Arrays.asList("PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG", null);
+        assertThatThrownBy(() -> service.choosePlaylists(withNull))
+                .hasMessage("Load your playlists again, then choose");
+    }
+
+    @Test
+    void theLoungeSwitchNeedsADevice() {
+        assertThatThrownBy(() -> service.setLounge(null, true)).hasMessage("Choose a device");
+        assertThatThrownBy(() -> service.setLounge(" ", false)).hasMessage("Choose a device");
+
+        assertThatThrownBy(() -> service.setLounge("kitchen", true))
+                .as("no device list").hasMessage("No device with id kitchen");
+        service.save(service.settings().withLoungeDevice("kitchen", true));
+        assertThat(service.setLounge("kitchen", false)).isEqualTo("kitchen");
         assertThat(service.settings().loungeDevices()).isEmpty();
     }
 }
