@@ -16,10 +16,14 @@ import dev.andre.homecontrol.adapters.androidtv.protocol.DisconnectCause;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteConnection;
 import dev.andre.homecontrol.adapters.androidtv.protocol.RemoteListener;
 import dev.andre.homecontrol.core.RemoteKey;
+import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.testsupport.RecordingStateListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.net.ServerSocket;
 import java.net.URI;
@@ -33,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -68,6 +73,35 @@ class AndroidTvSessionTest {
     void stopSession() throws Exception {
         session.close();
         fakeDevice.close();
+    }
+
+    static Stream<Arguments> whatTheRemoteProtocolCannotDo() {
+        return Stream.of(
+                Arguments.of(new Action.SetVolume(30), "Android TV Remote v2 has no absolute volume; use the volume keys"),
+                Arguments.of(new Action.Mute(true), "Android TV Remote v2 cannot set mute directly; use the mute key"),
+                Arguments.of(new Action.Stop(), "Android TV Remote v2 cannot stop a cast"),
+                Arguments.of(new Action.CastLoad("CC1AD845", Map.of()), "Android TV Remote v2 cannot load Cast media"),
+                Arguments.of(new Action.CastMessage("CC1AD845", "urn:x-cast:com.example", Map.of()),
+                        "Android TV Remote v2 cannot run Cast receiver apps"),
+                Arguments.of(new Action.SelectInput("HDMI_1"),
+                        "Android TV does not list its inputs; switch inputs from the Home screen"),
+                Arguments.of(new Action.PlayMedia(URI.create("http://nas/film.mp4"), "video/mp4", "Film", null),
+                        "Android TV Remote v2 cannot play a direct stream"),
+                Arguments.of(new Action.Pause(),
+                        "Android TV Remote v2 cannot pause a direct stream; use the play/pause key"),
+                Arguments.of(new Action.Resume(),
+                        "Android TV Remote v2 cannot resume a direct stream; use the play/pause key"),
+                Arguments.of(new Action.JoinGroup("kitchen"), "Android TV cannot be grouped"),
+                Arguments.of(new Action.LeaveGroup(), "Android TV cannot be grouped"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("whatTheRemoteProtocolCannotDo")
+    void refusesWhatTheRemoteProtocolCannotDoWithAReason(Action action, String reason) {
+        assertThatThrownBy(() -> session.execute(action))
+                .isInstanceOf(UnsupportedActionException.class)
+                .hasMessage(reason);
+        assertThat(fakeDevice.connections()).isZero();
     }
 
     @Test

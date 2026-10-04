@@ -166,6 +166,26 @@ class UpnpSessionTest {
     }
 
     @Test
+    void castAndGroupActionsAreRefusedWithAReason() {
+        startConnected();
+        String name = FakeUpnpRenderer.FRIENDLY_NAME;
+
+        var castLoad = new Action.CastLoad("CC1AD845", Map.of());
+        assertThatThrownBy(() -> session.execute(castLoad))
+                .isInstanceOf(UnsupportedActionException.class)
+                .hasMessage(name + " is a media renderer and is not a Cast receiver");
+        var castMessage = new Action.CastMessage("CC1AD845", "urn:x-cast:com.example", Map.of());
+        assertThatThrownBy(() -> session.execute(castMessage))
+                .hasMessage(name + " is a media renderer and is not a Cast receiver");
+        var join = new Action.JoinGroup("kitchen");
+        assertThatThrownBy(() -> session.execute(join))
+                .hasMessage(name + " is a media renderer and cannot be grouped");
+        var leave = new Action.LeaveGroup();
+        assertThatThrownBy(() -> session.execute(leave))
+                .hasMessage(name + " is a media renderer and cannot be grouped");
+    }
+
+    @Test
     void isOfflineWhileTheRendererIsGone() {
         startConnected();
 

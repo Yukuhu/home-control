@@ -317,6 +317,47 @@ class BluetoothSpeakerSessionTest {
     }
 
     @Test
+    void anAudioOutputTemplateThatMakesNoUsableIdIsExplained() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        start(properties.withAudioDeviceTemplate("pulse/bluez output {mac_}"));
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+
+        assertThatThrownBy(() -> session.execute(PLAY))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessage("JBL Flip 5: the audio output id is not usable; fix it on the setup page");
+        assertThat(launcher.starts).isEmpty();
+    }
+
+    @Test
+    void aPairedSpeakerIsConnectedOnTheFirstLookOnly() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(false).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        start(properties.withAutoConnect(true));
+
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
+        assertThat(bluez.calls()).containsOnlyOnce("connect AA:BB:CC:DD:EE:FF");
+    }
+
+    @Test
+    void aSpeakerThatIsNotPairedIsShownAsUnpaired() {
+        start();
+
+        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.UNPAIRED));
+        assertThat(session.state().powerOn()).isFalse();
+    }
+
+    @Test
+    void aClosedSessionTakesNoCommands() {
+        bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        start();
+        session.close();
+        var pause = new Action.Pause();
+
+        assertThatThrownBy(() -> session.execute(pause))
+                .isInstanceOf(DeviceOfflineException.class)
+                .hasMessage("JBL Flip 5 is not connected");
+    }
+
+    @Test
     void stopsPlaybackWhenTheSpeakerDisconnects() {
         bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(true).uuids(BluetoothDeviceInfo.A2DP_SINK);
         start();

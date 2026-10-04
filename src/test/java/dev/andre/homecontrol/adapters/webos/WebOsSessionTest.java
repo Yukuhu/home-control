@@ -15,6 +15,7 @@ import dev.andre.homecontrol.core.DeviceRegistry;
 import dev.andre.homecontrol.core.DeviceState;
 import dev.andre.homecontrol.core.DeviceStatus;
 import dev.andre.homecontrol.core.InputListing;
+import dev.andre.homecontrol.core.KeyPress;
 import dev.andre.homecontrol.core.LearnedSettings;
 import dev.andre.homecontrol.testsupport.InMemoryDeviceSecrets;
 import dev.andre.homecontrol.core.RemoteKey;
@@ -26,6 +27,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.JsonNode;
 
 import java.io.IOException;
@@ -37,6 +41,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -235,6 +240,30 @@ class WebOsSessionTest {
                 .isInstanceOf(UnsupportedActionException.class).hasMessage("LG TV cannot stop a cast");
     }
 
+    static Stream<Arguments> whatAWebOsTvCannotDo() {
+        return Stream.of(
+                Arguments.of(new Action.CastLoad("CC1AD845", Map.of()), "LG TV is not a Cast receiver"),
+                Arguments.of(new Action.CastMessage("CC1AD845", "urn:x-cast:com.example", Map.of()),
+                        "LG TV is not a Cast receiver"),
+                Arguments.of(new Action.PlayMedia(URI.create("http://nas/film.mp4"), "video/mp4", "Film", null),
+                        "LG TV cannot play a direct stream"),
+                Arguments.of(new Action.Pause(), "LG TV cannot pause a direct stream"),
+                Arguments.of(new Action.Resume(), "LG TV cannot resume a direct stream"),
+                Arguments.of(new Action.JoinGroup("kitchen"), "LG TV cannot be grouped"),
+                Arguments.of(new Action.LeaveGroup(), "LG TV cannot be grouped"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("whatAWebOsTvCannotDo")
+    void refusesWhatTheTvCannotDoWithAReason(Action action, String reason) throws IOException {
+        started();
+        connected();
+
+        assertThatThrownBy(() -> session.execute(action))
+                .isInstanceOf(UnsupportedActionException.class)
+                .hasMessage(reason);
+    }
+
     @Test
     void powerWhileOnTurnsTheTvOff() throws Exception {
         started();
@@ -385,6 +414,50 @@ class WebOsSessionTest {
         awaitStatus(DeviceStatus.UNPAIRED);
 
         await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(2)).until(() -> tv.registrations() == 1);
+    }
+
+    @Test
+    void anUnpairedTvRefusesCommandsUntilItIsPairedAgain() throws Exception {
+        session(Map.of("clientKey", "stale")).start();
+        awaitStatus(DeviceStatus.UNPAIRED);
+        var home = new Action.PressKey(RemoteKey.HOME);
+
+        assertThatThrownBy(() -> session.execute(home))
+                .isInstanceOf(DeviceOfflineException.class)
+                .hasMessage("LG TV must be paired again before it can be controlled");
+    }
+
+    @Test
+    void aHoldSendsItsButtonOnceAndItsEndNothing() throws Exception {
+        started();
+        connected();
+
+        session.execute(new Action.PressKey(RemoteKey.DPAD_UP, KeyPress.START_LONG));
+        session.execute(new Action.PressKey(RemoteKey.DPAD_UP, KeyPress.END_LONG));
+        session.execute(new Action.PressKey(RemoteKey.DPAD_DOWN));
+
+        assertThat(tv.nextButton()).isEqualTo("type:button\nname:UP\n\n");
+        assertThat(tv.nextButton()).isEqualTo("type:button\nname:DOWN\n\n");
+    }
+
+    @Test
+    void theEndOfAHoldOnATvThatIsNotConnectedFails() throws IOException {
+        session(Map.of("clientKey", FakeSsapServer.CLIENT_KEY));
+        var endOfHold = new Action.PressKey(RemoteKey.DPAD_UP, KeyPress.END_LONG);
+
+        assertThatThrownBy(() -> session.execute(endOfHold))
+                .isInstanceOf(DeviceOfflineException.class)
+                .hasMessage("LG TV is not connected");
+    }
+
+    @Test
+    void theVolumeDownKeyLowersTheVolume() throws Exception {
+        started();
+        connected();
+
+        session.execute(new Action.PressKey(RemoteKey.VOLUME_DOWN));
+
+        assertThat(tv.nextRequest("ssap://audio/volumeDown")).isNotNull();
     }
 
     @Test
