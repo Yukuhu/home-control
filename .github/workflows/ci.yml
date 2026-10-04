@@ -667,7 +667,7 @@ jobs:
           java-version: '25'
 
       - name: Submit the dependency graph
-        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        uses: gradle/actions/dependency-submission@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
 
       # Fails on a vulnerable runtime dependency that the pull request adds or changes. What is
       # disclosed later about a dependency already on main arrives as a Dependabot alert instead.
