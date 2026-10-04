@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -107,5 +108,47 @@ class JellyfinSettingsTest {
                 settings.serverName(), settings.serverVersion(), settings.userId(), settings.userName(),
                 settings.authMode(), settings.deviceId(), settings.castReceiverId(), settings.sessionLinks())
                 .deviceAddressLooksLocal();
+    }
+
+    @Test
+    void missingLinksAndPlayersAreEmpty() {
+        JellyfinSettings bare = new JellyfinSettings(settings.serverUrl(), settings.deviceServerUrl(), "server-1", "nas",
+                "10.11.2", "user-1", "andre", JellyfinSettings.AuthMode.PASSWORD, "device-1", "F007D354", null, null);
+
+        assertThat(bare.sessionLinks()).isEmpty();
+        assertThat(bare.players()).isEmpty();
+        assertThat(bare.player("shield")).isEqualTo(JellyfinSettings.Player.JELLYFIN);
+    }
+
+    @Test
+    void aVersionOneSectionWithoutAUserIsNotConfiguredAndOnlyVlcIsAPlayerChoice() {
+        assertThat(JellyfinSettings.fromVersionOne(null)).isEmpty();
+        assertThat(JellyfinSettings.fromVersionOne(Map.of("serverUrl", "http://nas:8096"))).isEmpty();
+
+        Map<String, String> section = new LinkedHashMap<>();
+        section.put("serverUrl", "http://nas:8096");
+        section.put("userId", "user-1");
+        section.put("player.tv", "jellyfin");
+        section.put("player.shield", "vlc");
+        Optional<JellyfinSettings> converted = JellyfinSettings.fromVersionOne(section);
+
+        assertThat(converted).hasValueSatisfying(s -> {
+            assertThat(s.players()).containsExactly(Map.entry("shield", JellyfinSettings.Player.VLC));
+            assertThat(s.deviceServerUrl()).isEqualTo(URI.create("http://nas:8096"));
+            assertThat(s.authMode()).isEqualTo(JellyfinSettings.AuthMode.PASSWORD);
+            assertThat(s.castReceiverId()).isEqualTo(JellyfinSettings.DEFAULT_CAST_RECEIVER_ID);
+        });
+    }
+
+    @Test
+    void aMissingAppIdRemovesTheLink() {
+        JellyfinSettings linked = settings.withSessionLink("shield", "jf-1");
+
+        assertThat(linked.withSessionLink("shield", null).sessionLinks()).isEmpty();
+    }
+
+    @Test
+    void anAddressWithoutAHostLooksLocal() {
+        assertThat(local("jellyfin")).isTrue();
     }
 }

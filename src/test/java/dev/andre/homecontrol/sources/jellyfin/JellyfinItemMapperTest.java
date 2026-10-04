@@ -104,4 +104,56 @@ class JellyfinItemMapperTest {
 
         assertThat(item).isEmpty();
     }
+
+    private static ContentItem item(String json) {
+        return JellyfinItemMapper.toItem(MAPPER.readTree(json)).orElseThrow();
+    }
+
+    @Test
+    void aVideoWithoutAYearOrPictureHasNoSubtitleOrArtwork() {
+        ContentItem video = item("{\"Id\":\"v1\",\"Type\":\"Video\",\"Name\":\"Clip\",\"SeriesId\":\"s1\"}");
+
+        assertThat(video.kind()).isEqualTo(ContentKind.VIDEO);
+        assertThat(video.title()).isEqualTo("Clip");
+        assertThat(video.subtitle()).isNull();
+        assertThat(video.artwork()).as("a series id without its tag is no picture").isNull();
+        assertThat(video.progress()).isNull();
+    }
+
+    @Test
+    void aTrackWithoutArtistsFallsBackToItsAlbumArtist() {
+        String json = "{\"Id\":\"t1\",\"Type\":\"Audio\",\"Name\":\"Song\",\"Artists\":[\" \",\"\"],\"AlbumArtist\":\"Band\"}";
+
+        assertThat(item(json).subtitle()).isEqualTo("Band");
+        assertThat(JellyfinItemMapper.playingTitle(MAPPER.readTree(json))).isEqualTo("Band · Song");
+    }
+
+    @Test
+    void aTrackWithNoArtistAtAllIsNamedByItsTitleAlone() {
+        String json = "{\"Id\":\"t1\",\"Type\":\"Audio\",\"Name\":\"Song\"}";
+
+        assertThat(item(json).subtitle()).isNull();
+        assertThat(JellyfinItemMapper.playingTitle(MAPPER.readTree(json))).isEqualTo("Song");
+    }
+
+    @Test
+    void anEpisodeIsNamedByWhatItHas() {
+        assertThat(JellyfinItemMapper.playingTitle(MAPPER.readTree("{\"Type\":\"Episode\",\"SeriesName\":\"Show\"}")))
+                .isEqualTo("Show");
+        assertThat(JellyfinItemMapper.playingTitle(MAPPER.readTree(
+                "{\"Type\":\"Episode\",\"IndexNumber\":2,\"ParentIndexNumber\":1}"))).isEqualTo("S1:E2");
+        assertThat(JellyfinItemMapper.playingTitle(MAPPER.readTree("{\"Type\":\"Episode\",\"IndexNumber\":7}")))
+                .isEqualTo("E7");
+        assertThat(JellyfinItemMapper.playingTitle(MAPPER.readTree("{\"Type\":\"Episode\"}"))).isEmpty();
+    }
+
+    @Test
+    void progressIsCappedAtTheEndAndNeedsARuntimeToComputeFromTicks() {
+        assertThat(item("{\"Id\":\"m1\",\"Type\":\"Movie\",\"UserData\":{\"PlayedPercentage\":120}}").progress())
+                .isEqualTo(1.0);
+        assertThat(item("{\"Id\":\"m1\",\"Type\":\"Movie\",\"UserData\":{\"PlaybackPositionTicks\":500}}").progress())
+                .isNull();
+        assertThat(item("{\"Id\":\"m1\",\"Type\":\"Movie\",\"RunTimeTicks\":100,"
+                + "\"UserData\":{\"PlaybackPositionTicks\":500}}").progress()).isEqualTo(1.0);
+    }
 }

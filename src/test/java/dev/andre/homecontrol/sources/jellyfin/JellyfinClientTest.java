@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.HashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -340,5 +341,74 @@ class JellyfinClientTest {
 
         assertThat(client.image(fake.url(), "abc123", "Primary", null, 300))
                 .hasValueSatisfying(image -> assertThat(image.bytes()).hasSize(poster.length));
+    }
+
+    @Test
+    void anotherMediaServerIsNotJellyfin() throws IOException {
+        fake = new FakeJellyfinServer().respondJson("GET", "/System/Info/Public", 200,
+                "{\"Id\":\"emby-1\",\"ProductName\":\"Emby Server\",\"Version\":\"4.8.0\"}");
+
+        assertThatThrownBy(() -> client.publicInfo(fake.url()))
+                .isInstanceOf(JellyfinException.class)
+                .hasMessage(fake.url() + " answered, but it is not a Jellyfin server");
+    }
+
+    @Test
+    void aServerCheckThatFailsForAnotherReasonKeepsItsReason() throws IOException {
+        fake = new FakeJellyfinServer().respondJson("GET", "/System/Info/Public", 401, "{}");
+
+        assertThatThrownBy(() -> client.publicInfo(fake.url()))
+                .isInstanceOfSatisfying(JellyfinException.class,
+                        e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.UNAUTHORIZED))
+                .hasMessageNotContaining("not a Jellyfin server");
+    }
+
+    @Test
+    void anUnreadableOrOldMajorVersionIsTooOldAndANewerOneIsAccepted() throws IOException {
+        fake = new FakeJellyfinServer().respondJson("GET", "/System/Info/Public", 200,
+                "{\"Id\":\"s\",\"ProductName\":\"Jellyfin Server\",\"Version\":\"unknown\"}");
+        assertThatThrownBy(() -> client.publicInfo(fake.url()))
+                .hasMessage("Jellyfin unknown is too old; Home Control needs Jellyfin 10.9 or newer");
+
+        fake.respondJson("GET", "/System/Info/Public", 200, "{\"Id\":\"s\",\"Version\":\"9.12.0\"}");
+        assertThatThrownBy(() -> client.publicInfo(fake.url())).hasMessageContaining("9.12.0 is too old");
+
+        fake.respondJson("GET", "/System/Info/Public", 200, "{\"Id\":\"s\",\"Version\":\"11.0.1\"}");
+        assertThat(client.publicInfo(fake.url()).path("Version").asString()).isEqualTo("11.0.1");
+    }
+
+    @Test
+    void aLoginThatFailsForAnotherReasonKeepsItsReason() throws IOException {
+        fake = new FakeJellyfinServer().respondJson("POST", "/Users/AuthenticateByName", 500, "{}");
+
+        assertThatThrownBy(() -> client.authenticateByName(fake.url(), "dev", "andre", "pw"))
+                .isInstanceOfSatisfying(JellyfinException.class,
+                        e -> assertThat(e.kind()).isEqualTo(ContentSourceException.Kind.SERVER_ERROR))
+                .hasMessageNotContaining("user name or password");
+    }
+
+    @Test
+    void anImageAnswerWithoutAContentTypeOrNot200IsNoImage() throws IOException {
+        String itemId = "b1c2d3e4f5061728394a5b6c7d8e9f01";
+        fake = new FakeJellyfinServer().respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 200, null,
+                new byte[] {1, 2, 3});
+        assertThatThrownBy(() -> client.image(fake.url(), itemId, "Primary", null, 480))
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin at " + fake.url() + " sent no image");
+
+        fake.respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 500, "image/jpeg", new byte[] {1});
+        assertThatThrownBy(() -> client.image(fake.url(), itemId, "Primary", null, 480))
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin at " + fake.url() + " sent no image");
+    }
+
+    @Test
+    void aQueryValueThatIsNullIsLeftOut() throws IOException {
+        fake = new FakeJellyfinServer().respondJson("GET", "/Items", 200, "{}");
+        Map<String, String> query = new HashMap<>();
+        query.put("userId", "u1");
+        query.put("parentId", null);
+
+        client.get(new JellyfinConnection(fake.url(), "tok", "dev", "u1"), "/Items", query);
+
+        assertThat(fake.last("GET", "/Items").query()).isEqualTo(Map.of("userId", "u1"));
     }
 }

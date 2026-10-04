@@ -10,6 +10,8 @@ import org.springframework.web.servlet.FlashMap;
 
 import java.net.URI;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.times;
@@ -163,5 +165,46 @@ class JellyfinSetupControllerTest extends WebSliceTest {
         playback = playback.substring(0, playback.indexOf("</section>") > 0 ? playback.indexOf("</section>") : playback.length());
 
         assertThat(playback).contains("value=\"shield\"").doesNotContain("value=\"living\"");
+    }
+
+    @Test
+    void aFailedConnectWithoutFieldsKeepsEmptyOnesAndTheDefaultMode() throws Exception {
+        willThrow(new JellyfinException(ContentSourceException.Kind.INVALID_INPUT,
+                "Enter the Jellyfin address as http://host:8096 (or https://…)"))
+                .given(jellyfinSetup).connect(any(), any());
+
+        FlashMap flashMap = mockMvc.perform(post("/setup/sources/jellyfin"))
+                .andExpect(redirectedUrl("/setup"))
+                .andReturn().getFlashMap();
+
+        assertThat(flashMap.get("jellyfinForm")).isEqualTo(Map.of("serverUrl", "", "deviceServerUrl", "", "mode", "password",
+                "userName", ""));
+    }
+
+    @Test
+    void theJellyfinAppCanBeChosenAgainOnceJellyfinIsConnected() throws Exception {
+        given(devices.capabilities("shield")).willReturn(Set.of(Capability.ANDROID_APPS));
+        given(jellyfinSetup.settings()).willReturn(Optional.empty());
+        mockMvc.perform(post("/setup/sources/jellyfin/players").param("device", "shield").param("player", "jellyfin"))
+                .andExpect(flash().attribute("jellyfinError", "Connect Jellyfin before choosing a player"));
+
+        var settings = new JellyfinSettings(URI.create("http://nas:8096"), URI.create("http://nas:8096"),
+                "server", "nas", "10.11.2", "user", "andre", JellyfinSettings.AuthMode.PASSWORD, "hc", "F007D354", Map.of())
+                .withPlayer("shield", JellyfinSettings.Player.VLC);
+        given(jellyfinSetup.settings()).willReturn(Optional.of(settings));
+        mockMvc.perform(post("/setup/sources/jellyfin/players").param("device", "shield").param("player", "jellyfin"))
+                .andExpect(flash().attribute("jellyfinMessage", "Player preference saved"));
+
+        verify(jellyfinSetup).save(settings.withPlayer("shield", JellyfinSettings.Player.JELLYFIN));
+    }
+
+    @Test
+    void aLinkThatCannotBeSavedSaysWhy() throws Exception {
+        willThrow(new JellyfinException(ContentSourceException.Kind.INVALID_INPUT, "Jellyfin is not connected"))
+                .given(jellyfinSetup).link("jf-1", "shield");
+
+        mockMvc.perform(post("/setup/sources/jellyfin/links").param("session", "jf-1").param("device", "shield"))
+                .andExpect(redirectedUrl("/setup"))
+                .andExpect(flash().attribute("jellyfinError", "Jellyfin is not connected"));
     }
 }

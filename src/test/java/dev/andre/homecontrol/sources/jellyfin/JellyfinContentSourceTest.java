@@ -212,4 +212,24 @@ class JellyfinContentSourceTest {
                 "enableImageTypes", "Primary,Thumb,Backdrop",
                 "imageTypeLimit", "1"));
     }
+
+    @Test
+    void anItemLookupThatFailsForAnotherReasonIsReported() throws IOException {
+        connected();
+        fake.respondJson("GET", "/Items/b1c2d3e4f5061728394a5b6c7d8e9f01", 500, "{}");
+
+        assertThatThrownBy(() -> source.item("b1c2d3e4f5061728394a5b6c7d8e9f01"))
+                .isInstanceOf(ContentSourceException.class)
+                .hasMessageContaining("answered HTTP 500");
+    }
+
+    @Test
+    void withoutAConnectionNothingIsAsked() {
+        given(setup.connection()).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> source.item("b1c2d3e4f5061728394a5b6c7d8e9f01"))
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin is not connected");
+        assertThatThrownBy(() -> source.search("bunny", 10))
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin is not connected");
+    }
 }

@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,6 +33,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.assertTimeout;
+import static org.awaitility.Awaitility.await;
 
 class JellyfinRouteExecutorTest {
 
@@ -321,6 +323,113 @@ class JellyfinRouteExecutorTest {
             verify(sessions, never()).playNow(anyString(), anyString(), anyLong());
         } finally {
             Thread.interrupted();
+        }
+    }
+
+    @Test
+    void theStartupTimeoutMustBePositive() {
+        for (Duration timeout : new Duration[] {Duration.ZERO, Duration.ofMillis(-1)}) {
+            assertThatThrownBy(() -> new JellyfinRouteExecutor(sessions, devices, commands, timeout))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Jellyfin startup timeout must be positive");
+        }
+    }
+
+    @Test
+    void anotherSourcesRouteIsAFailedAction() {
+        DelegatedRoute other = new DelegatedRoute() {
+            @Override public String source() { return "Other"; }
+            @Override public String key() { return "other"; }
+            @Override public String describe() { return "Other route"; }
+        };
+
+        assertThatThrownBy(() -> executor.execute(other, browser))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessage("Jellyfin could not start playback on Browser (Not a Jellyfin route)");
+        verifyNoInteractions(sessions, commands);
+    }
+
+    @Test
+    void aSessionLookupTheServerRefusesIsAFailedAction() {
+        given(devices.state("shield")).willReturn(ready());
+        given(sessions.sessionFor(shield)).willThrow(new JellyfinException(ContentSourceException.Kind.UNAUTHORIZED,
+                "Jellyfin rejected the API key"));
+        DelegatedRoute route = new JellyfinRoute.App("item-1", 0);
+
+        assertThatThrownBy(() -> executor.execute(route, shield))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessage("Jellyfin could not start playback on Shield (Jellyfin rejected the API key)");
+        verify(sessions, never()).playNow(anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    void aSessionLookupThatFailsUnexpectedlySaysItCouldNotCheckTheApp() {
+        given(devices.state("shield")).willReturn(ready());
+        given(sessions.sessionFor(shield)).willAnswer(_ -> {
+            throw new IOException("stream closed");
+        });
+        DelegatedRoute route = new JellyfinRoute.App("item-1", 0);
+
+        assertThatThrownBy(() -> executor.execute(route, shield))
+                .isInstanceOf(ActionFailedException.class)
+                .hasMessage("Could not check the Jellyfin app on Shield");
+        verify(sessions, never()).playNow(anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    void anInterruptWhileWaitingForTheDeviceStopsStartup() throws Exception {
+        given(devices.state("shield")).willReturn(DeviceState.initial());
+        var patient = new JellyfinRouteExecutor(sessions, devices, commands, Duration.ofSeconds(30),
+                Duration.ofSeconds(1), Duration.ofSeconds(10));
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Thread starting = Thread.ofPlatform().start(() -> {
+            try {
+                patient.execute(new JellyfinRoute.App("item-1", 0), shield);
+            } catch (RuntimeException e) {
+                failure.set(e);
+            }
+        });
+        await().until(() -> starting.getState() == Thread.State.TIMED_WAITING);
+
+        starting.interrupt();
+        starting.join(5000);
+
+        assertThat(failure.get()).isInstanceOf(ActionFailedException.class).hasMessage("Jellyfin startup was interrupted");
+        verifyNoInteractions(sessions);
+    }
+
+    @Test
+    void anInterruptWhileLookingForTheSessionStopsStartup() throws Exception {
+        given(devices.state("shield")).willReturn(ready());
+        CountDownLatch looking = new CountDownLatch(1);
+        CountDownLatch releaseLookup = new CountDownLatch(1);
+        given(sessions.sessionFor(shield)).willAnswer(_ -> {
+            looking.countDown();
+            releaseLookup.await(10, TimeUnit.SECONDS);
+            return Optional.of(session("late"));
+        });
+        var patient = new JellyfinRouteExecutor(sessions, devices, commands, Duration.ofSeconds(30),
+                Duration.ofSeconds(1), Duration.ofMillis(10));
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Thread starting = Thread.ofPlatform().start(() -> {
+            try {
+                patient.execute(new JellyfinRoute.App("item-1", 0), shield);
+            } catch (RuntimeException e) {
+                failure.set(e);
+            }
+        });
+        try {
+            assertThat(looking.await(5, TimeUnit.SECONDS)).isTrue();
+            await().until(() -> starting.getState() == Thread.State.TIMED_WAITING);
+
+            starting.interrupt();
+            starting.join(5000);
+
+            assertThat(failure.get()).isInstanceOf(ActionFailedException.class)
+                    .hasMessage("Jellyfin startup was interrupted");
+            verify(sessions, never()).playNow(anyString(), anyString(), anyLong());
+        } finally {
+            releaseLookup.countDown();
         }
     }
 }

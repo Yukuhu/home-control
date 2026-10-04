@@ -24,4 +24,12 @@ class JellyfinPlayableTest {
         assertThat(unroutableReason(new JellyfinPlayable.App("item-1", 0), all))
                 .isEqualTo("the Jellyfin app cannot be started on this device");
     }
+
+    @Test
+    void everyJellyfinReferenceNamesItsKind() {
+        assertThat(new JellyfinPlayable.Item("srv", "item-1", 0).kindLabel()).isEqualTo("Jellyfin");
+        assertThat(new JellyfinPlayable.Session("s", "item-1", 0, "Android TV").kindLabel()).isEqualTo("Jellyfin app");
+        assertThat(new JellyfinPlayable.Vlc("item-1").kindLabel())
+                .isEqualTo("Open in VLC (from beginning; no Jellyfin progress tracking)");
+    }
 }
