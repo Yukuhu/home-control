@@ -134,9 +134,9 @@ class JsonFileDeviceRegistryTest {
             "{\"id\":\"tv\",\"name\":\"TV\",\"host\":\" \",\"kind\":\"WEBOS\",\"lastSeen\":\"2026-08-29T18:00:00Z\"}| host is required",
             "{\"id\":\"tv\",\"name\":\"TV\",\"host\":\"10.0.0.9\",\"lastSeen\":\"2026-08-29T18:00:00Z\"}| kind is required",
             "{\"id\":\"tv\",\"name\":\"TV\",\"host\":\"10.0.0.9\",\"kind\":\"WEBOS\"}| lastSeen is required"})
-    void aRecordMissingWhatEveryDeviceHasNamesTheField(String record, String reason) throws Exception {
+    void aRecordMissingWhatEveryDeviceHasNamesTheField(String entry, String reason) throws Exception {
         Path file = dir.resolve("devices.json");
-        Files.writeString(file, "{\"version\":3,\"devices\":[" + record + "]}");
+        Files.writeString(file, "{\"version\":3,\"devices\":[" + entry + "]}");
 
         var registry = new JsonFileDeviceRegistry(file);
         assertThatThrownBy(registry::findAll)

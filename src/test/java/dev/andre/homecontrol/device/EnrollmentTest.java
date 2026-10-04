@@ -187,9 +187,10 @@ class EnrollmentTest {
 
     @Test
     void addingThroughAModuleThatIsSwitchedOffIsRefused() {
-        Wiring wiring = wire(HostAddresses::lookup, new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, false));
+        Enrollment enrollment = wire(HostAddresses::lookup,
+                new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, false)).enrollment();
 
-        assertThatThrownBy(() -> wiring.enrollment().addDiscovered("cast", "10.0.0.9", 8009))
+        assertThatThrownBy(() -> enrollment.addDiscovered("cast", "10.0.0.9", 8009))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("The cast module is switched off");
     }
@@ -199,8 +200,9 @@ class EnrollmentTest {
         StubAdapter cast = new StubAdapter("cast", DeviceKind.CAST, true, false);
         Wiring wiring = wire(HostAddresses::lookup, cast);
         cast.visible.add(new DiscoveredDevice("cast", "Kitchen", "10.0.0.9", 8009, Map.of()));
+        Enrollment enrollment = wiring.enrollment();
 
-        assertThatThrownBy(() -> wiring.enrollment().addDiscovered("cast", "10.0.0.9", 8010))
+        assertThatThrownBy(() -> enrollment.addDiscovered("cast", "10.0.0.9", 8010))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("That device is no longer visible on the network");
         assertThat(wiring.registry().findAll()).isEmpty();
@@ -213,12 +215,13 @@ class EnrollmentTest {
         Wiring wiring = wire(HostAddresses::lookup, webos, cast);
         webos.visible.add(new DiscoveredDevice("webos", "LG TV", "10.0.0.8", 3000, Map.of()));
         cast.visible.add(new DiscoveredDevice("cast", "Kitchen", "10.0.0.9", 8009, Map.of()));
+        Enrollment enrollment = wiring.enrollment();
 
-        assertThatThrownBy(() -> wiring.enrollment().addDiscovered("webos", "10.0.0.8", 3000))
+        assertThatThrownBy(() -> enrollment.addDiscovered("webos", "10.0.0.8", 3000))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("LG TV has to be paired, not added");
-        wiring.enrollment().addDiscovered("cast", "10.0.0.9", 8009);
-        assertThatThrownBy(() -> wiring.enrollment().addDiscovered("cast", "10.0.0.9", 8009))
+        enrollment.addDiscovered("cast", "10.0.0.9", 8009);
+        assertThatThrownBy(() -> enrollment.addDiscovered("cast", "10.0.0.9", 8009))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Kitchen is already added");
     }
@@ -228,11 +231,12 @@ class EnrollmentTest {
         Wiring wiring = wire(HostAddresses::lookup, new StubAdapter("cast", DeviceKind.CAST, true, false));
         wiring.enrollment().adopt(device("kitchen", "cast", "10.0.0.9"));
         wiring.enrollment().adopt(device("hall", "cast", "10.0.0.10"));
+        Enrollment enrollment = wiring.enrollment();
 
-        assertThatThrownBy(() -> wiring.enrollment().merge("kitchen", "hall"))
+        assertThatThrownBy(() -> enrollment.merge("kitchen", "hall"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("kitchen already has a cast connection");
-        assertThatThrownBy(() -> wiring.enrollment().merge("kitchen", "kitchen"))
+        assertThatThrownBy(() -> enrollment.merge("kitchen", "kitchen"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Pick two different devices to merge");
         assertThat(wiring.registry().findAll()).hasSize(2);
@@ -240,13 +244,14 @@ class EnrollmentTest {
 
     @Test
     void splittingAConnectionTheDeviceLacksOrItsOnlyOneIsRefused() {
-        Wiring wiring = wire(HostAddresses::lookup, new StubAdapter("cast", DeviceKind.CAST, true, false));
-        wiring.enrollment().adopt(device("kitchen", "cast", "10.0.0.9"));
+        Enrollment enrollment = wire(HostAddresses::lookup, new StubAdapter("cast", DeviceKind.CAST, true, false))
+                .enrollment();
+        enrollment.adopt(device("kitchen", "cast", "10.0.0.9"));
 
-        assertThatThrownBy(() -> wiring.enrollment().split("kitchen", "upnp"))
+        assertThatThrownBy(() -> enrollment.split("kitchen", "upnp"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("kitchen has no upnp connection");
-        assertThatThrownBy(() -> wiring.enrollment().split("kitchen", "cast"))
+        assertThatThrownBy(() -> enrollment.split("kitchen", "cast"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("kitchen has only one connection; there is nothing to split");
     }
