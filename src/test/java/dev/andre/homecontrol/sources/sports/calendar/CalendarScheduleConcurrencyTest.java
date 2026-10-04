@@ -50,6 +50,7 @@ class CalendarScheduleConcurrencyTest {
     private static final String BUNDESLIGA_PATH = "/private/token-abc123/bl.ics";
     private static final String WEEKLY_PATH = "/weekly.ics";
     private static final String BUNDESLIGA_ITEM = "ics:c-3f9a1c2b7d4e:069e696917c4a665";
+    private static final ZoneId BERLIN = ZoneId.of("Europe/Berlin");
 
     @TempDir
     Path dir;
@@ -58,6 +59,7 @@ class CalendarScheduleConcurrencyTest {
     private final ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();
     private FakeCalendarServer server;
     private SportsSettingsService settingsService;
+    private SportsTimeZones zones;
     private MutableClock clock;
     private CalendarSchedule schedule;
 
@@ -77,8 +79,8 @@ class CalendarScheduleConcurrencyTest {
                 new SportsSettings.CalendarEntry(BUNDESLIGA, "Bundesliga 2026/27", "127.0.0.1", null, Instant.EPOCH),
                 new SportsSettings.CalendarEntry(WEEKLY, "Weekly sport", "127.0.0.1", null, Instant.EPOCH))));
 
-        SportsTimeZones zones = mock(SportsTimeZones.class);
-        given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
+        zones = mock(SportsTimeZones.class);
+        given(zones.effective()).willReturn(BERLIN);
         clock = MutableClock.at(Instant.parse("2026-09-19T14:00:00Z"));
         // A held answer waits for the test, so the request timeout must outlast any test.
         SportsProperties properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
@@ -228,6 +230,64 @@ class CalendarScheduleConcurrencyTest {
 
         release.countDown();
         pass.get(10, TimeUnit.SECONDS);
+    }
+
+    /** The next pass stops once it has read the cache, before it expands, until the test releases it. */
+    private CountDownLatch holdTheNextPassAfterItsSnapshot() {
+        CountDownLatch expanding = new CountDownLatch(1);
+        AtomicBoolean hold = new AtomicBoolean(true);
+        given(zones.effective()).willAnswer(invocation -> {
+            if (hold.getAndSet(false)) {
+                expanding.countDown();
+                release.await();
+            }
+            return BERLIN;
+        });
+        return expanding;
+    }
+
+    @Test
+    void aCalendarForgottenWhileAPassExpandsItKeepsNoItems() throws Exception {
+        schedule.events();
+        assertThat(schedule.find(BUNDESLIGA_ITEM)).isPresent();
+        CountDownLatch expanding = holdTheNextPassAfterItsSnapshot();
+        Future<FeedResult> pass = pool.submit(schedule::events);
+        assertThat(expanding.await(5, TimeUnit.SECONDS)).isTrue();
+
+        settingsService.update(s -> s.withCalendars(List.of(s.calendars().get(1))));
+        schedule.forget(BUNDESLIGA);
+        release.countDown();
+        FeedResult result = pass.get(10, TimeUnit.SECONDS);
+
+        assertThat(schedule.find(BUNDESLIGA_ITEM)).isEmpty();
+        // Nor does the pass return it, for a rail to show.
+        assertThat(result.events()).noneMatch(e -> e.competitionKey().equals("calendar:" + BUNDESLIGA));
+        assertThat(result.feeds()).isEqualTo(1);
+        assertThat(result.succeeded()).isEqualTo(1);
+    }
+
+    @Test
+    void anOlderPassThatFinishesLastDoesNotUndoANewerOne() throws Exception {
+        schedule.events();
+        CountDownLatch expanding = holdTheNextPassAfterItsSnapshot();
+        Future<FeedResult> older = pool.submit(schedule::events);
+        assertThat(expanding.await(5, TimeUnit.SECONDS)).isTrue();
+
+        schedule.prime(WEEKLY, IcsParser.parse("""
+                BEGIN:VCALENDAR
+                BEGIN:VEVENT
+                UID:final@fixtures.example
+                DTSTART:20260921T180000Z
+                SUMMARY:Cup final
+                END:VEVENT
+                END:VCALENDAR
+                """));
+        SportsEvent added = schedule.events().events().stream()
+                .filter(e -> e.title().equals("Cup final")).findFirst().orElseThrow();
+        release.countDown();
+        older.get(10, TimeUnit.SECONDS);
+
+        assertThat(schedule.find(added.itemId())).isPresent();
     }
 
     private static String fixture(String name) throws IOException {

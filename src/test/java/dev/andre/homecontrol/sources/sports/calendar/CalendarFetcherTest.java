@@ -59,6 +59,15 @@ class CalendarFetcherTest {
     }
 
     @Test
+    void aLineFoldedInsideACharacterKeepsTheCharacter() {
+        server.respondFixture("/folded.ics", "bundesliga-folded.ics");
+
+        String text = fetcher.fetch(server.url("/folded.ics"));
+
+        assertThat(text).contains("Live \u00dcbertragung live ab 18:30").doesNotContain("\ufffd");
+    }
+
+    @Test
     void decodesTheDeclaredCharset() {
         byte[] body = "BEGIN:VCALENDAR\nSUMMARY:Köln\nEND:VCALENDAR\n".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
         server.respondBytes("/latin1.ics", 200, "text/calendar; charset=ISO-8859-1", body);

@@ -1,5 +1,6 @@
 package dev.andre.homecontrol.sources.sports.ics;
 
+import java.io.ByteArrayOutputStream;
 import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -58,6 +59,40 @@ public final class IcsParser {
             }
         }
         return reader.finish();
+    }
+
+    /**
+     * Removes the folds, a line break followed by a space or a tab, from the raw body. RFC 5545 §3.1 folds at octets,
+     * so a fold may split a multi-byte character, which unfolding the decoded text would leave garbled.
+     */
+    public static byte[] unfold(byte[] body) {
+        ByteArrayOutputStream unfolded = new ByteArrayOutputStream(body.length);
+        int i = 0;
+        while (i < body.length) {
+            int fold = foldAt(body, i);
+            if (fold > 0) {
+                i += fold;
+            } else {
+                unfolded.write(body[i]);
+                i++;
+            }
+        }
+        return unfolded.toByteArray();
+    }
+
+    /** The length of the fold that starts at {@code i}, or 0. */
+    private static int foldAt(byte[] body, int i) {
+        int lineBreak = 0;
+        if (body[i] == '\r') {
+            lineBreak = i + 1 < body.length && body[i + 1] == '\n' ? 2 : 1;
+        } else if (body[i] == '\n') {
+            lineBreak = 1;
+        }
+        if (lineBreak == 0 || i + lineBreak >= body.length) {
+            return 0;
+        }
+        byte next = body[i + lineBreak];
+        return next == ' ' || next == '\t' ? lineBreak + 1 : 0;
     }
 
     public static List<String> unfold(String text) {

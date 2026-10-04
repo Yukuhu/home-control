@@ -44,7 +44,8 @@ public class TheSportsDbSchedule implements SportsFeed {
     private static final Logger log = LoggerFactory.getLogger(TheSportsDbSchedule.class);
     private static final String LIMITED = "TheSportsDB is limiting requests; try again in a minute";
 
-    private record Entry(List<SportsEvent> events, Instant fetchedAt) {
+    /** {@code zone}: the household zone the day's all-day events were placed in. */
+    private record Entry(List<SportsEvent> events, Instant fetchedAt, ZoneId zone) {
     }
 
     /** A day's last failed download: when, whether TheSportsDB was limiting requests, and under which generation. */
@@ -129,7 +130,7 @@ public class TheSportsDbSchedule implements SportsFeed {
         refreshDue(settings.competitions(), dates, new Round(now, zone));
         // A key change clears what this pass fetched, and the refresh it asks for is skipped while this one runs: a
         // pass that a key change overtook starts over with the new key instead of publishing.
-        return publish(dates, started).orElseGet(this::pass);
+        return publish(dates, zone, started).orElseGet(this::pass);
     }
 
     /**
@@ -194,7 +195,7 @@ public class TheSportsDbSchedule implements SportsFeed {
     private void refreshIfDue(SportsSettings.CompetitionEntry competition, LocalDate date, Round round) {
         String cacheKey = cacheKey(competition.leagueId(), date);
         Entry entry = cache.get(cacheKey);
-        if (fresh(entry, round.now)) {
+        if (fresh(entry, round)) {
             return;
         }
         boolean limited = limited(round);
@@ -225,8 +226,10 @@ public class TheSportsDbSchedule implements SportsFeed {
         return round.rateLimited && generation.get() == round.limitedUnder;
     }
 
-    private boolean fresh(Entry entry, Instant now) {
-        return entry != null && entry.fetchedAt().plus(properties.theSportsDb().fixturesTtl()).isAfter(now);
+    /** Fetched within the TTL, for the zone the household uses now: after a zone change its all-day days move. */
+    private boolean fresh(Entry entry, Round round) {
+        return entry != null && entry.zone().equals(round.zone)
+                && entry.fetchedAt().plus(properties.theSportsDb().fixturesTtl()).isAfter(round.now);
     }
 
     private boolean failedRecently(String cacheKey, Instant now) {
@@ -244,7 +247,7 @@ public class TheSportsDbSchedule implements SportsFeed {
                                  Round round) {
         long started = generation.get();
         if (settingsService.current().competition(competition.leagueId()).isEmpty()
-                || fresh(cache.get(cacheKey), round.now) || failedRecently(cacheKey, round.now)) {
+                || fresh(cache.get(cacheKey), round) || failedRecently(cacheKey, round.now)) {
             return;
         }
         try {
@@ -257,7 +260,7 @@ public class TheSportsDbSchedule implements SportsFeed {
             }
             synchronized (lock) {
                 if (wanted(competition, started)) {
-                    cache.put(cacheKey, new Entry(mapped, round.now));
+                    cache.put(cacheKey, new Entry(mapped, round.now, round.zone));
                     lastFailure.remove(cacheKey);
                     errors.remove(competition.leagueId());
                 }
@@ -272,6 +275,15 @@ public class TheSportsDbSchedule implements SportsFeed {
             }
             log.warn("TheSportsDB fixtures for competition {} on {} failed ({})",
                     competition.leagueId(), date, e.kind());
+        } catch (RuntimeException e) {
+            // Not one of TheSportsDB's own failures: it fails this competition's day, not every sports rail.
+            synchronized (lock) {
+                if (wanted(competition, started)) {
+                    lastFailure.put(cacheKey, new Failure(round.now, false, started));
+                    errors.put(competition.leagueId(), "TheSportsDB's fixtures could not be read");
+                }
+            }
+            log.warn("Reading TheSportsDB fixtures for competition {} on {} failed", competition.leagueId(), date, e);
         }
     }
 
@@ -279,7 +291,7 @@ public class TheSportsDbSchedule implements SportsFeed {
      * The result for the competitions configured now, from the cache; empty when a key change came since
      * {@code started}.
      */
-    private Optional<FeedResult> publish(Set<LocalDate> dates, long started) {
+    private Optional<FeedResult> publish(Set<LocalDate> dates, ZoneId zone, long started) {
         synchronized (lock) {
             // Checked in the same step as the cache is read, so a key change either waits for this or is seen here.
             if (generation.get() != started) {
@@ -292,7 +304,7 @@ public class TheSportsDbSchedule implements SportsFeed {
             for (SportsSettings.CompetitionEntry competition : settings.competitions()) {
                 boolean hasEntry = false;
                 for (LocalDate date : dates) {
-                    Entry entry = cache.get(cacheKey(competition.leagueId(), date));
+                    Entry entry = inZone(cacheKey(competition.leagueId(), date), zone);
                     if (entry != null) {
                         hasEntry = true;
                         allEvents.addAll(entry.events());
@@ -315,14 +327,20 @@ public class TheSportsDbSchedule implements SportsFeed {
         if (!ranOnce) {
             events();
         }
-        for (Entry entry : cache.values()) {
-            for (SportsEvent event : entry.events()) {
-                if (event.itemId().equals(itemId)) {
-                    return Optional.of(event);
-                }
-            }
-        }
-        return Optional.empty();
+        ZoneId zone = zones.effective();
+        return cache.values().stream().filter(entry -> entry.zone().equals(zone))
+                .flatMap(entry -> entry.events().stream())
+                .filter(event -> event.itemId().equals(itemId))
+                .findFirst();
+    }
+
+    /**
+     * A cached day, unless its all-day events were placed in a zone the household no longer uses: a fetch after a
+     * zone change that fails leaves the day empty rather than on the wrong local day.
+     */
+    private Entry inZone(String cacheKey, ZoneId zone) {
+        Entry entry = cache.get(cacheKey);
+        return entry != null && entry.zone().equals(zone) ? entry : null;
     }
 
     public Optional<FeedStatus> status(String leagueId) {
@@ -333,11 +351,12 @@ public class TheSportsDbSchedule implements SportsFeed {
             return Optional.empty();
         }
         Instant now = clock.instant();
-        Set<LocalDate> dates = utcDates(now, zones.effective());
+        ZoneId zone = zones.effective();
+        Set<LocalDate> dates = utcDates(now, zone);
         Instant latest = null;
         int events = 0;
         for (LocalDate date : dates) {
-            Entry entry = cache.get(cacheKey(leagueId, date));
+            Entry entry = inZone(cacheKey(leagueId, date), zone);
             if (entry != null) {
                 events += entry.events().size();
                 if (latest == null || entry.fetchedAt().isAfter(latest)) {

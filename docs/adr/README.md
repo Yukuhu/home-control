@@ -13,5 +13,6 @@ promises. Superseded decisions stay, marked as such.
 | [0005](0005-outbound-http-for-content-sources.md) | Outbound HTTP for content sources: one guarded client, pinned addresses, one deadline, host-only failures | Accepted | 2026-09-30 |
 | [0006](0006-gradle-modules.md) | Gradle modules, with the root project as the app | Accepted | 2026-10-01 |
 | [0007](0007-theme-packages.md) | Installable presentation packages with permanent built-in themes | Accepted | 2026-10-02 |
+| [0008](0008-automatic-dependency-checksums.md) | Automatic dependency checksum updates in the existing PR | Accepted | 2026-10-04 |
 
 New decisions copy the header of 0001 (date, status, context) and take the next number.

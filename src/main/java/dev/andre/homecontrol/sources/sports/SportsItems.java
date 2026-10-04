@@ -20,6 +20,8 @@ import java.util.Optional;
 /** Turns a sports event into a content item and the one-line subtitle describing when it plays. */
 public final class SportsItems {
 
+    private static final String SPORTS = "sports";
+
     private SportsItems() {
     }
 
@@ -31,14 +33,17 @@ public final class SportsItems {
                                      Instant now, PinnedLinks pinnedLinks) {
         String subtitle = subtitle(event, settings, zone, locale, now);
         List<PlayableRef> playables = playables(event, settings, pinnedLinks);
-        return new ContentItem(event.itemId(), "sports", ContentKind.LIVE_EVENT, event.title(), subtitle,
+        return new ContentItem(event.itemId(), SPORTS, ContentKind.LIVE_EVENT, event.title(), subtitle,
                 event.artwork(), playables, null, event.startsAt(), event.endsAt());
     }
 
     /** Never depends on the event's phase: an ended event still opens the app (DAZN has replays). */
     public static List<PlayableRef> playables(SportsEvent event, SportsSettings settings, PinnedLinks pinnedLinks) {
         Optional<PlayableRef.AppLink> pinned = pinnedLinks == null
-                ? Optional.empty() : pinnedLinks.linkFor("sports", event.itemId());
+                ? Optional.empty() : pinnedLinks.linkFor(SPORTS, event.itemId());
+        if (pinned.isEmpty() && pinnedLinks != null && event.formerItemId() != null) {
+            pinned = pinnedLinks.linkFor(SPORTS, event.formerItemId()); // pinned before ids came from the UID
+        }
         if (pinned.isPresent()) {
             return List.of(pinned.get());
         }

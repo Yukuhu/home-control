@@ -59,30 +59,46 @@ jobs:
 
   checksums:
     name: Verify dependency checksums
-    # Stop once, before every strict Gradle build, if an update needs reviewed hashes.
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+    outputs:
+      state: ${{ steps.verification.outputs.state || steps.candidate.outputs.state }}
+      artifact: ${{ steps.candidate.outputs.artifact }}
     env:
-      IS_DEPENDABOT: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+      IS_DEPENDABOT: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository }}
       DEPENDENCY_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          # Match the merge revision tested by the builds. Its two parents include
-          # the PR head, which is the baseline the downloadable patch must apply to.
           fetch-depth: 2
           persist-credentials: false
+
+      - name: Test checksum verification and publication
+        run: |
+          python3 -m venv "$RUNNER_TEMP/checksum-tests"
+          "$RUNNER_TEMP/checksum-tests/bin/python" -m pip install --require-hashes --no-deps \
+            -r scripts/dependency-checksums/requirements.txt
+          "$RUNNER_TEMP/checksum-tests/bin/python" -m coverage run --rcfile=scripts/dependency-checksums/.coveragerc \
+            -m unittest discover -s scripts/dependency-checksums -p 'test_*.py' -v
+          "$RUNNER_TEMP/checksum-tests/bin/python" -m coverage xml --rcfile=scripts/dependency-checksums/.coveragerc
+
+      - name: Upload checksum tooling coverage for SonarCloud
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: checksum-coverage
+          path: build/reports/dependency-checksums/coverage.xml
+          if-no-files-found: error
 
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '25'
 
-      - name: Isolate Dependabot's unreviewed downloads
+      - name: Isolate Dependabot's unverified downloads
         if: env.IS_DEPENDABOT == 'true'
         run: echo "GRADLE_USER_HOME=$RUNNER_TEMP/gradle-checksum-review" >> "$GITHUB_ENV"
 
@@ -98,78 +114,153 @@ jobs:
           if ./gradlew --no-daemon --dependency-verification strict verifyDependencyChecksums \
               > "$RUNNER_TEMP/dependency-verification.log" 2>&1; then
             cat "$RUNNER_TEMP/dependency-verification.log"
+            echo "state=verified" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           cat "$RUNNER_TEMP/dependency-verification.log"
           if [[ "$IS_DEPENDABOT" == true ]] \
               && grep -Fq 'Dependency verification failed' "$RUNNER_TEMP/dependency-verification.log"; then
-            echo "needs-review=true" >> "$GITHUB_OUTPUT"
+            echo "needs-update=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           exit 1
 
-      # Only a candidate: it cannot unblock builds or change the committed trust file.
+      # Resolution executes dependency code, so this runner has no publishing credential or shared cache.
       - name: Generate candidate checksums
-        if: steps.verification.outputs.needs-review == 'true'
+        if: steps.verification.outputs.needs-update == 'true'
         run: ./gradlew --no-daemon --write-verification-metadata sha256 verifyDependencyChecksums
 
-      - name: Prepare the review patch
-        id: patch
-        if: always() && steps.verification.outputs.needs-review == 'true'
-        shell: bash
+      - name: Record candidate metadata and its revision
+        id: candidate
+        if: steps.verification.outputs.needs-update == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          # Preserve the committed XML style so the patch shows checksum changes.
-          python3 - <<'PY'
+          mkdir -p "$RUNNER_TEMP/checksum-candidate"
+          cp gradle/verification-metadata.xml "$RUNNER_TEMP/checksum-candidate/verification-metadata.xml"
+          python3 - <<'PYTHON'
+          import json, os
           from pathlib import Path
-          import subprocess
-          path = Path('gradle/verification-metadata.xml')
-          committed = subprocess.check_output(['git', 'show', 'HEAD:gradle/verification-metadata.xml']).decode()
-          generated = path.read_text()
-          declaration = committed.splitlines()[0]
-          generated = declaration + '\n' + generated.split('\n', 1)[1]
-          generated = generated.replace(' />', '/>')
-          if ' />' in committed:
-              generated = generated.replace('/>', ' />')
-          path.write_text(generated)
-          PY
-          if git diff --quiet "$DEPENDENCY_HEAD" -- gradle/verification-metadata.xml; then
-            echo "No checksum patch was generated. Check the generation log." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          mkdir -p "$RUNNER_TEMP/checksum-review"
-          git diff "$DEPENDENCY_HEAD" -- gradle/verification-metadata.xml > "$RUNNER_TEMP/checksum-review/verification-metadata.patch"
-          printf '%s\n' "$DEPENDENCY_HEAD" > "$RUNNER_TEMP/checksum-review/head-sha.txt"
-          git rev-parse HEAD > "$RUNNER_TEMP/checksum-review/tested-sha.txt"
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-          {
-            printf 'Dependency checksums need review for commit `%s`.\n\n' "$DEPENDENCY_HEAD"
-            echo 'Builds and browser tests have not started. Download the checksum artifact, compare every new hash with fresh official artifacts, and commit the reviewed patch to this PR.'
-            echo 'For protobuf updates, also add the other published protoc platform checksums.'
-            echo 'The patch applies to the PR head and includes reviewed metadata inherited from main when needed.'
-            echo 'See docs/dev/testing.md#dependabot-updates for the commands. The next push runs strict CI again.'
-          } >> "$GITHUB_STEP_SUMMARY"
+          manifest = {
+              'repository': os.environ['GITHUB_REPOSITORY'], 'pr': int(os.environ['PR_NUMBER']),
+              'head': os.environ['DEPENDENCY_HEAD'], 'base': os.environ['BASE_SHA'],
+              'tested': os.environ['GITHUB_SHA'], 'run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+          }
+          path = Path(os.environ['RUNNER_TEMP']) / 'checksum-candidate' / 'manifest.json'
+          path.write_text(json.dumps(manifest) + '\n')
+          PYTHON
+          echo "state=candidate" >> "$GITHUB_OUTPUT"
+          echo "artifact=dependency-checksums-$PR_NUMBER-$DEPENDENCY_HEAD-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Upload candidate checksums
-        if: always() && steps.patch.outputs.changed == 'true'
+        if: steps.candidate.outputs.state == 'candidate'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: dependency-checksums-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/checksum-review/
+          name: ${{ steps.candidate.outputs.artifact }}
+          path: ${{ runner.temp }}/checksum-candidate/
           if-no-files-found: error
           retention-days: 14
 
-      - name: Require reviewed checksums before starting builds
-        if: always() && steps.verification.outputs.needs-review == 'true'
+  checksum-update:
+    name: Update dependency checksums
+    needs: checksums
+    if: >-
+      needs.checksums.outputs.state == 'candidate'
+      && github.event_name == 'pull_request'
+      && github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      state: ${{ steps.commit.outputs.state || steps.prepare.outputs.state }}
+      commit_sha: ${{ steps.commit.outputs.commit_sha }}
+    env:
+      DEPENDENCY_HEAD: ${{ github.event.pull_request.head.sha }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      # Run only helpers already on the base branch. The separate PR checkout is data, never code.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        id: trusted
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+          persist-credentials: false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: pr-source
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.checksums.outputs.artifact }}
+          path: ${{ runner.temp }}/checksum-candidate
+
+      - name: Verify new artifacts and prepare the metadata commit
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "::error::Dependency checksums need review. See this job's summary and checksum artifact; commit the reviewed metadata to run the builds."
-          exit 1
+          git -C pr-source checkout --detach "$DEPENDENCY_HEAD"
+          python3 -I trusted/scripts/dependency-checksums/publish.py prepare \
+            --repository "$GITHUB_REPOSITORY" --pr "$PR_NUMBER" --head "$DEPENDENCY_HEAD" \
+            --base "$BASE_SHA" --tested "$GITHUB_SHA" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --artifact "$RUNNER_TEMP/checksum-candidate" --checkout "$GITHUB_WORKSPACE/pr-source" \
+            --output "$RUNNER_TEMP/checksum-verified"
+
+      - name: Check publishing configuration
+        if: steps.prepare.outputs.state == 'ready'
+        env:
+          APP_CLIENT_ID: ${{ vars.CHECKSUM_APP_CLIENT_ID }}
+          HAS_APP_KEY: ${{ secrets.CHECKSUM_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [[ -z "$APP_CLIENT_ID" || "$HAS_APP_KEY" != true ]]; then
+            echo "::error::Configure CHECKSUM_APP_CLIENT_ID and CHECKSUM_APP_PRIVATE_KEY in both Actions and Dependabot secrets. See docs/dev/testing.md."
+            exit 1
+          fi
+
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        if: steps.prepare.outputs.state == 'ready'
+        id: app-token
+        with:
+          client-id: ${{ vars.CHECKSUM_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CHECKSUM_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: read
+
+      - name: Commit verified checksums to this PR
+        id: commit
+        if: steps.prepare.outputs.state == 'ready'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          python3 -I trusted/scripts/dependency-checksums/publish.py commit \
+            --repository "$GITHUB_REPOSITORY" --pr "$PR_NUMBER" --head "$DEPENDENCY_HEAD" \
+            --checkout "$GITHUB_WORKSPACE/pr-source" --prepared "$RUNNER_TEMP/checksum-verified"
+
+      - name: Upload checksum verification evidence
+        if: always() && steps.prepare.outputs.state == 'ready'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: verified-checksums-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/checksum-verified/
+          retention-days: 14
 
   jar:
     name: Build the jar
     # The one jar of this run: the images that are tested and the images that are published are
     # all built from it. It carries its version, so the version is worked out here, first.
     needs: [changes, checksums]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.checksums.outputs.state == 'verified'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -287,7 +378,7 @@ jobs:
   test:
     name: Build and test
     needs: [changes, checksums]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.checksums.outputs.state == 'verified'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -337,7 +428,7 @@ jobs:
   image:
     name: Build the self-contained image
     needs: [changes, checksums]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.checksums.outputs.state == 'verified'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -425,7 +516,7 @@ jobs:
   e2e-chromium:
     name: Browser tests (Chromium)
     needs: [changes, checksums]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.checksums.outputs.state == 'verified'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -474,7 +565,7 @@ jobs:
   e2e-firefox:
     name: Browser tests (Firefox)
     needs: [changes, checksums]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.checksums.outputs.state == 'verified'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -487,7 +578,7 @@ jobs:
   e2e-webkit:
     name: Browser tests (WebKit)
     needs: [changes, checksums]
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.checksums.outputs.state == 'verified'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -530,6 +621,11 @@ jobs:
           name: pr-summary-coverage
           path: build/reports/pr-summary
 
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: checksum-coverage
+          path: build/reports/dependency-checksums
+
       - name: Analyze both test suites and gate pull requests
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -548,9 +644,10 @@ jobs:
     # of them until the resolved graph is submitted. Fork pull requests get a read-only token,
     # which cannot submit, so they are left out. Deliberately not needed by the release: a newly
     # disclosed vulnerability must not block shipping an unrelated fix.
-    needs: changes
+    needs: [changes, checksums]
     if: >-
       needs.changes.outputs.code == 'true'
+      && needs.checksums.outputs.state == 'verified'
       && (github.event_name == 'push'
       || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
@@ -626,7 +723,7 @@ jobs:
     # One comment per pull request, replaced on every run. Runs when earlier jobs failed, which
     # is when it matters, but not when the run was cancelled. Fork pull requests get a read-only
     # token, so they are left out.
-    needs: [changes, checksums, jar, test, e2e-chromium, e2e-firefox, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies, codeql]
+    needs: [changes, checksums, checksum-update, jar, test, e2e-chromium, e2e-firefox, e2e-webkit, image, smoke, smoke-bluetooth, sonar, dependencies, codeql]
     if: >-
       !cancelled()
       && github.event_name == 'pull_request'
@@ -742,9 +839,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SUMMARY_FILE: ${{ runner.temp }}/summary.md
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           trap 'echo "::warning::The pull request summary could not be posted."' ERR
+          live_head=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)
+          if [[ "$live_head" != "$HEAD_SHA" ]]; then
+            echo "PR changed; the current run will publish its own summary."
+            exit 0
+          fi
           comments="repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments"
           gh api --paginate "$comments?per_page=100" --jq '.[]
             | select(.user.login == "github-actions[bot]")
@@ -936,6 +1039,7 @@ jobs:
       - changes
       - commits
       - checksums
+      - checksum-update
       - jar
       - test
       - e2e-chromium
@@ -955,13 +1059,15 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS_JSON"
-          # A job is skipped when a job it needs failed, which fails this one anyway, or when
-          # its own condition leaves it out, as for the dependencies and the scan of a fork's pull request
-          # and for everything when only documentation changed.
-          failed=$(jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key]
-            | join(", ")' <<< "$NEEDS_JSON")
-          if [[ -n "$failed" ]]; then
-            echo "::error::Not passed: $failed"
-            exit 1
-          fi
+          python3 - <<'PYTHON'
+          import json, os, sys
+          needs = json.loads(os.environ['NEEDS_JSON'])
+          for name, job in needs.items():
+              print(f"{name}: {job['result']}")
+          failed = [name for name, job in needs.items() if job['result'] not in ('success', 'skipped')]
+          if needs['changes']['outputs'].get('code') != 'false' and needs['checksums']['outputs'].get('state') != 'verified':
+              failed.append('committed dependency checksums have not passed strict verification')
+          if failed:
+              print('::error::Not passed: ' + ', '.join(failed))
+              sys.exit(1)
+          PYTHON

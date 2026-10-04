@@ -3,8 +3,8 @@ updates:
   # Every dependency in this project is pinned to an exact version, so without
   # these PRs it rots silently.
   - package-ecosystem: gradle
-    # CI's checksum gate prepares a review patch because Dependabot cannot
-    # update verification metadata. A maintainer reviews and commits it before CI passes.
+    # CI independently verifies new artifact hashes and commits metadata to this same PR,
+    # then runs strict verification and the full suite on that commit.
     directory: /
     schedule:
       interval: weekly

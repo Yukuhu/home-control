@@ -7,6 +7,7 @@ import dev.andre.homecontrol.sources.http.OutboundFailure;
 import dev.andre.homecontrol.sources.http.OutboundRequest;
 import dev.andre.homecontrol.sources.http.OutboundResponse;
 import dev.andre.homecontrol.sources.http.Statuses;
+import dev.andre.homecontrol.sources.sports.ics.IcsParser;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 
 import java.net.URI;
@@ -26,6 +27,7 @@ public class CalendarFetcher implements AutoCloseable {
     /** The schedule fetches calendars one after another; a few more slots cover the setup page's checks. */
     private static final int MAX_CONNECTIONS = 4;
     private static final Pattern CHARSET = Pattern.compile("charset=\"?([^;\"]+)\"?", Pattern.CASE_INSENSITIVE);
+    private static final String FOLD = "\r\n \t";
 
     private final GuardedHttpClient http;
 
@@ -53,7 +55,10 @@ public class CalendarFetcher implements AutoCloseable {
                 .header("User-Agent", "HomeControl"));
         int status = response.status();
         if (status == 200) {
-            return new String(response.body(), charsetOf(response.contentType()));
+            Charset charset = charsetOf(response.contentType());
+            // RFC 5545 folds lines at octets, so a fold can split a character: unfold before decoding, in a charset
+            // whose line breaks are single ASCII bytes.
+            return new String(asciiLineBreaks(charset) ? IcsParser.unfold(response.body()) : response.body(), charset);
         }
         String host = response.uri().getHost();
         Kind kind = Statuses.kindOf(status);
@@ -62,6 +67,11 @@ public class CalendarFetcher implements AutoCloseable {
             case NOT_FOUND -> host + " has no calendar at that link";
             default -> host + " answered HTTP " + status;
         });
+    }
+
+    /** Whether line breaks, spaces and tabs are the single ASCII bytes the byte-level unfold looks for (not UTF-16). */
+    private static boolean asciiLineBreaks(Charset charset) {
+        return FOLD.equals(new String(FOLD.getBytes(StandardCharsets.US_ASCII), charset));
     }
 
     private static Charset charsetOf(String contentType) {

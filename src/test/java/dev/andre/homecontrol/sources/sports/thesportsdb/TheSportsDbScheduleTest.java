@@ -22,6 +22,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -35,6 +37,10 @@ class TheSportsDbScheduleTest {
     private MutableClock clock;
     private TheSportsDbSchedule schedule;
 
+    private SportsTimeZones zones;
+    private SportsProperties properties;
+    private TheSportsDbKeys keys;
+
     @BeforeEach
     void setUp() throws IOException {
         server = new FakeTheSportsDbServer().withStandardResponses();
@@ -46,10 +52,10 @@ class TheSportsDbScheduleTest {
                 new SportsSettings.CompetitionEntry("4331", "German Bundesliga", "Soccer", "Germany", null, null, Instant.EPOCH),
                 new SportsSettings.CompetitionEntry("4328", "English Premier League", "Soccer", "England", null, null, Instant.EPOCH))));
 
-        SportsTimeZones zones = mock(SportsTimeZones.class);
+        zones = mock(SportsTimeZones.class);
         given(zones.effective()).willReturn(ZoneId.of("Europe/Berlin"));
 
-        SportsProperties properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
+        properties = new SportsProperties(true, "", 30, 10, 10, Duration.ofMinutes(120),
                 new SportsProperties.Calendar(Duration.ofHours(6), Duration.ofSeconds(1), Duration.ofSeconds(2),
                 5242880, 3, true),
                 new SportsProperties.TheSportsDb(true, server.apiBase(), "123", Duration.ofHours(24),
@@ -57,7 +63,7 @@ class TheSportsDbScheduleTest {
 
         clock = MutableClock.at(Instant.parse("2026-09-19T14:00:00Z"));
         TheSportsDbClient client = new TheSportsDbClient(properties.theSportsDb());
-        TheSportsDbKeys keys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), properties);
+        keys = new TheSportsDbKeys(settingsService, mock(dev.andre.homecontrol.storage.SecretStore.class), properties);
         schedule = new TheSportsDbSchedule(client, keys, settingsService, properties, zones, clock);
     }
 
@@ -89,6 +95,52 @@ class TheSportsDbScheduleTest {
 
         schedule.events();
         assertThat(server.count("eventsday.php")).isEqualTo(4);
+    }
+
+    @Test
+    void aTimeZoneChangeFetchesTheDaysAgainForTheNewZone() {
+        schedule.events();
+        int fetched = server.count("eventsday.php");
+
+        // London's day covers the same UTC dates: only the zone the days were placed in differs.
+        given(zones.effective()).willReturn(ZoneId.of("Europe/London"));
+        schedule.events();
+
+        assertThat(server.count("eventsday.php")).isEqualTo(2 * fetched);
+    }
+
+    @Test
+    void aTimeZoneChangeWhoseFetchesFailKeepsNoDaysPlacedInTheOldZone() {
+        schedule.events();
+        assertThat(schedule.find("tsdb:2508360")).isPresent();
+
+        given(zones.effective()).willReturn(ZoneId.of("Europe/London"));
+        for (String league : List.of("4331", "4328")) {
+            for (String day : List.of("2026-09-18", "2026-09-19")) {
+                server.respondJson("eventsday.php", java.util.Map.of("d", day, "l", league), 500, "{}");
+            }
+        }
+        FeedResult result = schedule.events();
+
+        // An all-day fixture placed in Berlin would be judged against London's today.
+        assertThat(result.events()).isEmpty();
+        assertThat(result.errors()).hasSize(2);
+        assertThat(schedule.find("tsdb:2508360")).isEmpty();
+        assertThat(schedule.status("4331")).hasValueSatisfying(status -> assertThat(status.events()).isZero());
+    }
+
+    @Test
+    void anUnexpectedFailureFailsOnlyItsCompetition() {
+        TheSportsDbClient failing = mock(TheSportsDbClient.class);
+        given(failing.eventsDay(any(), any(), eq("4331"))).willThrow(new IllegalStateException("an unexpected answer"));
+        given(failing.eventsDay(any(), any(), eq("4328"))).willReturn(List.of());
+        TheSportsDbSchedule withFailing =
+                new TheSportsDbSchedule(failing, keys, settingsService, properties, zones, clock);
+
+        FeedResult result = withFailing.events();
+
+        assertThat(result.errors()).singleElement().asString().startsWith("German Bundesliga: ");
+        assertThat(result.succeeded()).isEqualTo(1);
     }
 
     @Test

@@ -143,13 +143,13 @@ class SportsRailTest {
         List<String> ids = source.rail("live-today").items().stream().map(ContentItem::id).toList();
 
         assertThat(ids).containsExactly(
-                "ics:c-3f9a1c2b7d4e:069e696917c4a665",
+                "ics:c-3f9a1c2b7d4e:f62bf256356fa991",
                 "tsdb:2508361",
                 "tsdb:2508362",
                 "tsdb:2601002",
                 "tsdb:2601003",
                 "tsdb:2508365",
-                "ics:c-3f9a1c2b7d4e:47f47c4a3b4c720d",
+                "ics:c-3f9a1c2b7d4e:24e0e6c51e38f8a8",
                 "tsdb:2508366");
     }
 

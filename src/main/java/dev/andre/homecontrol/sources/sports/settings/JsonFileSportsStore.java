@@ -123,9 +123,11 @@ public class JsonFileSportsStore {
     private static SportsSettings.CalendarEntry parseCalendar(JsonNode entry, int index) {
         String id = entry.path("id").asString("");
         String label = entry.path("label").asString("").strip();
+        if (label.length() > MAX_LABEL) {
+            label = label.substring(0, MAX_LABEL); // an older version kept a long host as the label uncut
+        }
         String host = entry.path("host").asString("").strip();
-        if (!CALENDAR_ID.matcher(id).matches() || label.isEmpty() || label.length() > MAX_LABEL
-                || host.isEmpty() || host.length() > MAX_HOST) {
+        if (!CALENDAR_ID.matcher(id).matches() || label.isEmpty() || host.isEmpty() || host.length() > MAX_HOST) {
             log.warn("Skipping sports calendar at index {}: invalid fields", index);
             return null;
         }

@@ -8,6 +8,7 @@ import dev.andre.homecontrol.security.PasswordRejectedException;
 import dev.andre.homecontrol.security.RequestLoginContext;
 import dev.andre.homecontrol.sources.http.OutboundAddressPolicy;
 import dev.andre.homecontrol.sources.sports.feed.FeedResult;
+import dev.andre.homecontrol.sources.sports.ics.IcsCalendar;
 import dev.andre.homecontrol.sources.sports.settings.JsonFileSportsStore;
 import dev.andre.homecontrol.sources.sports.settings.SportsProperties;
 import dev.andre.homecontrol.sources.sports.settings.SportsSettings;
@@ -180,6 +181,16 @@ class SportsCalendarsTest {
         int port = server.url("/x.ics").getPort();
         URI parsed = CalendarLinks.parse("webcal://127.0.0.1:" + port + "/x.ics");
         assertThat(parsed.getScheme()).isEqualTo("https");
+    }
+
+    @Test
+    void aHostLabelIsCutToTheLengthTheStoreKeeps() {
+        String host = "a".repeat(70) + ".calendar.example.org";
+        var unnamed = new IcsCalendar(null, null, List.of(), 0);
+
+        String label = SportsCalendars.resolvedLabel("", unnamed, URI.create("https://" + host + "/games.ics"));
+
+        assertThat(label).hasSize(80).isEqualTo(host.substring(0, 80));
     }
 
     @Test

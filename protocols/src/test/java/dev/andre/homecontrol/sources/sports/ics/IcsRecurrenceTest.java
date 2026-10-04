@@ -19,12 +19,14 @@ class IcsRecurrenceTest {
         assertThat(rule.count()).isEqualTo(5);
         assertThat(rule.until()).isNull();
         assertThat(rule.byDay()).containsExactly(DayOfWeek.THURSDAY, DayOfWeek.SATURDAY);
+        assertThat(rule.weekStart()).isEqualTo(DayOfWeek.SUNDAY);
 
         IcsRecurrence daily = IcsRecurrence.parse("freq=daily;until=20260920").orElseThrow();
         assertThat(daily.frequency()).isEqualTo(IcsRecurrence.Frequency.DAILY);
         assertThat(daily.interval()).isEqualTo(1);
         assertThat(daily.count()).isNull();
         assertThat(daily.until()).isEqualTo(new IcsTime.Date(java.time.LocalDate.of(2026, 9, 20)));
+        assertThat(daily.weekStart()).as("RFC 5545's default").isEqualTo(DayOfWeek.MONDAY);
     }
 
     @ParameterizedTest

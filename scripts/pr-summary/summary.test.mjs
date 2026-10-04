@@ -672,3 +672,30 @@ test("main writes the comment and asks SonarCloud only when the sonar job ran", 
     assert.equal(requests, 2);
     assert.match(await readFile(env.SUMMARY_FILE, "utf8"), /^## ✅ CI passed$/m);
 });
+
+for (const state of ["ready", "committed", "superseded"]) {
+    test(`checksum update ${state} reports progress without claiming CI passed`, () => {
+        const needs = Object.fromEntries(Object.keys(JSON.parse(environment.NEEDS_JSON))
+            .map((key) => [key, { result: "skipped", outputs: {} }]));
+        needs.checksums = { result: "success", outputs: { state: "candidate" } };
+        needs["checksum-update"] = { result: "success", outputs: { state, commit_sha: HEAD } };
+        const model = buildModel({ env: { ...environment, NEEDS_JSON: JSON.stringify(needs) }, suites: {}, gate: null, now: 0 });
+        const comment = render(model);
+        assert.match(comment, /Updating dependency checksums/);
+        assert.doesNotMatch(comment, /CI passed|download.*artifact/i);
+        if (state === "committed") assert.match(comment, /Committed verified checksums/);
+        if (state === "superseded") assert.match(comment, /PR changed/);
+    });
+}
+
+test("a checksum publication failure stays red with the publisher log", () => {
+    const needs = JSON.parse(environment.NEEDS_JSON);
+    needs.checksums = { result: "success", outputs: { state: "candidate" } };
+    needs["checksum-update"] = { result: "failure", outputs: {} };
+    const model = buildModel({ env: { ...environment, NEEDS_JSON: JSON.stringify(needs), JOBS_JSON: JSON.stringify([
+        { name: "Update dependency checksums", html_url: "https://example.test/publisher", conclusion: "failure" },
+    ]) }, suites: {}, gate: null, now: 0 });
+    const comment = render(model);
+    assert.match(comment, /CI failed/);
+    assert.match(comment, /Update dependency checksums.*❌.*https:\/\/example.test\/publisher/);
+});
