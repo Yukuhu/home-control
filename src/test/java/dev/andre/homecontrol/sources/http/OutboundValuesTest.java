@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.OptionalLong;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,5 +52,39 @@ class OutboundValuesTest {
         assertThat(post).isEqualTo(same).hasSameHashCodeAs(same)
                 .isNotEqualTo(OutboundRequest.get(uri))
                 .hasToString("OutboundRequest[POST api.example]");
+    }
+
+    @Test
+    void onlyGetAndPostWithANonNegativeCapAreRequests() {
+        assertThatThrownBy(() -> new OutboundRequest("PUT", ANSWERED, Map.of(), null, null, 0, true,
+                OptionalLong.empty(), false))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Only GET and POST are supported");
+        assertThatThrownBy(() -> OutboundRequest.get(ANSWERED).limitedTo(-1))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("A body cap cannot be negative");
+    }
+
+    @Test
+    void requestsThatDifferInAnyPartAreNotEqual() {
+        var request = OutboundRequest.get(ANSWERED).header("Accept", "application/json");
+
+        assertThat(request)
+                .isNotEqualTo(OutboundRequest.get(URI.create("https://api.example/other")).header("Accept", "application/json"))
+                .isNotEqualTo(OutboundRequest.get(ANSWERED).header("Accept", "text/plain"))
+                .isNotEqualTo(OutboundRequest.post(ANSWERED, new byte[0], null).header("Accept", "application/json"))
+                .isNotEqualTo(request.limitedTo(10))
+                .isNotEqualTo(request.failingFastWhenBusy())
+                .isNotEqualTo(request.endingBy(42))
+                .isNotEqualTo(request.withErrorBody())
+                .isNotEqualTo("GET api.example");
+        var post = OutboundRequest.post(ANSWERED, new byte[] {1}, "text/plain");
+        assertThat(post).isNotEqualTo(OutboundRequest.post(ANSWERED, new byte[] {1}, "application/json"))
+                .isNotEqualTo(OutboundRequest.post(ANSWERED, new byte[] {2}, "text/plain"));
+    }
+
+    @Test
+    void keepingOnlyNamedHeadersIgnoresTheirCase() {
+        var request = OutboundRequest.get(ANSWERED).header("ACCEPT", "text/plain").header("Authorization", "Bearer secret");
+
+        assertThat(request.keepingOnly(Set.of("accept")).headers()).containsExactly(Map.entry("ACCEPT", "text/plain"));
     }
 }
