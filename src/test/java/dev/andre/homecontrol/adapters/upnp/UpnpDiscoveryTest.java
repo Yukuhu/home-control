@@ -106,6 +106,40 @@ class UpnpDiscoveryTest {
     }
 
     @Test
+    void aDescriptionWithoutNameOrUdnIsNamedByAddressAndIdentifiedByItsUsn() {
+        DeviceDescription.Service avTransport = new DeviceDescription.Service("urn:schemas-upnp-org:service:AVTransport:1",
+                "av", URI.create("http://10.0.0.30/av"), null, null);
+        SsdpService anonymous = new SsdpService("uuid:5f9e::" + UpnpDiscovery.SEARCH_TARGET, UpnpDiscovery.SEARCH_TARGET,
+                "10.0.0.30", URI.create("http://10.0.0.30/d.xml"), Map.of(), Instant.MAX,
+                new DeviceDescription(" ", null, " ", null, List.of(avTransport)));
+
+        DiscoveredDevice found = UpnpDiscovery.toDevice(anonymous, true).orElseThrow();
+
+        assertThat(found.name()).isEqualTo("Media renderer at 10.0.0.30");
+        assertThat(found.port()).isEqualTo(80);
+        assertThat(found.attributes()).containsEntry("udn", "uuid:5f9e").doesNotContainKey("model");
+        assertThat(UpnpDiscovery.udnOf("uuid:no-separator")).isEqualTo("uuid:no-separator");
+    }
+
+    @Test
+    void aSonosDescriptionIsRecognisedByItsMakerToo() {
+        SsdpService described = new SsdpService("uuid:5f9e::" + UpnpDiscovery.SEARCH_TARGET, UpnpDiscovery.SEARCH_TARGET,
+                "10.0.0.31", URI.create("http://10.0.0.31:1400/d.xml"), Map.of(), Instant.MAX,
+                new DeviceDescription("Bath", "Sonos, Inc.", "Era 100", "uuid:5f9e", List.of()));
+        SsdpService undescribed = new SsdpService("uuid:5f9f::" + UpnpDiscovery.SEARCH_TARGET, UpnpDiscovery.SEARCH_TARGET,
+                "10.0.0.32", URI.create("http://10.0.0.32:1400/d.xml"), Map.of(), Instant.MAX, null);
+
+        assertThat(UpnpDiscovery.isSonos(described)).isTrue();
+        assertThat(UpnpDiscovery.isSonos(undescribed)).isFalse();
+    }
+
+    @Test
+    void noUdnOrHostHasNoLocation() {
+        assertThat(discovery.location(null, "127.0.0.1")).isEmpty();
+        assertThat(discovery.location(FakeUpnpRenderer.UDN, null)).isEmpty();
+    }
+
+    @Test
     void ignoresDevicesWithoutAvTransport() {
         URI location = URI.create("http://10.0.0.9:49152/d.xml");
         DeviceDescription renderingOnly = new DeviceDescription("TV", "Acme", "X", "uuid:x", List.of(
