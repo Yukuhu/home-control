@@ -4,6 +4,7 @@ import dev.andre.homecontrol.storage.DataDirectory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
@@ -107,6 +108,34 @@ class ThemeCssTest {
                 : selector.split("[: >+~]", 2)[0];
         assertThat(compiled).contains(":root[data-theme=\"custom\"] " + firstMember)
                 .contains("color:red;");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+        .sheet-device[aria-checked] | .sheet-device:is([aria-checked],:where(label.sheet-device[data-sheet-checked]))
+        .sheet-device[aria-checked="true"] | .sheet-device:is([aria-checked="true"],:where(label.sheet-device[data-sheet-checked="true"]))
+        .sheet-device[aria-checked="false"] | .sheet-device:is([aria-checked="false"],:where(label.sheet-device[data-sheet-checked="false"]))
+        .sheet-device[role] | .sheet-device:is([role],:where(label.sheet-device))
+        .sheet-device[role="radio"] | .sheet-device:is([role="radio"],:where(label.sheet-device))
+        .sheet-device[role="RADIO" i] | .sheet-device:is([role="RADIO" i],:where(label.sheet-device))
+        .sheet-device[role="radio" s] | .sheet-device:is([role="radio" s],:where(label.sheet-device))
+        button.sheet-device[role="radio"][aria-checked="true"] | :is(button,:where(label.sheet-device)).sheet-device:is([role="radio"],:where(label.sheet-device)):is([aria-checked="true"],:where(label.sheet-device[data-sheet-checked="true"]))
+        .sheet:has(button.sheet-device[role="radio"][aria-checked="true"]) | .sheet:has(:is(button,:where(label.sheet-device)).sheet-device:is([role="radio"],:where(label.sheet-device)):is([aria-checked="true"],:where(label.sheet-device[data-sheet-checked="true"])))
+        """)
+    void compilesLegacyPlaybackSelectorsWithSpecificityPreservingAliases(String source, String expected) {
+        assertThat(compile(source + " { color: red; }"))
+                .contains(":root[data-theme=\"custom\"] " + expected + " {\ncolor:red;");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        ".sheet-device[role=\"checkbox\"]", ".sheet-device[role=\"RADIO\"]",
+        ".sheet-device[role=\"RADIO\" s]", ".sheet-device[role=\"radıo\" i]"
+    })
+    void keepsRolesThatDoNotMatchRadioDistinctFromPlaybackCards(String selector) {
+        assertThat(compile(selector + " { color: red; }"))
+                .contains(":root[data-theme=\"custom\"] " + selector + " {\ncolor:red;")
+                .doesNotContain("label.sheet-device");
     }
 
     @ParameterizedTest

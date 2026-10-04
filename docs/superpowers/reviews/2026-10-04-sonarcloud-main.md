@@ -86,7 +86,7 @@ recommendations. This follow-up does not change their code or SonarCloud disposi
 
 ## Verification
 
-- `scripts/gradle.sh build` passes: 3,921 test cases, no failures/errors, one skipped.
+- `scripts/gradle.sh build` passes: 3,934 test cases, no failures/errors, one skipped.
 - `scripts/e2e.sh` passes across Chromium, Firefox and WebKit: 278 cases, no
   failures/errors or flaky retries, one skipped. The skip is the existing WebKit
   service-worker CSP case.
@@ -96,6 +96,10 @@ recommendations. This follow-up does not change their code or SonarCloud disposi
   specificity, unrelated roles and selectors inside `:has()`.
   The shared keyboard helper preserves wrapping and Home/End because WebKit's native
   radio navigation stops at the group boundary.
+- Compiler unit tests also cover the legacy state and compound-selector aliases,
+  radio-role presence and case matching, and unchanged selectors for other roles.
+  These exercise the Java paths in the coverage report consumed by SonarCloud;
+  the browser suite verifies how the emitted selectors style the cards.
 - Independent code review found no remaining production issues.
 
 The original checkout's build encounters unrelated Spotless violations in pre-existing
