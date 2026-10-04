@@ -9,6 +9,8 @@ import static org.assertj.core.api.Assertions.*;
 import static dev.andre.homecontrol.themes.ThemeTestPackages.*;
 
 class ThemeCatalogTest {
+    /** A well-formed revision that no stored package has. */
+    private static final String REVISION = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     @TempDir Path data;
     private ThemeCatalog catalog() { return new ThemeCatalog(new DataDirectory(data)); }
 
@@ -73,6 +75,26 @@ class ThemeCatalogTest {
         byte[] candidate = zip(files("custom", null));
         assertThatThrownBy(() -> catalog.install(candidate, null)).isInstanceOf(ThemeException.class);
         assertThat(Files.readString(registry)).isEqualTo("broken original");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+        "{\"version\":1,\"themes\":[]}",
+        "{\"version\":1,\"themes\":{\"Bad Id\":{\"current\":\"" + REVISION + "\"}}}",
+        "{\"version\":1,\"themes\":{\"default\":{\"current\":\"" + REVISION + "\"}}}",
+        "{\"version\":1,\"themes\":{\"custom\":{\"current\":\"not-a-revision\"}}}",
+        "{\"version\":1,\"themes\":{\"custom\":{\"current\":\"" + REVISION + "\",\"previous\":\"old\"}}}"
+    })
+    void catalogEntriesThatNameNoImportedThemeKeepTheBuiltinsAndTheFile(String document) throws Exception {
+        Files.createDirectories(data.resolve("themes"));
+        Path registry = data.resolve("themes/catalog.json");
+        Files.writeString(registry, document);
+
+        ThemeCatalog catalog = catalog();
+
+        assertThat(catalog.themes()).hasSize(2);
+        assertThat(catalog.problems()).isNotEmpty();
+        assertThat(Files.readString(registry)).isEqualTo(document);
     }
 
     @Test void failedCatalogWriteKeepsOldRevisionAndDoesNotExposeCandidate() throws Exception {
