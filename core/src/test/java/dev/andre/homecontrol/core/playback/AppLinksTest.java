@@ -144,4 +144,27 @@ class AppLinksTest {
     void parseHttpUrlRejectsTheSameInputsAsFromUrl(String url) {
         assertThatThrownBy(() -> AppLinks.parseHttpUrl(url)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void escapesAreDecodedWhateverTheCaseOfTheirHexDigits() {
+        assertThat(AppLinks.fileName("/a/b%c3%a4r%2Bx.mp4")).isEqualTo("bär+x.mp4");
+        assertThat(AppLinks.fileName("/a/B%C3%84R%2bX.mp4")).isEqualTo("BÄR+X.mp4");
+        // An escape cut off by the end of the name, or with one hex digit, is kept as written.
+        assertThat(AppLinks.fileName("/a/end%4")).isEqualTo("end%4");
+        assertThat(AppLinks.fileName("/a/x%4G.mp4")).isEqualTo("x%4G.mp4");
+        assertThat(AppLinks.fileName("/a/x%G4.mp4")).isEqualTo("x%G4.mp4");
+    }
+
+    @Test
+    void noPathMeansNoMediaType() {
+        assertThat(AppLinks.mediaTypeOf(null)).isEmpty();
+        assertThat(AppLinks.mediaTypeOf("/watch")).isEmpty();
+    }
+
+    @Test
+    void anAmazonLinkIsPrimeVideoOnlyForItsVideoPages() {
+        assertThat(AppLinks.serviceOf("www.amazon.de", "/gp/video/detail/B0ABC")).isEqualTo("primevideo");
+        assertThat(AppLinks.serviceOf("www.amazon.de", "/dp/B0ABC")).isEqualTo("web");
+        assertThat(AppLinks.serviceOf("www.amazon.de", null)).isEqualTo("web");
+    }
 }

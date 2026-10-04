@@ -109,4 +109,31 @@ class ServiceLinksTest {
         assertThat(ServiceLinks.appLink(URI.create("https://www.amazon.de/gp/video/detail/B0B8TJ4WQS/ref=x")).service())
                 .isEqualTo("primevideo");
     }
+
+    @Test
+    void noServiceHasNoNameOrAppHome() {
+        assertThat(ServiceLinks.displayName(null)).isEmpty();
+        assertThat(ServiceLinks.displayName("web")).isEmpty();
+        assertThat(ServiceLinks.appHome(null)).isEmpty();
+        assertThat(ServiceLinks.isAppHome(null)).isFalse();
+        assertThat(ServiceLinks.isAppHome(URI.create("https://www.netflix.com/title/80057281"))).isFalse();
+        assertThat(ServiceLinks.label(null, URI.create("https://example.org/a"))).isEqualTo("example.org");
+    }
+
+    @Test
+    void noIdIsNoTitleLink() {
+        assertThatThrownBy(() -> ServiceLinks.netflixTitle(null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ServiceLinks.primeVideoDetail(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Not a Prime Video GTI");
+    }
+
+    @Test
+    void aLinkWithoutAHostIsKeptAsItIs() {
+        URI opaque = URI.create("mailto:someone@example.org");
+
+        assertThat(ServiceLinks.canonical(opaque)).isSameAs(opaque);
+        assertThat(ServiceLinks.netflixTitleId(opaque)).isEmpty();
+        assertThat(ServiceLinks.primeVideoGti(opaque)).isEmpty();
+    }
 }
