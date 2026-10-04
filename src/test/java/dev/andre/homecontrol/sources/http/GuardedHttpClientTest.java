@@ -25,10 +25,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.awaitility.Awaitility.await;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The guarded client against a fake server on loopback. Host names resolve through the test's policy: source.test
@@ -590,5 +592,99 @@ class GuardedHttpClientTest {
 
         assertThat(server.last("POST", "/command").headers()).doesNotContainKey("content-type");
         assertThat(server.last("POST", "/command").body()).isEmpty();
+    }
+
+    @Test
+    void aProfileThatCouldNotWorkIsRefused() {
+        Duration second = Duration.ofSeconds(1);
+        HttpUrls.Rules rules = new HttpUrls.Rules(true, false, true, false, 0);
+
+        for (Runnable invalid : List.<Runnable>of(
+                () -> new Profile("the source", Redirects.NONE, -1, CAP, second, second, 1, rules),
+                () -> new Profile("the source", Redirects.NONE, 0, -1, second, second, 1, rules),
+                () -> new Profile("the source", Redirects.NONE, 0, Integer.MAX_VALUE, second, second, 1, rules),
+                () -> new Profile("the source", Redirects.NONE, 0, CAP, second, second, 0, rules))) {
+            assertThatThrownBy(invalid::run).isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Invalid profile for the source");
+        }
+    }
+
+    @Test
+    void aCallerWhoseDeadlineHasPassedOpensNoConnection() {
+        server.respond("GET", "/ok", Response.of(200, "text/plain", "hello"));
+        try (var client = client(Redirects.NONE)) {
+            ContentSourceException late = failureOf(() -> client.send(OutboundRequest.get(at("source.test", "/ok"))
+                    .endingBy(System.nanoTime() - 1)));
+
+            assertThat(late.kind()).isEqualTo(Kind.RATE_LIMITED);
+        }
+        assertThat(server.requests()).isEmpty();
+    }
+
+    @Test
+    void aCallerInterruptedWhileWaitingForASlotKeepsItsInterrupt() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        blockUntilReleased("/held", entered);
+        try (var client = client(Redirects.NONE, Duration.ofSeconds(5), 1, true)) {
+            CompletableFuture<?> holder = CompletableFuture.runAsync(() -> client.send(OutboundRequest.get(at("source.test", "/held"))));
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+            AtomicReference<ContentSourceException> failure = new AtomicReference<>();
+            AtomicReference<Boolean> stillInterrupted = new AtomicReference<>();
+            Thread waiting = Thread.ofPlatform().start(() -> {
+                failure.set(failureOf(() -> client.send(OutboundRequest.get(at("source.test", "/other"))
+                        .endingBy(System.nanoTime() + Duration.ofSeconds(5).toNanos()))));
+                stillInterrupted.set(Thread.currentThread().isInterrupted());
+            });
+            await().until(() -> waiting.getState() == Thread.State.TIMED_WAITING);
+
+            waiting.interrupt();
+            waiting.join(5000);
+
+            assertThat(failure.get()).hasMessageContaining(OutboundFailure.INTERRUPTED);
+            assertThat(failure.get().kind()).isEqualTo(Kind.UNREACHABLE);
+            assertThat(stillInterrupted.get()).isTrue();
+            release.countDown();
+            holder.join();
+        }
+        assertThat(server.requests("GET", "/other")).isEmpty();
+    }
+
+    @Test
+    void aCallerThatAsksForAnEncodingItselfKeepsItsChoice() {
+        server.respond("GET", "/plain", Response.of(200, "text/plain", "plain"));
+        try (var client = client(Redirects.NONE)) {
+            client.send(OutboundRequest.get(at("source.test", "/plain")).header("accept-encoding", "identity;q=1, *;q=0"));
+        }
+
+        assertThat(server.requests("GET", "/plain").getFirst().header("accept-encoding")).isEqualTo("identity;q=1, *;q=0");
+    }
+
+    @Test
+    void anAnswerMarkedAsIdentityEncodedIsRead() {
+        server.respond("GET", "/identity", Response.of(200, "text/plain", "plain").withHeader("Content-Encoding", "identity"));
+        try (var client = client(Redirects.NONE)) {
+            OutboundResponse response = client.send(OutboundRequest.get(at("source.test", "/identity")));
+
+            assertThat(new String(response.body(), StandardCharsets.UTF_8)).isEqualTo("plain");
+        }
+    }
+
+    @Test
+    void aRequestWithoutAHostNamesAnUnknownHost() {
+        var client = client(Redirects.NONE);
+        client.close();
+
+        assertThat(failureOf(() -> client.send(OutboundRequest.get(URI.create("http:/no-host")))))
+                .hasMessage("Could not reach the source at an unknown host (" + OutboundFailure.CLOSED + ")");
+    }
+
+    @Test
+    void closingTwiceIsHarmless() {
+        var client = client(Redirects.NONE);
+        client.close();
+        client.close();
+
+        assertThat(failureOf(() -> client.send(OutboundRequest.get(at("source.test", "/ok")))))
+                .hasMessageContaining(OutboundFailure.CLOSED);
     }
 }
