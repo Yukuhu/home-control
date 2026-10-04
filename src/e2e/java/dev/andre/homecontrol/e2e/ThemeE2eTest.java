@@ -321,9 +321,15 @@ class ThemeE2eTest extends E2eApplicationTest {
         themes.install(ThemePackageFixtures.derivative(themes.export("default"), "legacy", "Legacy", "#101917", """
                 input { opacity: 1; }
                 .sheet-device[aria-checked] { font-style: italic; }
-                .sheet-device[aria-checked="true"] { color: #123456; }
-                .sheet-device[aria-checked="false"] { color: #654321; }
-                .sheet:has(.sheet-device[aria-checked="true"]) { border-top-color: #abcdef; }
+                .sheet-device[role="radio"][aria-checked="true"] { color: #123456; }
+                button.sheet-device[aria-checked="true"] { color: #badbad; font-weight: 700; }
+                button.sheet-device[aria-checked="false"] { color: #654321; font-weight: 400; }
+                button.sheet-device[role][aria-checked="true"] { text-decoration: underline; }
+                .sheet-device[role="checkbox"][aria-checked="true"] { color: #deadbe; }
+                .sheet-device[role="RADIO" i] { border-bottom-color: #010203; }
+                .sheet-device[role="RADIO" s][aria-checked="true"] { color: #deadbe; }
+                .sheet-device[role="radıo" i][aria-checked="true"] { color: #deadbe; }
+                .sheet:has(button.sheet-device[role="radio"][aria-checked="true"]) { border-top-color: #abcdef; }
                 """), null);
         try (BrowserSession session = open(browser)) {
             Page page = session.page();
@@ -334,7 +340,11 @@ class ThemeE2eTest extends E2eApplicationTest {
             Locator bedroom = page.locator(".sheet-device").filter(new Locator.FilterOptions().setHasText("Bedroom"));
             assertThat(living).hasCSS("color", "rgb(18, 52, 86)");
             assertThat(bedroom).hasCSS("color", "rgb(101, 67, 33)");
+            assertThat(living).hasCSS("font-weight", "700");
+            assertThat(bedroom).hasCSS("font-weight", "400");
+            assertThat(living).hasCSS("text-decoration-line", "underline");
             assertThat(living).hasCSS("font-style", "italic");
+            assertThat(living).hasCSS("border-bottom-color", "rgb(1, 2, 3)");
             assertThat(page.locator("#play-sheet")).hasCSS("border-top-color", "rgb(171, 205, 239)");
             assertThat(bedroom.locator("input")).hasCSS("opacity", "0");
 
@@ -343,6 +353,9 @@ class ThemeE2eTest extends E2eApplicationTest {
             assertThat(bedroom.locator("input")).isChecked();
             assertThat(living).hasCSS("color", "rgb(101, 67, 33)");
             assertThat(bedroom).hasCSS("color", "rgb(18, 52, 86)");
+            assertThat(living).hasCSS("font-weight", "400");
+            assertThat(bedroom).hasCSS("font-weight", "700");
+            assertThat(bedroom).hasCSS("text-decoration-line", "underline");
             assertThat(page.locator("#sheet-route")).containsText("Play on Bedroom");
             page.keyboard().press("Tab");
             bedroom.locator("input").focus();

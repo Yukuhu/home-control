@@ -195,7 +195,7 @@ final class ThemeArchive {
         Map<String, byte[]> compilation = new TreeMap<>(files);
         compilation.put("@contract/token-schema.json", ThemeTokens.resource("/themes/token-schema.json"));
         compilation.put("@contract/default-tokens.json", ThemeTokens.resource("/themes/default/tokens.json"));
-        return digest(compilation, "home-control-theme-api-1-compiler-2");
+        return digest(compilation, "home-control-theme-api-1-compiler-3");
     }
 
     static String sourceRevision(Map<String, byte[]> files) { return digest(files, "home-control-theme-source-1"); }

@@ -74,6 +74,10 @@ The user approved changing two previously accepted choices from the
 Existing version 1 themes can keep their `aria-checked` selectors. The compiler expands
 them to include a private styling attribute mirrored from the native radio state. The
 alias preserves selector specificity and works inside existing `:has()` selectors.
+It also preserves the old `button` element and radio-role constraints: compounds such as
+`button.sheet-device[role="radio"][aria-checked="true"]` still select the replacement
+card. Role-presence selectors and explicit case-insensitive radio matches work, while
+other roles stay distinct. These styling aliases do not add ARIA roles to the labels.
 The compilation fingerprint changes so installed source packages recompile with fresh
 asset URLs; their source revisions and stored package format stay compatible.
 
@@ -88,6 +92,8 @@ recommendations. This follow-up does not change their code or SonarCloud disposi
   service-worker CSP case.
 - The browser regressions cover labeled native choices, checked state, route previews,
   wrapping arrow keys, existing theme selectors, protected input styling and focus.
+  The legacy-theme case also checks compound element/role/state selectors, competing
+  specificity, unrelated roles and selectors inside `:has()`.
   The shared keyboard helper preserves wrapping and Home/End because WebKit's native
   radio navigation stops at the group boundary.
 - Independent code review found no remaining production issues.

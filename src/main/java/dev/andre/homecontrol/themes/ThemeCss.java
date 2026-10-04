@@ -224,7 +224,7 @@ final class ThemeCss {
     private static String simpleSelector(CSSSelectorSimpleMember simple, boolean nested) {
         String value = simple.getValue();
         if (!supportedSimpleSelector(simple, nested)) throw ThemeException.invalid("Unsupported CSS selector hook: " + value);
-        return value;
+        return value.equals("button") ? playbackCardAlias(value, "") : value;
     }
 
     private static boolean supportedSimpleSelector(CSSSelectorSimpleMember simple, boolean nested) {
@@ -245,9 +245,24 @@ final class ThemeCss {
         if (attribute.getAttrName().equals("aria-checked")) {
             // Version 1 themes target the card's old ARIA state; native radios now own the accessible state.
             String alias = "[data-sheet-checked" + selector.substring("[aria-checked".length());
-            return ":is(" + selector + ",:where(.sheet-device" + alias + "))";
+            return playbackCardAlias(selector, alias);
+        }
+        if (attribute.getAttrName().equals("role") && matchesRadioRole(attribute)) {
+            return playbackCardAlias(selector, "");
         }
         return selector;
+    }
+
+    private static boolean matchesRadioRole(CSSSelectorAttribute attribute) {
+        if (attribute.getOperator() == null) return true;
+        String value = unquote(attribute.getAttrValue());
+        return value.equals("radio") || (attribute.getCaseSensitivityFlag() == ECSSAttributeCase.CASE_INSENSITIVE
+                && value.matches("[rR][aA][dD][iI][oO]"));
+    }
+
+    /** Preserve each legacy member's specificity without adding :has(), which cannot nest inside another :has(). */
+    private static String playbackCardAlias(String selector, String state) {
+        return ":is(" + selector + ",:where(label.sheet-device" + state + "))";
     }
 
     private static String nthSelector(CSSSelectorMemberFunctionLike function) {

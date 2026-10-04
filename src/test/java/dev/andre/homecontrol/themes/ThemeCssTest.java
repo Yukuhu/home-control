@@ -103,7 +103,9 @@ class ThemeCssTest {
     })
     void scopesSupportedSelectorForms(String selector) {
         String compiled = compile(selector + " { color: red; }");
-        assertThat(compiled).contains(":root[data-theme=\"custom\"] " + selector.split("[: >+~]", 2)[0])
+        String firstMember = selector.startsWith("button") ? ":is(button,:where(label.sheet-device))"
+                : selector.split("[: >+~]", 2)[0];
+        assertThat(compiled).contains(":root[data-theme=\"custom\"] " + firstMember)
                 .contains("color:red;");
     }
 
@@ -142,7 +144,7 @@ class ThemeCssTest {
         String source = "@media screen and (min-width: 20rem), print { "
                 + "button { position: relative; font-size: calc((100% - 2px) / 2); "
                 + "&::before { content: ''; position: absolute; inset: 0; pointer-events: none; } } }";
-        assertThat(compile(source)).contains("@media screen", "print", ":root[data-theme=\"custom\"] button", "&::before", "pointer-events:none", "calc(");
+        assertThat(compile(source)).contains("@media screen", "print", ":root[data-theme=\"custom\"] :is(button,:where(label.sheet-device))", "&::before", "pointer-events:none", "calc(");
     }
 
     @Test void namespacesFontAndAnimationReferencesAndRewritesLocalAssets() {
