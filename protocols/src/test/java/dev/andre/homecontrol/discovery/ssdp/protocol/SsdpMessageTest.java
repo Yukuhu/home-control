@@ -142,4 +142,28 @@ class SsdpMessageTest {
         assertThat(parsed.kind()).isEqualTo(SsdpMessage.Kind.SEARCH_REQUEST);
         assertThat(parsed.header("ST")).contains("urn:x:1");
     }
+
+    @Test
+    void headersEndAtTheFirstBlankLineAndLinesWithoutANameAreSkipped() {
+        byte[] response = """
+                HTTP/1.1 200 OK\r
+                no header here\r
+                : no name\r
+                ST: urn:x:1\r
+                \r
+                LOCATION: http://10.0.0.9:1/after-the-headers.xml\r
+                """.getBytes(US_ASCII);
+
+        SsdpMessage parsed = SsdpMessage.parse(response, response.length).orElseThrow();
+
+        assertThat(parsed.header("ST")).contains("urn:x:1");
+        assertThat(parsed.header("LOCATION")).isEmpty();
+        assertThat(parsed.header("no header here")).isEmpty();
+    }
+
+    @Test
+    void nothingIsNoMessage() {
+        assertThat(SsdpMessage.parse(null, 10)).isEmpty();
+        assertThat(SsdpMessage.parse(new byte[10], 0)).isEmpty();
+    }
 }

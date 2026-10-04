@@ -65,6 +65,15 @@ class CastFramingTest {
     }
 
     @Test
+    void aStreamThatEndsInsideTheLengthPrefixIsAnError() {
+        CastFraming reader = new CastFraming(new ByteArrayInputStream(new byte[]{0, 0}), OutputStream.nullOutputStream());
+
+        assertThatThrownBy(reader::read)
+                .isInstanceOf(EOFException.class)
+                .hasMessage("The Cast peer closed the stream inside a frame header");
+    }
+
+    @Test
     void refusesAFrameLargerThanTheLimit() {
         byte[] header = ByteBuffer.allocate(4).putInt(CastFraming.MAX_MESSAGE_BYTES + 1).array();
 

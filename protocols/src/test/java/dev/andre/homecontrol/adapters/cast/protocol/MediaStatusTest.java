@@ -80,6 +80,16 @@ class MediaStatusTest {
     }
 
     @Test
+    void withoutATitleOrAFileNameTheMediaIsUnknown() {
+        assertThat(new MediaStatus(1, "PLAYING", 0, null, " ", null, null).displayTitle()).isEqualTo("Unknown media");
+        assertThat(new MediaStatus(1, "PLAYING", 0, " ", null, null, null).displayTitle()).isEqualTo("Unknown media");
+        assertThat(new MediaStatus(1, "PLAYING", 0, "http://nas/films/", null, null, null).displayTitle())
+                .isEqualTo("Unknown media");
+        assertThat(new MediaStatus(1, "PLAYING", 0, "http://nas/a.mp4", "Big Buck Bunny", null, null).displayTitle())
+                .isEqualTo("Big Buck Bunny");
+    }
+
+    @Test
     void loadingAndUnknownStatesAreBuffering() {
         assertThat(status("LOADING").state()).isEqualTo(MediaStatus.PlayerState.BUFFERING);
         assertThat(status("SOMETHING_NEWER").state()).isEqualTo(MediaStatus.PlayerState.BUFFERING);

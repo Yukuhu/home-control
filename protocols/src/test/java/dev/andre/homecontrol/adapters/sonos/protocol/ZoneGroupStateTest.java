@@ -4,6 +4,7 @@ import dev.andre.homecontrol.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.net.URI;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -95,5 +96,28 @@ class ZoneGroupStateTest {
                 + "</ZoneGroup></ZoneGroups>");
 
         assertThat(state.visibleMembers()).extracting(ZoneGroupState.Member::uuid).containsExactly("A");
+    }
+
+    @Test
+    void anAnswerOfOneGroupIsReadAndOnlyItsUsableMembersKept() {
+        ZoneGroupState state = ZoneGroupState.parse("<ZoneGroup Coordinator=\"A\" ID=\"A:1\">"
+                + "<ZoneGroupMember UUID=\"A\" Location=\"http://192.168.1.80:1400/xml/device_description.xml\" ZoneName=\"Lan\"/>"
+                + "<Satellite UUID=\"S\" Location=\"http://192.168.1.82:1400/xml/device_description.xml\"/>"
+                + "<ZoneGroupMember UUID=\"\" Location=\"http://192.168.1.83:1400/xml/device_description.xml\"/>"
+                + "<ZoneGroupMember UUID=\"E\" Location=\"not a location\"/>"
+                + "</ZoneGroup>");
+
+        assertThat(state.groups()).singleElement().satisfies(group -> {
+            assertThat(group.coordinator()).isEqualTo("A");
+            assertThat(group.members()).extracting(ZoneGroupState.Member::uuid).containsExactly("A");
+        });
+    }
+
+    @Test
+    void aMemberWithoutAPortIsReachedOnTheSonosPort() {
+        ZoneGroupState.Member member = new ZoneGroupState.Member("A", URI.create("http://192.168.1.80/x"), "Lan", false);
+
+        assertThat(member.port()).isEqualTo(SonosEndpoints.DEFAULT_PORT);
+        assertThat(member.host()).isEqualTo("192.168.1.80");
     }
 }
