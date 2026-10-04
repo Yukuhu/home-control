@@ -317,6 +317,41 @@ class ThemeE2eTest extends E2eApplicationTest {
     }
 
     @BrowserTest
+    void existingThemeSelectorsFollowNativePlaybackChoices(String browser) throws IOException {
+        themes.install(ThemePackageFixtures.derivative(themes.export("default"), "legacy", "Legacy", "#101917", """
+                input { opacity: 1; }
+                .sheet-device[aria-checked] { font-style: italic; }
+                .sheet-device[aria-checked="true"] { color: #123456; }
+                .sheet-device[aria-checked="false"] { color: #654321; }
+                .sheet:has(.sheet-device[aria-checked="true"]) { border-top-color: #abcdef; }
+                """), null);
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+            page.navigate("/?device=living");
+            themePicker(page).selectOption("legacy");
+            page.locator("button.tile[data-item='clip-1']").click();
+            Locator living = page.locator(".sheet-device").filter(new Locator.FilterOptions().setHasText("Living Room"));
+            Locator bedroom = page.locator(".sheet-device").filter(new Locator.FilterOptions().setHasText("Bedroom"));
+            assertThat(living).hasCSS("color", "rgb(18, 52, 86)");
+            assertThat(bedroom).hasCSS("color", "rgb(101, 67, 33)");
+            assertThat(living).hasCSS("font-style", "italic");
+            assertThat(page.locator("#play-sheet")).hasCSS("border-top-color", "rgb(171, 205, 239)");
+            assertThat(bedroom.locator("input")).hasCSS("opacity", "0");
+
+            bedroom.click();
+
+            assertThat(bedroom.locator("input")).isChecked();
+            assertThat(living).hasCSS("color", "rgb(101, 67, 33)");
+            assertThat(bedroom).hasCSS("color", "rgb(18, 52, 86)");
+            assertThat(page.locator("#sheet-route")).containsText("Play on Bedroom");
+            page.keyboard().press("Tab");
+            bedroom.locator("input").focus();
+            assertThat(bedroom).hasCSS("outline-style", "solid");
+            assertThat(bedroom).hasCSS("outline-width", "2px");
+        }
+    }
+
+    @BrowserTest
     void reducedMotionAndKeyboardFocusOverrideImportedControlDecorations(String browser) throws IOException {
         themes.install(ThemePackageFixtures.derivative(themes.export("default"), "decorated", "Decorated", "#101917",
                 DECORATED_CONTROLS), null);

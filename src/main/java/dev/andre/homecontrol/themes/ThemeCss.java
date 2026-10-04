@@ -241,7 +241,13 @@ final class ThemeCss {
                 || (attribute.getOperator() != null && !attribute.getOperator().getAsCSSString(WRITER, 0).equals("="))) {
             throw ThemeException.invalid("Unsupported CSS attribute selector.");
         }
-        return attribute.getAsCSSString(WRITER, 0);
+        String selector = attribute.getAsCSSString(WRITER, 0);
+        if (attribute.getAttrName().equals("aria-checked")) {
+            // Version 1 themes target the card's old ARIA state; native radios now own the accessible state.
+            String alias = "[data-sheet-checked" + selector.substring("[aria-checked".length());
+            return ":is(" + selector + ",:where(.sheet-device" + alias + "))";
+        }
+        return selector;
     }
 
     private static String nthSelector(CSSSelectorMemberFunctionLike function) {

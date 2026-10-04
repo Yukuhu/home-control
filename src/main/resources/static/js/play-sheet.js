@@ -78,11 +78,16 @@ async function readJsonOrText(response) {
 
 function selectDevice(deviceId) {
     target = deviceId;
-    for (const button of sheet().querySelectorAll("[data-sheet-device]")) {
-        button.setAttribute("aria-checked", String(button.dataset.sheetDevice === deviceId));
-        button.tabIndex = button.dataset.sheetDevice === deviceId ? 0 : -1;
-    }
+    const input = sheet().querySelector(`[data-sheet-device="${CSS.escape(deviceId)}"]`);
+    if (input && !input.checked) input.checked = true;
+    syncDeviceStyles();
     preview().catch(previewFailed);
+}
+
+function syncDeviceStyles() {
+    for (const input of sheet().querySelectorAll("[data-sheet-device]")) {
+        input.closest(".sheet-device").dataset.sheetChecked = String(input.checked);
+    }
 }
 
 function previewFailed() {
@@ -216,13 +221,19 @@ export function openPlaySheet(tile) {
 
 export function initPlaySheet() {
     if (!sheet()) return;
+    // Keep wrapping arrows and Home/End consistent; WebKit's native radio navigation stops at the group edge.
     bindChoiceKeys(sheet().querySelector(".sheet-devices"), "[data-sheet-device]",
-        (button) => selectDevice(button.dataset.sheetDevice));
+        (input) => selectDevice(input.dataset.sheetDevice));
+    sheet().querySelector(".sheet-devices").addEventListener("change", (event) => {
+        const device = event.target.closest("[data-sheet-device]");
+        if (!device?.checked) return;
+        target = device.dataset.sheetDevice;
+        syncDeviceStyles();
+        preview().catch(previewFailed);
+    });
     document.addEventListener("click", (event) => {
         const tile = event.target.closest("button.tile");
         if (tile?.dataset.item) openPlaySheet(tile);
-        const device = event.target.closest("[data-sheet-device]");
-        if (device) selectDevice(device.dataset.sheetDevice);
     });
     document.getElementById("sheet-play").addEventListener("click", () => attempt(target, []).catch(playbackFailed));
     document.getElementById("sheet-pin")?.addEventListener("submit", submitPin);

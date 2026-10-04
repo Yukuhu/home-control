@@ -118,11 +118,16 @@ Nesting is supported:
         box-shadow: inset 3px 0 0 var(--panel-line);
     }
 
-    & .sheet-device[aria-checked="true"] {
+    & .sheet-device:has(input:checked) {
         background: rgba(105, 221, 237, .12);
     }
 }
 ```
+
+Playback device cards contain native radio inputs. Use `.sheet-device:has(input:checked)`
+for their selected appearance. Existing version 1 `aria-checked` selectors remain supported:
+the compiler also matches the card's private styling state, preserving selector specificity
+and selectors nested inside `:has()`. The native input supplies the accessible checked state.
 
 Quote attribute values, especially boolean strings such as `"true"`. CSS escapes and unsupported syntax are rejected
 rather than repaired. Custom properties use `--` followed by a lowercase letter and up to 63 lowercase letters,

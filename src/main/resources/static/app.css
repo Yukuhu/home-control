@@ -7,14 +7,16 @@
     [hidden] { display: none !important; }
     .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; }
     :focus-visible { outline-style: solid !important; outline-width: 2px !important; }
+    .sheet-device:has(input:focus-visible) { outline: 2px solid var(--focus) !important; outline-offset: -5px; }
+    .sheet-device input { opacity: 0 !important; }
     @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
     }
     @media (forced-colors: active) {
         *, *::before, *::after { clip-path: none !important; background-image: none !important; text-shadow: none !important; }
-        .chip.selected, .sheet-device[aria-checked=true], .mode-switch [aria-selected=true] { outline: 2px solid Highlight !important; }
+        .chip.selected, .sheet-device:has(input:checked), .mode-switch [aria-selected=true] { outline: 2px solid Highlight !important; }
         .touchpad, .dpad button, .tile .art { border: 1px solid CanvasText !important; }
-        :focus-visible { outline-color: Highlight !important; }
+        :focus-visible, .sheet-device:has(input:focus-visible) { outline-color: Highlight !important; }
     }
 }
 
@@ -210,8 +212,9 @@ kbd { font: var(--font-size-caption) var(--font-mono); padding: .15rem .25rem; b
 .sheet-item p { margin: 0; }
 .sheet-label { margin-top: 1.5rem; }
 .sheet-devices { display: flex; gap: .5rem; overflow-x: auto; padding: 4px; margin: -4px; }
-.sheet-device { flex: none; flex-direction: column; align-items: flex-start; gap: .25rem; font-size: var(--font-size-control); min-height: 64px; background: var(--sheet-device-bg); }
-.sheet-device[aria-checked=true] { border-color: var(--accent); background: var(--sheet-device-selected-bg); }
+.sheet-device { position: relative; flex: none; flex-direction: column; align-items: flex-start; gap: .25rem; font-size: var(--font-size-control); min-height: 64px; background: var(--sheet-device-bg); }
+.sheet-device input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.sheet-device:has(input:checked) { border-color: var(--accent); background: var(--sheet-device-selected-bg); }
 .sheet-route { padding: 1rem; margin: 1.2rem 0; border-radius: var(--radius-control); background: var(--sheet-route-bg); font-size: var(--font-size-secondary); color: var(--sheet-route-fg); }
 .sheet-route.unroutable { color: var(--danger); }
 #sheet-play { width: 100%; min-height: 48px; }

@@ -281,7 +281,7 @@
 
     /* Play sheet */
     & .sheet-item img { --cut: 10px; clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); }
-    & .sheet-device[aria-checked="true"] { --line: var(--cp-cyan); --fill: rgba(94, 246, 255, .12); color: var(--cp-cyan); }
+    & .sheet-device:has(input:checked) { --line: var(--cp-cyan); --fill: rgba(94, 246, 255, .12); color: var(--cp-cyan); }
     & .sheet-route { font-family: var(--cp-mono); font-size: .78rem; background: #04060a; border-left: 3px solid var(--cp-cyan); color: #b9f3f6; }
     & .sheet-route.unroutable { border-left-color: var(--cp-red); color: var(--cp-red); }
 

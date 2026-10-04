@@ -124,16 +124,16 @@ class InterfaceE2eTest extends E2eApplicationTest {
             page.keyboard().press("ArrowRight");
 
             assertThat(speaker).isFocused();
-            assertThat(speaker).hasAttribute("aria-checked", "true");
-            assertThat(living).hasAttribute("aria-checked", "false");
+            assertThat(speaker).isChecked();
+            assertThat(living).not().isChecked();
             assertThat(page.locator("#sheet-route")).containsText("Cannot play on Speaker");
             assertThat(page.locator("#sheet-play")).isDisabled();
 
             page.keyboard().press("ArrowRight");
 
             assertThat(bedroom).isFocused();
-            assertThat(bedroom).hasAttribute("aria-checked", "true");
-            assertThat(speaker).hasAttribute("aria-checked", "false");
+            assertThat(bedroom).isChecked();
+            assertThat(speaker).not().isChecked();
             assertThat(page.locator("#sheet-route")).containsText("Play on Bedroom");
             assertThat(page.locator("#sheet-play")).isEnabled();
             org.assertj.core.api.Assertions.assertThat(keyRequests).isEmpty();

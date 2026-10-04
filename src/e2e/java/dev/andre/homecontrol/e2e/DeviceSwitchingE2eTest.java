@@ -45,13 +45,13 @@ class DeviceSwitchingE2eTest extends E2eApplicationTest {
             page.locator("button.tile[data-item='clip-1']").click();
             assertThat(page.locator("#sheet-route")).hasText("Play on Living Room · Open in the YouTube app");
 
-            page.locator("[data-sheet-device='speaker']").click();
-            assertThat(page.locator("[data-sheet-device='speaker']")).hasAttribute("aria-checked", "true");
+            page.getByLabel(Pattern.compile("Speaker")).check();
+            assertThat(page.locator("[data-sheet-device='speaker']")).isChecked();
             assertThat(page.locator("#sheet-route")).containsText("Cannot play on Speaker");
             assertThat(page.locator("#sheet-play")).isDisabled();
 
-            page.locator("[data-sheet-device='bedroom']").click();
-            assertThat(page.locator("[data-sheet-device='bedroom']")).hasAttribute("aria-checked", "true");
+            page.getByLabel(Pattern.compile("Bedroom")).check();
+            assertThat(page.locator("[data-sheet-device='bedroom']")).isChecked();
             assertThat(page.locator("#sheet-route")).hasText("Play on Bedroom · Open in the YouTube app");
             assertThat(page.locator("#sheet-play")).isEnabled();
 

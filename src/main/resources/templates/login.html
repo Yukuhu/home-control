@@ -14,7 +14,7 @@
     <form method="post" th:action="@{/login}">
         <input type="hidden" name="next" th:value="${next}">
         <label for="login-password">Password</label>
-        <input id="login-password" type="password" name="password" autocomplete="current-password" autofocus required>
+        <input id="login-password" type="password" name="password" autocomplete="current-password" required>
         <button type="submit" class="primary">Log in <span aria-hidden="true">→</span></button>
     </form>
     <details class="auth-help">
