@@ -160,4 +160,31 @@ class JsonFilePinStoreTest {
         assertThat(pins).hasSize(1);
         assertThat(pins.get(0).title()).isEqualTo("First");
     }
+
+    @Test
+    void entriesWithoutAnIdTitleOrKnownKindAreSkippedAndOddFieldsAreDropped() throws IOException {
+        Path file = dir.resolve("pinned.json");
+        Files.writeString(file, """
+                {"version":1,"pins":[
+                  {"id":"not-an-id","url":"https://example.org/1","title":"No id"},
+                  {"id":"p-00000000000a","url":"https://example.org/2","title":" "},
+                  {"id":"p-00000000000b","url":"https://example.org/3","title":"%s"},
+                  {"id":"p-00000000000c","url":"https://example.org/4","title":"Odd kind","kind":"PODCAST"},
+                  {"id":"p-00000000000d","url":"https://example.org/5","title":"Kept","kind":null,
+                   "artwork":"https://bad host/a.png","subtitle":42,"upgradeOf":7,"createdAt":"yesterday"},
+                  {"id":"p-00000000000e","url":"https://example.org/6","title":"Local art","artwork":"/sources/x.png"}
+                ]}
+                """.formatted("t".repeat(121)));
+
+        List<Pin> pins = new JsonFilePinStore(file).load();
+
+        assertThat(pins).extracting(Pin::title).containsExactly("Kept", "Local art");
+        Pin kept = pins.getFirst();
+        assertThat(kept.kind()).isEqualTo(ContentKind.VIDEO);
+        assertThat(kept.artwork()).isNull();
+        assertThat(kept.subtitle()).isNull();
+        assertThat(kept.upgradeOf()).isNull();
+        assertThat(kept.createdAt()).isEqualTo(Instant.EPOCH);
+        assertThat(pins.getLast().artwork()).isEqualTo(URI.create("/sources/x.png"));
+    }
 }

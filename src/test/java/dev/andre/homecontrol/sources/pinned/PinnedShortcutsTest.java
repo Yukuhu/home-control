@@ -24,6 +24,8 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,6 +34,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 
 class PinnedShortcutsTest {
 
@@ -297,5 +302,97 @@ class PinnedShortcutsTest {
         Pin pin = shortcuts.addUpgrade("https://www.netflix.com/title/1", "tmdb/tv-77");
 
         assertThat(pin.artwork()).isNull();
+    }
+
+    @Test
+    void anUpgradeNeedsALinkOfAReasonableLength() {
+        assertThatThrownBy(() -> shortcuts.addUpgrade(null, "tmdb/tv-66732")).hasMessage("Enter a link to pin");
+        assertThatThrownBy(() -> shortcuts.addUpgrade("  ", "tmdb/tv-66732")).hasMessage("Enter a link to pin");
+        assertThatThrownBy(() -> shortcuts.addUpgrade("https://www.netflix.com/title/" + "1".repeat(2049), "tmdb/tv-66732"))
+                .hasMessage("That link is too long to pin");
+        assertThatThrownBy(() -> shortcuts.addUpgrade("https://www.netflix.com/title/1", null))
+                .hasMessage("That item cannot be pinned");
+        assertThatThrownBy(() -> shortcuts.add(null, "Title")).hasMessage("Enter a link to pin");
+        assertThat(shortcuts.all()).isEmpty();
+    }
+
+    @Test
+    void withoutContentSourcesNoItemCanBeUpgraded() {
+        var noSources = new PinnedShortcuts(store, new PinnedProperties(true, 3), events,
+                Clock.fixed(NOW, ZoneOffset.UTC), new SecureRandom(), providerOf(null));
+
+        assertThatThrownBy(() -> noSources.addUpgrade("https://www.netflix.com/title/1", "tmdb/tv-66732"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("That item is no longer available");
+    }
+
+    @Test
+    void anUpgradeToALinkPinnedOnItsOwnIsRefused() {
+        shortcuts.add("https://www.netflix.com/title/80057281", "");
+
+        assertThatThrownBy(() -> shortcuts.addUpgrade("https://www.netflix.com/title/80057281", "tmdb/tv-66732"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("That link is already pinned");
+        assertThat(shortcuts.all()).hasSize(1);
+    }
+
+    @Test
+    void aRenameNeedsATitleOfAReasonableLength() {
+        Pin pin = shortcuts.add("https://example.org/a", "A");
+        var id = pin.id();
+
+        assertThatThrownBy(() -> shortcuts.rename(id, null)).hasMessage("Enter a title");
+        assertThatThrownBy(() -> shortcuts.rename(id, "t".repeat(121))).hasMessage("Keep the title under 120 characters");
+        assertThat(shortcuts.find(id).orElseThrow().title()).isEqualTo("A");
+    }
+
+    @Test
+    void movingTheLastPinDownChangesNothing() {
+        shortcuts.add("https://example.org/a", "A");
+        Pin last = shortcuts.add("https://example.org/b", "B");
+        clearInvocations(events);
+
+        shortcuts.move(last.id(), false);
+
+        assertThat(shortcuts.all()).extracting(Pin::title).containsExactly("A", "B");
+        verify(events, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void anItemsOwnServerArtworkIsKept() {
+        given(tmdbSource.item("tv-78")).willReturn(Optional.of(new ContentItem("tv-78", "tmdb", ContentKind.VIDEO,
+                "Local Art", null, URI.create("/sources/tmdb/images/x.jpg"),
+                List.of(new PlayableRef.AppLink(ServiceLinks.appHome("netflix").orElseThrow(), "netflix")))));
+
+        Pin pin = shortcuts.addUpgrade("https://www.netflix.com/title/2", "tmdb/tv-78");
+
+        assertThat(pin.artwork()).isEqualTo(URI.create("/sources/tmdb/images/x.jpg"));
+    }
+
+    @Test
+    void aCollidingIdIsDrawnAgainAndGivenUpAfterAThousandTries() {
+        AtomicInteger draws = new AtomicInteger();
+        SecureRandom zerosTwiceThenOne = new SecureRandom() {
+            @Override
+            public void nextBytes(byte[] bytes) {
+                Arrays.fill(bytes, (byte) 0);
+                if (draws.incrementAndGet() > 2) {
+                    bytes[bytes.length - 1] = 1;
+                }
+            }
+        };
+        var colliding = new PinnedShortcuts(store, new PinnedProperties(true, 3), events,
+                Clock.fixed(NOW, ZoneOffset.UTC), zerosTwiceThenOne, providerOf(sources));
+        assertThat(colliding.add("https://example.org/a", "A").id()).isEqualTo("p-000000000000");
+        assertThat(colliding.add("https://example.org/b", "B").id()).isEqualTo("p-000000000001");
+
+        SecureRandom alwaysZeros = new SecureRandom() {
+            @Override
+            public void nextBytes(byte[] bytes) {
+                Arrays.fill(bytes, (byte) 0);
+            }
+        };
+        var stuck = new PinnedShortcuts(store, new PinnedProperties(true, 3), events,
+                Clock.fixed(NOW, ZoneOffset.UTC), alwaysZeros, providerOf(sources));
+        assertThatThrownBy(() -> stuck.add("https://example.org/c", "C"))
+                .isInstanceOf(IllegalStateException.class).hasMessage("Could not generate a unique pin id");
     }
 }

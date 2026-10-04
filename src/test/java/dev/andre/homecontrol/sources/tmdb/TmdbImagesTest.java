@@ -127,4 +127,22 @@ class TmdbImagesTest {
         images.poster(bearer, "/x.jpg");
         assertThat(fake.count("GET", "/3/configuration")).isEqualTo(2);
     }
+
+    @Test
+    void aBaseWithoutTrailingSlashGetsOneAndWithoutSizesThePreferredSizeIsUsed() {
+        fake.respondJson("GET", "/3/configuration", 200, """
+                {"images":{"secure_base_url":"https://image.tmdb.org/t/p","poster_sizes":[]}}""");
+
+        assertThat(images(properties(null)).poster(bearer, "/x.jpg"))
+                .isEqualTo(URI.create("https://image.tmdb.org/t/p/w342/x.jpg"));
+    }
+
+    @Test
+    void onlySmallerSizesMeansTheLargestOfThem() {
+        fake.respondJson("GET", "/3/configuration", 200, """
+                {"images":{"secure_base_url":"https://image.tmdb.org/t/p/","poster_sizes":["w92","w154"]}}""");
+
+        assertThat(images(properties(null)).poster(bearer, "/x.jpg"))
+                .isEqualTo(URI.create("https://image.tmdb.org/t/p/w154/x.jpg"));
+    }
 }

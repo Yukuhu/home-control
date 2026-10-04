@@ -107,4 +107,15 @@ class TmdbSetupControllerTest extends WebSliceTest {
         assertThat(body).doesNotContain("loginPassword")
                 .doesNotContain(FakeTmdbServer.READ_TOKEN).doesNotContain(FakeTmdbServer.API_KEY);
     }
+
+    @Test
+    void aFailedTestIsFlashed() throws Exception {
+        given(tmdbSetup.check()).willThrow(new TmdbException(
+                ContentSourceException.Kind.UNAUTHORIZED,
+                "TMDB rejected the API key or read access token"));
+
+        mockMvc.perform(post("/setup/sources/tmdb/test"))
+                .andExpect(redirectedUrl("/setup#tmdb"))
+                .andExpect(flash().attribute("tmdbError", "TMDB rejected the API key or read access token"));
+    }
 }

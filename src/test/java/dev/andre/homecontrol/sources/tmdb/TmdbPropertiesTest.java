@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
+import java.net.URI;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -57,5 +59,15 @@ class TmdbPropertiesTest {
         runner.withPropertyValues("home-control.tmdb.request-timeout=12")
                 .run(context -> assertThat(context.getBean(TmdbProperties.class).requestTimeout())
                         .isEqualTo(Duration.ofSeconds(12)));
+    }
+
+    @Test
+    void aBlankImageAddressIsNoneAndNoProviderIdsMeanTheDefaults() {
+        TmdbProperties properties = new TmdbProperties(true, URI.create("https://api.themoviedb.org/3"), URI.create(""),
+                Duration.ofSeconds(5), Duration.ofSeconds(10), 20, 40, Duration.ofHours(24), Duration.ofHours(24),
+                Map.of(), false);
+
+        assertThat(properties.imageBaseUrl()).isNull();
+        assertThat(properties.providerIds()).isEqualTo(TmdbProperties.DEFAULT_PROVIDER_IDS);
     }
 }

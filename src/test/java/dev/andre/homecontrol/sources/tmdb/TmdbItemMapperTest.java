@@ -80,4 +80,17 @@ class TmdbItemMapperTest {
         assertThat(strangerThings.subtitle()).isEqualTo("On Netflix · 2016");
         assertThat(strangerThings.playables()).isEqualTo(playables);
     }
+
+    @Test
+    void anOriginalTitleStandsInAndAResultWithoutAnyTitleIsSkipped() {
+        JsonNode original = JSON.readTree("{\"media_type\":\"movie\",\"id\":7,\"title\":\" \",\"original_title\":\"Le Film\"}");
+        JsonNode numericName = JSON.readTree("{\"media_type\":\"tv\",\"id\":8,\"name\":42,\"original_name\":\"Die Serie\"}");
+        JsonNode untitled = JSON.readTree("{\"media_type\":\"tv\",\"id\":9,\"name\":\"\"}");
+
+        assertThat(TmdbItemMapper.toItem(original, null, posters(), null, List.of()).orElseThrow().title())
+                .isEqualTo("Le Film");
+        assertThat(TmdbItemMapper.toItem(numericName, null, posters(), null, List.of()).orElseThrow().title())
+                .isEqualTo("Die Serie");
+        assertThat(TmdbItemMapper.toItem(untitled, null, posters(), null, List.of())).isEmpty();
+    }
 }
