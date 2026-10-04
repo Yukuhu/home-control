@@ -41,6 +41,21 @@ SonarCloud does not analyse; the figures above leave them out.
 Each batch records here the misses it leaves, with the reason (an `InterruptedException` handler, real multicast,
 a real `mpv` process, a TLS handshake failure inside the JDK).
 
+- C1: catch blocks for exceptions the JDK never throws here (`NoSuchAlgorithmException` for SHA-256, an in-memory
+  keystore's `IOException`, `UnknownHostException` for an address that already passed `isIpLiteral`, a Cast waiter
+  completed with anything but an `IOException`); `TextWebSocket`'s own opening timeout, which the JDK's handshake
+  timeout always beats; a send that fails or is interrupted mid-write (the outcome races the listener's close); the
+  `InsecureTls` trust manager's client-side callbacks, which an outbound connection never calls; the IANA fallback
+  spelling of Europe/Kyiv on JDKs that know it.
+- Unused code, left for a separate decision: `PlayableRef.kindLabel()` and `ContentSourceException`'s constructor
+  with a cause are never called in production.
+
+## Results
+
+| Batch | Tests added | Java lines (handwritten) | Java branches |
+| --- | --- | --- | --- |
+| C1 | 95 | 94.81 % → 95.24 % | 83.84 % → 85.12 % |
+
 ## Rules
 
 - New app tests are plain unit tests or extend `WebSliceTest`, `FullAppTest` or `ModulesOffTest`; no own Spring
