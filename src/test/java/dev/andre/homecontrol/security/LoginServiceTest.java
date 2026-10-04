@@ -247,6 +247,24 @@ class LoginServiceTest {
     }
 
     @Test
+    void aRefusalNamesEveryConnectedAccountAndAnUnknownKindByItsOwnName() {
+        MockHttpServletRequest request = firstSecretStored();
+        login.storeSecrets(Map.of("tmdb.api-key", "k", "custom", "x"), null, null, context(login, request));
+
+        assertThatThrownBy(() -> login.removePassword(PASSWORD))
+                .isInstanceOf(PasswordRejectedException.class)
+                .hasMessage("Disconnect Jellyfin, TMDB and custom first: their credentials need the login password");
+    }
+
+    @Test
+    void aBrowserIsNotResumedWhileNoPasswordIsSet() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        assertThat(login.resume(context(login, request))).isFalse();
+        assertThat(request.getSession(false)).isNull();
+    }
+
+    @Test
     void connectedAccountsAreNamedOnceEachAndDeviceSecretsAreNotAccounts() {
         store.putDeviceSecret("device.androidtv.keystore-password", "p");
         MockHttpServletRequest request = firstSecretStored();

@@ -52,4 +52,17 @@ class Argon2PasswordHasherTest {
         assertThat(hasher.matches("password",
                 "$argon2id$v=19$m=19456,t=2,p=1$!!$PL01amPyeUuxG7H0vIr5X+qHkZvWnHmGBGXFYvh8z2E")).isFalse();
     }
+
+    @Test
+    void rejectsHashesWhoseNumbersOrPartsAreOutOfBoundsWithoutDerivingAnything() {
+        String hash = "PL01amPyeUuxG7H0vIr5X+qHkZvWnHmGBGXFYvh8z2E";
+
+        assertThat(hasher.matches(null, "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$" + hash)).isFalse();
+        assertThat(hasher.matches("password", "$argon2id$v=19$m=19456,t=2,p=17$c29tZXNhbHQ$" + hash)).isFalse();
+        assertThat(hasher.matches("password", "$argon2id$v=19$m=8,t=2,p=2$c29tZXNhbHQ$" + hash)).isFalse();
+        // Thirteen characters are no Base64 at all.
+        assertThat(hasher.matches("password", "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQxx$" + hash)).isFalse();
+        // A hash longer than 64 bytes.
+        assertThat(hasher.matches("password", "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQ$" + "A".repeat(88))).isFalse();
+    }
 }

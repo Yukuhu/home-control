@@ -267,6 +267,24 @@ class LoginGatingTest extends FullAppTest {
                 .andExpect(redirectedUrl("/login?next=%2F"));
     }
 
+    @Test
+    void aFormPostedWithoutALoginOrAUsableRefererGoesBackToTheDashboard() throws Exception {
+        storeAFirstSecret();
+
+        mockMvc.perform(post("/setup/password").header("Host", "localhost").header("Origin", "http://localhost")
+                        .accept("text/html"))
+                .andExpect(status().isSeeOther())
+                .andExpect(redirectedUrl("/login?next=%2F"));
+        mockMvc.perform(post("/setup/password").header("Host", "localhost").header("Origin", "http://localhost")
+                        .header("Referer", "http://localhost/set up").accept("text/html"))
+                .andExpect(status().isSeeOther())
+                .andExpect(redirectedUrl("/login?next=%2F"));
+        mockMvc.perform(post("/setup/password").header("Host", "localhost").header("Origin", "http://localhost")
+                        .header("Referer", "mailto:someone@example.org").accept("text/html"))
+                .andExpect(status().isSeeOther())
+                .andExpect(redirectedUrl("/login?next=%2F"));
+    }
+
     /** What a page asks when its live updates stopped: is the login gone, or only the server? */
     @Test
     void theSessionAnswersWhetherThisBrowserMayStillSeeTheApp() throws Exception {
