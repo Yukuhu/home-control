@@ -93,4 +93,39 @@ class DeviceSwitchingE2eTest extends E2eApplicationTest {
             assertThat(page.locator("#app-living")).hasText("Live stream");
         }
     }
+
+    @BrowserTest
+    void aPausedTitleShowsWhereItStoppedAndAMutedDeviceSaysSo(String browser) {
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+            page.navigate("/?device=living&remote=open");
+
+            fakeDevices.push("living", new DeviceState(DeviceStatus.CONNECTED, true, "org.videolan.vlc",
+                    7, 20, true, Instant.now(), new NowPlaying("Severance", PlaybackState.PAUSED, 65.0, 3420.0)));
+            assertThat(page.locator("#app-living")).hasText("Severance (paused) · 1:05 / 57:00");
+            assertThat(page.locator("#vol-living")).hasText("muted");
+
+            fakeDevices.push("living", new DeviceState(DeviceStatus.CONNECTED, true, "org.videolan.vlc",
+                    7, 20, false, Instant.now(), new NowPlaying("Radio", PlaybackState.PLAYING, 30.0, null)));
+            assertThat(page.locator("#app-living")).hasText("Radio · 0:30");
+            assertThat(page.locator("#vol-living")).hasText("vol 7");
+        }
+    }
+
+    @BrowserTest
+    void theVolumeSliderShowsADevicesOwnScaleAsAPercentage(String browser) {
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+            page.navigate("/?device=bedroom&remote=open");
+            Locator slider = page.locator("#volume-bedroom");
+
+            fakeDevices.push("bedroom", new DeviceState(DeviceStatus.CONNECTED, true, "com.example.launcher",
+                    10, 20, false, Instant.now()));
+            assertThat(slider).hasValue("50");
+
+            fakeDevices.push("bedroom", new DeviceState(DeviceStatus.CONNECTED, true, "com.example.launcher",
+                    10, 0, false, Instant.now()));
+            assertThat(slider).hasValue("0");
+        }
+    }
 }
