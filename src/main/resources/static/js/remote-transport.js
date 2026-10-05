@@ -15,9 +15,3 @@ export function sendKey(deviceId, key, { repeat = 1, press = "short", keepalive 
     const suffix = query.size ? `?${query}` : "";
     return post(`/devices/${encodeURIComponent(deviceId)}/key/${key}${suffix}`, undefined, { keepalive });
 }
-
-export async function openLink(deviceId, uri) {
-    const form = new URLSearchParams({ uri });
-    const response = await post(`/devices/${encodeURIComponent(deviceId)}/play`, form);
-    return response.text();
-}
