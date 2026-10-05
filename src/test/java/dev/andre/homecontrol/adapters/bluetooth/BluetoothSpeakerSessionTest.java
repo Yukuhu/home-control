@@ -331,10 +331,15 @@ class BluetoothSpeakerSessionTest {
     @Test
     void aPairedSpeakerIsConnectedOnTheFirstLookOnly() {
         bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5").paired(true).connected(false).uuids(BluetoothDeviceInfo.A2DP_SINK);
+        // The speaker stays out of reach: every later poll sees it disconnected and must not page it again.
+        bluez.failAlways("connect", UNREACHABLE, "br-connection-page-timeout");
         start(properties.withAutoConnect(true));
 
-        await().atMost(WAIT).untilAsserted(() -> assertThat(session.state().status()).isEqualTo(DeviceStatus.CONNECTED));
-        assertThat(bluez.calls()).containsOnlyOnce("connect AA:BB:CC:DD:EE:FF");
+        await().atMost(WAIT).until(() -> bluez.calls().contains("connect AA:BB:CC:DD:EE:FF"));
+        // Five times the 100 ms poll interval.
+        await().during(Duration.ofMillis(500)).atMost(WAIT).untilAsserted(() ->
+                assertThat(bluez.calls()).containsOnlyOnce("connect AA:BB:CC:DD:EE:FF"));
+        assertThat(session.state().status()).isEqualTo(DeviceStatus.DISCONNECTED);
     }
 
     @Test
