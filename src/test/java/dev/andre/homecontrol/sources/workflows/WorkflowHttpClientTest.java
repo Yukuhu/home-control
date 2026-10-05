@@ -511,6 +511,6 @@ class WorkflowHttpClientTest {
             assertThatThrownBy(() -> client.checkMedia(null)).hasMessage("Build media URL: invalid HTTP URL");
         }
         assertThat(new WorkflowHttpClient.Request("https://api.example/feed?token=secret",
-                List.of(new WorkflowDraft.Header("Authorization", "Bearer secret"))).toString()).isEqualTo("Request");
+                List.of(new WorkflowDraft.Header("Authorization", "Bearer secret")))).hasToString("Request");
     }
 }

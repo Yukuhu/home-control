@@ -56,10 +56,12 @@ class OutboundValuesTest {
 
     @Test
     void onlyGetAndPostWithANonNegativeCapAreRequests() {
-        assertThatThrownBy(() -> new OutboundRequest("PUT", ANSWERED, Map.of(), null, null, 0, true,
-                OptionalLong.empty(), false))
+        Map<String, String> noHeaders = Map.of();
+        OptionalLong noLength = OptionalLong.empty();
+        assertThatThrownBy(() -> new OutboundRequest("PUT", ANSWERED, noHeaders, null, null, 0, true, noLength, false))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("Only GET and POST are supported");
-        assertThatThrownBy(() -> OutboundRequest.get(ANSWERED).limitedTo(-1))
+        OutboundRequest get = OutboundRequest.get(ANSWERED);
+        assertThatThrownBy(() -> get.limitedTo(-1))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("A body cap cannot be negative");
     }
 

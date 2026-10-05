@@ -322,12 +322,13 @@ class JellyfinSetupServiceTest {
     void aBlankUserNameOrApiKeyIsRefusedBeforeJellyfinIsAsked() {
         var noUser = new JellyfinSetupService.ConnectRequest(fake.url() + "/", null, JellyfinSettings.AuthMode.PASSWORD,
                 " ", "user pw", null, LOGIN_PASSWORD, LOGIN_PASSWORD);
-        assertThatThrownBy(() -> setup.connect(noUser, browser()))
+        var browser = browser();
+        assertThatThrownBy(() -> setup.connect(noUser, browser))
                 .isInstanceOf(JellyfinException.class).hasMessage("Enter the Jellyfin user name");
 
         var noKey = new JellyfinSetupService.ConnectRequest(fake.url() + "/", null, JellyfinSettings.AuthMode.API_KEY,
                 "andre", null, " ", LOGIN_PASSWORD, LOGIN_PASSWORD);
-        assertThatThrownBy(() -> setup.connect(noKey, browser()))
+        assertThatThrownBy(() -> setup.connect(noKey, browser))
                 .isInstanceOf(JellyfinException.class).hasMessage("Enter the Jellyfin API key")
                 .extracting(e -> ((JellyfinException) e).kind()).isEqualTo(ContentSourceException.Kind.INVALID_INPUT);
 
@@ -338,12 +339,14 @@ class JellyfinSetupServiceTest {
     @Test
     void aLoginWithoutATokenOrUserIsNotKept() {
         fake.respondJson("POST", "/Users/AuthenticateByName", 200, "{\"AccessToken\":\"\",\"User\":{\"Id\":\"u1\"}}");
-        assertThatThrownBy(() -> setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), browser()))
+        var request = passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD);
+        var browser = browser();
+        assertThatThrownBy(() -> setup.connect(request, browser))
                 .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin did not return a usable login")
                 .extracting(e -> ((JellyfinException) e).kind()).isEqualTo(ContentSourceException.Kind.BAD_RESPONSE);
 
         fake.respondJson("POST", "/Users/AuthenticateByName", 200, "{\"AccessToken\":\"tok\",\"User\":{}}");
-        assertThatThrownBy(() -> setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), browser()))
+        assertThatThrownBy(() -> setup.connect(request, browser))
                 .hasMessage("Jellyfin did not return a usable login");
         assertThat(setup.settings()).isEmpty();
         assertThat(secretStore.secret(JellyfinSettings.TOKEN_SECRET)).isEmpty();

@@ -348,9 +348,11 @@ class JellyfinClientTest {
         fake = new FakeJellyfinServer().respondJson("GET", "/System/Info/Public", 200,
                 "{\"Id\":\"emby-1\",\"ProductName\":\"Emby Server\",\"Version\":\"4.8.0\"}");
 
-        assertThatThrownBy(() -> client.publicInfo(fake.url()))
+        URI url = fake.url();
+
+        assertThatThrownBy(() -> client.publicInfo(url))
                 .isInstanceOf(JellyfinException.class)
-                .hasMessage(fake.url() + " answered, but it is not a Jellyfin server");
+                .hasMessage(url + " answered, but it is not a Jellyfin server");
     }
 
     @Test
@@ -392,12 +394,13 @@ class JellyfinClientTest {
         String itemId = "b1c2d3e4f5061728394a5b6c7d8e9f01";
         fake = new FakeJellyfinServer().respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 200, null,
                 new byte[] {1, 2, 3});
-        assertThatThrownBy(() -> client.image(fake.url(), itemId, "Primary", null, 480))
-                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin at " + fake.url() + " sent no image");
+        URI url = fake.url();
+        assertThatThrownBy(() -> client.image(url, itemId, "Primary", null, 480))
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin at " + url + " sent no image");
 
         fake.respondBytes("GET", "/Items/" + itemId + "/Images/Primary", 500, "image/jpeg", new byte[] {1});
-        assertThatThrownBy(() -> client.image(fake.url(), itemId, "Primary", null, 480))
-                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin at " + fake.url() + " sent no image");
+        assertThatThrownBy(() -> client.image(url, itemId, "Primary", null, 480))
+                .isInstanceOf(JellyfinException.class).hasMessage("Jellyfin at " + url + " sent no image");
     }
 
     @Test

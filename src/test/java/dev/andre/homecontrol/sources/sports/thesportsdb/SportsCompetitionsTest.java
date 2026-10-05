@@ -227,8 +227,9 @@ class SportsCompetitionsTest {
     void aKeyCheckThatFailsForAnotherReasonKeepsItsReason() {
         server.respondJson("lookupleague.php", Map.of("id", "4328"), 503, "{}");
 
-        assertThatThrownBy(() -> competitions.usePersonalKey(
-                new SportsCompetitions.PersonalKey("9876543210", "household password", "household password"), http))
+        var key = new SportsCompetitions.PersonalKey("9876543210", "household password", "household password");
+
+        assertThatThrownBy(() -> competitions.usePersonalKey(key, http))
                 .isInstanceOf(TheSportsDbException.class)
                 .hasMessage("TheSportsDB had a server error (HTTP 503)");
         assertThat(settingsService.current().keyKind()).isEqualTo(SportsSettings.KeyKind.FREE);
