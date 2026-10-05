@@ -79,7 +79,7 @@ Measured against main at the start (handwritten Java: 94.81 % of lines, 83.84 % 
 | Batch | Pull request | Browser tests added | JavaScript lines | JavaScript branches |
 | --- | --- | --- | --- | --- |
 | E1 user flows | #199 | 24 per browser | 99.06 % | 88.41 % |
-| E2 swipes, labels, restored forms | #202 | 5 per browser | see its CI summary | |
+| E2 swipes, labels, restored forms | #202 | 5 per browser | 99.87 % | 88.99 % |
 
 Open questions the batches raised, for the owner: whether TheSportsDB's `strTime` offset (`18:45:00+01:00`) should
 be honoured (it is read as UTC; no test pins either reading), and the two unused members above.
