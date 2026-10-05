@@ -56,6 +56,31 @@ class TouchpadE2eTest extends E2eApplicationTest {
     }
 
     @BrowserTest
+    void verticalSwipesSendDownAndUp(String browser) {
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+            page.navigate("/?device=living&remote=open");
+            selectTouchpad(page);
+            double[] c = centerOf(page.locator("#touchpad"));
+
+            page.mouse().move(c[0], c[1]);
+            page.mouse().down();
+            page.mouse().move(c[0], c[1] + 60, new Mouse.MoveOptions().setSteps(4));
+            page.mouse().up();
+            await().until(() -> fakeDevices.recorded("living").contains(new Action.PressKey(RemoteKey.DPAD_DOWN, KeyPress.SHORT)));
+
+            page.mouse().move(c[0], c[1]);
+            page.mouse().down();
+            page.mouse().move(c[0], c[1] - 60, new Mouse.MoveOptions().setSteps(4));
+            page.mouse().up();
+            await().until(() -> fakeDevices.recorded("living").contains(new Action.PressKey(RemoteKey.DPAD_UP, KeyPress.SHORT)));
+
+            org.assertj.core.api.Assertions.assertThat(fakeDevices.recorded("living")).containsExactly(
+                    new Action.PressKey(RemoteKey.DPAD_DOWN, KeyPress.SHORT), new Action.PressKey(RemoteKey.DPAD_UP, KeyPress.SHORT));
+        }
+    }
+
+    @BrowserTest
     void holdSendsStartAndEndOfALongPress(String browser) {
         try (BrowserSession session = open(browser)) {
             Page page = session.page();
