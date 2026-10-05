@@ -47,14 +47,42 @@ a real `mpv` process, a TLS handshake failure inside the JDK).
   timeout always beats; a send that fails or is interrupted mid-write (the outcome races the listener's close); the
   `InsecureTls` trust manager's client-side callbacks, which an outbound connection never calls; the IANA fallback
   spelling of Europe/Kyiv on JDKs that know it.
+- C2: real multicast in `MdnsBrowser` and `SsdpDiscovery` (CI runners have none; `-Dmdns.tests=true` runs the
+  opt-in test); the mDNS listener adapters in `CastDiscovery` and `MdnsDiscovery`, reachable only through the
+  browser's package-private dispatch; `PairingService.begin(host, name)`, which would need the fixed pairing port.
+- C3: JDK-exception handlers that cannot fire; races a test would have to time (a calendar removed between being
+  found due and downloaded, the Jellyfin deadline between its check and the session lookup, a run's deadline against
+  a free workflow slot).
+- C4: the theme upload's second size check and the multipart-limit handler (a servlet container limit MockMvc does
+  not enforce); the interrupt paths of `SearchService` and `EventStream`.
+- JavaScript: `sw.js`'s branches (the service worker runs in its own isolate; only some of its paths are driven by
+  the offline tests).
 - Unused code, left for a separate decision: `PlayableRef.kindLabel()` and `ContentSourceException`'s constructor
-  with a cause are never called in production.
+  with a cause are never called in production. `remote-transport.js`'s `openLink` was removed (E2).
+- A measurement gap, not a test gap: `WorkflowValidator`, `WorkflowJson`, `WorkflowPlan` and `YouTubePlaylists`
+  refuse input through helpers that always throw but return nothing, so JaCoCo counts the calling line and its
+  branch as missed even when a test reaches it. A helper that returns the exception (`throw fail(...)`) would let
+  them count.
 
 ## Results
 
-| Batch | Tests added | Java lines (handwritten) | Java branches |
-| --- | --- | --- | --- |
-| C1 | 95 | 94.81 % → 95.24 % | 83.84 % → 85.12 % |
+Measured against main at the start (handwritten Java: 94.81 % of lines, 83.84 % of branches; browser JavaScript:
+97.06 % of lines, 87.38 % of branches). Each Java row is that batch alone on main.
+
+| Batch | Pull request | Tests added | Java lines | Java branches |
+| --- | --- | --- | --- | --- |
+| C1 protocols and core | #197 | 95 | 95.24 % | 85.12 % |
+| C2 adapters and discovery | #198 | 91 | 95.50 % | 84.89 % |
+| C3 content sources | #201 | 213 | 96.09 % | 87.30 % |
+| C4 web, security, storage, themes | #200 | 28 | 95.03 % | 84.23 % |
+
+| Batch | Pull request | Browser tests added | JavaScript lines | JavaScript branches |
+| --- | --- | --- | --- | --- |
+| E1 user flows | #199 | 24 per browser | 99.06 % | 88.41 % |
+| E2 swipes, labels, restored forms | #202 | 5 per browser | see its CI summary | |
+
+Open questions the batches raised, for the owner: whether TheSportsDB's `strTime` offset (`18:45:00+01:00`) should
+be honoured (it is read as UTC; no test pins either reading), and the two unused members above.
 
 ## Rules
 
