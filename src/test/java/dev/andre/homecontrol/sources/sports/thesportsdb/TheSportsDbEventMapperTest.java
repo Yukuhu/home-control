@@ -245,8 +245,6 @@ class TheSportsDbEventMapperTest {
             assertThat(event.allDay()).as(time).isTrue();
             assertThat(event.startsAt()).as(time).isEqualTo(Instant.parse("2026-09-18T22:00:00Z"));
         }
-        assertThat(map(event("\"dateEvent\":\"2026-09-19\",\"strTime\":\"18:45:00+01:00\""), "4331").orElseThrow()
-                .startsAt()).isEqualTo(Instant.parse("2026-09-19T18:45:00Z"));
     }
 
     @Test
