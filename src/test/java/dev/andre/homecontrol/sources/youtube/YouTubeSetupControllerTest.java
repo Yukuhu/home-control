@@ -205,7 +205,7 @@ class YouTubeSetupControllerTest extends WebSliceTest {
                 .andExpect(flash().attribute("youtubeError", "Google browser sign-in needs an HTTPS domain"))
                 .andReturn().getFlashMap();
 
-        assertThat(flashMap.get("youtubeForm")).isEqualTo(Map.of("clientId", "web-client.apps.googleusercontent.com"));
+        assertThat((Map<String, Object>) flashMap).containsEntry("youtubeForm", Map.of("clientId", "web-client.apps.googleusercontent.com"));
     }
 
     @Test

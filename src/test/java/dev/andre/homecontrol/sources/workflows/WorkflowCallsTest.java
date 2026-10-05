@@ -233,8 +233,9 @@ class WorkflowCallsTest {
             var engine = new WorkflowCalls(heldClient(release));
             var plan = WorkflowPlan.of(draft);
             var run = new WorkflowCalls.Run(Duration.ofMillis(200), 4);
+            var calls = draft.calls();
 
-            assertThatThrownBy(() -> engine.run(draft.calls(), plan, Map.of(), run, null))
+            assertThatThrownBy(() -> engine.run(calls, plan, Map.of(), run, null))
                     .isInstanceOf(WorkflowException.class)
                     .hasMessage("Fetch JSON: the workflow took too long; try again later");
         } finally { release.countDown(); }
@@ -274,8 +275,9 @@ class WorkflowCallsTest {
         var engine = new WorkflowCalls(broken);
         var plan = WorkflowPlan.of(draft);
         var run = new WorkflowCalls.Run(Duration.ofSeconds(5), 4);
+        var calls = draft.calls();
 
-        assertThatThrownBy(() -> engine.run(draft.calls(), plan, Map.of(), run, null))
+        assertThatThrownBy(() -> engine.run(calls, plan, Map.of(), run, null))
                 .isInstanceOf(WorkflowException.class)
                 .hasMessage("Fetch JSON: request failed");
     }

@@ -177,7 +177,7 @@ class JellyfinSetupControllerTest extends WebSliceTest {
                 .andExpect(redirectedUrl("/setup"))
                 .andReturn().getFlashMap();
 
-        assertThat(flashMap.get("jellyfinForm")).isEqualTo(Map.of("serverUrl", "", "deviceServerUrl", "", "mode", "password",
+        assertThat((Map<String, Object>) flashMap).containsEntry("jellyfinForm", Map.of("serverUrl", "", "deviceServerUrl", "", "mode", "password",
                 "userName", ""));
     }
 

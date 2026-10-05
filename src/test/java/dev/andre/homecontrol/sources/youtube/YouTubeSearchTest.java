@@ -278,7 +278,7 @@ class YouTubeSearchTest {
     }
 
     @Test
-    void concurrentIdenticalSearchesShareOneFailure() throws Exception {
+    void concurrentIdenticalSearchesShareOneFailure() {
         CountDownLatch release = new CountDownLatch(1);
         AtomicInteger calls = new AtomicInteger();
         YouTubeApiClient failing = new YouTubeApiClient(null, URI.create("http://unused"), null, null) {
