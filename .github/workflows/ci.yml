@@ -87,7 +87,7 @@ jobs:
           "$RUNNER_TEMP/checksum-tests/bin/python" -m coverage xml --rcfile=scripts/dependency-checksums/.coveragerc
 
       - name: Upload checksum tooling coverage for SonarCloud
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: checksum-coverage
           path: build/reports/dependency-checksums/coverage.xml
@@ -155,7 +155,7 @@ jobs:
 
       - name: Upload candidate checksums
         if: steps.candidate.outputs.state == 'candidate'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ${{ steps.candidate.outputs.artifact }}
           path: ${{ runner.temp }}/checksum-candidate/
@@ -249,7 +249,7 @@ jobs:
 
       - name: Upload checksum verification evidence
         if: always() && steps.prepare.outputs.state == 'ready'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: verified-checksums-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/checksum-verified/
@@ -352,7 +352,7 @@ jobs:
       # Java bytecode is architecture-independent, so this one jar serves both
       # platforms the images are built for.
       - name: Upload the jar
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: jar
           path: build/libs/*.jar
@@ -369,7 +369,7 @@ jobs:
 
       - name: Upload the release notes
         if: steps.plan.outputs.release == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-notes
           path: ${{ runner.temp }}/notes.md
@@ -399,7 +399,7 @@ jobs:
         run: ./gradlew build
 
       - name: Upload Java analysis reports for SonarCloud
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: java-analysis
           # Every module's results, with the paths they have in the repository; the SonarCloud job
@@ -411,7 +411,7 @@ jobs:
 
       - name: Upload the test report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: test-report
           path: '**/build/reports/tests/test'
@@ -419,7 +419,7 @@ jobs:
       # Uploaded even when tests fail, which is when the pull request summary needs them most.
       - name: Upload the test results for the pull request summary
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: junit-test
           path: '**/build/test-results/test/TEST-*.xml'
@@ -541,7 +541,7 @@ jobs:
           npm run report
 
       - name: Upload JavaScript coverage for SonarCloud
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: browser-coverage
           path: build/reports/browser-coverage/lcov.info
@@ -556,7 +556,7 @@ jobs:
           npm run coverage
 
       - name: Upload the summary script's coverage for SonarCloud
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pr-summary-coverage
           path: build/reports/pr-summary/lcov.info
