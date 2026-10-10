@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/gradle-home ./gradlew --no-daemon bootJar
 FROM scratch AS jar
 COPY --from=build /src/build/libs/*.jar /
 
-FROM eclipse-temurin:25-jre@sha256:8da0490fa9a3c26867012019565948eef0ee69438f5c75ac28146967bae984b5
+FROM eclipse-temurin:25-jre@sha256:fcd7fd7b387f94bb2ac461478a7436ad8e349924c374ea8313919624dceae636
 # Bluetooth speakers (optional) need the mpv player, which adds about 430 MB.
 # Default builds leave it out; --build-arg WITH_MPV=true (the -bluetooth image) installs it.
 ARG WITH_MPV=false
