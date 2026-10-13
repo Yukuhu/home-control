@@ -42,7 +42,7 @@ runs:
 
     - name: Upload the browser test report and traces
       if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
       with:
         name: e2e-report-${{ inputs.browser }}
         path: |
@@ -52,7 +52,7 @@ runs:
 
     - name: Upload the test results for the pull request summary
       if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
       with:
         name: junit-e2e-${{ inputs.browser }}
         path: build/test-results/e2eTest/TEST-*.xml
