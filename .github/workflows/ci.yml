@@ -709,7 +709,7 @@ jobs:
       # Java is read from its source, without a build. CodeQL still fetches the dependencies, to
       # know the types the code uses, but keeps none of them: kept, they took half a gigabyte
       # of the cache for every scan.
-      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           languages: ${{ matrix.language }}
           build-mode: none
