@@ -31,6 +31,11 @@ updates:
       - /.github/actions/*
     schedule:
       interval: weekly
+    groups:
+      # CodeQL's analyze step rejects the configuration of an init of another version.
+      codeql:
+        patterns:
+          - "github/codeql-action*"
 
   # The base images are pinned by digest, so that a build is of known content and the image
   # that is tested is built on the base of the one that is published. These pull requests
