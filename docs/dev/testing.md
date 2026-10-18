@@ -121,7 +121,8 @@ pull request, using two jobs in `.github/workflows/ci.yml`:
    it generates candidate metadata in an isolated cache, uploads it with the PR/head/base/merge identities, and
    lets only the update job proceed. Application builds wait.
 2. `Update dependency checksums` runs trusted helpers from the base commit on a fresh runner. It checks each
-   new artifact against a fresh Maven Central download, falling back to the Gradle Plugin Portal only on 404.
+   new artifact against a fresh Maven Central download, falling back to the Gradle Plugin Portal when Central
+   returns 404 or other bytes (a plugin marker can be on both, and Gradle resolves plugins from the Portal).
    POM-advertised Gradle module metadata is included even when generation omits it. Existing hashes and verification settings cannot change. Protobuf updates include all published protoc
    platforms. Metadata already verified on the base is retained.
 3. The job commits only `gradle/verification-metadata.xml` to the existing PR branch using the checksum App.

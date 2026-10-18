@@ -84,20 +84,26 @@ class Repository:
                 time.sleep(attempt + 1)
         raise VerificationError('Repository download failed after three attempts')
 
-    def fetch(self, group, module, version, artifact):
+    def fetch(self, group, module, version, artifact, expected=None):
+        """Central's copy; the Portal's if Central has none, or if Central's is not the `expected` SHA-256.
+
+        Gradle resolves plugins from the Portal, and a plugin marker can be on both with different bytes.
+        """
         path = coordinate((group, module, version, artifact))
-        url = CENTRAL + path
+        central = None
         try:
             try:
-                body = self._read(url)
+                central = Download(self._read(CENTRAL + path), CENTRAL + path)
             except HTTPError as error:
                 if error.code != 404:
                     raise
-                url = PORTAL + path
-                body = self._read(url)
+            if central is not None and (expected is None or sha256(central.body) == expected):
+                return central
+            return Download(self._read(PORTAL + path), PORTAL + path)
         except HTTPError as error:
+            if central is not None and error.code == 404:
+                return central
             raise VerificationError(f'Artifact unavailable: {path} (HTTP {error.code})') from None
-        return Download(body, url)
 
     def protoc_artifacts(self, version):
         safe_identifier(version)
@@ -224,7 +230,7 @@ def verify_candidate_artifacts(candidate, trusted, accepted, additions, reposito
     for key, attrs in candidate.items():
         if key in trusted:
             continue
-        download = repository.fetch(*key)
+        download = repository.fetch(*key, expected=attrs['value'])
         if sha256(download.body) != attrs['value']:
             raise VerificationError(f'Checksum mismatch: {key[-1]}')
         accept(accepted, additions, key, download)

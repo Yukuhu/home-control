@@ -18,7 +18,9 @@ commit. The publisher never runs Gradle or code from the dependency branch. It a
 for same-repository Dependabot PRs changing the version catalog and verification metadata.
 
 Preserve existing hashes and verification settings. Compare each new artifact's SHA-256 with a fresh download
-from Maven Central, or from the Gradle Plugin Portal if Central returns 404. Only HTTPS repository origins and
+from Maven Central, or from the Gradle Plugin Portal if Central returns 404 or serves other bytes. (Amended
+2026-10-18: Gradle resolves plugins from the Portal, and a plugin marker such as Spotless's can be on both with
+different bytes; the 404-only fallback rejected the copy Gradle had verified.) Only HTTPS repository origins and
 approved redirects are allowed. Include POM-advertised Gradle module metadata even when generation omits it,
 and include all published protoc platforms. Previously verified metadata inherited
 from the base can be retained without another download.

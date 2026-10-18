@@ -37,7 +37,7 @@ class FakeRepository:
         self.platforms = platforms or []
         self.requests = []
 
-    def fetch(self, *key):
+    def fetch(self, *key, expected=None):
         self.requests.append(key)
         if key not in self.artifacts:
             raise VerificationError('artifact unavailable')
@@ -157,6 +157,21 @@ class VerificationTest(unittest.TestCase):
         with self.assertRaisesRegex(VerificationError, 'mismatch'):
             self.verify(candidate, repository)
 
+    def test_pr212_plugin_marker_is_verified_against_the_portal_copy_gradle_resolved(self):
+        marker = ('com.diffplug.spotless', 'com.diffplug.spotless.gradle.plugin', '8.10.4',
+                  'com.diffplug.spotless.gradle.plugin-8.10.4.pom')
+        path = verify.coordinate(marker)
+        served = {verify.CENTRAL + path: b'central marker', verify.PORTAL + path: b'portal marker'}
+        repo = Repository()
+        candidate = metadata([(OLD, digest(b'old')), (marker, digest(b'portal marker'))])
+        with patch.object(repo, '_read', side_effect=served.__getitem__):
+            result = self.verify(candidate, repo)
+            self.assertEqual(result.additions[0]['source_url'], verify.PORTAL + path)
+            self.assertIn(b'Verified against Gradle Plugin Portal', result.xml)
+            neither = metadata([(OLD, digest(b'old')), (marker, digest(b'other marker'))])
+            with self.assertRaisesRegex(VerificationError, 'mismatch'):
+                self.verify(neither, repo)
+
     def test_pom_marker_completes_gradle_module_omitted_by_generation(self):
         pom = ('org.junit', 'junit-bom', '5.14.4', 'junit-bom-5.14.4.pom')
         module = pom[:3] + ('junit-bom-5.14.4.module',)
@@ -221,6 +236,26 @@ class RepositoryTest(unittest.TestCase):
             with self.assertRaises(VerificationError):
                 repo.fetch(*NEW)
             self.assertEqual(read.call_count, 1)
+
+    def test_central_bytes_other_than_expected_fall_back_to_the_portal(self):
+        repo = Repository()
+        with patch.object(repo, '_read', side_effect=[b'central', b'portal']):
+            download = repo.fetch(*NEW, expected=digest(b'portal'))
+            self.assertEqual(download.body, b'portal')
+            self.assertIn('plugins.gradle.org', download.source_url)
+        with patch.object(repo, '_read', return_value=b'central') as read:
+            self.assertEqual(repo.fetch(*NEW, expected=digest(b'central')).body, b'central')
+            self.assertEqual(read.call_count, 1)
+        missing = HTTPError('https://plugins.gradle.org', 404, 'missing', {}, None)
+        self.addCleanup(missing.close)
+        with patch.object(repo, '_read', side_effect=[b'central', missing]):
+            # The caller reports Central's bytes as the mismatch.
+            self.assertEqual(repo.fetch(*NEW, expected=digest(b'portal')).body, b'central')
+        denied = HTTPError('https://plugins.gradle.org', 403, 'denied', {}, None)
+        self.addCleanup(denied.close)
+        with patch.object(repo, '_read', side_effect=[b'central', denied]):
+            with self.assertRaisesRegex(VerificationError, 'HTTP 403'):
+                repo.fetch(*NEW, expected=digest(b'portal'))
 
     def test_download_retries_are_bounded(self):
         repo = Repository()
