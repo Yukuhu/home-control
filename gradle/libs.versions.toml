@@ -32,7 +32,7 @@ errorprone = "2.50.0"
 errorprone-plugin = "5.1.1"
 spotless = "8.10.4"
 
-ph-css = "8.2.2"
+ph-css = "8.2.3"
 
 [libraries]
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
