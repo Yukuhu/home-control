@@ -4,7 +4,7 @@
 # - From a jar CI built once, natively: `--build-context jar=<a directory holding only that jar>` replaces the jar
 #   stage, so the build stage never runs. Java bytecode is architecture-independent, so only the JRE layer differs
 #   between linux/amd64 and linux/arm64, and the multi-arch build takes seconds instead of a Gradle build under QEMU.
-FROM gradle:jdk25@sha256:30f0c2e94f2b91cffaa192cebc86f1ba8efc574b9a8e93b33164e5f2ed839c08 AS build
+FROM gradle:jdk25@sha256:ca424744a6a45a575f333edea680696d980999c461be38b1574a4c70d5455f24 AS build
 # Gradle and the dependencies it downloads stay in a cache mount, so a rebuild from a changed checkout reuses them.
 ENV GRADLE_USER_HOME=/gradle-home
 WORKDIR /src
