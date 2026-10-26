@@ -2778,5 +2778,42 @@
             <sha256 value="be4102a7945dd4e27589e25998702d7c412c376e84a7d6366b946ecdf8794aa7" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="com.microsoft.playwright" name="driver" version="1.64.0">
+         <artifact name="driver-1.64.0.jar">
+            <sha256 value="116badd0cfc74d85bc58fef74fe492e63da72035d4ec8569ad88188332b839c5" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="driver-1.64.0.pom">
+            <sha256 value="6305228b5c176607a35c01e0d638eebfe37c1c3278dc7c31a3250af0981febed" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.microsoft.playwright" name="driver-bundle" version="1.64.0">
+         <artifact name="driver-bundle-1.64.0.jar">
+            <sha256 value="c04dce9bd95e758c2c5784dfb9b508ba8f4b7601aa1a4f738ae269e5c0bd49a9" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="driver-bundle-1.64.0.pom">
+            <sha256 value="48f53e7ca7f2f108b255cda0276d25f663dc3bf3e3f03e7c8ebe5419414374a2" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.microsoft.playwright" name="parent-pom" version="1.64.0">
+         <artifact name="parent-pom-1.64.0.pom">
+            <sha256 value="e54855c42e251d3931d8a27070cf12518a37e4d2e0ce148dcbb31ba201480b0a" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.microsoft.playwright" name="playwright" version="1.64.0">
+         <artifact name="playwright-1.64.0.jar">
+            <sha256 value="b4a40f4af4b8e0b8aec0b461c2f475aed6a5e6693bdbf65de2fee6d31cd17c7b" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="playwright-1.64.0.pom">
+            <sha256 value="3c11c81b2c5ad4a10f393a2529c8b6d24d6695ff4ca986027051054bfd8c996a" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="org.junit" name="junit-bom" version="5.14.1">
+         <artifact name="junit-bom-5.14.1.module">
+            <sha256 value="278acb11ccc9998694224386f96fb4941a22edb42cb446c92e0f1f33014b6b48" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="junit-bom-5.14.1.pom">
+            <sha256 value="01b01dfa366550b40ac5760548a7d728b6109d17c451e83864d1e5e0ce862c94" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
