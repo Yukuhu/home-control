@@ -2,7 +2,7 @@
 # Tracked copy of .superpowers/gradle.sh (.superpowers/ is gitignored agent scratch space). Runs
 # Gradle inside a container image (default gradle:jdk25) for anyone without a local JDK 25.
 # Usage: scripts/gradle.sh test   |   scripts/gradle.sh test --tests 'dev.andre.*Foo*'
-#        HC_GRADLE_IMAGE=home-control-e2e:playwright-1.63.0 scripts/gradle.sh e2eTest
+#        HC_GRADLE_IMAGE=home-control-e2e:playwright-<version> scripts/gradle.sh e2eTest
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/scripts/container-runtime.sh"
