@@ -2881,5 +2881,147 @@
             <sha256 value="c3725048603f7c9c6891c252b95a5585320aa821a1e3c08ec00826c0b97d5ff7" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="com.github.ben-manes.caffeine" name="caffeine" version="3.3.0">
+         <artifact name="caffeine-3.3.0.jar">
+            <sha256 value="5d015adc655191c8f9a152c4cc871170a04d28040ed281d0e74ade87d6ae8aff" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="caffeine-3.3.0.module">
+            <sha256 value="f817d766b76189cfc32be957438980b468646c6da280c6d7f45a26c37c971bf1" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.auto.service" name="auto-service-aggregator" version="1.1.1">
+         <artifact name="auto-service-aggregator-1.1.1.pom">
+            <sha256 value="e2dc3e263a5db0cc8172fb2eb9bcd232acecfdc96e817103eab3c8d9f1900c6a" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.auto.service" name="auto-service-annotations" version="1.1.1">
+         <artifact name="auto-service-annotations-1.1.1.jar">
+            <sha256 value="16a76dd00a2650568447f5d6e3a9e2c809d9a42367d56b45215cfb89731f4d24" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="auto-service-annotations-1.1.1.pom">
+            <sha256 value="1659fd0a25cea9fa9abfb18deb9d7b180cce3aceab16ff9e625461567e44a2df" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.auto.value" name="auto-value-annotations" version="1.11.1">
+         <artifact name="auto-value-annotations-1.11.1.jar">
+            <sha256 value="6c61a11420a5cddf3313888e9d335d5eedfbeb9a8da26591470fbfe61f5bf859" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="auto-value-annotations-1.11.1.pom">
+            <sha256 value="b8a68cde9600622903732f6a8258588fd097d290cb1378a3f092f2cdc432fcb6" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.auto.value" name="auto-value-parent" version="1.11.1">
+         <artifact name="auto-value-parent-1.11.1.pom">
+            <sha256 value="76996ca8c9dec171fd59b42f5a73a74d18ec3ac933a31697cc192e52d5a6e02e" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.errorprone" name="error_prone_annotation" version="2.51.0">
+         <artifact name="error_prone_annotation-2.51.0.jar">
+            <sha256 value="e9a7e46490fa272381a427e91dd266189c6b6b622985821a092d24acad3aa7c9" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="error_prone_annotation-2.51.0.pom">
+            <sha256 value="31c4f28bc8896cf350bc7ce902feb69f99b0b430f18496974728d72b8f80b727" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.errorprone" name="error_prone_annotations" version="2.51.0">
+         <artifact name="error_prone_annotations-2.51.0.jar">
+            <sha256 value="51a6d8348c7e307e47183859c07597dc8a2899c5d1b6f18a471bccaa3203d5cf" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="error_prone_annotations-2.51.0.pom">
+            <sha256 value="77314f3f9bc693cbdf14b9bd8ba9a02d9a2c336431541bf798ef5c71cff483f3" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.errorprone" name="error_prone_check_api" version="2.51.0">
+         <artifact name="error_prone_check_api-2.51.0.jar">
+            <sha256 value="208d9ae3f9de9b9f2e6e773b27a5c4c363cc62f27d4699bd6fde57be373e0174" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="error_prone_check_api-2.51.0.pom">
+            <sha256 value="54de31f03656b80170c300be0214236d7c9ec7e9395e325b0a58db5e1d1583c7" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.errorprone" name="error_prone_core" version="2.51.0">
+         <artifact name="error_prone_core-2.51.0.jar">
+            <sha256 value="9a2e2d326fc686c7a0497ab508fde32c298f59cbb78b88e3f26a24fa8e30c31d" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="error_prone_core-2.51.0.pom">
+            <sha256 value="469a8e0aa52918de6654f9b6a2b59425c5a86a844e9f15ee36a9078236bb572c" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.errorprone" name="error_prone_parent" version="2.51.0">
+         <artifact name="error_prone_parent-2.51.0.pom">
+            <sha256 value="124642638c795ab1a030a56cc01017957de4415468f47c89109973d63c7643eb" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.googlejavaformat" name="google-java-format" version="1.37.0">
+         <artifact name="google-java-format-1.37.0.jar">
+            <sha256 value="49874ad1d6b1006d2f8660482135609eb124888e0046c3dbfefc706a0387c700" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="google-java-format-1.37.0.pom">
+            <sha256 value="ae9c58622fd7fca223ac3ebec77bfb9c1f950ea481c20f786405e13252367c95" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.googlejavaformat" name="google-java-format-parent" version="1.37.0">
+         <artifact name="google-java-format-parent-1.37.0.pom">
+            <sha256 value="7b103362462c4e16e6567715180e87f8a02255ab105d5bb6bac64a244d705a23" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.guava" name="guava" version="33.7.2-jre">
+         <artifact name="guava-33.7.2-jre.jar">
+            <sha256 value="b530942257fb935f8b2cfaa5f8eb5bd59c555fd8e8d01b8ce98912e077ea606c" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="guava-33.7.2-jre.module">
+            <sha256 value="7170b42bdc6a9cbfd78a2142d6dfb423473503c584bedbae85d24359dca5029f" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="io.github.java-diff-utils" name="java-diff-utils" version="4.17">
+         <artifact name="java-diff-utils-4.17.jar">
+            <sha256 value="3e3b6e149bf5d091422689ad6fcc22baad503a52b1139a9baf250fb6de633024" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="java-diff-utils-4.17.pom">
+            <sha256 value="3ad0574059e056c8fa817d490e1c45c171721f29181e2fcc64bc319bdecb67e0" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="io.github.java-diff-utils" name="java-diff-utils-parent" version="4.17">
+         <artifact name="java-diff-utils-parent-4.17.pom">
+            <sha256 value="5a9c1307779ffed08f2e26a70f348820b84f6823fc8d8b1352b8b0b4248f30c2" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="org.commonmark" name="commonmark" version="0.29.0">
+         <artifact name="commonmark-0.29.0.jar">
+            <sha256 value="4c9b0fa481e36d7176f38e572c134656424cf9601bc190855d0f89478df901c6" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="commonmark-0.29.0.pom">
+            <sha256 value="dbd3979a45e5c6b4dcb57c0e71961c3decdb7e089f5b8f5b93754c2c8e178973" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="org.commonmark" name="commonmark-ext-gfm-tables" version="0.29.0">
+         <artifact name="commonmark-ext-gfm-tables-0.29.0.jar">
+            <sha256 value="f263d284c0795b0ddd6071d4fa969f67d460644c20828e51957ad5aec0d75612" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="commonmark-ext-gfm-tables-0.29.0.pom">
+            <sha256 value="20a67830ba96d37826eb7f3354a9f390caa27e1f66af67029ff69ef7c2f33bd1" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="org.commonmark" name="commonmark-parent" version="0.29.0">
+         <artifact name="commonmark-parent-0.29.0.pom">
+            <sha256 value="118b96f673388d28bc6c33519bb9b19770be59f58935f230bca9eb0b082f6e19" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="org.pcollections" name="pcollections" version="5.0.0">
+         <artifact name="pcollections-5.0.0.jar">
+            <sha256 value="d42da212e052cbeedfea5eb20641b74ee574bc02302c584a16718db5376fa92c" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="pcollections-5.0.0.module">
+            <sha256 value="ea3a07c9a5c91e45a9339fd9c73af9f03bc59f3525add54b10e0c511ebc689d7" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="org.safere" name="safere" version="1.0.0">
+         <artifact name="safere-1.0.0.jar">
+            <sha256 value="388c5a91ad8648f96d55a6b0e7068d40b38c4fb9e19139026fc2c0168f54dd95" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="safere-1.0.0.pom">
+            <sha256 value="33c672c524101a4c74015233916a8e6db34c0b9a668dcef25f0b8819a173eafa" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
