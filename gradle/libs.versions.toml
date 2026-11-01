@@ -28,7 +28,7 @@ playwright = "1.64.0"
 archunit = "1.5.1"
 # The JaCoCo agent and report tools the build runs (build.gradle.kts, toolVersion).
 jacoco = "0.8.16"
-errorprone = "2.50.0"
+errorprone = "2.51.0"
 errorprone-plugin = "5.1.1"
 spotless = "8.10.4"
 
