@@ -139,8 +139,10 @@ public class FakeRemoteServer implements AutoCloseable {
     /** Sends part of a frame so tests can hold the client's reader inside a message. */
     public void pushRaw(byte[] bytes) throws IOException {
         synchronized (stream) {
-            socket.getOutputStream().write(bytes);
-            socket.getOutputStream().flush();
+            // A malformed frame can make the peer close before a second stream lookup.
+            var output = socket.getOutputStream();
+            output.write(bytes);
+            output.flush();
         }
     }
 
