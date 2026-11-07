@@ -3540,5 +3540,18 @@
             <sha256 value="a81570d53c8710355e0216a4405afa93834b17c4cdd0ed9aa8beede3a132bbbe" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="com.google.protobuf" name="com.google.protobuf.gradle.plugin" version="0.10.1">
+         <artifact name="com.google.protobuf.gradle.plugin-0.10.1.pom">
+            <sha256 value="b55acabb5384a06bf94f96e5b05536b4cc37c86f14baf9aecf7b8ec5cd51e8b8" origin="Verified against Gradle Plugin Portal" />
+         </artifact>
+      </component>
+      <component group="com.google.protobuf" name="protobuf-gradle-plugin" version="0.10.1">
+         <artifact name="protobuf-gradle-plugin-0.10.1.jar">
+            <sha256 value="02aee6feb303c2ef359a217d7c87ddf65f44828cd2b9aa98550e634a7179cf9d" origin="Verified against Gradle Plugin Portal" />
+         </artifact>
+         <artifact name="protobuf-gradle-plugin-0.10.1.pom">
+            <sha256 value="52012d6b3357ea11eee384eec30ada902f842fe7cd86409144678fee4a6efe67" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
