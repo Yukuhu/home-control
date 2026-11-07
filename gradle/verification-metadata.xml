@@ -3540,5 +3540,18 @@
             <sha256 value="a81570d53c8710355e0216a4405afa93834b17c4cdd0ed9aa8beede3a132bbbe" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="net.ltgt.errorprone" name="net.ltgt.errorprone.gradle.plugin" version="5.2.0">
+         <artifact name="net.ltgt.errorprone.gradle.plugin-5.2.0.pom">
+            <sha256 value="1933349ff1bd01e371534cd25b5dc9df967aafb1380e38fe04e12c20f7921c11" origin="Verified against Gradle Plugin Portal" />
+         </artifact>
+      </component>
+      <component group="net.ltgt.gradle" name="gradle-errorprone-plugin" version="5.2.0">
+         <artifact name="gradle-errorprone-plugin-5.2.0.jar">
+            <sha256 value="89124c70fe8ee74724c4b84bc66b02f93196d10b75b34f2730036f696444dada" origin="Verified against Gradle Plugin Portal" />
+         </artifact>
+         <artifact name="gradle-errorprone-plugin-5.2.0.module">
+            <sha256 value="80cced6bc92a1f7a48bf07ef4c0395ad8f7b964a5cb3418e50b5edca9d564575" origin="Verified against Gradle Plugin Portal" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
