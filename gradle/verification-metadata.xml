@@ -3540,5 +3540,95 @@
             <sha256 value="a81570d53c8710355e0216a4405afa93834b17c4cdd0ed9aa8beede3a132bbbe" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="com.helger" name="ph-css" version="8.4.0">
+         <artifact name="ph-css-8.4.0.jar">
+            <sha256 value="46634d63670a156895b6fab8e208a426b68e6d61e3f1fae4d7871df0edc68fed" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="ph-css-8.4.0.pom">
+            <sha256 value="ac59c2a2d495dab0d7f4f80bf6d4d19b0ef79b9f1eab8feeba7c8dad7ffcec67" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger" name="ph-css-parent-pom" version="8.4.0">
+         <artifact name="ph-css-parent-pom-8.4.0.pom">
+            <sha256 value="c7a15560c513e2527f7f9bc72ef512a66c1de67cfdc4a29cf38f6f97d8044135" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger.commons" name="ph-annotations" version="12.5.3">
+         <artifact name="ph-annotations-12.5.3.jar">
+            <sha256 value="5ae7ed49add484a096e6527d3516e9d76eef04321d18ea111079a8ff54a9162c" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="ph-annotations-12.5.3.pom">
+            <sha256 value="8a8f9bad68203d9776fb00f39d5610b10a8e2c18691422831f3c7e476b7808ae" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger.commons" name="ph-base" version="12.5.3">
+         <artifact name="ph-base-12.5.3.jar">
+            <sha256 value="a77cb95c868b304dc13d08ecd2f5b359356c913ff9ab050a5d4dbcfbd76287f1" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="ph-base-12.5.3.pom">
+            <sha256 value="7eabe68227dca19bd8110cb4084aea5c5d5b9144ea84abc30a44bb8a6930789a" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger.commons" name="ph-cache" version="12.5.3">
+         <artifact name="ph-cache-12.5.3.jar">
+            <sha256 value="283f492a9db43e6f129c34031c02877fd68e0014d2dfc53b69f0d278e92681b1" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="ph-cache-12.5.3.pom">
+            <sha256 value="4ba5b02d10bbcb89e29ee7861f10d8184fe515cbd23b459093923470b3b0531d" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger.commons" name="ph-collection" version="12.5.3">
+         <artifact name="ph-collection-12.5.3.jar">
+            <sha256 value="b395b0d62eeaab313b595b0071bebd7f5139ddb2325769951556e299c8e02799" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="ph-collection-12.5.3.pom">
+            <sha256 value="6922956e64104f93bcef3677a14d9a75a5622d7df93a13c2ad3d55dc1e41cdac" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger.commons" name="ph-commons-parent-pom" version="12.5.3">
+         <artifact name="ph-commons-parent-pom-12.5.3.pom">
+            <sha256 value="2f7f4b8872c72d8579827fc9fefbe485f3e27c39a94ba89c0b9be2f18e3fdd3b" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger.commons" name="ph-io" version="12.5.3">
+         <artifact name="ph-io-12.5.3.jar">
+            <sha256 value="ec71186328b467876df8ddf94aff32e3bc449e81bcfc0840af6736c7467b4e75" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="ph-io-12.5.3.pom">
+            <sha256 value="a00b411e0820e3f230cc5b503b3c5fce6c9f3c1ee9ba5378741fd6c2ca3cb31f" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger.commons" name="ph-mime" version="12.5.3">
+         <artifact name="ph-mime-12.5.3.jar">
+            <sha256 value="7d12d2dbf02679aa17a8a136e40758c1fd96aff0dadc75390294a2eccbeb244b" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="ph-mime-12.5.3.pom">
+            <sha256 value="8aff3fbabba9667a8c8bc283fbd07a7b5c7f4545488ee66daec4b9a3c2efcf2c" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger.commons" name="ph-statistics" version="12.5.3">
+         <artifact name="ph-statistics-12.5.3.jar">
+            <sha256 value="d77835d3cfd3b2ddf24c0ad04ca94ac2ee2b36f4533e6e8fd2f88419beb261a7" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="ph-statistics-12.5.3.pom">
+            <sha256 value="6693c5549d2a391fae974f55ba0f8fe2fc753fc00588489dd54a92fe84eeaae3" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger.commons" name="ph-text" version="12.5.3">
+         <artifact name="ph-text-12.5.3.jar">
+            <sha256 value="50b7ced6ae8145b9fc5eea5f11b0d9bfd5d194956457ce5ee3df2fa3f96bccff" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="ph-text-12.5.3.pom">
+            <sha256 value="fc1e44a1e90c87c3f298a7002d9c320924957e71d397367543a9e22cffc5e827" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.helger.commons" name="ph-typeconvert" version="12.5.3">
+         <artifact name="ph-typeconvert-12.5.3.jar">
+            <sha256 value="c35d35e67ff7ff331b01529c9ae76d90ecae69760af809e83464f7c6f7e92337" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="ph-typeconvert-12.5.3.pom">
+            <sha256 value="f449cab7d11b55293c5e921f83dc29c20251fe4857b6899464b2a70e865568ec" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
