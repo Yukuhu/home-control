@@ -3540,5 +3540,73 @@
             <sha256 value="a81570d53c8710355e0216a4405afa93834b17c4cdd0ed9aa8beede3a132bbbe" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="com.diffplug.spotless" name="com.diffplug.spotless.gradle.plugin" version="8.11.0">
+         <artifact name="com.diffplug.spotless.gradle.plugin-8.11.0.pom">
+            <sha256 value="88121786330d099cac327a4b05b4c7673b9519389ef08174124b73f92f497895" origin="Verified against Gradle Plugin Portal" />
+         </artifact>
+      </component>
+      <component group="com.diffplug.spotless" name="spotless-lib" version="4.11.0">
+         <artifact name="spotless-lib-4.11.0.jar">
+            <sha256 value="daa762461c24feef790f83e9e9f2a24884b2ab5c9d2553719cdfe48f1bd15c36" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="spotless-lib-4.11.0.module">
+            <sha256 value="62b906a695787a9b971c5c4d17b6e3a13b7cbe2c955307a4e7060cc8fe7e9a9f" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.diffplug.spotless" name="spotless-lib-extra" version="4.11.0">
+         <artifact name="spotless-lib-extra-4.11.0.jar">
+            <sha256 value="8384f38f6f31fd902aecadf788877110d6b4031cd5c27e066044b1e7383b0a1b" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="spotless-lib-extra-4.11.0.module">
+            <sha256 value="a13bbf7c7d819eac9ded4a823c78ab5f32f9a8435b30f1a5683008719a236e5d" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.diffplug.spotless" name="spotless-plugin-gradle" version="8.11.0">
+         <artifact name="spotless-plugin-gradle-8.11.0.jar">
+            <sha256 value="371b5e90f3bf70d9b2513c21a7894b61a5bb0e9b6639957288f867edd60e86df" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="spotless-plugin-gradle-8.11.0.module">
+            <sha256 value="46905ff9ac2d08cf7e34ce0f61c1b9a05995147eb0b0db93c81e603c01c71f3f" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.errorprone" name="error_prone_annotations" version="2.47.0">
+         <artifact name="error_prone_annotations-2.47.0.jar">
+            <sha256 value="5364bc6f22e72e98195e406a58d3ba1c09ffa11dea0729592cb870dc2de4056d" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="error_prone_annotations-2.47.0.pom">
+            <sha256 value="d80c889a4a6f711f6945fbee79e05ec247b178a567e9d5abf58eb26ebf0a0752" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.errorprone" name="error_prone_parent" version="2.47.0">
+         <artifact name="error_prone_parent-2.47.0.pom">
+            <sha256 value="2368a990c7a63095e1d0d44459d5a4092f0eb31f8562bd12cdf0e1c877b6a685" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.googlejavaformat" name="google-java-format" version="2.0.0">
+         <artifact name="google-java-format-2.0.0.jar">
+            <sha256 value="7a03f28f7379dcb32e5fc5a6ded62524c4a31e9616e3b477a2f71d7124c5ccad" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="google-java-format-2.0.0.pom">
+            <sha256 value="9d0102894b3cd5faa580f1dddedfb22096facfb149a53eb615169e3e2a7ebbd6" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.googlejavaformat" name="google-java-format-parent" version="2.0.0">
+         <artifact name="google-java-format-parent-2.0.0.pom">
+            <sha256 value="d45988dad2407693183de037d752c1935fef017a5b81a0c330c55a1b2d7fb5c1" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.guava" name="guava" version="33.6.0-jre">
+         <artifact name="guava-33.6.0-jre.jar">
+            <sha256 value="dc573e1fca4fd5454f4a5fd3d7da2df03002876a4175bafc14a95980dd7713b3" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="guava-33.6.0-jre.module">
+            <sha256 value="2baf73ce839ae48e4b9e0083e256b0e58fc3bf8fc78fc3fbe797bbc89011216e" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.guava" name="guava-parent" version="33.6.0-jre">
+         <artifact name="guava-parent-33.6.0-jre.pom">
+            <sha256 value="374bd31f61b1cf612bee9ab2e4d70bbdf77dd85a49b431f809d4fbdc901f2dd4" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
