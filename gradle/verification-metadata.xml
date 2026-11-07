@@ -3540,5 +3540,13 @@
             <sha256 value="a81570d53c8710355e0216a4405afa93834b17c4cdd0ed9aa8beede3a132bbbe" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="org.jmdns" name="jmdns" version="3.6.5">
+         <artifact name="jmdns-3.6.5.jar">
+            <sha256 value="d20cff6ee19a30c0f3ad7c0a0fe74652f0d0d7293e987d726989cdef66ae08af" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="jmdns-3.6.5.pom">
+            <sha256 value="1d91908d5b14fa1740f2bb2afb2019de7d15d3b9c83b93ca822915a04cdcc021" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
