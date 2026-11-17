@@ -94,9 +94,16 @@ final class ThemeTokens {
                 : member instanceof CSSExpressionMemberFunction function && colorFunction(function);
     }
 
+    /** The numeric comma forms, each by its own name: CSSColorHelper.isColorValue also takes CSS Color 4's forms. */
     private static boolean colorFunction(CSSExpressionMemberFunction function) {
-        return Set.of("rgb", "rgba", "hsl", "hsla").contains(function.getFunctionName())
-                && com.helger.css.utils.CSSColorHelper.isColorValue(function.getAsCSSString(com.helger.css.writer.CSSWriterSettings.DEFAULT_SETTINGS, 0));
+        String css = function.getAsCSSString(com.helger.css.writer.CSSWriterSettings.DEFAULT_SETTINGS, 0);
+        return switch (function.getFunctionName()) {
+            case "rgb" -> com.helger.css.utils.CSSColorHelper.isRGBColorValue(css);
+            case "rgba" -> com.helger.css.utils.CSSColorHelper.isRGBAColorValue(css);
+            case "hsl" -> com.helger.css.utils.CSSColorHelper.isHSLColorValue(css);
+            case "hsla" -> com.helger.css.utils.CSSColorHelper.isHSLAColorValue(css);
+            default -> false;
+        };
     }
 
     private static boolean isLength(CSSExpression value) {

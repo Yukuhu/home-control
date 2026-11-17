@@ -52,7 +52,7 @@ class ThemeArchiveTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"{\"bg\":\"red; color:blue\"}", "{\"unknown\":\"red\"}", "{\"bg\":42}", "{\"bg\":\"rgb(banana)\"}", "{\"bg\":\"rgba(1, 2, 3)\"}", "{\"radius-control\":\"calc(banana)\"}", "{\"radius-control\":\"clamp(1px, 2px)\"}", "{\"bg\":\"url(https://evil.test/x)\"}", "[]"})
+    @ValueSource(strings = {"{\"bg\":\"red; color:blue\"}", "{\"unknown\":\"red\"}", "{\"bg\":42}", "{\"bg\":\"rgb(banana)\"}", "{\"bg\":\"rgba(1, 2, 3)\"}", "{\"bg\":\"rgb(1 2 3 / 50%)\"}", "{\"radius-control\":\"calc(banana)\"}", "{\"radius-control\":\"clamp(1px, 2px)\"}", "{\"bg\":\"url(https://evil.test/x)\"}", "[]"})
     void rejectsMalformedOrUnsafeTokens(String json) {
         var files = files("custom", null);
         files.put("tokens.json", json.getBytes(StandardCharsets.UTF_8));

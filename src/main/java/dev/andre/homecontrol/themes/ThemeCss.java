@@ -216,7 +216,8 @@ final class ThemeCss {
             case CSSSelectorMemberPseudoWhere where -> selectorFunction(":where", where.getAllSelectors(), nested);
             case CSSSelectorMemberNot not -> selectorFunction(":not", not.getAllSelectors(), nested);
             case CSSSelectorMemberPseudoHas has -> selectorFunction(":has", has.getAllSelectors(), nested);
-            case CSSSelectorMemberFunctionLike function -> nthSelector(function);
+            case CSSSelectorMemberNth nth -> nthSelector(nth);
+            case CSSSelectorMemberFunctionLike _ -> throw ThemeException.invalid("Unsupported CSS selector function.");
             default -> throw ThemeException.invalid("Unsupported CSS selector.");
         };
     }
@@ -232,7 +233,7 @@ final class ThemeCss {
         if (simple.isClass()) return HOOKS.contains(value.substring(1));
         if (simple.isHash()) return IDS.contains(value.substring(1));
         if (simple.isNesting()) return nested;
-        if (simple.isPseudo()) return PSEUDOS.contains(value) || value.matches(":nth-(?:last-)?(?:child|of-type)\\((?:[0-9n+\\-\\s]+|odd|even)\\)");
+        if (simple.isPseudo()) return PSEUDOS.contains(value);
         return ELEMENTS.contains(value);
     }
 
@@ -265,11 +266,10 @@ final class ThemeCss {
         return ":is(" + selector + ",:where(label.sheet-device" + state + "))";
     }
 
-    private static String nthSelector(CSSSelectorMemberFunctionLike function) {
-        if (!words(":nth-child :nth-last-child :nth-of-type :nth-last-of-type").contains(function.getFunctionName())) throw ThemeException.invalid("Unsupported CSS selector function.");
-        String parameter = function.getParameterExpression().getAsCSSString(WRITER, 0);
-        if (!parameter.matches("[0-9n+\\-\\s]+|odd|even")) throw ThemeException.invalid("Unsupported nth selector expression.");
-        return function.getAsCSSString(WRITER, 0);
+    /** Every :nth-child, :nth-last-child, :nth-of-type and :nth-last-of-type, without an "of" selector list. */
+    private static String nthSelector(CSSSelectorMemberNth nth) {
+        if (nth.hasOfSelectors() || !nth.getExpression().matches("[0-9n+\\-]+|odd|even")) throw ThemeException.invalid("Unsupported nth selector expression.");
+        return nth.getAsCSSString(WRITER, 0);
     }
 
     private String selectorFunction(String name, List<CSSSelector> selectors, boolean nested) {

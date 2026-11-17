@@ -112,7 +112,20 @@ class ThemeCssTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-        .sheet-device[aria-checked] | .sheet-device:is([aria-checked],:where(label.sheet-device[data-sheet-checked]))
+        .tile:nth-child(3n+2) | .tile:nth-child(3n+2)
+        .tile:nth-child(2n + 1) | .tile:nth-child(2n+1)
+        .tile:nth-last-child(-n+3) | .tile:nth-last-child(-n+3)
+        .tile:nth-of-type(odd) | .tile:nth-of-type(odd)
+        .tile:nth-last-of-type(4) | .tile:nth-last-of-type(4)
+        """)
+    void compilesNthSelectors(String source, String expected) {
+        assertThat(compile(source + " { color: red; }"))
+                .contains(":root[data-theme=\"custom\"] " + expected + " {\ncolor:red;");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+        .sheet-device[aria-checked] |.sheet-device:is([aria-checked],:where(label.sheet-device[data-sheet-checked]))
         .sheet-device[aria-checked="true"] | .sheet-device:is([aria-checked="true"],:where(label.sheet-device[data-sheet-checked="true"]))
         .sheet-device[aria-checked="false"] | .sheet-device:is([aria-checked="false"],:where(label.sheet-device[data-sheet-checked="false"]))
         .sheet-device[role] | .sheet-device:is([role],:where(label.sheet-device))
