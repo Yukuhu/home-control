@@ -3732,5 +3732,29 @@
             <sha256 value="f449cab7d11b55293c5e921f83dc29c20251fe4857b6899464b2a70e865568ec" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="org.bouncycastle" name="bcpkix-jdk18on" version="1.87">
+         <artifact name="bcpkix-jdk18on-1.87.jar">
+            <sha256 value="a44be2660d72ed88673372b8cc2d53a25a5aaf27122fb803ed93f07147536aa1" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="bcpkix-jdk18on-1.87.pom">
+            <sha256 value="885903ce260189835347570ee4074d94d8fe5b37a28d27125d74809d6550bc7e" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="org.bouncycastle" name="bcprov-jdk18on" version="1.87">
+         <artifact name="bcprov-jdk18on-1.87.jar">
+            <sha256 value="12d2d3dd82a9ec15e92ec7c7943ee64f6097c6dc12c07e984f1693b77565b9aa" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="bcprov-jdk18on-1.87.pom">
+            <sha256 value="5f47acac9808ce09227323c51fb0d2301b1a985bfb8fb8eefdfd3c0dd9825a0c" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="org.bouncycastle" name="bcutil-jdk18on" version="1.87">
+         <artifact name="bcutil-jdk18on-1.87.jar">
+            <sha256 value="af46dd381553fdc466cd0c18f8bf2144c7dbcb7337eee3e16cab15e96613ddf0" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="bcutil-jdk18on-1.87.pom">
+            <sha256 value="0216c10db1dba65ba7c0296b5fccdf500a1658857a4922d71fa467d9e3bfe534" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
