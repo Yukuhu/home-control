@@ -3843,5 +3843,47 @@
             <sha256 value="31b614120ff2858dd84fded11a96b8c00cb75abc8bfcdd14b6551050e27bcdc1" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="com.google.code.gson" name="gson" version="2.15.0">
+         <artifact name="gson-2.15.0.jar">
+            <sha256 value="96d3dd843dc2911de01cdabcd50064cb9e860353102a0a78c96fd833d396fc7d" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="gson-2.15.0.pom">
+            <sha256 value="426bc968a4e521865a58dd17a60389fed6195a1c357e3eb8bcb7cae31387bcae" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.google.code.gson" name="gson-parent" version="2.15.0">
+         <artifact name="gson-parent-2.15.0.pom">
+            <sha256 value="337664b30ade9b66e373b6efca1aba7421c1f8ff63643b8aa8b6d05d8efe8e8b" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.microsoft.playwright" name="driver" version="1.65.0">
+         <artifact name="driver-1.65.0.jar">
+            <sha256 value="3924c019c0c80bfd9aca5bded67d9b367afa120e4c7ebdbf11a9b56dd00e71bd" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="driver-1.65.0.pom">
+            <sha256 value="1daf288c5b2ae9b1b07e258dd87c61bec83636d27f32c8a2708cb16682e521e5" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.microsoft.playwright" name="driver-bundle" version="1.65.0">
+         <artifact name="driver-bundle-1.65.0.jar">
+            <sha256 value="e34600216d6128bd37e18b6beeec8b98eaf7b4f4a9646cb759ca72c10a243294" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="driver-bundle-1.65.0.pom">
+            <sha256 value="9f4149974546c73941000567a897a02dd17b748047b24ee7ae5612a5dee3f311" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.microsoft.playwright" name="parent-pom" version="1.65.0">
+         <artifact name="parent-pom-1.65.0.pom">
+            <sha256 value="c2fb975af1e5ee2b6e741ca27569d1a41a527107180ce5f43d6758825610c6d2" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="com.microsoft.playwright" name="playwright" version="1.65.0">
+         <artifact name="playwright-1.65.0.jar">
+            <sha256 value="e8433b478fa8b1465b2592d3472f7867eb1ba38db7bf8cd5ed46857c041ed1e9" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="playwright-1.65.0.pom">
+            <sha256 value="ca2347ab6944601982ca788f319cd6acf79ed98b254475be10bdaa4c9abca611" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
