@@ -2,7 +2,7 @@
 spring-boot = "4.1.2"
 # Spring Boot 4.1.1 manages Tomcat 11.0.24, which has three critical vulnerabilities (CVE-2026-65182,
 # CVE-2026-65905, CVE-2026-68525). Remove this once Spring Boot manages 11.0.25 or later.
-tomcat = "11.0.27"
+tomcat = "11.0.29"
 # Spring Boot 4.1.1 manages Jackson 3.1.5, which has three vulnerabilities (GHSA-q4xh-88c3-wmh7,
 # GHSA-wjgm-6hv5-3cvf, GHSA-gx83-3vf8-gh7j). The Spring Boot Gradle plugin puts 3.1.5 on the build
 # classpath too, and the dependency graph reports it, so build.gradle.kts raises it there as well.
@@ -20,19 +20,19 @@ protobuf-plugin = "0.10.1"
 sonarqube = "7.5.0.8588"
 test-retry = "1.6.6"
 jmdns = "3.6.5"
-bouncycastle = "1.86"
+bouncycastle = "1.87"
 bluez-dbus = "0.3.5"
 dbus-java = "5.2.2"
 # scripts/e2e.sh and the CI browser cache read this version.
-playwright = "1.64.0"
+playwright = "1.65.0"
 archunit = "1.5.1"
 # The JaCoCo agent and report tools the build runs (build.gradle.kts, toolVersion).
 jacoco = "0.8.16"
-errorprone = "2.51.0"
+errorprone = "2.53.0"
 errorprone-plugin = "5.2.0"
 spotless = "8.11.0"
 
-ph-css = "8.4.0"
+ph-css = "8.4.1"
 
 [libraries]
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
