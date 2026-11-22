@@ -3838,5 +3838,10 @@
             <sha256 value="59e8bbfd43e3541c1a3e26f168c95ec8fee0076db91acfa4d78ede95509f26b4" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="com.google.guava" name="guava-parent" version="33.8.0-jre">
+         <artifact name="guava-parent-33.8.0-jre.pom">
+            <sha256 value="31b614120ff2858dd84fded11a96b8c00cb75abc8bfcdd14b6551050e27bcdc1" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
