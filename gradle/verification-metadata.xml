@@ -3885,5 +3885,29 @@
             <sha256 value="ca2347ab6944601982ca788f319cd6acf79ed98b254475be10bdaa4c9abca611" origin="Verified against Maven Central" />
          </artifact>
       </component>
+      <component group="org.apache.tomcat.embed" name="tomcat-embed-core" version="11.0.29">
+         <artifact name="tomcat-embed-core-11.0.29.jar">
+            <sha256 value="45302cad046c8b8c51ba80b34f2a01d1c75a66792587c3ac5e8fda9ff8abf837" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="tomcat-embed-core-11.0.29.pom">
+            <sha256 value="bbabe2c23f5c254f7793bc3257382aa1bcaf2b08029babe63afd19b3c2453edb" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="org.apache.tomcat.embed" name="tomcat-embed-el" version="11.0.29">
+         <artifact name="tomcat-embed-el-11.0.29.jar">
+            <sha256 value="7d0dcc2b9720333e459209426fb23f135d63dbfc3afc8918801b70549503ee3c" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="tomcat-embed-el-11.0.29.pom">
+            <sha256 value="9873acc78476e8a9bcf7a1cbb40206f872fb63bd97f88e63de2eb03f4aa7b7b7" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
+      <component group="org.apache.tomcat.embed" name="tomcat-embed-websocket" version="11.0.29">
+         <artifact name="tomcat-embed-websocket-11.0.29.jar">
+            <sha256 value="ed88cd7a77ff5ab5baeee57eb804bb39c433c79ebf636b2e185facd42280d6f0" origin="Verified against Maven Central" />
+         </artifact>
+         <artifact name="tomcat-embed-websocket-11.0.29.pom">
+            <sha256 value="1ea5e9406f073147969411498befd894f751e56ffa282c859faeef987f8e612b" origin="Verified against Maven Central" />
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
