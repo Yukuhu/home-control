@@ -6,8 +6,11 @@ import com.microsoft.playwright.options.AriaRole;
 import dev.andre.homecontrol.core.Action;
 import dev.andre.homecontrol.core.Device;
 import dev.andre.homecontrol.core.DeviceKind;
+import dev.andre.homecontrol.core.KeyPress;
+import dev.andre.homecontrol.core.RemoteKey;
 import org.junit.jupiter.api.AfterEach;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 
@@ -142,6 +145,35 @@ class DeviceControlsE2eTest extends E2eApplicationTest {
             button(playback, "Pause").click();
 
             assertThat(page.locator("#toast .toast-text")).hasText("Den Speaker refused to Pause");
+        }
+    }
+
+    @BrowserTest
+    void quickPressesOfARemoteButtonAllReachTheDevice(String browser) {
+        adoptDen("REMOTE_KEYS", "", Map.of());
+        // The first press takes a while to reach the device; the next ones come before it has.
+        fakeDevices.delayNextPress(KeyPress.SHORT, Duration.ofMillis(500));
+        try (BrowserSession session = open(browser)) {
+            Locator down = button(openRemote(session.page()), "Down");
+
+            for (int press = 0; press < 5; press++) {
+                down.click();
+            }
+
+            Action pressDown = new Action.PressKey(RemoteKey.DPAD_DOWN, KeyPress.SHORT);
+            await().until(() -> fakeDevices.recorded("den").stream().filter(pressDown::equals).count() == 5);
+        }
+    }
+
+    @BrowserTest
+    void aRemoteButtonTheDeviceRefusesShowsItsReason(String browser) {
+        adoptDen("REMOTE_KEYS", "PressKey", Map.of());
+        try (BrowserSession session = open(browser)) {
+            Page page = session.page();
+
+            button(openRemote(page), "Home").click();
+
+            assertThat(page.locator("#toast .toast-text")).hasText("Den Speaker refused to PressKey");
         }
     }
 

@@ -76,32 +76,32 @@
             </div>
             <div class="remote-controls" data-remote th:attr="data-device=${id}">
                 <section class="dpad">
-                    <button th:attr="hx-post=@{/devices/{id}/key/DPAD_UP(id=${id})}" class="up" aria-label="Up">▲</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/DPAD_LEFT(id=${id})}" class="left" aria-label="Left">◀</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/DPAD_CENTER(id=${id})}" class="ok">OK</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/DPAD_RIGHT(id=${id})}" class="right" aria-label="Right">▶</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/DPAD_DOWN(id=${id})}" class="down" aria-label="Down">▼</button>
+                    <button type="button" data-key="DPAD_UP" class="up" aria-label="Up">▲</button>
+                    <button type="button" data-key="DPAD_LEFT" class="left" aria-label="Left">◀</button>
+                    <button type="button" data-key="DPAD_CENTER" class="ok">OK</button>
+                    <button type="button" data-key="DPAD_RIGHT" class="right" aria-label="Right">▶</button>
+                    <button type="button" data-key="DPAD_DOWN" class="down" aria-label="Down">▼</button>
                 </section>
 
                 <section class="row essential">
-                    <button th:attr="hx-post=@{/devices/{id}/key/BACK(id=${id})}">Back</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/HOME(id=${id})}">Home</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/MENU(id=${id})}">Menu</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/POWER(id=${id})}">Power</button>
+                    <button type="button" data-key="BACK">Back</button>
+                    <button type="button" data-key="HOME">Home</button>
+                    <button type="button" data-key="MENU">Menu</button>
+                    <button type="button" data-key="POWER">Power</button>
                 </section>
 
                 <section class="row">
-                    <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_PREVIOUS(id=${id})}" aria-label="Previous"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 5v14m14-14L8 12l11 7Z"/></svg></button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/REWIND(id=${id})}" aria-label="Rewind"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m12 5-9 7 9 7Zm9 0-9 7 9 7Z"/></svg></button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/PLAY_PAUSE(id=${id})}" aria-label="Play or pause"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m4 5 10 7-10 7Zm13 0v14m4-14v14"/></svg></button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/FAST_FORWARD(id=${id})}" aria-label="Fast forward"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m3 5 9 7-9 7Zm9 0 9 7-9 7Z"/></svg></button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/MEDIA_NEXT(id=${id})}" aria-label="Next"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M19 5v14M5 5l11 7-11 7Z"/></svg></button>
+                    <button type="button" data-key="MEDIA_PREVIOUS" aria-label="Previous"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 5v14m14-14L8 12l11 7Z"/></svg></button>
+                    <button type="button" data-key="REWIND" aria-label="Rewind"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m12 5-9 7 9 7Zm9 0-9 7 9 7Z"/></svg></button>
+                    <button type="button" data-key="PLAY_PAUSE" aria-label="Play or pause"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m4 5 10 7-10 7Zm13 0v14m4-14v14"/></svg></button>
+                    <button type="button" data-key="FAST_FORWARD" aria-label="Fast forward"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m3 5 9 7-9 7Zm9 0 9 7-9 7Z"/></svg></button>
+                    <button type="button" data-key="MEDIA_NEXT" aria-label="Next"><svg class="control-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M19 5v14M5 5l11 7-11 7Z"/></svg></button>
                 </section>
 
                 <section class="row essential">
-                    <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_DOWN(id=${id})}">Vol −</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_MUTE(id=${id})}">Mute</button>
-                    <button th:attr="hx-post=@{/devices/{id}/key/VOLUME_UP(id=${id})}">Vol +</button>
+                    <button type="button" data-key="VOLUME_DOWN">Vol −</button>
+                    <button type="button" data-key="VOLUME_MUTE">Mute</button>
+                    <button type="button" data-key="VOLUME_UP">Vol +</button>
                 </section>
             </div>
         </div>
