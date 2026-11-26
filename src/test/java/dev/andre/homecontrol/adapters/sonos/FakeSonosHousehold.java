@@ -16,6 +16,8 @@ public class FakeSonosHousehold implements AutoCloseable {
     private final List<FakeSonosPlayer> players = new CopyOnWriteArrayList<>();
     /** member uuid → coordinator uuid */
     private final Map<String, String> coordinatorOf = new ConcurrentHashMap<>();
+    /** Rooms the topology lists besides the players, each a group of its own at a LAN address no fake serves. */
+    private volatile int extraRooms;
 
     public FakeSonosPlayer addPlayer(String bindAddress, String uuid, String zoneName) throws IOException {
         FakeSonosPlayer player = new FakeSonosPlayer(this, bindAddress, uuid, zoneName);
@@ -52,6 +54,11 @@ public class FakeSonosHousehold implements AutoCloseable {
         return coordinatorOf(uuid).equals(uuid);
     }
 
+    /** Makes the topology list {@code rooms} more rooms than there are players, as a forged answer could. */
+    public void listAlso(int rooms) {
+        extraRooms = rooms;
+    }
+
     public synchronized String zoneGroupState() {
         StringBuilder xml = new StringBuilder("<ZoneGroupState><ZoneGroups>");
         for (FakeSonosPlayer coordinator : players) {
@@ -68,6 +75,13 @@ public class FakeSonosHousehold implements AutoCloseable {
                 }
             }
             xml.append("</ZoneGroup>");
+        }
+        for (int room = 0; room < extraRooms; room++) {
+            String uuid = "RINCON_EXTRA" + room;
+            xml.append("<ZoneGroup Coordinator=\"").append(uuid).append("\" ID=\"").append(uuid)
+                    .append(":1\"><ZoneGroupMember UUID=\"").append(uuid).append("\" Location=\"http://192.168.1.")
+                    .append(room % 250 + 2).append(":1400/xml/device_description.xml\" ZoneName=\"Room ").append(room)
+                    .append("\"/></ZoneGroup>");
         }
         return xml.append("</ZoneGroups><VanishedDevices></VanishedDevices></ZoneGroupState>").toString();
     }

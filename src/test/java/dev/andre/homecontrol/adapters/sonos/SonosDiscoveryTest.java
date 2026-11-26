@@ -6,6 +6,7 @@ import dev.andre.homecontrol.core.DiscoveredDevice;
 import dev.andre.homecontrol.discovery.ssdp.protocol.FakeSsdpResponder;
 import dev.andre.homecontrol.discovery.ssdp.SsdpDiscovery;
 import dev.andre.homecontrol.discovery.ssdp.SsdpProperties;
+import dev.andre.homecontrol.discovery.ssdp.SsdpService;
 import dev.andre.homecontrol.discovery.ssdp.SsdpTimings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -172,6 +173,53 @@ class SonosDiscoveryTest {
             assertThat(kitchen.calls()).isEmpty();
             assertThat(living.calls()).isEmpty();
         });
+    }
+
+    @Test
+    void aPlayerIsAskedOnceAnIntervalWhateverHouseholdItsAnnouncementsName() {
+        discovery.close();
+        discovery = discovery(Duration.ofSeconds(30));
+
+        for (int forged = 0; forged < 20; forged++) {
+            discovery.seen(announcement(living, "Sonos_forged_" + forged));
+        }
+
+        assertThat(living.calls()).hasSize(1);
+        assertThat(discovery.devices()).containsExactlyInAnyOrder(livingRoom(), kitchenRoom());
+    }
+
+    @Test
+    void keepsAtMostSixteenHouseholds() {
+        for (int forged = 0; forged < SonosDiscovery.MAX_HOUSEHOLDS + 4; forged++) {
+            discovery.seen(announcement(living, "Sonos_forged_" + forged));
+        }
+
+        assertThat(living.calls()).hasSize(SonosDiscovery.MAX_HOUSEHOLDS + 4);
+        assertThat(discovery.devices()).hasSize(SonosDiscovery.MAX_HOUSEHOLDS * 2);
+    }
+
+    @Test
+    void anAnswerListingMoreRoomsThanAHouseholdHoldsIsIgnored() {
+        household.listAlso(SonosDiscovery.MAX_ROOMS);
+
+        discovery.seen(announcement(living, FakeSonosHousehold.HOUSEHOLD));
+
+        assertThat(living.calls()).hasSize(1);
+        assertThat(discovery.devices()).isEmpty();
+        assertThat(events).isEmpty();
+    }
+
+    private SonosDiscovery discovery(Duration topologyInterval) {
+        return new SonosDiscovery(ssdp, new SonosProperties(true, Duration.ofSeconds(1), Duration.ofSeconds(1),
+                topologyInterval, Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1),
+                Duration.ofSeconds(2)), events::add);
+    }
+
+    /** What the living room announces, naming {@code household}. */
+    private static SsdpService announcement(FakeSonosPlayer player, String household) {
+        return new SsdpService("uuid:" + player.uuid() + "::" + SonosDiscovery.SEARCH_TARGET, SonosDiscovery.SEARCH_TARGET,
+                "127.0.0.2", player.location(), Map.of("X-RINCON-HOUSEHOLD", household), Instant.now().plusSeconds(1800),
+                null);
     }
 
     @Test
