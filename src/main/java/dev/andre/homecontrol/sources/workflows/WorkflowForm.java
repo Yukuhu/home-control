@@ -124,9 +124,29 @@ public final class WorkflowForm {
         boolean keeps = row.urlMode == Replacement.KEEP || row.headersMode == Replacement.KEEP;
         Call previous = keeps ? savedCall(saved, row.savedName) : null;
         String url = row.urlMode == Replacement.KEEP ? previous.url() : row.url;
-        List<Header> headers = row.headersMode == Replacement.KEEP ? previous.headers()
-                : row.headers.stream().map(h -> new Header(h.name, h.value)).toList();
+        List<Header> headers;
+        if (row.headersMode == Replacement.KEEP) {
+            requireSameServer(row.name, previous, url);
+            headers = previous.headers();
+        } else {
+            headers = row.headers.stream().map(h -> new Header(h.name, h.value)).toList();
+        }
         return new Call(row.name, row.scope, url, headers, variables(row.variables));
+    }
+
+    /**
+     * Saved headers can hold credentials the browser never sees again, so they stay with the server they were saved
+     * for: a call that keeps them may change its path and query, not its scheme, host or port. A URL that is not valid
+     * at all is left to the validator, which rejects the draft before anything is fetched.
+     */
+    private static void requireSameServer(String name, Call previous, String url) {
+        if (previous.headers().isEmpty() || previous.url().equals(url)) return;
+        var before = WorkflowTemplate.origin(previous.url());
+        var after = WorkflowTemplate.origin(url);
+        if (before.isPresent() && after.isPresent() && !before.equals(after)) {
+            throw new WorkflowException(WorkflowException.Stage.WORKFLOW,
+                    "call " + name + ": headers are required again for another server");
+        }
     }
 
     private static Call savedCall(WorkflowDefinition saved, String savedName) {
