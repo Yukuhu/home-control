@@ -36,23 +36,37 @@ public final class UpnpXml {
         return parse(xml == null ? new byte[0] : xml.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * {@code text} as XML character data or an attribute value. Characters XML 1.0 cannot carry at all (control
+     * characters other than tab and line breaks, U+FFFE, U+FFFF and lone surrogates) are left out: a title holding
+     * one would otherwise make the whole SOAP request malformed, and the renderer refuse it.
+     */
     public static String escape(String text) {
         if (text == null) {
             return "";
         }
         StringBuilder out = new StringBuilder(text.length() + 16);
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
+        text.codePoints().forEach(c -> {
             switch (c) {
                 case '&' -> out.append("&amp;");
                 case '<' -> out.append("&lt;");
                 case '>' -> out.append("&gt;");
                 case '"' -> out.append("&quot;");
                 case '\'' -> out.append("&apos;");
-                default -> out.append(c);
+                default -> {
+                    if (allowedInXml(c)) {
+                        out.appendCodePoint(c);
+                    }
+                }
             }
-        }
+        });
         return out.toString();
+    }
+
+    /** XML 1.0's Char production. */
+    private static boolean allowedInXml(int c) {
+        return c == 0x9 || c == 0xA || c == 0xD || (c >= 0x20 && c <= 0xD7FF) || (c >= 0xE000 && c <= 0xFFFD)
+                || (c >= 0x10000 && c <= 0x10FFFF);
     }
 
     public static String localName(Node node) {
