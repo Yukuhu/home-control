@@ -5,7 +5,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -45,6 +47,22 @@ public final class WorkflowTemplate {
         StringBuilder checked = new StringBuilder();
         for (Token token : tokens) checked.append(token.variable() ? "x" : token.text());
         validUri(checked.toString());
+    }
+
+    /**
+     * The server a URL template reaches, as {@code scheme://host:port} with the scheme's default port filled in, or
+     * empty when it is not a valid template. Placeholders sit only in the path or query, so they never change it.
+     */
+    static Optional<String> origin(String template) {
+        if (template == null || template.isBlank() || template.length() > MAX_URL) return Optional.empty();
+        try {
+            URI uri = HttpUrls.parse(VARIABLE.matcher(template).replaceAll("x"), TEMPLATE_URLS);
+            String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+            int port = uri.getPort() >= 0 ? uri.getPort() : "https".equals(scheme) ? 443 : 80;
+            return Optional.of(scheme + "://" + uri.getHost().toLowerCase(Locale.ROOT) + ":" + port);
+        } catch (HttpUrls.InvalidUrlException _) {
+            return Optional.empty();
+        }
     }
 
     /** The variable names this template uses. */

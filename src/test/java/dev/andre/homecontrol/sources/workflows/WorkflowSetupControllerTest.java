@@ -306,6 +306,54 @@ class WorkflowSetupControllerTest extends WebSliceTest {
         assertThat(captureUpdatedDraft().enabled()).isFalse();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"https://collector.example/saved-secret", "http://api.example/saved-secret",
+            "https://api.example:8443/saved-secret", "https://api.example.collector.example/saved-secret"})
+    void keptHeadersNeverGoToAnotherServer(String url) throws Exception {
+        var result = mvc.perform(validPost().param("calls[0].urlMode", "REPLACE").param("calls[0].url", url)
+                        .param("calls[0].headersMode", "KEEP").param("calls[0].variables[0].name", "A")
+                        .param("calls[0].variables[0].pointer", "/id")
+                        .param("templateMode", "REPLACE").param("template", "https://media.example/{A}"))
+                .andExpect(status().isOk()).andReturn();
+        assertSafeError(result);
+        var binding = (BindingResult) result.getModelAndView().getModel().get(BindingResult.MODEL_KEY_PREFIX + "workflowForm");
+        assertThat(binding.getFieldError("calls[0].headersMode")).isNotNull()
+                .extracting(org.springframework.validation.FieldError::getDefaultMessage).asString()
+                .contains("Replace them when you change the server");
+        verify(workflowStore, never()).update(any(), anyLong(), any(), any());
+    }
+
+    @Test void aNewCallCannotBorrowAnotherCallsSavedHeadersForItsOwnServer() throws Exception {
+        var result = mvc.perform(keptPost().param("calls[1].name", "extra").param("calls[1].scope", "SHARED")
+                        .param("calls[1].savedName", "main").param("calls[1].urlMode", "REPLACE")
+                        .param("calls[1].url", "https://collector.example/{A}").param("calls[1].headersMode", "KEEP")
+                        .param("templateMode", "KEEP"))
+                .andExpect(status().isOk()).andReturn();
+        assertSafeError(result);
+        verify(workflowStore, never()).update(any(), anyLong(), any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"https://api.example/other?page={A}", "https://API.example:443/saved-secret/{A}"})
+    void keptHeadersFollowANewPathOnTheSameServer(String url) throws Exception {
+        when(workflowStore.update(eq(id), eq(3L), any(), any())).thenReturn(saved);
+        mvc.perform(validPost().with(request -> {
+                            request.setParameter("calls[0].name", "token");
+                            request.setParameter("calls[0].savedName", "");
+                            return request;
+                        }).param("calls[0].urlMode", "REPLACE")
+                        .param("calls[0].url", "https://api.example/token").param("calls[0].headersMode", "REPLACE")
+                        .param("calls[0].variables[0].name", "A").param("calls[0].variables[0].pointer", "/id")
+                        .param("calls[1].name", "main").param("calls[1].scope", "SHARED").param("calls[1].savedName", "main")
+                        .param("calls[1].urlMode", "REPLACE").param("calls[1].url", url).param("calls[1].headersMode", "KEEP")
+                        .param("calls[1].variables[0].name", "B").param("calls[1].variables[0].pointer", "/id")
+                        .param("templateMode", "REPLACE").param("template", "https://media.example/{B}"))
+                .andExpect(status().is3xxRedirection());
+        var main = captureUpdatedDraft().calls().get(1);
+        assertThat(main.url()).isEqualTo(url);
+        assertThat(main.headers()).extracting(WorkflowDraft.Header::value).containsExactly("Bearer saved-secret");
+    }
+
     @Test void firstSaveRejectsKeepWithoutReachingStore() throws Exception {
         when(login.loginRequired()).thenReturn(false);
         var result = mvc.perform(post("/setup/workflows").param("calls[0].name", "main").param("calls[0].urlMode", "KEEP"))

@@ -23,7 +23,8 @@
 - Rolling back to a release before version 2 cannot read workflows saved since; they show as unreadable in Setup
   until removed or the newer release is restored.
 - A variable's value can fill a call URL's path and query values but never its host, so no response can redirect a
-  credential to another server.
+  credential to another server. An edit cannot either: a call that keeps its saved headers keeps the scheme, host and
+  port they were saved for.
 - Migration makes a stored definition longer: braces are doubled, and calls, scope and field objects are added. A
   version 1 workflow close to the 16,384-character limit still reads, but it may fail to save again until it is
   shortened.

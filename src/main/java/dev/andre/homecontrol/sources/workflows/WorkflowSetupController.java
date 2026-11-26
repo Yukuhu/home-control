@@ -220,6 +220,9 @@ public final class WorkflowSetupController {
     private static String guidance(String detail) {
         if (detail.contains(" uses {") && detail.contains("further down")) return "This call uses a value no call above it provides.";
         if (detail.contains(" uses {")) return "This call uses a value that no call defines.";
+        if (detail.endsWith("headers are required again for another server")) {
+            return "Saved headers only go to the server they were saved for. Replace them when you change the server.";
+        }
         if (detail.equals("definition exceeds storage limit")) {
             return "This workflow is too large to save; remove calls, headers or variables.";
         }

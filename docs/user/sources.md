@@ -35,7 +35,9 @@ change the order.
   offered only for tiles from an entry array.
 - **Source URL** and **Request headers** — the address and any headers the call sends. On a
   saved call, choose **Keep saved URL** or **Replace URL**, and **Keep saved headers** or
-  **Replace headers**.
+  **Replace headers**. Saved headers only go to the server they were saved for: a replaced URL
+  may change the path and query, but to change the scheme, host or port, replace the headers
+  too.
 - **Add value** — a value to take from the response. Fill in **Variable name** and **JSON
   Pointer**. Pointers can be empty to select the root; escape `/` as `~1` and `~` as `~0`. New
   values start checked as **Sensitive value**; uncheck it only for values you want visible in
