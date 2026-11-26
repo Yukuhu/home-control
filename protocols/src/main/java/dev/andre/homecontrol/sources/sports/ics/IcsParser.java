@@ -39,6 +39,11 @@ public final class IcsParser {
     /** An RFC 5545 dur-value split at its first {@code T}: sign, weeks and days before it; H, M, S after it. */
     private static final Pattern DURATION_DATE = Pattern.compile("^([+-])?P(?:(\\d+)W)?(?:(\\d+)D)?$");
     private static final Pattern DURATION_TIME = Pattern.compile("^(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?$");
+    /**
+     * The longest DURATION read; a longer one is ignored and the event gets the default length. Nothing a schedule
+     * lists lasts longer, and a duration of billions of days would carry the event's end past the last instant.
+     */
+    static final Duration MAX_DURATION = Duration.ofDays(366);
 
     record ContentLine(String name, Map<String, String> params, String value) {
     }
@@ -253,7 +258,7 @@ public final class IcsParser {
             Duration duration = Duration.ofDays(7 * number(date.group(2)) + number(date.group(3)))
                     .plusHours(number(time.group(1))).plusMinutes(number(time.group(2)))
                     .plusSeconds(number(time.group(3)));
-            return duration.isZero() || duration.isNegative() ? null : duration;
+            return duration.isZero() || duration.isNegative() || duration.compareTo(MAX_DURATION) > 0 ? null : duration;
         } catch (NumberFormatException | ArithmeticException _) {
             return null;
         }

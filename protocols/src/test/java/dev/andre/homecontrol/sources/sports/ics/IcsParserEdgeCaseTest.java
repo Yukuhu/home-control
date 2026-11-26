@@ -149,6 +149,17 @@ class IcsParserEdgeCaseTest {
         assertThat(IcsParser.parseDuration(value)).isNull();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"P400000000000D", "PT99999999999999H", "P99999999999W", "P367D", "P53W"})
+    void durationsLongerThanAYearAreIgnored(String value) {
+        assertThat(IcsParser.parseDuration(value)).isNull();
+    }
+
+    @Test
+    void aDurationOfAYearIsKept() {
+        assertThat(IcsParser.parseDuration("P366D")).isEqualTo(Duration.ofDays(366));
+    }
+
     @Test
     void aNullDurationIsNull() {
         assertThat(IcsParser.parseDuration(null)).isNull();
