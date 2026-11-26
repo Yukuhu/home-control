@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.mock.env.MockEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -63,6 +64,20 @@ class OnModuleConditionTest {
                 .run(context -> assertThat(context).hasBean("jellyfinBean"));
         runner.withPropertyValues("home-control.jellyfin.enabled=yes")
                 .run(context -> assertThat(context).doesNotHaveBean("jellyfinBean"));
+    }
+
+    @Test
+    void codeOutsideTheConditionReadsAModuleTheSameWay() {
+        assertThat(OnModuleCondition.isOn(new MockEnvironment(), Module.SONOS)).isTrue();
+        assertThat(OnModuleCondition.isOn(new MockEnvironment(), Module.BLUETOOTH)).isFalse();
+        assertThat(OnModuleCondition.isOn(new MockEnvironment().withProperty("home-control.sonos.enabled", "TRUE"),
+                Module.SONOS)).isTrue();
+        for (String off : new String[] {"false", "yes", "on", "1", "enabled"}) {
+            assertThat(OnModuleCondition.isOn(new MockEnvironment().withProperty("home-control.sonos.enabled", off),
+                    Module.SONOS)).as(off).isFalse();
+        }
+        assertThat(OnModuleCondition.isOn(new MockEnvironment().withProperty("home-control.sports.enabled", "false"),
+                Module.THESPORTSDB)).isFalse();
     }
 
     @Test
