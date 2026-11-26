@@ -59,6 +59,8 @@ public class FakeTizenServer implements AutoCloseable {
     private volatile boolean issueTokens = true;
     private volatile int deviceInfoPadding;
     private volatile boolean stalling;
+    /** The TV is gone without closing anything: no REST, and the open channel takes messages but never answers. */
+    private volatile boolean silent;
     private final CountDownLatch closing = new CountDownLatch(1);
 
     public FakeTizenServer() throws IOException {
@@ -144,6 +146,15 @@ public class FakeTizenServer implements AutoCloseable {
         remote.dropAll();
     }
 
+    /**
+     * The TV lost power or dropped off the network without closing anything: REST stops answering, and the open
+     * channel keeps taking messages but never answers again. New connections are not answered either.
+     */
+    public void fallSilent() {
+        restAvailable = false;
+        silent = true;
+    }
+
     /** Standby without network standby: REST and the WebSocket are both gone. */
     public void switchOff() {
         restAvailable = false;
@@ -181,6 +192,9 @@ public class FakeTizenServer implements AutoCloseable {
     private void open(FakeWebSocketServer.Connection connection) {
         openConnections.add(connection);
         queries.add(connection.query() == null ? "" : connection.query());
+        if (silent) {
+            return;
+        }
         // Real sets chatter before answering; the client must skip this.
         connection.send("{\"event\":\"ed.edenTV.update\",\"data\":{\"update_type\":\"ed.edenApp.update\"}}");
         if (TOKEN.equals(queryParameter(connection.query(), "token"))) {
@@ -200,6 +214,9 @@ public class FakeTizenServer implements AutoCloseable {
     }
 
     private void message(FakeWebSocketServer.Connection connection, String text) {
+        if (silent) {
+            return;
+        }
         JsonNode message = JSON.readTree(text);
         JsonNode params = message.path("params");
         switch (message.path("method").asString("")) {

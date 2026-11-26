@@ -216,7 +216,11 @@ public class TizenSession implements DeviceHandle {
             publisher.update(state -> state.withStatus(DeviceStatus.DISCONNECTED).withPower(false).withCurrentApp(null));
             return;
         }
-        if (connection.current().isEmpty() && (handshakeBackingOff() || !connect())) {
+        Optional<TizenRemoteConnection> held = connection.current();
+        if (held.isEmpty() && (handshakeBackingOff() || !connect())) {
+            return;
+        }
+        if (held.isPresent() && info.isEmpty() && !stillAnswers(held.get())) {
             return;
         }
         String app = visibleKnownApp();
@@ -313,6 +317,27 @@ public class TizenSession implements DeviceHandle {
         } else {
             TizenSettings.keys(secrets).store(keyRef, token);
         }
+    }
+
+    /**
+     * Runs on the loop, when the REST API did not answer: whether the held channel still does. A TV that lost power or
+     * dropped off the network closes nothing, and the channel takes keys without complaint, so without this check the
+     * TV would stay "on" and Power would send KEY_POWER into the void instead of waking it. Only a TV that answered
+     * the installed-app request before is asked; one that never does is taken at its word, as before.
+     */
+    private boolean stillAnswers(TizenRemoteConnection held) {
+        if (held.installedApps().isEmpty()) {
+            return true;
+        }
+        try {
+            if (held.answers(timings.requestTimeout())) {
+                return true;
+            }
+        } catch (IOException _) {
+            // A request that cannot even be sent is no answer either.
+        }
+        lost(held, "it stopped answering");
+        return false;
     }
 
     /** Runs on the loop. */
