@@ -29,7 +29,10 @@ function refetch(sourceId, railId) {
     // froze the tab. `!el.isConnected` (true once outerHTML actually swapped this element out) is a
     // second guard against recursing when nothing changed, and `setTimeout` defers any recursion to
     // a fresh task instead of the current microtask queue.
+    // A fetch that fails leaves the rail as it was: the next rail event, or the stream's reconnect, which sends
+    // every rail again, fetches it then. Catching keeps the failure from surfacing as an unhandled rejection.
     window.htmx.ajax("GET", path, { source: el, target: el, swap: "outerHTML" })
+        .catch(() => {})
         .finally(() => {
             inFlight.delete(key);
             if (!el.isConnected) setTimeout(() => refetch(sourceId, railId), 0);
@@ -45,6 +48,6 @@ export function watchRails() {
     on("rails", ({ rails }) => {
         const shown = [...document.querySelectorAll("#rails > .rail")].map((el) => el.dataset.rail);
         if (shown.join("|") === rails.join("|")) return;
-        window.htmx.ajax("GET", "/rails", { source: "#rails", target: "#rails", swap: "outerHTML" });
+        window.htmx.ajax("GET", "/rails", { source: "#rails", target: "#rails", swap: "outerHTML" }).catch(() => {});
     });
 }
