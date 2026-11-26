@@ -82,6 +82,22 @@ public class BluetoothSpeakerAdapter implements DeviceAdapter, AdapterDiscovery 
         }
     }
 
+    /** A speaker's own Bluetooth address is in its settings; its sessions never dial the device's host. */
+    @Override
+    public boolean remembersOwnHost() {
+        return true;
+    }
+
+    /** The speaker's own address, which a speaker merged into another device takes with it when it is split off. */
+    @Override
+    public String hostOf(Device device) {
+        try {
+            return BluetoothSettings.of(device).address();
+        } catch (IllegalArgumentException _) {
+            return device.host();
+        }
+    }
+
     @Override
     public List<DiscoveredDevice> discovered() {
         // Scan results live in the Bluetooth setup section (BluetoothPairingService), not the

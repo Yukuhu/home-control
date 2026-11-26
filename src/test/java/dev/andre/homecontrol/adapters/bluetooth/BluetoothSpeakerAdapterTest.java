@@ -49,6 +49,18 @@ class BluetoothSpeakerAdapterTest {
     }
 
     @Test
+    void aSpeakerKeepsItsOwnAddressInsideAnotherDevice() {
+        Device tv = new Device("tv", "Living Room TV", DeviceKind.WEBOS, "192.168.1.30",
+                Map.of("webos", Map.of()), Instant.EPOCH)
+                .withAdapter("bluetooth", speaker("AA:BB:CC:DD:EE:FF").adapterSettings("bluetooth"));
+
+        assertThat(adapter.remembersOwnHost()).isTrue();
+        assertThat(adapter.hostOf(tv)).isEqualTo("AA:BB:CC:DD:EE:FF");
+        assertThat(adapter.hostOf(new Device("plain", "Plain", DeviceKind.BLUETOOTH, "AA:BB:CC:DD:EE:01",
+                Map.of("bluetooth", Map.of()), Instant.EPOCH))).isEqualTo("AA:BB:CC:DD:EE:01");
+    }
+
+    @Test
     void forgetUnpairsOnTheHost() {
         Device device = speaker("AA:BB:CC:DD:EE:FF");
         bluez.known("AA:BB:CC:DD:EE:FF", "JBL Flip 5");
