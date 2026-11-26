@@ -190,23 +190,32 @@ async function reconcileCatalog(response, mine) {
 
 async function catalogResponse(event, pathname) {
     const mine = themeGeneration;
+    let response;
     try {
-        const response = await fetch(event.request);
-        if (pathname.endsWith(".json") && response.ok && !response.redirected) {
-            // Cleanup has its own lifetime: a slow theme download must not delay a successful online catalog.
-            event.waitUntil(reconcileCatalog(response.clone(), mine));
-        }
-        return response;
+        response = await fetch(event.request);
+    } catch {
+        return offlineCatalogResponse(pathname, Response.error());
     }
-    catch {
-        try {
-            const catalog = await offlineCatalog();
-            if (pathname.endsWith(".json")) return Response.json(catalog);
-            return new Response(`globalThis.homeControlThemes=${JSON.stringify(catalog)};`, {
-                headers: { "Content-Type": "text/javascript; charset=utf-8", "X-Content-Type-Options": "nosniff" }
-            });
-        } catch { return Response.error(); }
+    // A proxy answering for a server it cannot reach: the page's script gets the offline catalog, as with no answer.
+    // The JSON a theme refresh reads keeps the failure, which is not evidence that a cached revision was removed.
+    if (!pathname.endsWith(".json") && SERVER_UNREACHABLE.has(response.status)) {
+        return offlineCatalogResponse(pathname, response);
     }
+    if (pathname.endsWith(".json") && response.ok && !response.redirected) {
+        // Cleanup has its own lifetime: a slow theme download must not delay a successful online catalog.
+        event.waitUntil(reconcileCatalog(response.clone(), mine));
+    }
+    return response;
+}
+
+async function offlineCatalogResponse(pathname, otherwise) {
+    try {
+        const catalog = await offlineCatalog();
+        if (pathname.endsWith(".json")) return Response.json(catalog);
+        return new Response(`globalThis.homeControlThemes=${JSON.stringify(catalog)};`, {
+            headers: { "Content-Type": "text/javascript; charset=utf-8", "X-Content-Type-Options": "nosniff" }
+        });
+    } catch { return otherwise; }
 }
 
 async function cachedPresentation(path) {
@@ -220,8 +229,12 @@ async function cachedPresentation(path) {
 }
 
 async function presentationResponse(request, path) {
-    try { return await fetch(request); }
+    let response;
+    try { response = await fetch(request); }
     catch { return await cachedPresentation(path) ?? Response.error(); }
+    // A proxy answering for a server it cannot reach sends its own error page: the cached copy styles the offline page.
+    if (SERVER_UNREACHABLE.has(response.status)) return await cachedPresentation(path) ?? response;
+    return response;
 }
 
 async function cacheTheme(id, revision, mine) {

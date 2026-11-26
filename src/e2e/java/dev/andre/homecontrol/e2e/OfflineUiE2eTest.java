@@ -78,6 +78,35 @@ class OfflineUiE2eTest extends E2eApplicationTest {
         }
     }
 
+    /** The proxy answers the offline page's stylesheet, scripts and theme with its error too: the cached ones serve. */
+    @BrowserTest
+    void aProxyAnsweringForADownServerStillGetsAStyledOfflinePage(String browser) throws IOException, InterruptedException {
+        try (OfflineOrigin origin = new OfflineOrigin(baseUrl(), themes);
+             BrowserSession session = Browsers.open(browser, origin.baseUrl(),
+                     "OfflineUiE2eTest-aProxyAnsweringForADownServerStillGetsAStyledOfflinePage")) {
+            // Playwright routing disables the HTTP cache, so everything comes from the network or the worker.
+            session.context().route("**/*", Route::resume);
+            Page page = session.page();
+            page.navigate("/offline.html");
+            assumeTrue((Boolean) page.evaluate("() => 'serviceWorker' in navigator"),
+                    "This browser does not expose service workers");
+            String onlineBackground = (String) page.locator("body")
+                    .evaluate("body => getComputedStyle(body).backgroundColor");
+            registerWorker(page);
+            page.evaluate("() => localStorage.setItem('homecontrol.theme.v1', 'cyberpunk')");
+
+            origin.answerEverything(502);
+            page.navigate("/");
+
+            assertThat(page).hasTitle("Home Control is offline");
+            assertThat(page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName(Pattern.compile("Try again"))))
+                    .hasCSS("display", "inline-flex");
+            assertThat(page.locator("html")).hasAttribute("data-theme", "cyberpunk");
+            assertThat(page.locator("body")).hasCSS("background-color", "rgb(7, 8, 13)");
+            org.assertj.core.api.Assertions.assertThat(onlineBackground).isNotEqualTo("rgb(7, 8, 13)");
+        }
+    }
+
     @BrowserTest
     void offlineNavigationsKeepTheirStylesWithoutCachingLiveRequests(String browser) throws IOException, InterruptedException {
         try (OfflineOrigin origin = new OfflineOrigin(baseUrl(), themes);
@@ -544,6 +573,12 @@ class OfflineUiE2eTest extends E2eApplicationTest {
         private String shellPolicy() { return shellPolicy; }
 
         private void disconnect() { server.close(); }
+
+        /** Every request is answered with {@code status}, as a proxy answers for a server it cannot reach. */
+        private void answerEverything(int status) {
+            server.respond("GET", "/**", dev.andre.homecontrol.testsupport.Response.of(status, "text/html",
+                    "<!doctype html><title>Proxy error " + status + "</title>"));
+        }
 
         /** A page a proxy would answer with this status, titled after it. */
         private void answer(String path, int status) {
