@@ -73,8 +73,9 @@ class DashboardPageTest extends WebSliceTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"status-living\"")))
                 .andExpect(content().string(containsString("id=\"status-bedroom\"")))
-                .andExpect(content().string(containsString("/devices/living/key/DPAD_UP")))
-                .andExpect(content().string(not(containsString("/devices/bedroom/key/"))))
+                .andExpect(content().string(containsString(remoteKeysOf("living"))))
+                .andExpect(content().string(containsString("<button type=\"button\" data-key=\"DPAD_UP\"")))
+                .andExpect(content().string(not(containsString(remoteKeysOf("bedroom")))))
                 .andExpect(content().string(containsString("com.netflix.ninja")))
                 .andExpect(content().string(containsString("/devices/living/play")))
                 .andExpect(result -> org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
@@ -113,7 +114,7 @@ class DashboardPageTest extends WebSliceTest {
 
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("/devices/bedroom/key/HOME")))
+                .andExpect(content().string(containsString(remoteKeysOf("bedroom"))))
                 .andExpect(content().string(not(containsString("/devices/bedroom/play"))));
     }
 
@@ -133,8 +134,8 @@ class DashboardPageTest extends WebSliceTest {
                 .andExpect(status().isOk())
                 .andExpect(result -> org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
                         .containsPattern("<body[^>]* data-device=\"bedroom\""))
-                .andExpect(content().string(containsString("/devices/bedroom/key/HOME")))
-                .andExpect(content().string(not(containsString("/devices/living/key/"))));
+                .andExpect(content().string(containsString(remoteKeysOf("bedroom"))))
+                .andExpect(content().string(not(containsString(remoteKeysOf("living")))));
     }
 
     @Test
@@ -149,7 +150,7 @@ class DashboardPageTest extends WebSliceTest {
 
         mockMvc.perform(get("/").param("device", "ghost"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("/devices/bedroom/key/HOME")));
+                .andExpect(content().string(containsString(remoteKeysOf("bedroom"))));
     }
 
     @Test
@@ -194,7 +195,7 @@ class DashboardPageTest extends WebSliceTest {
                 .andExpect(content().string(containsString("id=\"volume-cast-10-0-0-9\"")))
                 .andExpect(content().string(containsString("/devices/cast-10-0-0-9/mute")))
                 .andExpect(content().string(containsString("/devices/cast-10-0-0-9/stop")))
-                .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/key/"))))
+                .andExpect(content().string(not(containsString(remoteKeysOf("cast-10-0-0-9")))))
                 .andExpect(content().string(not(containsString("/devices/cast-10-0-0-9/pause"))));
     }
 
@@ -243,7 +244,7 @@ class DashboardPageTest extends WebSliceTest {
                 .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/stop")))
                 .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/volume")))
                 .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/mute")))
-                .andExpect(content().string(not(containsString("/devices/upnp-10-0-0-30/key/"))))
+                .andExpect(content().string(not(containsString(remoteKeysOf("upnp-10-0-0-30")))))
                 .andExpect(content().string(containsString("/devices/upnp-10-0-0-30/play")))
                 .andExpect(content().string(containsString("the speaker must be able to reach the URL")))
                 .andExpect(content().string(not(containsString("This speaker plays through the server"))));
@@ -270,7 +271,7 @@ class DashboardPageTest extends WebSliceTest {
                 .andExpect(content().string(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/play")))
                 .andExpect(content().string(containsString("This speaker plays through the server")))
                 .andExpect(content().string(not(containsString("the speaker must be able to reach the URL"))))
-                .andExpect(content().string(not(containsString("/devices/bluetooth-aa-bb-cc-dd-ee-ff/key/"))));
+                .andExpect(content().string(not(containsString(remoteKeysOf("bluetooth-aa-bb-cc-dd-ee-ff")))));
     }
 
     @Test
@@ -383,7 +384,7 @@ class DashboardPageTest extends WebSliceTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"remote-drawer\"")))
                 .andExpect(content().string(containsString("hidden=\"hidden\"")))
-                .andExpect(content().string(containsString("/devices/bedroom/key/DPAD_UP")));
+                .andExpect(content().string(containsString(remoteKeysOf("bedroom"))));
 
         mockMvc.perform(get("/").param("remote", "open"))
                 .andExpect(status().isOk())
@@ -496,5 +497,10 @@ class DashboardPageTest extends WebSliceTest {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Connect a source")));
+    }
+
+    /** The remote's key buttons, which send their keys to this device. */
+    private static String remoteKeysOf(String deviceId) {
+        return "data-remote data-device=\"" + deviceId + "\"";
     }
 }

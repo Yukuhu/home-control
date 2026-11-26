@@ -28,7 +28,15 @@ document.addEventListener("homecontrol:stream", ({ detail }) => {
     status.classList.toggle("connected", detail.connected);
 });
 
-// htmx drives the buttons and the open-link form; failures carry the server's reason.
+// The remote's keys go out like keyboard shortcuts and swipes: each press at once, each failure toasted on its own.
+// As htmx buttons, a press made while the last was still on its way was held back, and only the newest one sent.
+document.querySelector("[data-remote]")?.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-key]");
+    if (!button) return;
+    sendKey(event.currentTarget.dataset.device, button.dataset.key).catch((error) => toast(error.message));
+});
+
+// htmx drives the other buttons and the open-link form; failures carry the server's reason.
 document.body.addEventListener("htmx:responseError", (event) => {
     toast(event.detail.xhr.responseText || "The device is not connected");
 });
