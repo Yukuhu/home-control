@@ -359,6 +359,31 @@ class SsapConnectionTest {
     }
 
     @Test
+    void closingFailsARequestStillWaitingAtOnce() throws Exception {
+        SsapConnection opened = open();
+        opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
+        server.ignoreRequests(SsapUris.SYSTEM_INFO);
+        CompletableFuture<Throwable> waiting = CompletableFuture.supplyAsync(() -> {
+            try {
+                opened.request(SsapUris.SYSTEM_INFO, SsapMessages.empty());
+                return null;
+            } catch (IOException e) {
+                return e;
+            }
+        });
+        assertThat(server.nextRequest(SsapUris.SYSTEM_INFO)).isNotNull();
+
+        opened.close();
+
+        assertThat(waiting.get(1, TimeUnit.SECONDS))
+                .isInstanceOf(IOException.class)
+                .isNotInstanceOf(DeviceTimeoutException.class)
+                .hasMessage("The connection to the TV was closed");
+        assertThatThrownBy(() -> opened.request(SsapUris.SYSTEM_INFO, SsapMessages.empty()))
+                .hasMessage("The connection to the TV was closed");
+    }
+
+    @Test
     void aRequestWaitingWhenTheTvHangsUpFailsAsClosed() throws Exception {
         SsapConnection opened = open();
         opened.register(FakeSsapServer.CLIENT_KEY, Duration.ofSeconds(1));
