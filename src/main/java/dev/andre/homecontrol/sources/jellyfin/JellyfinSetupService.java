@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Connects, checks and disconnects the Jellyfin server; the only writer of its settings and token. */
 public class JellyfinSetupService {
@@ -29,6 +30,7 @@ public class JellyfinSetupService {
     private final JsonFileSourceSettings sources;
     private final SecretStore secrets;
     private final LoginService login;
+    private final List<Runnable> changeListeners = new CopyOnWriteArrayList<>();
 
     public JellyfinSetupService(JellyfinClient client, JsonFileSourceSettings sources, SecretStore secrets, LoginService login) {
         this.client = client;
@@ -44,6 +46,11 @@ public class JellyfinSetupService {
     public Optional<JellyfinConnection> connection() {
         return settings().flatMap(settings -> secrets.secret(JellyfinSettings.TOKEN_SECRET)
                 .map(token -> new JellyfinConnection(settings.serverUrl(), token, settings.deviceId(), settings.userId())));
+    }
+
+    /** Runs {@code listener} after every connect and disconnect: the account, or the server, may be another now. */
+    public void onChanged(Runnable listener) {
+        changeListeners.add(listener);
     }
 
     public JellyfinSettings connect(ConnectRequest request, LoginContext context) {
@@ -89,6 +96,7 @@ public class JellyfinSetupService {
         previous.filter(old -> old.authMode() == JellyfinSettings.AuthMode.PASSWORD)
                 .ifPresent(old -> previousToken.filter(oldToken -> !oldToken.equals(token))
                         .ifPresent(oldToken -> revokeQuietly(new JellyfinConnection(old.serverUrl(), oldToken, old.deviceId(), old.userId()))));
+        changeListeners.forEach(Runnable::run);
         return next;
     }
 
@@ -150,6 +158,7 @@ public class JellyfinSetupService {
                 .ifPresent(this::revokeQuietly);
         sources.remove(JellyfinSettings.SOURCE_ID);
         login.removeSecrets(List.of(JellyfinSettings.TOKEN_SECRET));
+        changeListeners.forEach(Runnable::run);
     }
 
     private static JsonNode findUser(JsonNode users, String name) {

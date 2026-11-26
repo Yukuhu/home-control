@@ -1,6 +1,7 @@
 package dev.andre.homecontrol.sources.jellyfin;
 
 import dev.andre.homecontrol.config.ConditionalOnModule;
+import dev.andre.homecontrol.content.RailCache;
 import dev.andre.homecontrol.config.Module;
 import dev.andre.homecontrol.core.DeviceCommands;
 import dev.andre.homecontrol.core.DeviceQueries;
@@ -8,6 +9,7 @@ import dev.andre.homecontrol.core.playback.RouteStrategy;
 import dev.andre.homecontrol.security.LoginService;
 import dev.andre.homecontrol.storage.JsonFileSourceSettings;
 import dev.andre.homecontrol.storage.SecretStore;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,6 +31,12 @@ public class JellyfinConfiguration {
     public JellyfinSetupService jellyfinSetupService(JellyfinClient client, JsonFileSourceSettings sources,
                                                      SecretStore secrets, LoginService login) {
         return new JellyfinSetupService(client, sources, secrets, login);
+    }
+
+    /** Another account or server has other rails: the cached ones are dropped as soon as it changes. */
+    @Bean
+    public ApplicationRunner jellyfinChangeHook(JellyfinSetupService setup, RailCache rails) {
+        return args -> setup.onChanged(() -> rails.invalidateSource(JellyfinSettings.SOURCE_ID));
     }
 
     @Bean
