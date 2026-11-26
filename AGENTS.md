@@ -12,7 +12,7 @@ Rules for everyone who changes this repository, people and coding agents alike. 
 
 ## Stack
 
-- Java 25, Spring Boot 4.1.1, Jackson 3 (packages `tools.jackson.*`). MockMvc's test auto-configuration is in
+- Java 25, Spring Boot 4.1.2, Jackson 3 (packages `tools.jackson.*`). MockMvc's test auto-configuration is in
   `org.springframework.boot.webmvc.test.autoconfigure`.
 - Thymeleaf, htmx, server-sent events and plain ES modules. No Node build and no frontend framework.
 
