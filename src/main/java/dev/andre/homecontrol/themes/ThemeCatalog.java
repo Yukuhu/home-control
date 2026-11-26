@@ -47,6 +47,8 @@ public final class ThemeCatalog {
     private Map<String, Revision> entries = Map.of();
     private boolean damagedRegistry;
     /** What readers see; replaced, never changed, by {@link #publishView()} under the monitor. */
+    // An immutable record of copied collections, swapped whole: the volatile reference is all readers need.
+    @SuppressWarnings("java:S3077")
     private volatile View view;
 
     /** One published state of the catalog, with each theme's descriptor worked out once. */
