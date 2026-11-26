@@ -513,6 +513,22 @@ class DevicesTest {
     }
 
     @Test
+    void aMacForADeviceThatNothingWakesIsRefused() throws Exception {
+        DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
+        try (Devices devices = wakingDevices(registry)) {
+            String before = Files.readString(dir.resolve("devices.json"));
+
+            DeviceSettings deviceSettings = devices.settings();
+            assertThatThrownBy(() -> deviceSettings.setWakeOnLanMac("box", "a8-23-fe-01-02-03"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Box has no connection that wakes it with Wake-on-LAN");
+            deviceSettings.setWakeOnLanMac("box", "");
+
+            assertThat(Files.readString(dir.resolve("devices.json"))).isEqualTo(before);
+        }
+    }
+
+    @Test
     void whatAHandleLearnsIsStoredUnderItsAdapterWithoutReconnecting() {
         DeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
         try (var _ = wakingDevices(registry)) {
