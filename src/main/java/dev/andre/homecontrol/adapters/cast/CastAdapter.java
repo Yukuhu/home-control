@@ -74,6 +74,12 @@ public class CastAdapter implements DeviceAdapter, AdapterDiscovery {
         return CastSettings.hostOf(device);
     }
 
+    /** A receiver merged in by name keeps its own address in its settings ({@link CastSettings#host()}). */
+    @Override
+    public boolean remembersOwnHost() {
+        return true;
+    }
+
     @Override
     public void validate(Device device) {
         try {

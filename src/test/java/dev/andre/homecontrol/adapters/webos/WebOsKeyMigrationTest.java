@@ -135,8 +135,8 @@ class WebOsKeyMigrationTest {
     void aMergeCarriesTheReferenceSoThePairingStillWorks() {
         secrets.putDeviceSecret(WebOsSettings.secretName(REF), "the-key");
         JsonFileDeviceRegistry registry = new JsonFileDeviceRegistry(dir.resolve("devices.json"));
-        registry.save(new Device("tv", "Living Room TV", DeviceKind.WEBOS, "192.168.1.31",
-                Map.of("upnp", Map.of("location", "http://192.168.1.31:1400/xml")), Instant.now()));
+        registry.save(new Device("tv", "Living Room TV", DeviceKind.WEBOS, "192.168.1.30",
+                Map.of("upnp", Map.of("location", "http://192.168.1.30:1400/xml")), Instant.now()));
         registry.save(lg(Map.of("keyRef", REF)));
 
         Device merged;

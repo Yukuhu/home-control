@@ -266,7 +266,7 @@ final class Enrollment implements DeviceEnrollment {
             if (isRegistered(registered, found)) {
                 throw new IllegalArgumentException(found.name() + " is already added");
             }
-            device = DeviceMatching.owner(registered, found)
+            device = DeviceMatching.owner(registered, found, discovery.remembersOwnHost())
                     .map(target -> target.withAdapter(adapterId, settings))
                     .orElseGet(() -> new Device(DeviceMatching.uniqueId(registered, adapterId, found.host()), found.name(),
                             adapter.kind(), found.host(), Map.of(adapterId, settings), Instant.now()));
@@ -301,7 +301,7 @@ final class Enrollment implements DeviceEnrollment {
             if (carrier.isPresent()) {
                 reconnectIfMoved(carrier.get(), found.adapterId(), settings.get(), after);
             } else {
-                DeviceMatching.owner(registered, found).ifPresent(target -> {
+                DeviceMatching.owner(registered, found, discovery.remembersOwnHost()).ifPresent(target -> {
                     Device merged = target.withAdapter(found.adapterId(), settings.get());
                     registry.save(merged);
                     after.connect(merged);
@@ -330,12 +330,18 @@ final class Enrollment implements DeviceEnrollment {
         log.info("{} receiver for {} answered at a new address; reconnecting", adapterId, device.name());
     }
 
-    /** Moves every adapter of {@code source} into {@code target} and removes {@code source}. */
+    /**
+     * Moves every adapter of {@code source} into {@code target} and removes {@code source}. An adapter that dials the
+     * device's own address moves only to a device at the same address; host names are resolved before the lock.
+     */
     @Override
     public Device merge(String targetId, String sourceId) {
         if (targetId.equals(sourceId)) {
             throw new IllegalArgumentException("Pick two different devices to merge");
         }
+        HostAddresses addresses = HostAddresses.resolve(registry.findAll().stream()
+                .filter(device -> device.id().equals(targetId) || device.id().equals(sourceId))
+                .map(Device::host).toList(), resolver);
         AfterLock after = new AfterLock();
         Device merged;
         synchronized (lock) {
@@ -357,6 +363,10 @@ final class Enrollment implements DeviceEnrollment {
                 if (boundToDeviceId(adapterId)) {
                     throw new IllegalArgumentException("Merge the other way round: the " + adapterId
                             + " pairing of " + source.name() + " only works under its own id");
+                }
+                if (!remembersOwnHost(adapterId) && !addresses.same(source.host(), target.host())) {
+                    throw new IllegalArgumentException("The " + adapterId + " connection of " + source.name()
+                            + " only works at " + source.host() + ", and " + target.name() + " is at " + target.host());
                 }
                 merged = merged.withAdapter(adapterId, entry.getValue());
             }
@@ -417,6 +427,12 @@ final class Enrollment implements DeviceEnrollment {
         return discovery != null && discovery.settingsFor(found).isPresent();
     }
 
+    /** True when the adapter's entry keeps its own address, so it may join a device at another one (Cast). */
+    private boolean remembersOwnHost(String adapterId) {
+        AdapterDiscovery discovery = discoveries.get(adapterId);
+        return discovery != null && discovery.remembersOwnHost();
+    }
+
     /** True when the adapter keeps its pairing under the device id, so its entry never moves to another id. */
     private boolean boundToDeviceId(String adapterId) {
         AdapterDiscovery discovery = discoveries.get(adapterId);
@@ -452,10 +468,11 @@ final class Enrollment implements DeviceEnrollment {
             if (result.hasAdapter(entry.getKey())) {
                 continue;
             }
-            Optional<DiscoveredDevice> match = DeviceMatching.absorbable(result, entry.getValue(), others);
+            AdapterDiscovery discovery = discoveries.get(entry.getKey());
+            Optional<DiscoveredDevice> match = DeviceMatching.absorbable(result, entry.getValue(), others,
+                    discovery.remembersOwnHost());
             if (match.isPresent()) {
-                result = result.withAdapter(entry.getKey(),
-                        discoveries.get(entry.getKey()).settingsFor(match.get()).orElseThrow());
+                result = result.withAdapter(entry.getKey(), discovery.settingsFor(match.get()).orElseThrow());
             }
         }
         return result;

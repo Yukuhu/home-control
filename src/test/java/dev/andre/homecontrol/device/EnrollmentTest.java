@@ -186,6 +186,68 @@ class EnrollmentTest {
     }
 
     @Test
+    void aReceiverThatDialsTheDeviceAddressNeverJoinsADeviceByNameAlone() {
+        StubAdapter webos = new StubAdapter("webos", DeviceKind.WEBOS, false, false);
+        StubAdapter sonos = new StubAdapter("sonos", DeviceKind.SONOS, true, false).dialingTheDeviceAddress();
+        Wiring wiring = wire(HostAddresses::lookup, webos, sonos);
+        wiring.registry().save(new Device("tv", "Living Room", DeviceKind.WEBOS, "10.0.0.6",
+                Map.of("webos", Map.of()), Instant.EPOCH));
+        DiscoveredDevice room = new DiscoveredDevice("sonos", "Living Room", "10.0.0.9", 1400, Map.of());
+        sonos.visible.add(room);
+
+        wiring.enrollment().onDiscovered(new DeviceDiscoveredEvent(room));
+        assertThat(wiring.registry().findById("tv").orElseThrow().hasAdapter("sonos")).isFalse();
+        assertThat(wiring.enrollment().addable()).containsExactly(room);
+
+        Device added = wiring.enrollment().addDiscovered("sonos", "10.0.0.9", 1400);
+        assertThat(added.id()).isNotEqualTo("tv");
+        assertThat(added.host()).isEqualTo("10.0.0.9");
+
+        wiring.registry().delete(added.id());
+        wiring.enrollment().adopt(wiring.registry().findById("tv").orElseThrow());
+        assertThat(wiring.registry().findById("tv").orElseThrow().hasAdapter("sonos")).isFalse();
+    }
+
+    @Test
+    void aReceiverThatDialsTheDeviceAddressJoinsTheDeviceAtThatAddress() {
+        StubAdapter webos = new StubAdapter("webos", DeviceKind.WEBOS, false, false);
+        StubAdapter upnp = new StubAdapter("upnp", DeviceKind.UPNP, true, false).dialingTheDeviceAddress();
+        Wiring wiring = wire(HostAddresses::lookup, webos, upnp);
+        wiring.registry().save(new Device("tv", "Living Room TV", DeviceKind.WEBOS, "10.0.0.9",
+                Map.of("webos", Map.of()), Instant.EPOCH));
+        DiscoveredDevice renderer = new DiscoveredDevice("upnp", "[TV] Renderer", "10.0.0.9", 1400, Map.of());
+        upnp.visible.add(renderer);
+
+        wiring.enrollment().onDiscovered(new DeviceDiscoveredEvent(renderer));
+
+        assertThat(wiring.registry().findById("tv").orElseThrow().hasAdapter("upnp")).isTrue();
+    }
+
+    @Test
+    void mergeMovesAnEntryThatDialsTheDeviceAddressOnlyToADeviceAtThatAddress() {
+        StubAdapter webos = new StubAdapter("webos", DeviceKind.WEBOS, false, false);
+        StubAdapter sonos = new StubAdapter("sonos", DeviceKind.SONOS, true, false).dialingTheDeviceAddress();
+        InetAddress tvAddress = InetAddress.ofLiteral("10.0.0.9");
+        Wiring wiring = wire(host -> host.equals("tv.local") ? Optional.of(tvAddress) : HostAddresses.lookup(host),
+                webos, sonos);
+        wiring.registry().save(new Device("tv", "Living Room", DeviceKind.WEBOS, "10.0.0.6",
+                Map.of("webos", Map.of()), Instant.EPOCH));
+        wiring.registry().save(new Device("named", "Living Room", DeviceKind.WEBOS, "tv.local",
+                Map.of("webos", Map.of()), Instant.EPOCH));
+        wiring.enrollment().adopt(new Device("speaker", "Living Room", DeviceKind.SONOS, "10.0.0.9",
+                Map.of("sonos", Map.of("port", "1400")), Instant.EPOCH));
+        Enrollment enrollment = wiring.enrollment();
+
+        assertThatThrownBy(() -> enrollment.merge("tv", "speaker"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("The sonos connection of Living Room only works at 10.0.0.9, and Living Room is at 10.0.0.6");
+        assertThat(wiring.registry().findById("speaker")).isPresent();
+
+        assertThat(enrollment.merge("named", "speaker").adapters()).containsOnlyKeys("webos", "sonos");
+        assertThat(wiring.registry().findById("speaker")).isEmpty();
+    }
+
+    @Test
     void addingThroughAModuleThatIsSwitchedOffIsRefused() {
         Enrollment enrollment = wire(HostAddresses::lookup,
                 new StubAdapter("androidtv", DeviceKind.ANDROID_TV, false, false)).enrollment();
