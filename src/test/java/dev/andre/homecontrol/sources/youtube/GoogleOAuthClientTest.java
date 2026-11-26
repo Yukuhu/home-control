@@ -32,6 +32,17 @@ class GoogleOAuthClientTest {
     }
 
     @Test
+    void aRevocationGoogleRefusesFails() throws IOException {
+        start();
+        fake.respond("POST", "/oauth/revoke", FakeGoogleServer.Canned.json(400, "{\"error\":\"invalid_token\"}"));
+
+        assertThatThrownBy(() -> client.revoke("1//refresh")).isInstanceOf(YouTubeException.class);
+
+        fake.respond("POST", "/oauth/revoke", FakeGoogleServer.Canned.json(200, "{}"));
+        client.revoke("1//refresh");
+    }
+
+    @Test
     void requestsADeviceCode() throws IOException {
         start();
         fake.respond("POST", "/oauth/device/code", FakeGoogleServer.Canned.fixture(200, "oauth-device-code.json"));

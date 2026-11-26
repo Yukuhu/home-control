@@ -268,7 +268,9 @@ public class YouTubeSetupService {
             try {
                 oauth.revoke(token);
             } catch (YouTubeException e) {
-                log.info("Could not revoke the YouTube authorization at Google: {}", e.getMessage());
+                // Disconnected here all the same; the grant stays valid at Google until it is removed there.
+                log.warn("Google did not revoke the YouTube authorization ({}); remove it in the Google account's"
+                        + " third-party access settings", e.getMessage());
             }
         });
     }

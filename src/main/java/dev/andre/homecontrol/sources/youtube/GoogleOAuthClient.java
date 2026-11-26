@@ -184,8 +184,12 @@ public class GoogleOAuthClient {
         throw failure(response);
     }
 
+    /** Asks Google to revoke {@code token}; a refusal throws, so a disconnect can say the grant is still valid there. */
     public void revoke(String token) {
-        http.postForm(URI.create(base + "/revoke"), Map.of("token", token), Map.of());
+        YouTubeHttp.Response response = http.postForm(URI.create(base + "/revoke"), Map.of("token", token), Map.of());
+        if (!response.ok()) {
+            throw failure(response);
+        }
     }
 
     private AccessToken accessToken(JsonNode json) {
