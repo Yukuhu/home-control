@@ -38,6 +38,13 @@ public class RemoteConnection implements AutoCloseable {
     private static final int FEATURE_POWER = 1 << 5;    // 32
     private static final int FEATURE_VOLUME = 1 << 6;   // 64
     private static final int FEATURE_APP_LINK = 1 << 9;  // 512, RemoteAppLinkLaunchRequest
+    /**
+     * How many stale windows the device may stay silent while commands go out. It postpones its pings while it
+     * receives commands, so writes count as activity, but a write to a device that has vanished still succeeds into
+     * the socket's buffer: without a bound, steady key presses would keep a dead connection open, each reported as
+     * sent, until TCP gave up after about a quarter of an hour.
+     */
+    static final int SILENT_WINDOWS_WHILE_SENDING = 6;
     private static final int CLIENT_FEATURES = FEATURE_KEY
             | FEATURE_IME_RECEIVE
             | FEATURE_POWER
@@ -51,8 +58,10 @@ public class RemoteConnection implements AutoCloseable {
     private final long staleTimeoutNanos;
     private final Thread idleWatchdog;
 
-    /** Guarded by this connection's monitor, together with the idle-expiry decision. */
+    /** Guarded by this connection's monitor, together with the idle-expiry decision: the last message either way. */
     private long lastActivityNanos = System.nanoTime();
+    /** Guarded by this connection's monitor: the last message the device sent. */
+    private long lastInboundNanos = lastActivityNanos;
 
     private volatile boolean configured;
     private volatile boolean closed;
@@ -145,6 +154,11 @@ public class RemoteConnection implements AutoCloseable {
         lastActivityNanos = System.nanoTime();
     }
 
+    private synchronized void recordInbound() {
+        lastActivityNanos = System.nanoTime();
+        lastInboundNanos = lastActivityNanos;
+    }
+
     private void watchIdle() {
         try {
             while (!closed) {
@@ -163,7 +177,10 @@ public class RemoteConnection implements AutoCloseable {
         if (closed) {
             return 0;
         }
-        long remaining = staleTimeoutNanos - (System.nanoTime() - lastActivityNanos);
+        long now = System.nanoTime();
+        long idle = staleTimeoutNanos - (now - lastActivityNanos);
+        long silent = SILENT_WINDOWS_WHILE_SENDING * staleTimeoutNanos - (now - lastInboundNanos);
+        long remaining = Math.min(idle, silent);
         if (remaining <= 0) {
             finish(DisconnectCause.STALE);
         }
@@ -174,23 +191,15 @@ public class RemoteConnection implements AutoCloseable {
         try {
             RemoteMessage message;
             while (!closed && (message = stream.read(RemoteMessage.parser())) != null) {
-                recordActivity();
+                recordInbound();
                 dispatch(message);
             }
             finish(DisconnectCause.CLOSED);
         } catch (InvalidProtocolBufferException e) {
-            // protobuf's delimited-parsing helpers catch ANY IOException raised while reading
-            // the length prefix or the message body and rewrap it as InvalidProtocolBufferException
-            // (their catch-all for "the stream didn't hold a valid message"), with the real
-            // exception underneath as the cause. That applies just as much to a certificate
-            // rejection as to a plain read timeout: verified empirically that when the device
-            // rejects our certificate, the client's TLS handshake most often completes
-            // successfully from startHandshake()'s point of view, and the resulting
-            // SSLHandshakeException (certificate_unknown) only surfaces here, on the first
-            // post-handshake read - not from TlsSockets.connect() the way UnpairedException
-            // in connect() above assumes. Unwrap and classify the real cause through the same
-            // rule classify() applies below, so this is reported correctly instead of a bogus
-            // corrupt-message ERROR.
+            // A message protobuf cannot read, or one longer than MessageStream allows: ERROR. MessageStream reads the
+            // socket itself, so a socket failure reaches the catch below as it was thrown. That includes a certificate
+            // the device rejected: the handshake most often completes from startHandshake()'s point of view, and the
+            // SSLHandshakeException (certificate_unknown) only surfaces on the first read after it.
             finish(classify(e.getCause()));
         } catch (IOException e) {
             // Reached directly for a write-side failure too (e.g. MessageStream.write() failing
