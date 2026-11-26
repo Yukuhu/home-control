@@ -255,6 +255,22 @@ class JellyfinSetupServiceTest {
     }
 
     @Test
+    void connectingAndDisconnectingTellTheListenersOnlyOnceTheyAreDone() {
+        LoginContext request = new RequestLoginContext(new MockHttpServletRequest(), loginService);
+        java.util.List<Boolean> connectedWhenTold = new java.util.concurrent.CopyOnWriteArrayList<>();
+        setup.onChanged(() -> connectedWhenTold.add(setup.settings().isPresent()));
+        var weakPassword = passwordRequest("short", "short");
+
+        assertThatThrownBy(() -> setup.connect(weakPassword, request)).isInstanceOf(RuntimeException.class);
+        assertThat(connectedWhenTold).isEmpty();
+
+        setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), request);
+        setup.disconnect();
+
+        assertThat(connectedWhenTold).containsExactly(true, false);
+    }
+
+    @Test
     void disconnectStillWorksWhenJellyfinIsDown() {
         setup.connect(passwordRequest(LOGIN_PASSWORD, LOGIN_PASSWORD), new RequestLoginContext(new MockHttpServletRequest(), loginService));
         fake.close();
