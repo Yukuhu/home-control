@@ -25,6 +25,9 @@ public record SsdpMessage(Kind kind, Map<String, String> headers) {
             return Optional.empty();
         }
         String[] lines = new String(data, 0, length, StandardCharsets.UTF_8).split("\r?\n");
+        if (lines.length == 0) {
+            return Optional.empty(); // nothing but line breaks
+        }
         String start = lines[0].trim().toUpperCase(Locale.ROOT);
         Kind kind;
         if (start.startsWith("HTTP/1.1 200")) {

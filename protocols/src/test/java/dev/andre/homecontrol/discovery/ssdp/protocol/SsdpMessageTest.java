@@ -166,4 +166,11 @@ class SsdpMessageTest {
         assertThat(SsdpMessage.parse(null, 10)).isEmpty();
         assertThat(SsdpMessage.parse(new byte[10], 0)).isEmpty();
     }
+
+    @Test
+    void aDatagramOfLineBreaksAloneIsNoMessage() {
+        for (String breaks : new String[] {"\r\n", "\n", "\r\n\r\n\n"}) {
+            assertThat(SsdpMessage.parse(breaks.getBytes(US_ASCII), breaks.length())).as(breaks).isEmpty();
+        }
+    }
 }
