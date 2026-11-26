@@ -157,7 +157,8 @@ public class TheSportsDbSchedule implements SportsFeed {
         settings.competitions().forEach(c -> known.add(c.leagueId()));
         cache.keySet().removeIf(key -> !known.contains(leagueIdOf(key))
                 || (firstDate != null && dateOf(key).isBefore(firstDate.minusDays(1))));
-        lastFailure.keySet().removeIf(key -> !known.contains(leagueIdOf(key)));
+        lastFailure.keySet().removeIf(key -> !known.contains(leagueIdOf(key))
+                || (firstDate != null && dateOf(key).isBefore(firstDate.minusDays(1))));
         errors.keySet().removeIf(leagueId -> !known.contains(leagueId));
     }
 
