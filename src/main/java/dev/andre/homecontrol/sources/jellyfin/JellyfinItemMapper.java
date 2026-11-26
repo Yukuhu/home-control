@@ -144,7 +144,16 @@ public final class JellyfinItemMapper {
         return null;
     }
 
+    /**
+     * The proxied artwork of {@code itemId}, or null when the server sent something that is no Jellyfin id: such an
+     * id would break the address (failing the whole rail) or point the browser at another path of this app.
+     */
     private static URI image(String itemId, String tag) {
+        try {
+            JellyfinClient.id(itemId);
+        } catch (IllegalArgumentException _) {
+            return null;
+        }
         return URI.create(IMAGE_PATH + itemId + "/Primary?tag=" + URLEncoder.encode(tag, StandardCharsets.UTF_8));
     }
 }

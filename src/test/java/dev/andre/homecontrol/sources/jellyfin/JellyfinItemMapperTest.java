@@ -110,6 +110,16 @@ class JellyfinItemMapperTest {
     }
 
     @Test
+    void anIdThatIsNoJellyfinIdGetsNoArtworkAndSparesTheItem() {
+        for (String id : new String[] {"../../setup", "has space", "a\"quote", "x?y"}) {
+            String json = "{\"Id\":\"ok1\",\"Type\":\"Episode\",\"Name\":\"Pilot\",\"ImageTags\":{},"
+                    + "\"SeriesId\":" + MAPPER.writeValueAsString(id) + ",\"SeriesPrimaryImageTag\":\"t1\"}";
+
+            assertThat(item(json).artwork()).as(id).isNull();
+        }
+    }
+
+    @Test
     void aVideoWithoutAYearOrPictureHasNoSubtitleOrArtwork() {
         ContentItem video = item("{\"Id\":\"v1\",\"Type\":\"Video\",\"Name\":\"Clip\",\"SeriesId\":\"s1\"}");
 
