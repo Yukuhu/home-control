@@ -22,7 +22,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Validates immutable revisions before atomically publishing a versioned catalog snapshot. */
+/**
+ * Validates immutable revisions before atomically publishing a versioned catalog snapshot.
+ *
+ * <p>Every page, key press and login check reads the catalog, so reads never wait: they see the {@link View} published
+ * after the last change. Changes (install, remove) run one at a time under this object's monitor, which an install
+ * holds through unpacking, compiling and writing the package, and publish a new view once they are done.
+ */
 public final class ThemeCatalog {
     private static final int MAX_IMPORTS = 32;
     private static final long MAX_STORAGE = 256L * 1024 * 1024;
@@ -40,6 +46,13 @@ public final class ThemeCatalog {
     private final List<String> problems = new ArrayList<>();
     private Map<String, Revision> entries = Map.of();
     private boolean damagedRegistry;
+    /** What readers see; replaced, never changed, by {@link #publishView()} under the monitor. */
+    private volatile View view;
+
+    /** One published state of the catalog, with each theme's descriptor worked out once. */
+    private record View(Map<String, ThemePackage> packages, Map<String, ThemeDescriptor> descriptors,
+                        List<ThemeDescriptor> themes, Map<String, ThemeAsset> publicAssets, List<String> problems) {
+    }
 
     public ThemeCatalog(DataDirectory data) {
         directory = data.resolve(THEMES).toAbsolutePath().normalize();
@@ -50,32 +63,48 @@ public final class ThemeCatalog {
             builtins.put(id, theme);
             publicAssets.putAll(theme.presentation());
         }
-        load();
+        synchronized (this) {
+            load();
+            publishView();
+        }
     }
 
-    public synchronized List<ThemeDescriptor> themes() {
-        List<ThemeDescriptor> result = new ArrayList<>();
-        builtins.values().forEach(theme -> result.add(theme.descriptor(true)));
-        installed.values().stream().sorted(Comparator.comparing(t -> t.manifest().id())).forEach(theme -> result.add(theme.descriptor(false)));
-        return List.copyOf(result);
+    public List<ThemeDescriptor> themes() { return view.themes(); }
+
+    public ThemeDescriptor require(String id) {
+        ThemeDescriptor descriptor = view.descriptors().get(id);
+        if (descriptor == null) throw new ThemeException(404, "Theme was not found.");
+        return descriptor;
     }
 
-    public synchronized ThemeDescriptor require(String id) { return requirePackage(id).descriptor(builtins.containsKey(id)); }
     public ThemePackage inspect(byte[] bytes) { return validate(ThemeArchive.read(bytes), false); }
-    public synchronized List<String> problems() { return List.copyOf(problems); }
+    public List<String> problems() { return view.problems(); }
     public String defaultColor() { return builtins.get("default").tokens().get("theme-color"); }
-    public synchronized Optional<ThemeAsset> asset(String rawPath) { return Optional.ofNullable(publicAssets.get(rawPath)); }
-    public synchronized byte[] export(String id) {
-        ThemePackage theme = requirePackage(id);
+    public Optional<ThemeAsset> asset(String rawPath) { return Optional.ofNullable(view.publicAssets().get(rawPath)); }
+    public byte[] export(String id) {
+        ThemePackage theme = view.packages().get(id);
+        if (theme == null) throw new ThemeException(404, "Theme was not found.");
         Map<String, byte[]> source = new LinkedHashMap<>(theme.files());
         // Export all additive token defaults while retaining original author CSS and relative asset paths.
         source.put(TOKENS, Json.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(new java.util.TreeMap<>(theme.tokens())));
         return ThemeArchive.write(source);
     }
 
-    public synchronized ThemeDescriptor install(byte[] bytes, String expectedRevision) {
-        writable();
+    /** Unpacks and compiles the package before taking the monitor, so a second change waits only for the writes. */
+    public ThemeDescriptor install(byte[] bytes, String expectedRevision) {
         ThemePackage candidate = inspect(bytes);
+        synchronized (this) {
+            try {
+                return install(candidate, expectedRevision);
+            } finally {
+                publishView();
+            }
+        }
+    }
+
+    /** Under the monitor. */
+    private ThemeDescriptor install(ThemePackage candidate, String expectedRevision) {
+        writable();
         String id = candidate.manifest().id();
         Revision previous = entries.get(id);
         ThemePackage priorPackage = installed.get(id);
@@ -108,6 +137,15 @@ public final class ThemeCatalog {
     }
 
     public synchronized void remove(String id) {
+        try {
+            removeInstalled(id);
+        } finally {
+            publishView();
+        }
+    }
+
+    /** Under the monitor. */
+    private void removeInstalled(String id) {
         protect(id);
         writable();
         Revision old = entries.get(id);
@@ -124,11 +162,17 @@ public final class ThemeCatalog {
         if (old.previous() != null) reclaim(id, old.previous());
     }
 
-    private ThemePackage requirePackage(String id) {
-        ThemePackage theme = builtins.get(id);
-        if (theme == null) theme = installed.get(id);
-        if (theme == null) throw new ThemeException(404, "Theme was not found.");
-        return theme;
+    /** Under the monitor: what readers see from now on. */
+    private void publishView() {
+        Map<String, ThemePackage> packages = new LinkedHashMap<>(builtins);
+        Map<String, ThemeDescriptor> descriptors = new LinkedHashMap<>();
+        builtins.forEach((id, theme) -> descriptors.put(id, theme.descriptor(true)));
+        installed.values().stream().sorted(Comparator.comparing(t -> t.manifest().id())).forEach(theme -> {
+            packages.put(theme.manifest().id(), theme);
+            descriptors.put(theme.manifest().id(), theme.descriptor(false));
+        });
+        view = new View(Map.copyOf(packages), Map.copyOf(descriptors), List.copyOf(descriptors.values()),
+                Map.copyOf(publicAssets), List.copyOf(problems));
     }
 
     private ThemePackage validate(Map<String, byte[]> files, boolean builtin) {

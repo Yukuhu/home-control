@@ -34,6 +34,34 @@ class ThemeCatalogTest {
         assertThat(catalog().themes()).extracting(ThemeDescriptor::id).containsExactly("default", "cyberpunk");
     }
 
+    @Test void readsNeverWaitForAnInstallOrRemovalInProgress() throws Exception {
+        ThemeCatalog catalog = catalog();
+        var installed = catalog.install(zip(files("custom", null)), null);
+        try (var reader = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            // What install and remove hold for their whole run, unpacking and fsyncs included.
+            synchronized (catalog) {
+                var read = reader.submit(() -> {
+                    assertThat(catalog.themes()).extracting(ThemeDescriptor::id).containsExactly("default", "cyberpunk", "custom");
+                    assertThat(catalog.require("default").id()).isEqualTo("default");
+                    assertThat(catalog.asset(installed.stylesheet())).isPresent();
+                    assertThat(catalog.export("custom")).isNotEmpty();
+                    return catalog.problems();
+                });
+                assertThat(read.get(5, java.util.concurrent.TimeUnit.SECONDS)).isEmpty();
+            }
+        }
+    }
+
+    @Test void aFailedChangeLeavesWhatReadersSeeUnchanged() {
+        ThemeCatalog catalog = catalog();
+        var installed = catalog.install(zip(files("custom", null)), null);
+        assertThatThrownBy(() -> catalog.install(zip(files("custom", ":root { color: #234; }")), null))
+                .isInstanceOf(ThemeException.class);
+        assertThatThrownBy(() -> catalog.remove("default")).isInstanceOf(ThemeException.class);
+        assertThat(catalog.require("custom")).isEqualTo(installed);
+        assertThat(catalog.asset(installed.stylesheet())).isPresent();
+    }
+
     @Test void exposesOnlyExactCommittedPresentationPaths() {
         ThemeCatalog catalog = catalog();
         var inspected = catalog.inspect(zip(files("custom", null)));
