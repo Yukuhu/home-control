@@ -15,6 +15,17 @@ class UpnpXmlTest {
     }
 
     @Test
+    void leavesOutWhatXmlCannotCarryAndKeepsEverythingElse() {
+        String title = "Tab\tLine\nReturn\rBell\u0007Escape\u001BNul\u0000\uFFFE\uFFFF\uD800 Café 😀 \uFFFD";
+
+        String escaped = UpnpXml.escape(title);
+
+        assertThat(escaped).isEqualTo("Tab\tLine\nReturn\rBellEscapeNul Café 😀 \uFFFD");
+        assertThat(UpnpXml.childText(UpnpXml.parse("<t><title>" + escaped + "</title></t>"), "title"))
+                .contains("Tab\tLine\nReturn\nBellEscapeNul Café 😀 \uFFFD");
+    }
+
+    @Test
     void readsElementsIgnoringPrefixes() {
         Element root = UpnpXml.parse("<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body>"
                 + "<u:GetVolumeResponse xmlns:u=\"urn:x\"><CurrentVolume>35</CurrentVolume><Note>&lt;b&gt;</Note>"
