@@ -46,6 +46,24 @@ class IcsOccurrencesEdgeCaseTest {
     }
 
     @Test
+    void anEventWithAnEndlessDurationGetsTheDefaultLengthAndSparesTheOthers() {
+        IcsOccurrences.Result result = expand(
+                "BEGIN:VEVENT", "UID:old@x", "SUMMARY:Long ago", "DTSTART:20190105T150000Z", "DURATION:P400000000000D",
+                "END:VEVENT",
+                "BEGIN:VEVENT", "UID:timed@x", "SUMMARY:Timed", "DTSTART:20260920T150000Z", "DURATION:PT99999999999999H",
+                "END:VEVENT",
+                "BEGIN:VEVENT", "UID:allday@x", "SUMMARY:All day", "DTSTART;VALUE=DATE:20260921",
+                "DURATION:P99999999999W", "END:VEVENT",
+                "BEGIN:VEVENT", "UID:match@x", "SUMMARY:Match", "DTSTART:20260922T180000Z", "END:VEVENT");
+
+        assertThat(result.occurrences()).extracting(IcsOccurrence::uid, IcsOccurrence::startsAt, IcsOccurrence::endsAt)
+                .containsExactly(
+                        tuple("timed@x", Instant.parse("2026-09-20T15:00:00Z"), Instant.parse("2026-09-20T17:00:00Z")),
+                        tuple("allday@x", Instant.parse("2026-09-20T22:00:00Z"), Instant.parse("2026-09-21T22:00:00Z")),
+                        tuple("match@x", Instant.parse("2026-09-22T18:00:00Z"), Instant.parse("2026-09-22T20:00:00Z")));
+    }
+
+    @Test
     void theWeekStartDecidesWhichWeeksAnIntervalSkips() {
         // RFC 5545's own example: every other week on Sunday and Monday, counted in weeks from Sunday or from Monday.
         String[] fromSunday = {"BEGIN:VEVENT", "UID:alt@x", "SUMMARY:Alternating", "DTSTART:20260920T130000Z",
