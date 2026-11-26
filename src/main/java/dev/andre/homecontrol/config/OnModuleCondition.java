@@ -11,7 +11,17 @@ import org.springframework.core.type.AnnotatedTypeMetadata;
  * module is on by default, and its parent is on too. Any other value switches it off, as the
  * {@code @ConditionalOnProperty(havingValue = "true")} it replaces did.
  */
-class OnModuleCondition extends SpringBootCondition {
+public class OnModuleCondition extends SpringBootCondition {
+
+    /** Whether {@code module} is on by this rule, for code that must agree with {@link ConditionalOnModule}. */
+    public static boolean isOn(Environment environment, Module module) {
+        for (Module each = module; each != null; each = each.parent().orElse(null)) {
+            if (!enabled(environment, each)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     @Override
     public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
