@@ -7,6 +7,7 @@ import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.security.LoginRequiredException;
+import dev.andre.homecontrol.storage.StorageException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -37,7 +38,8 @@ class ErrorAdviceTest {
             "unroutable", () -> new UnroutableException("Shield: this device cannot open app links"),
             "failed", () -> new ActionFailedException("Shield refused the key"),
             "source", () -> new ContentSourceException(ContentSourceException.Kind.UNREACHABLE, "Jellyfin did not answer"),
-            "login", LoginRequiredException::new);
+            "login", LoginRequiredException::new,
+            "storage", () -> new StorageException("Cannot write /data/sources.json; check that /data is writable", null));
 
     @RestController
     static class Throwing {
@@ -58,7 +60,8 @@ class ErrorAdviceTest {
                 Arguments.of("unroutable", 422, "Shield: this device cannot open app links"),
                 Arguments.of("failed", 502, "Shield refused the key"),
                 Arguments.of("source", 502, "Jellyfin did not answer"),
-                Arguments.of("login", 401, "Log in first"));
+                Arguments.of("login", 401, "Log in first"),
+                Arguments.of("storage", 503, "Cannot write /data/sources.json; check that /data is writable"));
     }
 
     @ParameterizedTest

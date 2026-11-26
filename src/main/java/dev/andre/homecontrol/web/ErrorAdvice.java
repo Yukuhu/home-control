@@ -7,6 +7,7 @@ import dev.andre.homecontrol.core.UnsupportedActionException;
 import dev.andre.homecontrol.core.content.ContentSourceException;
 import dev.andre.homecontrol.core.playback.UnroutableException;
 import dev.andre.homecontrol.security.LoginRequiredException;
+import dev.andre.homecontrol.storage.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -40,6 +41,12 @@ public class ErrorAdvice {
     @ExceptionHandler({ActionFailedException.class, ContentSourceException.class})
     public ResponseEntity<String> failed(RuntimeException e) {
         return text(HttpStatus.BAD_GATEWAY, e);
+    }
+
+    /** A file under /data could not be read or written: the reason names it and what to check, e.g. the mount. */
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<String> storage(StorageException e) {
+        return text(HttpStatus.SERVICE_UNAVAILABLE, e);
     }
 
     /**
