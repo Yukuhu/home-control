@@ -300,7 +300,9 @@ public class RailCache implements SmartLifecycle {
                     published = succeed(entry, rail, interval);
                 } catch (ContentSourceException e) {
                     published = fail(entry, e.getMessage(), interval);
-                } catch (IllegalArgumentException _) {
+                } catch (IllegalArgumentException e) {
+                    // Usually a rail the source dropped; logged, because a value the source could not read lands here too.
+                    log.debug("Rail {} is not offered: {}", RailSnapshot.key(descriptor), e.toString());
                     published = fail(entry, found.displayName() + " no longer offers " + descriptor.title(), interval);
                 } catch (RuntimeException e) {
                     log.warn("Rail {} failed to load", RailSnapshot.key(descriptor), e);
