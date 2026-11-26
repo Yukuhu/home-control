@@ -216,7 +216,7 @@ public final class SsapConnection implements AutoCloseable {
 
     private JsonNode send(String id, String type, String uri, ObjectNode payload) throws IOException {
         if (closedReason != null) {
-            throw new IOException("The TV closed the connection: " + closedReason);
+            throw new IOException(closedReason);
         }
         CompletableFuture<JsonNode> answer = new CompletableFuture<>();
         pending.put(id, answer);
@@ -273,8 +273,11 @@ public final class SsapConnection implements AutoCloseable {
     }
 
     private void failEverythingWaiting(String reason) {
-        closedReason = reason;
-        IOException closed = new IOException("The TV closed the connection: " + reason);
+        failEverythingWaiting(new IOException("The TV closed the connection: " + reason));
+    }
+
+    private void failEverythingWaiting(IOException closed) {
+        closedReason = closed.getMessage();
         pending.values().forEach(future -> future.completeExceptionally(closed));
         registration.add(SsapMessages.JSON.createObjectNode().put("type", "closed"));
     }
@@ -283,13 +286,23 @@ public final class SsapConnection implements AutoCloseable {
         return message.path("type").asString("");
     }
 
+    /**
+     * Fails every request still waiting, then closes both sockets. Closing from this side is never reported to the
+     * listener, so a command in flight would otherwise wait out its whole timeout and then fail as unanswered. The
+     * main socket closes outside the monitor, which a button press holds while it opens the pointer socket: a close
+     * never waits behind one, and the press it ends fails at once.
+     */
     @Override
-    public synchronized void close() {
-        if (pointer != null) {
-            pointer.close();
+    public void close() {
+        failEverythingWaiting(new IOException("The connection to the TV was closed"));
+        TextWebSocket main = socket;
+        if (main != null) {
+            main.close();
         }
-        if (socket != null) {
-            socket.close();
+        synchronized (this) {
+            if (pointer != null) {
+                pointer.close();
+            }
         }
     }
 }
