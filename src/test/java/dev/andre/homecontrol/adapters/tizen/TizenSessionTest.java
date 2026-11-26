@@ -392,6 +392,19 @@ class TizenSessionTest {
     }
 
     @Test
+    void aTvThatFallsSilentIsOffSoPowerWakesIt() throws Exception {
+        startWithInstalledApps();
+        await().atMost(Duration.ofSeconds(5)).until(() -> stored("macAddress") != null);
+
+        tv.fallSilent();
+        awaitStatus(DeviceStatus.DISCONNECTED);
+        assertThat(session.state().powerOn()).isFalse();
+
+        session.execute(new Action.PressKey(RemoteKey.POWER));
+        assertThat(receiver.nextPacket()).containsExactly(WakeOnLan.magicPacket("70:2A:D5:01:02:03"));
+    }
+
+    @Test
     void powerWhileOffWithoutAMacExplainsTheFix() {
         tv.switchOff();
         start(PAIRED);
@@ -512,6 +525,10 @@ class TizenSessionTest {
 
         connected();
         assertThat(stored("macAddress")).isNull();
+        // Every poll now asks the channel whether the TV is still there; a TV that answers stays connected.
+        await().during(Duration.ofMillis(1_000)).atMost(Duration.ofSeconds(3))
+                .until(() -> session.state().status() == DeviceStatus.CONNECTED && session.state().powerOn());
+        assertThat(tv.connections()).isEqualTo(1);
     }
 
     @Test

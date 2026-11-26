@@ -100,6 +100,22 @@ public final class TizenRemoteConnection implements AutoCloseable {
         return Optional.ofNullable(channel.installedApps);
     }
 
+    /**
+     * Asks the TV for its installed apps again and waits up to {@code timeout} for the answer. A TV that vanished
+     * without closing the connection still accepts whatever is sent, so an answer is the only sign that it is there:
+     * false when none came. Meaningful only for a TV that answered the request before ({@link #installedApps()}).
+     */
+    public boolean answers(Duration timeout) throws IOException {
+        long before = channel.appAnswers();
+        requestInstalledApps();
+        try {
+            return channel.awaitAppAnswerAfter(before, timeout);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for the TV", e);
+        }
+    }
+
     @Override
     public void close() {
         socket.close();
@@ -115,8 +131,33 @@ public final class TizenRemoteConnection implements AutoCloseable {
         @SuppressWarnings("java:S3077")
         private volatile List<TizenApp> installedApps;
 
+        /** How many installed-app lists the TV has sent; guarded by this channel's monitor. */
+        private long appAnswers;
+
         private Channel(Consumer<String> whenClosed) {
             this.whenClosed = whenClosed;
+        }
+
+        private synchronized long appAnswers() {
+            return appAnswers;
+        }
+
+        private synchronized boolean awaitAppAnswerAfter(long seen, Duration timeout) throws InterruptedException {
+            long deadline = System.nanoTime() + timeout.toNanos();
+            while (appAnswers == seen) {
+                long left = deadline - System.nanoTime();
+                if (left <= 0) {
+                    return false;
+                }
+                TimeUnit.NANOSECONDS.timedWait(this, left);
+            }
+            return true;
+        }
+
+        private synchronized void appAnswered(List<TizenApp> apps) {
+            installedApps = apps;
+            appAnswers++;
+            notifyAll();
         }
 
         @Override
@@ -137,7 +178,7 @@ public final class TizenRemoteConnection implements AutoCloseable {
                     events.add(CHANNEL_CONNECT_EVENT);
                 }
                 case CHANNEL_UNAUTHORIZED_EVENT -> events.add(CHANNEL_UNAUTHORIZED_EVENT);
-                case "ed.installedApp.get" -> installedApps = TizenMessages.installedApps(message);
+                case "ed.installedApp.get" -> appAnswered(TizenMessages.installedApps(message));
                 case "ms.error" -> log.atDebug()
                         .addArgument(() -> message.path("data").path("message").asString(""))
                         .log("The TV reported an error: {}");

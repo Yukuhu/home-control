@@ -113,6 +113,19 @@ class TizenRemoteConnectionTest {
     }
 
     @Test
+    void aTvThatIsThereAnswersAndOneThatFellSilentDoesNot() throws IOException {
+        TizenRemoteConnection opened = open(FakeTizenServer.TOKEN);
+        assertThat(opened.awaitAuthorization(Duration.ofSeconds(2))).isEqualTo(TizenRemoteConnection.Authorization.CONNECTED);
+
+        assertThat(opened.answers(Duration.ofSeconds(2))).isTrue();
+        assertThat(opened.installedApps()).isPresent();
+
+        fake.fallSilent();
+        assertThat(opened.answers(Duration.ofMillis(300))).isFalse();
+        assertThat(reasons).isEmpty();
+    }
+
+    @Test
     void theTvClosingTheConnectionIsReportedOnce() throws Exception {
         open(FakeTizenServer.TOKEN).awaitAuthorization(Duration.ofSeconds(2));
 
