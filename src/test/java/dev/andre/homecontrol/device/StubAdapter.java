@@ -32,6 +32,7 @@ class StubAdapter implements DeviceAdapter, AdapterDiscovery {
     private final boolean pairingFree;
     private final boolean boundCredentials;
     private final Set<Capability> capabilities;
+    private boolean remembersOwnHost = true;
 
     final List<DiscoveredDevice> visible = new CopyOnWriteArrayList<>();
     final List<String> forgotten = new CopyOnWriteArrayList<>();
@@ -45,6 +46,12 @@ class StubAdapter implements DeviceAdapter, AdapterDiscovery {
         this.boundCredentials = boundCredentials;
         this.capabilities = EnumSet.noneOf(Capability.class);
         this.capabilities.addAll(List.of(capabilities));
+    }
+
+    /** Like Sonos and UPnP: the entry dials the device's own address and stores none of its own. */
+    StubAdapter dialingTheDeviceAddress() {
+        remembersOwnHost = false;
+        return this;
     }
 
     @Override
@@ -88,7 +95,9 @@ class StubAdapter implements DeviceAdapter, AdapterDiscovery {
             return Optional.empty();
         }
         Map<String, String> settings = new LinkedHashMap<>();
-        settings.put("host", found.host());
+        if (remembersOwnHost) {
+            settings.put("host", found.host());
+        }
         settings.put("port", String.valueOf(found.port()));
         String stableId = found.attributes().get("id");
         if (stableId != null) {
@@ -100,7 +109,12 @@ class StubAdapter implements DeviceAdapter, AdapterDiscovery {
     /** Like Cast: a pairing-free entry remembers its own address, which may differ from the device's. */
     @Override
     public String hostOf(Device device) {
-        return device.adapterSettings(id).getOrDefault("host", device.host());
+        return remembersOwnHost ? device.adapterSettings(id).getOrDefault("host", device.host()) : device.host();
+    }
+
+    @Override
+    public boolean remembersOwnHost() {
+        return remembersOwnHost;
     }
 
     /**

@@ -161,7 +161,10 @@ multicast, so the container needs `network_mode: host`.
 
 - Open **Setup**. Renderers and Sonos rooms appear under **Ready to add (no pairing needed)**;
   press **Add**. A renderer inside a TV that is already registered (same address)
-  is merged into that TV automatically as soon as it is discovered — no Add needed.
+  is merged into that TV automatically as soon as it is discovered — no Add needed. A
+  renderer or Sonos room only ever joins a device at its own address, never one that merely
+  has the same name, and **Merge devices** refuses to move it into a device at another
+  address, because it would then be reached at that device's address.
 - Sonos rooms appear once by room name; the partner of a stereo pair, subs and surrounds are
   part of their room, not devices of their own. Any one announcing player lists the whole
   household.

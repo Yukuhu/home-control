@@ -45,4 +45,13 @@ public interface AdapterDiscovery {
     default boolean credentialsBoundToDeviceId() {
         return false;
     }
+
+    /**
+     * True when this adapter's entry keeps the address it reaches the device at in its own settings (Cast), so it can
+     * belong to a device at another address: matched by name, or merged into one by hand. Default false: the adapter
+     * dials the device's own address, so its entry only works in a device at the address it was found at.
+     */
+    default boolean remembersOwnHost() {
+        return false;
+    }
 }

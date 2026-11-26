@@ -47,39 +47,41 @@ final class DeviceMatching {
 
     /**
      * The device a discovered receiver belongs to, for "Add" and the automatic merge. Among devices without the
-     * receiver's adapter: the one at the receiver's address; otherwise the single one with the receiver's name, unless
-     * that name or that address belongs to another registered device, where the receiver would belong instead.
+     * receiver's adapter: the one at the receiver's address; otherwise, only for an adapter that remembers its own
+     * address ({@code byName}), the single one with the receiver's name, unless that name or that address belongs to
+     * another registered device, where the receiver would belong instead.
      */
-    static Optional<Device> owner(List<Device> registered, DiscoveredDevice found) {
+    static Optional<Device> owner(List<Device> registered, DiscoveredDevice found, boolean byName) {
         List<Device> candidates = registered.stream().filter(device -> !device.hasAdapter(found.adapterId())).toList();
-        return pick(candidates, found.host(), found.name(), Device::host, Device::name,
+        return pick(candidates, found.host(), found.name(), Device::host, Device::name, byName,
                 chosen -> registered.stream().anyMatch(other -> !other.id().equals(chosen.id())
                         && (sameName(other.name(), found.name()) || other.host().equalsIgnoreCase(found.host()))));
     }
 
     /**
      * The receiver a newly adopted device absorbs: the same rule, seen from the device. The one at its address;
-     * otherwise the single one with its name, unless another registered device shares that name or sits at that
-     * receiver's address.
+     * otherwise ({@code byName}) the single one with its name, unless another registered device shares that name or
+     * sits at that receiver's address.
      */
-    static Optional<DiscoveredDevice> absorbable(Device device, List<DiscoveredDevice> receivers, List<Device> others) {
-        return pick(receivers, device.host(), device.name(), DiscoveredDevice::host, DiscoveredDevice::name,
+    static Optional<DiscoveredDevice> absorbable(Device device, List<DiscoveredDevice> receivers, List<Device> others,
+                                                 boolean byName) {
+        return pick(receivers, device.host(), device.name(), DiscoveredDevice::host, DiscoveredDevice::name, byName,
                 chosen -> others.stream().anyMatch(other ->
                         sameName(other.name(), device.name()) || other.host().equalsIgnoreCase(chosen.host())));
     }
 
-    /** Same address first; otherwise the single same-named candidate, unless it belongs elsewhere. */
+    /** Same address first; otherwise, when allowed, the single same-named candidate, unless it belongs elsewhere. */
     private static <T> Optional<T> pick(List<T> candidates, String host, String name, Function<T, String> hostOf,
-                                        Function<T, String> nameOf, Predicate<T> belongsElsewhere) {
+                                        Function<T, String> nameOf, boolean byName, Predicate<T> belongsElsewhere) {
         Optional<T> byHost = candidates.stream().filter(c -> hostOf.apply(c).equalsIgnoreCase(host)).findFirst();
-        if (byHost.isPresent()) {
+        if (byHost.isPresent() || !byName) {
             return byHost;
         }
-        List<T> byName = candidates.stream().filter(c -> sameName(nameOf.apply(c), name)).toList();
-        if (byName.size() != 1 || belongsElsewhere.test(byName.getFirst())) {
+        List<T> named = candidates.stream().filter(c -> sameName(nameOf.apply(c), name)).toList();
+        if (named.size() != 1 || belongsElsewhere.test(named.getFirst())) {
             return Optional.empty();
         }
-        return Optional.of(byName.getFirst());
+        return Optional.of(named.getFirst());
     }
 
     static boolean sameName(String a, String b) {
