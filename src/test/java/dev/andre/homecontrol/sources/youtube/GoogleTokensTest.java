@@ -51,6 +51,69 @@ class GoogleTokensTest {
     }
 
     @Test
+    void callersNeedingATokenMeanwhileShareOneRefresh() throws Exception {
+        java.util.concurrent.CountDownLatch google = new java.util.concurrent.CountDownLatch(1);
+        given(oauth.refresh("cid", "csecret", "rt")).willAnswer(call -> {
+            google.await();
+            return new GoogleOAuthClient.AccessToken("ya29.shared", clock.instant().plus(Duration.ofHours(1)));
+        });
+
+        try (var callers = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = callers.submit(tokens::accessToken);
+            org.awaitility.Awaitility.await().until(() -> org.mockito.Mockito.mockingDetails(oauth).getInvocations().size() == 1);
+            var second = callers.submit(tokens::accessToken);
+            var third = callers.submit(tokens::accessToken);
+
+            // While Google is slow, nothing else waits on it: not the setup page, not a reset.
+            assertThat(callers.submit(tokens::revoked).get(1, java.util.concurrent.TimeUnit.SECONDS)).isFalse();
+            google.countDown();
+
+            assertThat(java.util.List.of(first.get(), second.get(), third.get())).containsOnly("ya29.shared");
+        }
+        verify(oauth, times(1)).refresh("cid", "csecret", "rt");
+    }
+
+    @Test
+    void aResetDuringARefreshKeepsNoTokenFromIt() throws Exception {
+        java.util.concurrent.CountDownLatch google = new java.util.concurrent.CountDownLatch(1);
+        given(oauth.refresh("cid", "csecret", "rt")).willAnswer(call -> {
+            google.await();
+            return new GoogleOAuthClient.AccessToken("ya29.before", clock.instant().plus(Duration.ofHours(1)));
+        });
+
+        try (var callers = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var waiting = callers.submit(tokens::accessToken);
+            org.awaitility.Awaitility.await().until(() -> org.mockito.Mockito.mockingDetails(oauth).getInvocations().size() == 1);
+            tokens.reset();
+            google.countDown();
+            assertThat(waiting.get()).isEqualTo("ya29.before");
+        }
+
+        given(oauth.refresh("cid", "csecret", "rt"))
+                .willReturn(new GoogleOAuthClient.AccessToken("ya29.after", clock.instant().plus(Duration.ofHours(1))));
+        assertThat(tokens.accessToken()).isEqualTo("ya29.after");
+    }
+
+    @Test
+    void aFailedRefreshIsTriedAgainByTheNextCaller() {
+        given(oauth.refresh("cid", "csecret", "rt"))
+                .willThrow(new YouTubeException(ContentSourceException.Kind.UNREACHABLE, "Google did not answer"))
+                .willReturn(new GoogleOAuthClient.AccessToken("ya29.b", clock.instant().plus(Duration.ofHours(1))));
+
+        assertThatThrownBy(tokens::accessToken).isInstanceOf(YouTubeException.class).hasMessage("Google did not answer");
+        assertThat(tokens.accessToken()).isEqualTo("ya29.b");
+    }
+
+    @Test
+    void anErrorDuringARefreshLeavesNoCallerWaiting() {
+        given(oauth.refresh("cid", "csecret", "rt")).willThrow(new StackOverflowError())
+                .willReturn(new GoogleOAuthClient.AccessToken("ya29.c", clock.instant().plus(Duration.ofHours(1))));
+
+        assertThatThrownBy(tokens::accessToken).isInstanceOf(StackOverflowError.class);
+        assertThat(tokens.accessToken()).isEqualTo("ya29.c");
+    }
+
+    @Test
     void refreshesAMinuteBeforeExpiry() {
         given(oauth.refresh("cid", "csecret", "rt"))
                 .willReturn(new GoogleOAuthClient.AccessToken("ya29.a", clock.instant().plus(Duration.ofMinutes(10))));
