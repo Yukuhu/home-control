@@ -125,7 +125,7 @@ class ThemeCssTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-        .sheet-device[aria-checked] |.sheet-device:is([aria-checked],:where(label.sheet-device[data-sheet-checked]))
+        .sheet-device[aria-checked] | .sheet-device:is([aria-checked],:where(label.sheet-device[data-sheet-checked]))
         .sheet-device[aria-checked="true"] | .sheet-device:is([aria-checked="true"],:where(label.sheet-device[data-sheet-checked="true"]))
         .sheet-device[aria-checked="false"] | .sheet-device:is([aria-checked="false"],:where(label.sheet-device[data-sheet-checked="false"]))
         .sheet-device[role] | .sheet-device:is([role],:where(label.sheet-device))
