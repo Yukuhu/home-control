@@ -212,6 +212,24 @@ class RemoteConnectionTest {
     }
 
     @Test
+    void commandsKeepASilentDeviceForSixStaleWindowsAtMost() throws Exception {
+        reconnectWithTimeout(300);
+        long started = System.nanoTime();
+
+        // Keys keep going out to a device that never answers, as one that vanished never does.
+        await().pollDelay(Duration.ZERO).pollInterval(Duration.ofMillis(100)).atMost(Duration.ofSeconds(10))
+                .ignoreExceptions().until(() -> {
+                    if (disconnect.get() == null) {
+                        connection.sendKey(RemoteKeyCode.KEYCODE_DPAD_DOWN, RemoteDirection.SHORT);
+                    }
+                    return disconnect.get() == DisconnectCause.STALE;
+                });
+
+        assertThat(Duration.ofNanos(System.nanoTime() - started))
+                .isGreaterThanOrEqualTo(Duration.ofMillis(300L * RemoteConnection.SILENT_WINDOWS_WHILE_SENDING - 300));
+    }
+
+    @Test
     void ownerCloseDoesNotLaterReportAnIdleDisconnect() throws Exception {
         reconnectWithTimeout(300);
 
