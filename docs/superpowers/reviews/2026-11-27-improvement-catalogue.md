@@ -5,7 +5,7 @@ analysis](2026-11-27-improvement-analysis.md), which also says how this was done
 
 Each entry gives impact, effort (S < 2 h, M < 1 day, L a few days, XL more than a week), its kind, how verification left
 it, and its status at `main` 3932f9b. Evidence was re-pointed to the line numbers at 3932f9b. A proposal that duplicates
-another names the one it was merged into and is not repeated.
+another names the one it was merged into; its text stays for the details it adds.
 
 | Area | Prefix | Proposals | Merged into another | Partly fixed | Fixed | Rejected |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -325,7 +325,31 @@ concept also removes tests that pin it. Judgement call.
 
 ### ARCH-10 — Clean device-supplied fault text in one place before it reaches the browser
 
-Merged into [SEC-1](#sec-1), which covers it. Impact medium, effort S, status open.
+**Merged into [SEC-1](#sec-1).** It is kept here for the details it adds; plan and track the work under SEC-1.
+
+Impact **medium** · effort **S** · risk · confirmed · **open**
+
+**Problem.** This is the review's open question, confirmed at code level. Any text a LAN device returns in a refusal
+reaches the toast unchanged, with no length cap, no stripping of control characters and no URL redaction. Scenario: a
+DLNA renderer or a custom Cast receiver rejects a Jellyfin stream and echoes the URL in its fault string. The toast then
+shows `…?ApiKey=<token>`, and so does any screenshot of it. Whether real devices do this is unverified.
+
+**Proposal.** Clean device text in DeviceCalls, the single choke point, and in RendererCommands.run: strip control
+characters, collapse whitespace, cap the length at ~160 characters, and redact the userinfo and query of anything
+URL-shaped, e.g. with a `RedactedUris.inText(String)` helper. Add one test per protocol with a fault that echoes a URL.
+
+**Trade-offs.** Users may lose a little device detail in rare cases. This puts the redaction rule in one place instead
+of trusting every device.
+
+**Evidence:**
+
+- protocols/src/main/java/dev/andre/homecontrol/adapters/upnp/protocol/SoapClient.java:111-123
+- src/main/java/dev/andre/homecontrol/adapters/support/RendererCommands.java:101-109
+- protocols/src/main/java/dev/andre/homecontrol/adapters/cast/protocol/CastApps.java:48,84,102,119,145,150-153
+- protocols/src/main/java/dev/andre/homecontrol/adapters/cast/protocol/CastIncoming.java:18-21
+- src/main/java/dev/andre/homecontrol/adapters/support/DeviceCalls.java:30-40
+- src/main/java/dev/andre/homecontrol/web/ErrorAdvice.java:41-44,65-67
+- core/src/main/java/dev/andre/homecontrol/core/RedactedUris.java:11-25
 
 <a id="arch-11"></a>
 
@@ -485,7 +509,47 @@ contract suite: refusals use the standard text (ARCH-4), nothing is published af
 
 ### ARCH-V1 — Forgetting a device whose adapter module is switched off leaves its pairing credentials behind
 
-Merged into [ARCH-1](#arch-1), which covers it. Impact low, effort S, status open.
+**Merged into [ARCH-1](#arch-1).** It is kept here for the details it adds; plan and track the work under ARCH-1.
+
+Impact **low** · effort **S** · defect · found by the verifier · **open**
+
+**Problem.** Scenario: a household switches the webOS module off (HOME_CONTROL_WEBOS_ENABLED=false) and then presses
+Forget on its LG TV on the setup page. Enrollment.forget finds no webOS adapter bean, skips adapter.forget, and deletes
+the record. The client key stays in secrets.json under a reference nothing names any more, and no later start removes
+it: switching the module back on does not help, because no device carries the keyRef. Tizen behaves the same. For
+Android TV with its module off, the client private key and certificate stay in keystore.p12. This has the same root
+cause as DC4 (ARCH-1): per-adapter lifecycle hooks run only while the module is on. It contradicts ADR 0002's promise
+that forgetting a device removes its key. The Android TV half overlaps the known AC8/B3 keystore sweep; the webOS/Tizen
+half is not in the 2026-10-03 review.
+
+**Proposal.** Use the always-on key helper from ARCH-1 step 3 on forget too: before deleting the record, call
+PairingKeys.forget for the webos and tizen entries whatever the module state. Or, more generally and
+module-independently, at startup remove every `device.*` secret whose keyRef no adapter entry in devices.json names any
+more; the keyRef field name is shared (PairingKeys.KEY_REF). That also cleans up the secrets orphaned by DC2. Fold
+Android TV into the planned B3 keystore sweep: remove aliases that no registered device's androidtv entry names. Add a
+test that forgets a webOS device with the module off and asserts no device secret remains.
+
+**Trade-offs.** The startup sweep is storage housekeeping at start, not a queued command, so it fits 'commands are
+ephemeral'. It must not run on a store it cannot fully read, and it must treat the keystore password secret (also
+device.*) as always referenced. As with ARCH-1, an always-on class that knows the webos/tizen keyRef convention is a
+narrow exception to ADR 0002's 'the registry knows no adapter' and should be named there; matching on the shared KEY_REF
+field avoids naming adapters.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/device/Enrollment.java:176-182 (adapter.forget only when the adapter bean exists,
+  then delete)
+- src/main/java/dev/andre/homecontrol/device/RegisteredDevices.java:38-42
+- src/main/java/dev/andre/homecontrol/web/SetupController.java:186-187,233-235
+- src/main/resources/templates/setup.html:152-157 (the Forget form per device)
+- src/main/java/dev/andre/homecontrol/adapters/webos/WebOsAdapter.java:106-108
+- src/main/java/dev/andre/homecontrol/adapters/tizen/TizenAdapter.java:103-105
+- src/main/java/dev/andre/homecontrol/adapters/webos/WebOsSettings.java:34-36 (secret name
+  device.webos.<keyRef>.client-key)
+- src/main/java/dev/andre/homecontrol/adapters/androidtv/AndroidTvAdapter.java:93-95 (keystore entry deleted only here)
+- docs/adr/0002-versioned-data-files-and-device-secrets.md:39-40
+- src/test/java/dev/andre/homecontrol/device/DevicesTest.java:274 (no test of forget with the module off; EnrollmentTest
+  has none either)
 
 ### Rejected in ARCH
 
@@ -1200,7 +1264,34 @@ must decline cleanly when idle. Small and additive; no persistence change.
 
 ### DEV-6 — Redact device-supplied failure text before it reaches the browser
 
-Merged into [SEC-1](#sec-1), which covers it. Impact low, effort S, status open.
+**Merged into [SEC-1](#sec-1).** It is kept here for the details it adds; plan and track the work under SEC-1.
+
+Impact **low** · effort **S** · risk · revised by the verifier · **open**
+
+**Problem.** Product rule: secrets never reach the browser. Suppose a renderer (or a custom Cast receiver) answers a
+SetAVTransportURI or LOAD of a Jellyfin stream with a fault that echoes the URL, as some embedded DLNA stacks do
+(unverified for any specific model). The ApiKey then appears in the toast and in the 502 body. Separately, a webOS "open
+link" that times out shows the full link, query included. Today it is down to each device not to echo secrets.
+
+**Proposal.** Move StreamRedaction next to core's RedactedUris (or into adapters.support). Apply it once in
+DeviceCalls.run to the refusal text, and in RendererCommands.run to the fault text. Use RedactedUris.withoutQuery in
+WebOsSession.execute's 'open' description, as Android TV does. Pin it with a FakeUpnpRenderer or FakeCastReceiver mode
+whose fault echoes the request URL with an ApiKey. Low priority: it guards against a device behaviour nobody has seen
+yet.
+
+**Trade-offs.** Slightly less detail in rare error messages (queries become ?…). The architecture rules allow sharing
+through adapters.support. No downside worth weighing.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/adapters/support/RendererCommands.java:99-107
+- protocols/src/main/java/dev/andre/homecontrol/adapters/upnp/protocol/SoapFault.java:37-40
+- protocols/src/main/java/dev/andre/homecontrol/adapters/cast/protocol/CastApps.java:150-153 and
+  src/main/java/dev/andre/homecontrol/adapters/support/DeviceCalls.java:36-37
+- protocols/src/main/java/dev/andre/homecontrol/adapters/webos/protocol/SsapConnection.java:203-215
+- src/main/java/dev/andre/homecontrol/adapters/webos/WebOsSession.java:155
+- src/main/java/dev/andre/homecontrol/web/ErrorAdvice.java:41-44,65-67
+- src/main/java/dev/andre/homecontrol/adapters/bluetooth/player/StreamRedaction.java:6-23
 
 <a id="dev-7"></a>
 
@@ -1272,7 +1363,38 @@ connectTimeout. The pointer is not swapped out atomically.
 
 ### DEV-9 — Land the registry and keystore hygiene batch from the 2026-10-03 review (DC2, DC3, DC4, AC8 still open)
 
-Merged into [ARCH-1](#arch-1), which covers it. Impact medium, effort M, status open.
+**Merged into [ARCH-1](#arch-1).** It is kept here for the details it adds; plan and track the work under ARCH-1.
+
+Impact **medium** · effort **M** · debt · revised by the verifier · **open**
+
+**Problem.** The R6 batch never landed. If a merge's second write fails (disk full, I/O error), the source's adapter
+entry and its webOS/Tizen keyRef are lost and its live session is orphaned (DC2). Forgetting a Bluetooth speaker whose
+BlueZ is slow holds the registry lock for up to 45 s, stalling pairings, discovery merges and learned-setting writes
+(DC3). With the webOS or Tizen module off, the v2→v3 key migration leaves that TV's key in plain text in devices.json,
+against the encrypted-at-rest rule (DC4). Every mistyped Android TV pairing address leaves a private key in keystore.p12
+for good (AC8).
+
+**Proposal.** As proposed: add DeviceRegistry.replace(save, delete) as a single file.update and use it in merge and
+split. Split forget into a local part under the lock and a part after it, for example by letting an adapter return work
+that AfterLock runs. Run the PairingKeys migrations for webos and tizen from an always-on bean, independent of the
+module switches. Keep the pairing ClientCertificate in memory until PairingResult.Paired. Add one startup sweep that
+removes keystore aliases and secrets.json device secrets that no registered device references. That also cleans up after
+a Forget made while the owning module was switched off, which today skips adapter.forget.
+
+**Trade-offs.** The registry interface grows by one method. The always-on migration needs the two secret-name functions
+without the adapter beans, a small refactor of WebOsSettings/TizenSettings. All within the product rules (atomic writes,
+in-place upgrade).
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/device/Enrollment.java:374-375,416-417 — two separate writes in merge and split
+- src/main/java/dev/andre/homecontrol/device/JsonFileDeviceRegistry.java:198-211
+- src/main/java/dev/andre/homecontrol/device/Enrollment.java:167-187 with
+  src/main/java/dev/andre/homecontrol/adapters/bluetooth/BluetoothSpeakerAdapter.java:75-83 — BlueZ remove under the
+  registry lock
+- src/main/java/dev/andre/homecontrol/device/Enrollment.java:127-139 — migration only for switched-on adapters
+- src/main/java/dev/andre/homecontrol/adapters/androidtv/PairingService.java:73 and CertificateStore.java:114-120
+- src/main/java/dev/andre/homecontrol/device/Enrollment.java:176-181 — forget skips switched-off adapters
 
 <a id="dev-10"></a>
 
@@ -1338,7 +1460,30 @@ by model year; this is a judgement call that needs on-device checks (see DEV-14)
 
 ### DEV-12 — Per-connection diagnostics and a Reconnect button on Setup
 
-Merged into [OPS-4](#ops-4), which covers it. Impact medium, effort M, status open.
+**Merged into [OPS-4](#ops-4).** It is kept here for the details it adds; plan and track the work under OPS-4.
+
+Impact **medium** · effort **M** · improvement · confirmed · **open**
+
+**Problem.** On a merged device (for example webOS + Cast + UPnP), the user cannot tell which connection is down or why
+(wrong address, TV refusing the key, TLS failure, Wake-on-LAN off), nor when the next retry happens. Support therefore
+needs logs, which is awkward for a CasaOS appliance. A device left disconnected by a failed adapter connect cannot be
+revived without a restart or a re-pair.
+
+**Proposal.** Expose DeviceQueries.connections(id), a list of (adapterId, status, since, lastFailure, nextAttemptAt),
+built from Generation.states plus a small diagnostics record each session already knows (the Reconnector phase and
+backoff, the last caught exception message, redacted per DEV-6). Show it under each device on Setup, with a Reconnect
+now button. That button calls DeviceConnections.begin/complete for the device (also the recovery path for a failed
+connect) or the sessions' existing reconnectNow/pollNow. Log the mDNS and SSDP interfaces in the same section (DEV-1).
+
+**Trade-offs.** Adds a read model and a small Setup UI. Failure texts must be redacted, and the section stays behind the
+login. Moderate effort, high operational value for a LAN appliance.
+
+**Evidence:**
+
+- core/src/main/java/dev/andre/homecontrol/core/DeviceStates.java:6-47
+- src/main/java/dev/andre/homecontrol/device/DeviceConnections.java:104-119,215-244
+- src/main/resources/templates/setup.html:153-158
+- src/main/java/dev/andre/homecontrol/web/HealthController.java:8-18
 
 <a id="dev-13"></a>
 
@@ -1534,7 +1679,37 @@ user still decides whether to press again.
 
 ### SRC-2 — Moving a rail loses concurrent moves and forgets where disabled or unavailable sources' rails were
 
-Merged into [DATA-6](#data-6), which covers it. Impact low, effort S, status open.
+**Merged into [DATA-6](#data-6).** It is kept here for the details it adds; plan and track the work under DATA-6.
+
+Impact **low** · effort **S** · defect · revised by the verifier · **open**
+
+**Problem.** (a) Lost update: two moves arrive close together (two tabs, or a double tap on a phone). Both read [a,b,c];
+A writes [a,c,b], B writes [b,a,c], and A's move is gone. (b) More likely: the household switches TMDB off for a while,
+or disables a workflow, or YouTube is disconnected, and moves any other rail. The stored railOrder is replaced with only
+the rails visible now, so TMDB's and the workflow's saved positions are erased. When they come back they are appended at
+the end, and the user has to reorder them again.
+
+**Proposal.** Compute the move inside prefs.update, from the stored preferences: prefs.update(p -> p.withRailMoved(rail,
+direction, visibleKeys)). Here visibleKeys is the current allRailsInOrder list, and a new
+SourcePreferences.withRailMoved merges it into the stored railOrder. Stored keys that are not visible now keep their
+relative positions. The rail swaps with its nearest visible neighbour. Keep the keys of disabled sources and of
+switched-off modules. When the merged list would pass the 200 cap, drop the keys not seen for longest (for example,
+unknown keys from the end) instead of throwing. Tests: a disabled source's rails keep their slot after another rail
+moves, and two moves applied in sequence both survive. No /data format change.
+
+**Trade-offs.** A small change in core and the controller, with no format change (railOrder stays a list of keys). Stale
+keys of deleted rails then linger in railOrder up to the 200 cap. Prune keys whose source module no longer exists, but
+keep keys of disabled sources.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/web/SourcesSetupController.java:98-119
+- src/main/java/dev/andre/homecontrol/web/SourcesSetupController.java:158-160
+- src/main/java/dev/andre/homecontrol/content/StoredRailPreferences.java:41-60
+- core/src/main/java/dev/andre/homecontrol/core/content/SourcePreferences.java:31-36
+- core/src/main/java/dev/andre/homecontrol/core/content/SourcePreferences.java:72-74
+- src/main/java/dev/andre/homecontrol/content/SourcePreferencesService.java:40-45
+- src/main/java/dev/andre/homecontrol/sources/youtube/YouTubeContentSource.java:66-68
 
 <a id="src-3"></a>
 
@@ -1867,13 +2042,57 @@ applies only where a position exists. Effort is mostly UI and tests.
 
 ### SRC-13 — A 'Recently played' rail and history across sources
 
-Merged into [PROD-12](#prod-12), which covers it. Impact medium, effort L, status open.
+**Merged into [PROD-12](#prod-12).** It is kept here for the details it adds; plan and track the work under PROD-12.
+
+Impact **medium** · effort **L** · feature · confirmed · **open**
+
+**Problem.** Only Jellyfin has a notion of 'continue'; YouTube's API no longer exposes watch history, and TMDB, sports,
+pins and workflows have none. 'Play that video on the bedroom TV again' or 'the radio workflow we always use' means
+searching or scrolling each time. The server already knows every successful play, but forgets it.
+
+**Proposal.** Publish a core `PlaybackStartedEvent(sourceId, itemId, title, subtitle, artwork, kind, deviceId, at)` from
+PlaybackService on Played. Add a switchable module (home-control.history.enabled, listed in config.Module) that keeps
+the last N (e.g. 50) plays in /data/history.json through VersionedJsonFile and AtomicFiles. It offers a 'Recently
+played' rail whose tiles keep their original sourceId and id, so Play re-reads the item from its source and routes as
+usual, plus 'last used device' as a hint for the play sheet. It stores no playables and no tokens. Add a 'Clear history'
+button in Setup.
+
+**Trade-offs.** A household-wide history is a privacy choice: default it off, or make it easy to clear, and document it.
+Items that no longer exist (an expired workflow catalog entry, a deleted YouTube video) answer 'No such item'; prune
+them on read. Fits the product rules: JSON under /data written atomically, a module that can be switched off, and no
+command is queued (history is a record, not a queue).
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/playback/PlaybackService.java:88-103
+- src/main/java/dev/andre/homecontrol/web/ContentItemView.java:6-14
+- src/main/java/dev/andre/homecontrol/web/ContentPlayController.java:117-124
+- src/main/java/dev/andre/homecontrol/config/Module.java:10-24
 
 <a id="src-15"></a>
 
 ### SRC-15 — Device-flow sign-in shows Google's error_description, unlike the browser flow
 
-Merged into [SEC-2](#sec-2), which covers it. Impact low, effort S, status open.
+**Merged into [SEC-2](#sec-2).** It is kept here for the details it adds; plan and track the work under SEC-2.
+
+Impact **low** · effort **S** · defect · confirmed · **open**
+
+**Problem.** The two OAuth paths disagree. If Google's device-flow token endpoint answers an unexpected error, for
+example invalid_grant or unauthorized_client with a description quoting the submitted request, Setup shows Google's text
+verbatim. The code-exchange path deliberately never does that. The risk is small (Setup is behind the login), but it
+breaks a rule the module set for itself, and the text is not written for users.
+
+**Proposal.** Map known device-flow error codes to the module's own wording and show only the code otherwise ('Google
+refused the authorization (unauthorized_client). Check the OAuth client type and try again.'); log the description at
+debug level. Add a test with a fake answer whose description contains a secret-looking value.
+
+**Trade-offs.** Users lose Google's sometimes helpful detail on the page, but it stays in the debug log. Trivial change.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/sources/youtube/GoogleOAuthClient.java:157-166
+- src/main/java/dev/andre/homecontrol/sources/youtube/YouTubeAuthorizationService.java:271-273
+- src/main/java/dev/andre/homecontrol/sources/youtube/GoogleOAuthClient.java:123-127
 
 <a id="src-v1"></a>
 
@@ -2081,13 +2300,70 @@ failure on every tick. 930f76a only added a debug log on a different catch, Rail
 
 ### DATA-4 — Persisted formats are defined by Java record names that only round-trip tests guard: freeze the current formats with golden files
 
-Merged into [TEST-2](#test-2), which covers it. Impact low, effort M, status open.
+**Merged into [TEST-2](#test-2).** It is kept here for the details it adds; plan and track the work under TEST-2.
+
+Impact **low** · effort **M** · risk · revised by the verifier · **open**
+
+**Problem.** Scenario: a refactor renames Device.adapters to connections, or YouTubeSettings.playlists to
+playlistTitles. It compiles, and every round-trip test passes. After the upgrade: - every devices.json entry binds with
+no adapters, and validation accepts it; - the first learned-settings or merge write saves that, so every pairing setting
+is lost; - there was no version bump, so no .v3 backup exists either. A YouTube playlist selection is lost the same way.
+
+**Proposal.** (1, S) Move the format-change rule from the phase-2b spec into AGENTS.md, next to 'Existing installs
+upgrade in place', and into docs/dev/architecture.md's storage row. A format change bumps the version, migrates on read,
+ships a previous-format fixture, and pins the current field names with a golden file. (2, M) Commit current-version
+golden files, each with a test that reads it and asserts every field and a test that compares the written form, for the
+reflection-bound formats whose names are not pinned yet: - the jellyfin section (every JellyfinSettings component,
+Player included); - the tmdb section; - a workflow schema-2 definition, decoded through WorkflowCodec. devices.json and
+the YouTube section are already pinned and need nothing. (3, optional) Give a copy of the mapper used for data files a
+DeserializationProblemHandler that logs an unknown property once per file at WARN, without its value.
+
+**Trade-offs.** Golden files must be regenerated on every legitimate change, which is the point. Failing at runtime on
+unknown fields would break harmless hand edits, hence log only. Most of the effort is the fixtures for about 8 record
+types.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/config/Json.java:14-18
+- core/src/main/java/dev/andre/homecontrol/core/Device.java:14-24
+- src/main/java/dev/andre/homecontrol/device/JsonFileDeviceRegistry.java:123-145
+- src/test/java/dev/andre/homecontrol/device/JsonFileDeviceRegistryTest.java:160-180,250-262
+- src/test/java/dev/andre/homecontrol/sources/youtube/YouTubeSettingsTest.java:72-74
+- src/test/java/dev/andre/homecontrol/sources/jellyfin/JellyfinSettingsTest.java:88-91
+- src/main/java/dev/andre/homecontrol/sources/jellyfin/JellyfinSettings.java:11-13
+- src/main/java/dev/andre/homecontrol/sources/tmdb/TmdbSettings.java:9
+- src/main/java/dev/andre/homecontrol/sources/workflows/WorkflowCodec.java:24-34
+- docs/superpowers/specs/2026-09-29-phase-2b-storage-design.md:46-48
 
 <a id="data-5"></a>
 
 ### DATA-5 — Merge and split write the registry twice, and a failure between the writes loses a device entry (DC2, still open)
 
-Merged into [ARCH-1](#arch-1), which covers it. Impact low, effort S, status open.
+**Merged into [ARCH-1](#arch-1).** It is kept here for the details it adds; plan and track the work under ARCH-1.
+
+Impact **low** · effort **S** · defect · revised by the verifier · **open**
+
+**Problem.** Merge a webOS TV into a Shield while /data is full, or remounted read-only, between the two writes: - the
+delete succeeds, so the source is gone from memory and disk; - the save throws, so the target is unchanged; - the
+source's webOS keyRef and Wake-on-LAN MAC are lost, its encrypted key is orphaned in secrets.json, and the TV must be
+paired again. A failed split loses the split adapter's settings the same way. Enrollment's only change since the review
+(c66d111) was in discovery.
+
+**Proposal.** Add DeviceRegistry.replace(Collection<Device> saved, Collection<String> deleted). Give it a default that
+loops, for the fakes, and implement it in JsonFileDeviceRegistry as a single file.update. Use it in merge and in split.
+Add a test with a registry whose write fails, asserting that both entries are unchanged and the source stays connected.
+A smaller fix for merge alone is to save(merged) before delete(sourceId): a failure then leaves a duplicate entry, which
+is harmless because PairingKeys.forget keeps a keyRef that another entry still uses (PairingKeys.java:94-104). Split
+still needs replace().
+
+**Trade-offs.** One more method on a core interface. It also halves the fsyncs. No product-rule impact.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/device/Enrollment.java:374-376,416-417
+- src/main/java/dev/andre/homecontrol/device/JsonFileDeviceRegistry.java:198-211
+- src/main/java/dev/andre/homecontrol/storage/VersionedJsonFile.java:95-116
+- core/src/main/java/dev/andre/homecontrol/core/DeviceRegistry.java:6-18
 
 <a id="data-6"></a>
 
@@ -2230,7 +2506,28 @@ deliberate spec decision and needs an ADR. The documentation fix has no cost.
 
 ### DATA-10 — Migrate TV pairing keys and remove orphaned device secrets even while the module is off (DC4, still open)
 
-Merged into [ARCH-1](#arch-1), which covers it. Impact low, effort M, status open.
+**Merged into [ARCH-1](#arch-1).** It is kept here for the details it adds; plan and track the work under ARCH-1.
+
+Impact **low** · effort **M** · risk · confirmed · **open**
+
+**Problem.** An install from before 2B, upgraded with HOME_CONTROL_WEBOS_ENABLED=false (an LG TV paired long ago), keeps
+the TV's clientKey in plain text in devices.json v3 indefinitely. Forgetting an LG TV while webOS is off leaves its
+encrypted key unreachable, and nothing ever removes it.
+
+**Proposal.** Add an always-on bean in adapters.support, without @ConditionalOnModule. At startup, under the registry
+lock, it: - runs PairingKeys.migrate for webos (clientKey) and tizen (token) on every entry, whatever the module state;
+- removes `device.<adapter>.<ref>.*` secrets whose reference no registry entry holds, for the adapters whose naming it
+knows.
+
+**Trade-offs.** Code for a switched-off module's data runs at startup. This is a deliberate exception to 'modules can be
+switched off', justified by the secrets-at-rest rule, so it needs to be named and kept free of protocol code. The sweep
+must be conservative and never delete a secret belonging to an entry it cannot parse.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/device/Enrollment.java:126-139,166-185
+- src/main/java/dev/andre/homecontrol/adapters/support/PairingKeys.java:64-87
+- src/main/java/dev/andre/homecontrol/device/JsonFileDeviceRegistry.java:42-56
 
 <a id="data-12"></a>
 
@@ -2321,7 +2618,31 @@ the kernel. Exclude the file from snapshots and backups.
 
 ### DATA-15 — Allow HOME_CONTROL_SECRET and secret.key to be rotated, and version secrets.json's contents
 
-Merged into [SEC-10](#sec-10), which covers it. Impact low, effort M, status open.
+**Merged into [SEC-10](#sec-10).** It is kept here for the details it adds; plan and track the work under SEC-10.
+
+Impact **low** · effort **M** · feature · confirmed · **open**
+
+**Problem.** A passphrase that leaked (a compose file pushed to a public repository) cannot be changed: a new value
+stops startup, and so does removing it. The only path is deleting secrets.json, which means pairing every TV again,
+reconnecting every source and losing every workflow. Moving to a host where the key-file mode is wanted instead has the
+same problem.
+
+**Proposal.** Add HOME_CONTROL_SECRET_PREVIOUS. When decryption with the current passphrase fails the GCM tag check and
+the previous one succeeds, re-encrypt with the current passphrase (or with a new secret.key when HOME_CONTROL_SECRET is
+now unset), and log 'unset HOME_CONTROL_SECRET_PREVIOUS'. Rotate secret.key with a run-once setting and marker, as
+reset-login does. Give the plaintext document a version, so a future change has a migration path and a newer file is
+named as newer.
+
+**Trade-offs.** One more secret-bearing variable for one start; it must never be logged (follow the
+SecurityProperties.toString pattern). Older snapshots from DATA-1 stay readable only with the old key, which needs
+documenting.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/storage/SecretKeySource.java:73-103
+- src/main/java/dev/andre/homecontrol/storage/SecretStore.java:72-75,220-254,262-275
+- docs/user/security.md:35-38
+- docs/superpowers/specs/2026-09-29-phase-2b-storage-design.md:248-254
 
 <a id="data-v1"></a>
 
@@ -2851,19 +3172,57 @@ keeps plain ES modules, so the 'No Node build' rule holds.
 
 ### WEB-14 — Rail order: moves are computed outside the preferences lock, and every step is a full page reload
 
-Merged into [DATA-6](#data-6), which covers it. Impact low, effort S, status open.
+**Merged into [DATA-6](#data-6).** It is kept here for the details it adds; plan and track the work under DATA-6.
+
+Impact **low** · effort **S** · defect · confirmed · **open**
+
+**Problem.** Two moves close together (two tabs, or a double tap on a phone) both read [A,B,C]. 'Move C up' writes
+[A,C,B], then 'Move B up' writes [B,A,C], and C's move is lost without a trace (2026-10-03 open question, confirmed).
+Separately, moving a rail four places takes four full page reloads, each jumping back to the top of the section.
+
+**Proposal.** Compute the swap inside the update lambda from the `p` it receives, by exposing
+StoredRailPreferences.allRailsInOrder(sources, current). Add a test with two concurrent moves. Enhance the list with
+htmx (hx-post, target the <ol>, swap outerHTML, then focus the moved row's button), keeping the plain forms as the no-JS
+fallback.
+
+**Trade-offs.** None significant. The fix stays inside web and content.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/web/SourcesSetupController.java:92-119 — order computed outside update()
+- src/main/java/dev/andre/homecontrol/content/SourcePreferencesService.java:39-45 — synchronized update applies the
+  precomputed change
+- src/main/java/dev/andre/homecontrol/content/StoredRailPreferences.java:36-41 — public overload reads current()
+- src/main/resources/templates/fragments/sources-setup.html:31-51 — plain forms per row
 
 <a id="web-15"></a>
 
 ### WEB-15 — Every request, including key presses and the event stream, takes the theme catalog's lock (ST2 still open on the web side)
 
-Merged into [DATA-7](#data-7), which covers it. Impact low, effort S, status fixed at 3932f9b.
+**Merged into [DATA-7](#data-7).** It is kept here for the details it adds; plan and track the work under DATA-7.
+
+Impact **low** · effort **S** · risk · confirmed · **fixed at 3932f9b**
+
+Fixed since the analysis: 8e64157 (with c0eedf7 documenting the volatile view) makes catalog reads lock-free. themes(),
+require(), problems(), asset() and export() read an immutable View through a volatile field (ThemeCatalog.java:49-56,
+74-91), which publishView() replaces after each change (:167-178). install() now unpacks and compiles before it takes
+the monitor (:95-106). ThemeViewAdvice and the PublicAssetPaths predicate therefore no longer block on an install. What
+remains is optional and minor: the web-side narrowing was not done. ThemeViewAdvice is still an unscoped
+@ControllerAdvice that runs for key presses and the event stream, but it now only reads the volatile view.
 
 <a id="web-v1"></a>
 
 ### WEB-V1 — Repeated taps on a remote button are silently dropped by htmx's default per-element queue
 
-Merged into [WEB-2](#web-2), which covers it. Impact medium, effort S, status fixed at 3932f9b.
+**Merged into [WEB-2](#web-2).** It is kept here for the details it adds; plan and track the work under WEB-2.
+
+Impact **medium** · effort **S** · defect · found by the verifier · **fixed at 3932f9b**
+
+Fixed since the analysis: 89e8d65 removes hx-post from the remote buttons. They are type=button data-key buttons, and
+one click handler sends each press immediately through sendKey, toasting each failure on its own. htmx's per-element
+'last' queue no longer applies, so no tap is dropped. The fix sends every press rather than coalescing them into
+repeat=n as proposed. A browser test covers the scenario: a slow first press, five quick clicks on Down, five DPAD_DOWN
+presses recorded.
 
 <a id="ops"></a>
 
@@ -2887,7 +3246,48 @@ that should be measured first (heap and GC defaults, AOT gains, keep-alive benef
 
 ### OPS-1 — mDNS binds to whatever getLocalHost() returns, loopback or a wrong NIC included, and silently loses discovery
 
-Merged into [DEV-1](#dev-1), which covers it. Impact high, effort S, status open.
+**Merged into [DEV-1](#dev-1).** It is kept here for the details it adds; plan and track the work under DEV-1.
+
+Impact **high** · effort **S** · defect · confirmed · **open**
+
+**Problem.** On Raspberry Pi OS, Debian and Ubuntu, /etc/hosts maps the hostname to 127.0.1.1. Under network_mode: host,
+Docker gives the container the host's hostname and a copy of that file, so InetAddress.getLocalHost() returns 127.0.1.1.
+MdnsBrowser passes this non-null address to JmDNS.create, which skips jmDNS's own loopback correction. jmDNS 3.6.5 then
+binds its send socket to 127.0.1.1:5353, and queries for _androidtvremote2._tcp and _googlecast._tcp cannot leave on the
+LAN interface (Linux refuses a loopback source on a non-loopback device). Discovery then works only when another
+device's query happens to trigger a multicast answer. Cast devices may appear sporadically, a Shield usually never, and
+Setup shows 'No devices found yet'. The log shows nothing unusual. The same code picks a single wrong interface on a
+multi-homed NAS whose hostname resolves to a VPN or second NIC. The only override is an undocumented system property.
+The exact outcome depends on /etc/hosts and kernel routing, so it should be confirmed on a Pi, but the code path itself
+is verified.
+
+**Proposal.** In bindAddress, treat a getLocalHost() result that is loopback, any-local or link-local like
+UnknownHostException and fall through to selectFallback. Prefer the site-local IPv4 address of the interface that
+carries the default route. Add a documented home-control.discovery.interface property (an interface name or address; env
+HOME_CONTROL_DISCOVERY_INTERFACE). It takes precedence, and net.mdns.interface keeps working for existing installs. Log
+the chosen address and interface ('mDNS discovery on 192.168.1.20 (eth0)'), or the reason none was usable. Add unit
+tests for a 127.0.1.1 result and for a multi-homed list. Later, consider JmmDNS for hosts that really are multi-homed.
+
+**Trade-offs.** A small, contained change in the discovery package; no product or architecture rule is affected. A
+heuristic can still choose wrong on unusual hosts, which the explicit setting covers. JmmDNS (one jmDNS per interface)
+would fix multi-homing properly but adds threads and duplicate events, so it is left as a follow-up.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/discovery/MdnsBrowser.java:102-103 — JmDNS.create(bindAddress(net.mdns.interface,
+  getLocalHost, interfaceFallback))
+- src/main/java/dev/andre/homecontrol/discovery/MdnsBrowser.java:111-118 — fallback only on UnknownHostException; a
+  loopback result is returned as is
+- src/main/java/dev/andre/homecontrol/discovery/MdnsBrowser.java:141-147 — selectFallback filters loopback/any-local,
+  but only on the fallback path
+- src/main/java/dev/andre/homecontrol/discovery/MdnsBrowser.java:105 — logs the service types, not the bound address
+- src/test/java/dev/andre/homecontrol/discovery/MdnsBrowserTest.java:40-46 — pins the bypass; no loopback case
+- jmdns-3.6.5.jar javax.jmdns.impl.HostInfo.newHostInfo (javap offsets 21-94) — loopback correction only for a null
+  address
+- jmdns-3.6.5.jar javax.jmdns.impl.JmDNSImpl.openMulticastSocket (javap offsets 58-150) — send socket bound to (hostInfo
+  address, 5353)
+- compose.yaml:7-11 — host networking is the recommended setup
+- docs/superpowers/reviews/2026-09-26-sonarcloud-triage.md:73-75 — earlier fix covered only the unresolvable hostname
 
 <a id="ops-2"></a>
 
@@ -3047,7 +3447,57 @@ X-Accel-Buffering still need their own configuration, which the doc covers. HTTP
 
 ### OPS-6 — Theme catalog: ST1 (assets held twice in heap) and ST2 (one lock across installs) are still open, and every request now pays for them
 
-Merged into [DATA-7](#data-7), which covers it. Impact medium, effort M, status partly fixed at 3932f9b.
+**Merged into [DATA-7](#data-7).** It is kept here for the details it adds; plan and track the work under DATA-7.
+
+Impact **medium** · effort **M** · risk · revised by the verifier · **partly fixed at 3932f9b**
+
+**Problem.** Two problems. First, on a 1-2 GB host with a few large imported themes that were updated a few times, heap
+use approaches twice the stored bytes for current and retained revisions. Every asset response also allocates a full
+copy. Combined with the default 256 MB heap (OPS-2), an import or startup can hit OutOfMemoryError, and at startup that
+becomes a restart loop. Second, while an import parses up to 30 MiB, compiles CSS and fsyncs to an SD card (seconds on a
+Pi), every request blocks on the catalog lock through ThemeViewAdvice: remote key presses, thumbnails, the SSE
+subscribe, and the Docker health check with its 5 s timeout. Even without an import, each of those requests builds every
+theme's descriptor list for nothing.
+
+**Proposal.** Publish an immutable catalog snapshot (descriptors, the public-asset index and the protected ids) through
+a volatile field. themes(), require(), asset() and the login gate's predicate then read it without a lock. install and
+remove validate and stage outside any lock readers use, and swap the snapshot after the registry write. Keep only the
+compiled CSS and metadata in memory, and serve the other presentation assets from their immutable files under
+/data/themes/<id>/<revision>/source (a FileSystemResource, or a shared read-only buffer without a per-request clone).
+Read source files from disk for export. Then retained revisions cost almost no heap, and the startup OOM loop from ST1
+cannot happen. Do not catch OutOfMemoryError. Restrict ThemeViewAdvice to page controllers (annotations =
+Controller.class, excluding @RestController, or assignableTypes) so /health, /events and the key endpoints skip it.
+
+**Trade-offs.** Serving from disk adds file I/O, but the files are small, immutable and cached by the browser for a
+year. The snapshot rewrite touches a security-relevant component: the asset allowlist must still come only from
+validated packages. The data format is unchanged, so no migration is needed.
+
+**Since the analysis.** ST2 is fixed by 8e64157 (fix(themes): stop a theme install from holding up every request), with
+c0eedf7 documenting it. themes(), require(), asset(), problems() and export() now read a volatile immutable View and
+take no lock (ThemeCatalog.java:49-57,74-93). install() unpacks and compiles before taking the monitor (96-105).
+publishView() works out each descriptor once per change (167-178). ThemeViewAdvice and the login gate's asset predicate
+therefore no longer block or rebuild descriptors. Still open: ST1. ThemePackage keeps cloned source files beside the
+presentation assets. ThemeAsset clones on construction and on every bytes(), and each asset response still allocates a
+full copy. Current and retained revisions are still loaded into publicAssets under the 256 MiB budget. Export still
+reads from heap. Assets are not served from files under /data. Minor: ThemeViewAdvice is still unrestricted, though now
+it costs only a volatile read.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/themes/ThemePackage.java:24-28 — source files cloned and kept beside the
+  presentation assets
+- src/main/java/dev/andre/homecontrol/themes/ThemeAsset.java:7-8 — clone on construction and on every bytes()
+- src/main/java/dev/andre/homecontrol/web/ThemeAssetsController.java:39-48 — asset.bytes() per response
+- src/main/java/dev/andre/homecontrol/themes/ThemeCatalog.java:34,216-230 — 256 MiB budget; current and retained
+  revisions loaded into publicAssets
+- src/main/java/dev/andre/homecontrol/themes/ThemeCatalog.java:131-132 — install keeps prior and new presentation assets
+  in publicAssets
+- src/main/java/dev/andre/homecontrol/themes/ThemeCatalog.java:49-57,74-105,167-178 — (fixed) volatile View read
+  lock-free; install inspects outside the monitor
+- src/main/java/dev/andre/homecontrol/ThemeConfiguration.java:20 and security/LoginGateFilter.java:62 — every gated
+  request calls asset(), now lock-free
+- src/main/java/dev/andre/homecontrol/web/ThemeViewAdvice.java:10-25 — still an unrestricted @ControllerAdvice
+  @ModelAttribute
 
 <a id="ops-7"></a>
 
@@ -3091,7 +3541,38 @@ sports time zone and is left as an optional follow-up.
 
 ### OPS-8 — Take an automatic snapshot of /data before an upgrade migrates it
 
-Merged into [DATA-1](#data-1), which covers it. Impact medium, effort M, status open.
+**Merged into [DATA-1](#data-1).** It is kept here for the details it adds; plan and track the work under DATA-1.
+
+Impact **medium** · effort **M** · feature · confirmed · **open**
+
+**Problem.** Releases are frequent, and appliance users update unattended (Watchtower, CasaOS). The docs make rollback
+depend on a manual copy taken before the upgrade, which unattended updates never take. Scenario: a release re-protects
+keystore.p12 and migrates devices.json, and it has a regression. Rolling back to the previous tag cannot open the files.
+The per-file .v<n>.json copies do not cover the keystore or secrets, so the household has to pair every TV again and
+reconnect every source.
+
+**Proposal.** At startup, before any store reads its file (with the DataDirectory checks), compare the jar's
+Implementation-Version with /data/.last-version. If they differ and this is not a first install, copy the small state
+files and themes/catalog.json, but not the theme packages, into /data/backups/<old-version>-<UTC timestamp>/. Write
+through AtomicFiles and fsync, then record the new version. Keep the last three snapshots, log one INFO line, and show
+the snapshots in the diagnostics section (OPS-4). Document a rollback: stop, copy a snapshot back, start the old tag.
+Skip snapshots for 0.0.0-SNAPSHOT builds. On a full or read-only disk, log a WARN and continue.
+
+**Trade-offs.** secrets.json stays encrypted in the copy. With the default secret.key, copying it along gives the same
+exposure the 'honest limit' in security.md already describes; with HOME_CONTROL_SECRET there is no key file to copy. It
+costs well under 1 MB per snapshot. It reinforces the 'upgrade in place' rule rather than changing it. The new files
+under /data must be documented.
+
+**Evidence:**
+
+- docs/user/configuration.md:99-105 — 'Copy the whole data directory before you upgrade… Without a copy there is no way
+  back'
+- src/main/java/dev/andre/homecontrol/storage/VersionedJsonFile.java:168-185 — one redacted copy per JSON file, only on
+  a version change
+- src/main/java/dev/andre/homecontrol/storage/DataDirectory.java:15-26 — the named state files
+- src/main/java/dev/andre/homecontrol/HomeControlConfiguration.java:111-112 — DataDirectory bean, created before every
+  store
+- README.md:52-53 — every releasable commit on main is released
 
 <a id="ops-9"></a>
 
@@ -3189,7 +3670,42 @@ absolute budgets. RSS right after start varies by a few MB. CI runs slightly lon
 
 ### OPS-V1 — Every open dashboard tab keeps an SSE connection open, even when hidden; over plain-HTTP LAN access this uses up the browser's six connections per host
 
-Merged into [WEB-4](#web-4), which covers it. Impact medium, effort S, status open.
+**Merged into [WEB-4](#web-4).** It is kept here for the details it adds; plan and track the work under WEB-4.
+
+Impact **medium** · effort **S** · risk · found by the verifier · **open**
+
+**Problem.** Browsers allow six HTTP/1.1 connections per host across all tabs and installed-PWA windows of a profile
+(Chrome, Firefox and Safari). Direct LAN access to http://<host>:8080 is HTTP/1.1, because browsers do not use HTTP/2
+without TLS. Every dashboard tab holds one connection for /events for as long as it exists, hidden or not. Scenario: a
+desktop or a wall tablet has the dashboard open in several tabs, or in a tab plus the installed PWA. With three tabs
+open, a new dashboard has only three connections left for htmx requests, key presses and the image proxy, so rails load
+slowly. From the sixth tab on, the next page's requests queue behind streams that never end, and the page and its remote
+keys appear to hang with no error. The server also keeps a subscriber, a sender thread and heartbeats for each hidden
+tab.
+
+**Proposal.** In events.js, close the EventSource once the page has been hidden for about 30 s, and reopen it on
+visibilitychange when the page is visible again. The server's subscribe snapshot (EventStreamController.snapshot)
+repaints device states and rails at once. Do not announce a deliberate close as a disconnect (no 'Reconnecting…'
+banner). Optionally use a BroadcastChannel leader election later, so that visible tabs of one browser share one stream.
+Add a browser test: hide the page, check that the stream closes, show it again, check the snapshot is applied.
+
+**Trade-offs.** A tab that comes back shows the snapshot instead of an unbroken event history, which is the same path a
+network reconnect already takes. Phones already suspend background tabs, so the change matters mainly for desktops,
+tablets and PWA windows. Behind an HTTPS reverse proxy with HTTP/2 the limit does not apply, but closing hidden streams
+still saves server resources. Client-only change; it fits every product and architecture rule.
+
+**Evidence:**
+
+- src/main/resources/static/js/events.js:1,23-34,56-59 — one EventSource per page, opened once and never closed; no
+  visibilitychange handling
+- src/main/resources/static/js/app.js:1,3 and state-view.js:1, rails.js:1 — the dashboard opens the stream at load
+- src/main/resources/static/js/app.js:31-37 — each key press now sent at once as its own request (89e8d65)
+- src/main/java/dev/andre/homecontrol/web/EventStream.java:72-73,99 — each subscriber is an SseEmitter with NO_TIMEOUT
+  and its own virtual sender thread
+- src/main/resources/application.yaml (no server.http2) and docs/user/security.md:10-11 — direct LAN access is plain
+  HTTP/1.1
+- src/main/java/dev/andre/homecontrol/web/EventStreamController.java:46-61 — a reconnecting tab already gets a full
+  snapshot
 
 ### Rejected in OPS
 
@@ -3228,7 +3744,47 @@ stale.
 
 ### TEST-1 — mDNS binds to the loopback address when the host name resolves to 127.0.1.1; add the missing test and fall back
 
-Merged into [DEV-1](#dev-1), which covers it. Impact high, effort S, status open.
+**Merged into [DEV-1](#dev-1).** It is kept here for the details it adds; plan and track the work under DEV-1.
+
+Impact **high** · effort **S** · defect · revised by the verifier · **open**
+
+**Problem.** Scenario: the appliance runs on Raspberry Pi OS, Debian or Ubuntu, where /etc/hosts maps the host name to
+127.0.1.1. With network_mode: host, Docker gives the container the host's name and a copy of the host's /etc/hosts.
+InetAddress.getLocalHost() then returns 127.0.1.1, so JmDNS joins the multicast group on the loopback interface. The log
+still says 'Listening for [...]' (line 104), and no Android TV or Cast device is ever discovered. The user sees an empty
+'Find a device' list and no error. The unit test pins exactly this behaviour with a non-loopback address, so the suite
+cannot catch it. I did not run this; it depends on the host's /etc/hosts.
+
+**Proposal.** 1. Add a failing test first, e.g. aHostnameThatResolvesToLoopbackFallsBackToAnInterface. Cover 127.0.1.1,
+127.0.0.1 and ::1 as the resolved host, with a fallback that returns 192.168.1.42, and assert the fallback wins. 2. In
+bindAddress, treat a resolved address that isLoopbackAddress() or isAnyLocalAddress() like an unresolvable host name and
+go to interfaceFallback. This mirrors what JmDNS's own HostInfo.newHostInfo does when it is given no address, which
+MdnsBrowser bypasses by always passing one. 3. Log the chosen address and its interface at INFO in start(), so a field
+report shows it. 4. Keep the explicit net.mdns.interface override first. Note: the field outcome (queries confined to lo
+while passive reception still works) follows from reading JmDNS's bytecode and Linux routing. It is not reproduced on
+hardware.
+
+**Trade-offs.** Small and local. A host whose only multicast-capable interface really is loopback would now fail to
+start discovery (with the existing 'use manual entry' warning) instead of silently listening on lo. That is better. This
+is a discovery defect found through a test gap; it fits every AGENTS.md rule.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/discovery/MdnsBrowser.java:102-105 — JmDNS.create(bindAddress(...)), then
+  'Listening for' logged unconditionally
+- src/main/java/dev/andre/homecontrol/discovery/MdnsBrowser.java:111-118 — resolved host name returned with no loopback
+  check
+- src/main/java/dev/andre/homecontrol/discovery/MdnsBrowser.java:140-147 — selectFallback filters loopback but is not
+  reached
+- src/test/java/dev/andre/homecontrol/discovery/MdnsBrowserTest.java:40-46 — pins 'resolved host name wins' with
+  10.0.0.8 only
+- jmdns-3.6.5.jar javax/jmdns/impl/HostInfo.newHostInfo (javap) — loopback replacement only when address is null (jmdns
+  still 3.6.5)
+- jmdns-3.6.5.jar javax/jmdns/impl/JmDNSImpl.openMulticastSocket (javap) — binds the given address
+- compose.yaml:11, casaos/docker-compose.yml:7 — network_mode: host
+- docs/superpowers/reviews/2026-09-26-sonarcloud-triage.md:73-75 — fallback added only for unresolvable host names
+- build/reports/jacoco/testCodeCoverageReport/testCodeCoverageReport.xml — build artifact measured at f9f9de9
+  (MdnsBrowser 102-109, 121-138 unexecuted)
 
 <a id="test-2"></a>
 
@@ -3284,7 +3840,40 @@ enforces the AGENTS.md rule that existing installs upgrade in place.
 
 ### TEST-3 — Check docs/user/configuration.md against what actually binds: every documented variable reaches its property and every documented default is real
 
-Merged into [DOCS-1](#docs-1), which covers it. Impact medium, effort M, status open.
+**Merged into [DOCS-1](#docs-1).** It is kept here for the details it adds; plan and track the work under DOCS-1.
+
+Impact **medium** · effort **M** · improvement · revised by the verifier · **open**
+
+**Problem.** The configuration table is the user's only reference, and nothing checks it. The TMDB open question is one
+example. Relaxed binding of HOME_CONTROL_TMDB_PROVIDER_IDS_NETFLIX=8,1796 into a map under a dashed name (provider-ids)
+is untested. So is what happens to primevideo when only NETFLIX is set. A typo in a documented variable, a renamed
+property, or a wrong default (FB5 shipped one) passes the build. On an appliance configured only through environment
+variables, a variable that silently binds to nothing is a support problem nobody can see.
+
+**Proposal.** Add a ConfigurationDocumentationTest that parses the table with a small, explicit grammar: a backticked
+name, a backticked default and the meaning. 1. For each name, environment variable or property, build an Environment
+from the production application.yaml plus a SystemEnvironmentPropertySource or a map source holding just that name with
+a sample value. Bind the owning @ConfigurationProperties record with Binder and assert the value arrived. 2. Where the
+documented default is a literal, compare it with the bound default. 3. Skip prose defaults ('see CastProperties',
+'discovered from TMDB') explicitly by name. 4. Pin the TMDB case as a regression test:
+HOME_CONTROL_TMDB_PROVIDER_IDS_NETFLIX alone binds netflix and keeps the primevideo default. This already works with
+Spring Boot 4.1.2, so the test documents it and does not fix anything. 5. Add docs/user/configuration.md to
+read_by_tests in scripts/code-changed.sh and to the test inputs in build.gradle.kts.
+
+**Trade-offs.** Parsing a Markdown table is a little brittle; keep a small, explicit grammar of backticked name,
+backticked default and meaning. Some defaults are prose ('see CastProperties', 'discovered from TMDB'); skip those
+explicitly. It keeps the legacy `SHIELD_*` names honest too.
+
+**Evidence:**
+
+- docs/user/configuration.md:5-79 — the configuration table (property and env-var names mixed)
+- src/main/java/dev/andre/homecontrol/sources/tmdb/TmdbProperties.java:29,35-36 — providerIds map and fallback to
+  defaults
+- src/main/resources/application.yaml:184-186 — provider-ids defaults
+- src/test/java/dev/andre/homecontrol/sources/tmdb/TmdbPropertiesTest.java:65-71 — defaults only
+- docs/superpowers/reviews/2026-10-03-codebase-review.md:501-502 — FB5, a wrong documented default
+- scripts/code-changed.sh:14 — read_by_tests list without configuration.md
+- build.gradle.kts:213-227 — test inputs.files list without configuration.md
 
 <a id="test-4"></a>
 
@@ -3420,7 +4009,33 @@ MessageStream and never asserts the two-byte prefix bytes, and FakeRemoteServer 
 
 ### TEST-7 — A device-session contract kit that every adapter runs: commands are ephemeral, close stops everything, reconnects replay nothing
 
-Merged into [ARCH-15](#arch-15), which covers it. Impact low, effort S, status open.
+**Merged into [ARCH-15](#arch-15).** It is kept here for the details it adds; plan and track the work under ARCH-15.
+
+Impact **low** · effort **S** · improvement · revised by the verifier · **open**
+
+**Problem.** 'Commands are ephemeral: a request that cannot be carried out now fails now, nothing is queued' is the core
+product rule. Each adapter's test re-proves it by hand, in a different style and depth. A new adapter, or a refactor of
+one, can quietly queue a command, say in a Reconnector retry or a buffered socket write, and nothing generic catches it.
+Scenario: a future adapter buffers key presses while reconnecting. Its author writes happy-path tests only, and after a
+Wi-Fi blip the TV executes five stale volume-up presses.
+
+**Proposal.** Add a small guard test that imports main classes with ArchUnit (ArchitectureTest already does) and finds
+every concrete DeviceAdapter. It fails when an adapter is missing from FeaturesMatchCapabilitiesTest.adapters(). It also
+fails when the adapter's session has no test method tagged @Tag("commands-fail-now"); tag the seven existing
+offline-refusal tests. A shared DeviceSessionContract base class stays optional, worth considering only if an eighth
+adapter arrives. Its hooks for 'connected' differ between socket and polled sessions, which is the L cost.
+
+**Trade-offs.** The adapters' notions of 'connected' differ (socket versus polled), so the kit needs careful optional
+hooks; that is the L. It adds a few seconds per adapter, partly paid back by the deleted duplicates. It encodes the
+AGENTS.md rule directly.
+
+**Evidence:**
+
+- src/test/java/dev/andre/homecontrol/adapters/FeaturesMatchCapabilitiesTest.java:48-57 — hand-kept list, still 7
+  adapters
+- src/test/java/dev/andre/homecontrol/adapters/cast/CastSessionTest.java:345,441; webos/WebOsSessionTest.java:345;
+  androidtv/AndroidTvSessionTest.java:262; tizen/TizenSessionTest.java:375; upnp/UpnpSessionTest.java:195 — the
+  offline-refusal tests, still untagged
 
 <a id="test-8"></a>
 
@@ -3617,7 +4232,30 @@ sonar.coverage.exclusions for them if SonarCloud turns out to count them.
 
 ### TEST-14 — Two concurrent rail moves can lose one (open review question still holds); move the computation inside the update and add a race test
 
-Merged into [DATA-6](#data-6), which covers it. Impact low, effort S, status open.
+**Merged into [DATA-6](#data-6).** It is kept here for the details it adds; plan and track the work under DATA-6.
+
+Impact **low** · effort **S** · defect · confirmed · **open**
+
+**Problem.** Scenario: two tabs, or a double tap on a phone. Request 1 moves rail A down while request 2 moves rail C
+up; both read [A, B, C]. Request 1 writes [B, A, C], then request 2 writes [A, C, B]. A's move is lost and the page says
+'Rail order saved' to both.
+
+**Proposal.** Compute the swap inside the lambda: prefs.update(p -> swap(orderFrom(p, descriptors), rail, direction)).
+Add a WebSliceTest or unit test that holds the first move between its read and its write with a latch-held stub, then
+lets the second move run, and asserts both moves happened. Add a tiny Races.together(n, action) helper to testsupport
+for this kind of test, so read-modify-write seams are cheap to cover.
+
+**Trade-offs.** Small and local; low user impact. The helper adds a convention that should be documented in testing.md.
+
+**Evidence:**
+
+- src/main/java/dev/andre/homecontrol/web/SourcesSetupController.java:98-118 — order computed before update
+- src/main/java/dev/andre/homecontrol/web/SourcesSetupController.java:158-160 — railKeys() reads outside the lock
+- src/main/java/dev/andre/homecontrol/content/SourcePreferencesService.java:40-45 — synchronized update applies the
+  change to current()
+- src/main/java/dev/andre/homecontrol/content/StoredRailPreferences.java:37-39 — allRailsInOrder(sources) re-reads
+  preferences.current()
+- docs/superpowers/reviews/2026-10-03-codebase-review.md:587-588 — the open question
 
 <a id="test-v1"></a>
 
@@ -3931,7 +4569,32 @@ Small, low-risk changes.
 
 ### BUILD-8 — Layer the image into dependencies and application, and optionally add a JVM AOT cache
 
-Merged into [OPS-9](#ops-9), which covers it. Impact low, effort M, status open.
+**Merged into [OPS-9](#ops-9).** It is kept here for the details it adds; plan and track the work under OPS-9.
+
+Impact **low** · effort **M** · improvement · revised by the verifier · **open**
+
+**Problem.** Every release, including one-line fixes, makes every installation download a new ~40 MB jar layer, of which
+about 92% did not change. On a Raspberry Pi on Wi-Fi, or for CasaOS users pulling `latest`, that is wasted bandwidth and
+time, and it multiplies with the current per-commit release cadence. JVM startup on arm64 boards is also slow (the smoke
+test allows 120 s, and the healthcheck start period is 60 s). The extracted layout is what Spring Boot needs to use JDK
+25's AOT cache to improve that.
+
+**Proposal.** Optional. Extract the jar with `java -Djarmode=tools -jar app.jar extract --layers --launcher` in an
+intermediate stage, and COPY the dependencies, spring-boot-loader, snapshot-dependencies and application directories as
+separate layers. Keep the exec-form entrypoint and --home-control.data-dir=/data, and update DockerImageTest. Look at an
+AOT cache only after measuring startup on a Pi.
+
+**Trade-offs.** The Dockerfile becomes slightly longer, and DockerImageTest and the smoke test may need updates. The
+'image that ran is the image that is published' property is unaffected, because layering happens inside the same build.
+An AOT cache must be produced on the target architecture and JDK build, so only natively (the smoke jobs are native). It
+is worth doing only if measurements show the startup gain. No product rule is affected.
+
+**Evidence:**
+
+- Dockerfile:28 — COPY --from=jar /*.jar /app/app.jar
+- Dockerfile:44 — java -jar entrypoint
+- build/libs/home-control-0.0.0-SNAPSHOT.jar — 68 libs, 39,140 KiB; BOOT-INF/layers.idx present (measured at f9f9de9)
+- src/test/java/dev/andre/homecontrol/deployment/DockerImageTest.java:22 — pins the single-jar COPY
 
 <a id="build-10"></a>
 
@@ -4030,13 +4693,65 @@ easy to review. Low risk.
 
 ### BUILD-13 — Add an image-level upgrade test: the previous release's data, opened by the new image
 
-Merged into [TEST-2](#test-2), which covers it. Impact low, effort M, status open.
+**Merged into [TEST-2](#test-2).** It is kept here for the details it adds; plan and track the work under TEST-2.
+
+Impact **low** · effort **M** · feature · revised by the verifier · **open**
+
+**Problem.** Unit tests cover the migrations that someone thought to write. They do not catch an upgrade that fails only
+with real artifacts in /data: a file written by the old app with different permissions, a secrets.json encrypted under
+an old key derivation, a keystore format, or a field the new code now requires. The first place such a regression
+appears is a user's Raspberry Pi after `latest` moves, and the product rule makes that a release-blocking class of bug
+(judgement).
+
+**Proposal.** In the amd64 smoke job, add a step that copies a fixture /data, assembled from the existing fixtures
+(devices v1/v2, sources v1, secrets v1 with secret.key), into a volume owned by 1000. Start the candidate on it and
+assert that it becomes healthy, that the setup page lists the seeded devices and sources, and that no secret value
+appears in the page. Optionally, write that fixture /data with the previous release's image (:latest) first, to catch
+files whose ownership or permissions a real older app wrote.
+
+**Trade-offs.** It pulls the previous image on each run (about 300 MB from GHCR, a public read) and adds about a minute.
+Seeding through HTTP couples the test to setup forms; fixture directories are simpler but less realistic. It does not
+replace unit tests for migrations, but it makes the product rule an end-to-end check.
+
+**Evidence:**
+
+- scripts/smoke-test-image.sh:116-125 — the only image-level upgrade check is synthetic
+- src/test/resources/fixtures/secrets/ — secrets-keyfile-v1.json, secrets-passphrase-v1.json, secret.key
+- src/test/resources/fixtures/devices/ (devices-v2.json, devices-v2-tv-keys.json),
+  src/test/resources/fixtures/sources/sources-v1.json — recorded older data files
+- .github/actions/smoke-image/action.yml:85-94 — the smoke step runs only the candidate
 
 <a id="build-14"></a>
 
 ### BUILD-14 — Raise a curated set of Error Prone warnings to errors
 
-Merged into [ARCH-13](#arch-13), which covers it. Impact low, effort M, status open.
+**Merged into [ARCH-13](#arch-13).** It is kept here for the details it adds; plan and track the work under ARCH-13.
+
+Impact **low** · effort **M** · improvement · revised by the verifier · **open**
+
+**Problem.** The codebase is heavy on sockets, schedulers and concurrency, which is where several of Error Prone's
+WARNING-level checks find real bugs: ignored futures, swallowed interrupts, missing enum cases, reference equality on
+boxed values, and locale-dependent case conversion. With all warnings off, the build gets only the ERROR-level subset.
+SonarCloud covers some of these, but only as PR annotations, after compilation, and not locally.
+
+**Proposal.** Run one build with Error Prone warnings on and count findings per check. Raise to error only the checks
+with few false positives and real value here (for example FutureReturnValueIgnored, MissingCasesInEnumSwitch,
+StringCaseLocaleUsage), and fix or narrowly suppress each finding with a one-line reason. Separately, make
+SsdpDiscovery's scheduled search catch RuntimeException as RailCache and YouTubeAuthorizationService do. Record the list
+of raised checks in docs/dev/testing.md.
+
+**Trade-offs.** There is a one-time clean-up cost and some suppressions. Each check added later is a small, reviewable
+change. Prefer checks with a low false-positive rate; skip style-only checks. NullAway with JSpecify (which Spring
+Framework 7 adopts) is a bigger follow-up and belongs in a separate decision.
+
+**Evidence:**
+
+- build.gradle.kts:59-68 — disableAllWarnings = true
+- src/main/java/dev/andre/homecontrol/discovery/ssdp/SsdpDiscovery.java:127,159-178 — scheduled search catches only
+  IOException
+- src/main/java/dev/andre/homecontrol/content/RailCache.java:363-369 — already catches RuntimeException
+- src/main/java/dev/andre/homecontrol/sources/youtube/YouTubeAuthorizationService.java:75,342-348 — tick already catches
+  RuntimeException
 
 <a id="build-15"></a>
 
@@ -4197,7 +4912,41 @@ is the intended FB10 behaviour. No product rule is affected.
 
 ### DOCS-2 — Map-keyed settings set by environment variable bind only for keys application.yaml already lists
 
-Merged into [DOCS-1](#docs-1), which covers it. Impact low, effort S, status open.
+**Merged into [DOCS-1](#docs-1).** It is kept here for the details it adds; plan and track the work under DOCS-1.
+
+Impact **low** · effort **S** · defect · revised by the verifier · **open**
+
+**Problem.** Spring Boot's legacy env mapping (dashes written as underscores) works for a map key only when another
+property source already contains that key. Scenario 1: a user adds
+`HOME_CONTROL_SPORTS_THESPORTSDB_SPORT_DURATIONS_CRICKET=480m` in compose.yaml. The app starts normally and cricket
+keeps the fallback duration, with no warning. Scenario 2: `HOME_CONTROL_CONTENT_RAILS_REFRESH_INTERVALS_JELLYFIN=10m`
+(the env form of the YAML comment's example) is ignored. Scenario 3: a future cleanup that drops provider-ids from
+application.yaml, relying on TmdbProperties.DEFAULT_PROVIDER_IDS, silently breaks the two documented TMDB variables, and
+no test would notice.
+
+**Proposal.** Add one binding test: a StandardEnvironment with the production application.yaml plus a
+SystemEnvironmentPropertySource named systemEnvironment holding each HOME_CONTROL_* variable that configuration.md
+documents, asserting that each one lands on its property. That pins the TMDB provider-id variables against a later yaml
+cleanup. In the guide, document the map-key rule: a key that application.yaml already lists can be overridden with the
+usual spelling, and a new key needs the canonical form without dashes
+(HOMECONTROL_SPORTS_THESPORTSDB_SPORTDURATIONS_CRICKET) or SPRING_APPLICATION_JSON. Leave out the startup warning for
+unknown HOME_CONTROL_* variables unless DOCS-1's metadata lands. Even then it should only warn.
+
+**Trade-offs.** The test is cheap. The startup warning needs care: CasaOS and Compose users may set unrelated
+HOME_CONTROL_* variables, so it should warn, never fail. Changing the binding itself (for example a custom property
+source) is not worth it; documenting the rule is enough.
+
+**Evidence:**
+
+- docs/user/configuration.md:52-53 - HOME_CONTROL_TMDB_PROVIDER_IDS_NETFLIX/_PRIMEVIDEO
+- docs/user/configuration.md:81-83 - sport-durations named without an env form
+- src/main/resources/application.yaml:184-186,216-225,256 - provider-ids and sport-durations keys; refresh-intervals: {}
+- src/main/java/dev/andre/homecontrol/sources/tmdb/TmdbProperties.java:29,32,36 - providerIds falls back to
+  DEFAULT_PROVIDER_IDS when empty
+- src/main/java/dev/andre/homecontrol/content/ContentProperties.java:37-39 - Map<String, Duration> refreshIntervals
+- src/test/java/dev/andre/homecontrol/config/LegacyPropertyNamesTest.java:101,165 - only env-source tests, for shield
+  keys
+- src/test/java/dev/andre/homecontrol/sources/tmdb/TmdbPropertiesTest.java:71 - checks defaults only
 
 <a id="docs-3"></a>
 
@@ -4367,13 +5116,76 @@ inflation; limit ADRs to data formats and identity rules.
 
 ### DOCS-8 — Add an 'Updating, backups and your data' guide and put upgrade notes in release notes
 
-Merged into [DATA-2](#data-2), which covers it. Impact medium, effort M, status open.
+**Merged into [DATA-2](#data-2).** It is kept here for the details it adds; plan and track the work under DATA-2.
+
+Impact **medium** · effort **M** · docs · revised by the verifier · **open**
+
+**Problem.** Releases are frequent, automatic, and some migrate /data one-way. A user who updates the way most Compose
+users do (`docker compose pull && up -d`, or Watchtower) never sees the one warning that matters, because it is in the
+configuration reference. If they then need to roll back, they cannot without the copy. With no inventory of /data,
+people back up the four files the README names and miss themes, sports, pinned links and source settings.
+
+**Proposal.** Add docs/user/updating.md, linked from the README's Running, prebuilt-image and CasaOS sections. It
+covers: the update commands for each deployment path (docker compose pull && up -d, git pull && up --build, CasaOS);
+'copy /data first'; and the rollback steps, moved there from configuration.md, which keeps a one-line link. Add a short
+inventory table (one row per DataDirectory constant plus themes/ and the <name>.v<n>.json copies) saying what each holds
+and whether a restore needs it, and keep the README's 'back up the whole directory' rule as the headline. Optionally, a
+test asserts every DataDirectory constant appears in the table. For release notes, adopt a commit footer for changes
+that migrate a /data format, for example a BREAKING CHANGE note that the conventionalcommits preset already renders, so
+the release says 'copy /data before this one'.
+
+**Trade-offs.** It supports the 'existing installs upgrade in place' rule rather than changing it. Using BREAKING CHANGE
+for every migration makes minor bumps more frequent, which is harmless pre-1.0 but noisy. A custom section needs a
+preset tweak in the TriPSs action configuration.
+
+**Evidence:**
+
+- docs/user/configuration.md:90-105 - one-way upgrade, 'Copy the whole data directory before you upgrade', rollback
+  steps
+- README.md:21-23 - 'Preserve that directory when updating'; README.md:83-84 - 'Back up and move that directory as a
+  whole'
+- README.md:17-53 - no update procedure for Compose, prebuilt image or CasaOS
+- src/main/java/dev/andre/homecontrol/storage/DataDirectory.java:15-26;
+  src/main/java/dev/andre/homecontrol/themes/ThemeCatalog.java:35 - the files under /data
+- docs/user/security.md:16 - the only per-file backup verdict
+- /.github/workflows/ci.yml:361-368 - release notes are the generated changelog only
 
 <a id="docs-9"></a>
 
 ### DOCS-9 — Write a requirements, network and troubleshooting page for first-run users
 
-Merged into [OPS-10](#ops-10), which covers it. Impact medium, effort M, status open.
+**Merged into [OPS-10](#ops-10).** It is kept here for the details it adds; plan and track the work under OPS-10.
+
+Impact **medium** · effort **M** · docs · confirmed · **open**
+
+**Problem.** Common first-run failures have no single place to look: Docker Desktop on macOS or Windows (where host
+networking does not provide LAN multicast), a host firewall dropping multicast or the TV ports, '421 Misdirected
+Request' behind a proxy, German content titles by default, or a data directory owned by root. Support issues also arrive
+without a usable version.
+
+**Proposal.** Add docs/user/troubleshooting.md as a symptom-to-cause-to-fix index that links into the existing sections.
+Add docs/user/network.md (or a section in it) with a table of inbound and outbound ports and protocols per device
+family, multicast needs, and firewall and Docker Desktop notes. Restructure the README's Running section as a quick
+start that uses the prebuilt image (`image:`) by default, with build-from-source second. Mention choosing language and
+region in First steps. Document how to read the running version, and consider showing it on Setup and logging it
+prominently (not on /health, which is unauthenticated). Optionally make in-app doc links point at the running version's
+tag.
+
+**Trade-offs.** Making the prebuilt image the default changes the README's primary path, which existing users may
+notice. compose.yaml can keep `build: .` with the image line documented, or ship a second compose file. The locale
+default stays de-DE: changing it would alter existing installs that never chose one (upgrade-in-place rule).
+
+**Evidence:**
+
+- compose.yaml:7-11; docs/user/devices.md:143,160,229-232 - the only networking and discovery guidance
+- src/main/java/dev/andre/homecontrol/adapters/androidtv/AndroidTvSettings.java:14;
+  src/main/java/dev/andre/homecontrol/adapters/androidtv/PairingService.java:32;
+  src/main/java/dev/andre/homecontrol/adapters/cast/CastSettings.java:17;
+  src/main/resources/application.yaml:53-54,60-61,75-77,137 - ports not in the user docs
+- src/main/resources/application.yaml:261-262 - de-DE/DE defaults; README.md:103-110 - First steps silent on language
+  and region
+- /.github/ISSUE_TEMPLATE/1-bug.yml:43-47 - version as image tag
+- src/main/resources/templates/login.html:25 - docs link to blob/main
 
 <a id="docs-10"></a>
 
@@ -4476,13 +5288,66 @@ tooling cost.
 
 ### DOCS-V1 — .dockerignore ships agent worktrees and nested docs into every local image build
 
-Merged into [BUILD-15](#build-15), which covers it. Impact low, effort S, status open.
+**Merged into [BUILD-15](#build-15).** It is kept here for the details it adds; plan and track the work under BUILD-15.
+
+Impact **low** · effort **S** · defect · found by the verifier · **open**
+
+**Problem.** Coding agents in this repository create git worktrees under .claude/worktrees (or .worktrees). They are
+gitignored but not dockerignored. A maintainer or agent who runs the README's `docker compose up --build` from such a
+checkout sends about 426 MB of stale copies as build context. `COPY . .` puts them into the build stage, and the bootJar
+layer rebuilds whenever any worktree file changes, even when the app's own sources did not. Root-anchored patterns such
+as `docs` and `.gradle` do not exclude the nested copies. CI is unaffected because it builds the image from a prebuilt
+jar via --build-context.
+
+**Proposal.** Add `.claude`, `.worktrees` and `.codex` to .dockerignore, or better, switch to an allowlist: `*`, then
+`!build.gradle.kts`, `!settings.gradle.kts`, `!gradle.properties`, `!gradlew`, `!gradle/`, `!core/`, `!protocols/`,
+`!src/`, and keep `**/build`. Add a deployment test asserting that every directory .gitignore lists is also excluded
+from the Docker context, and add .dockerignore to the test inputs in build.gradle.kts.
+
+**Trade-offs.** An allowlist must be kept in step when a new Gradle module or a build input is added; the deployment
+test catches a missing one only if it builds the context, so the simple denylist additions are the low-risk first step.
+No product rule is affected.
+
+**Evidence:**
+
+- .dockerignore:1-6 - excludes only root .git, .gradle, data, docs, .superpowers, plus **/build
+- .gitignore:9-11 - ignores .worktrees/, .superpowers/ and .claude/worktrees/, which .dockerignore does not exclude
+- Dockerfile:11-12 - `COPY . .` then `./gradlew --no-daemon bootJar`
+- README.md:17-19 - `docker compose up --build` is the primary documented way to run
+- du --exclude=build .claude/worktrees: about 426 MB at analysis time, including nested docs/ and .gradle/
 
 <a id="docs-v2"></a>
 
 ### DOCS-V2 — No documented way to get diagnostic logs, and no warning about the one logger that leaks secrets
 
-Merged into [OPS-10](#ops-10), which covers it. Impact low, effort S, status open.
+**Merged into [OPS-10](#ops-10).** It is kept here for the details it adds; plan and track the work under OPS-10.
+
+Impact **low** · effort **S** · docs · found by the verifier · **open**
+
+**Problem.** Take a user whose LG TV keeps dropping. They file a bug with INFO logs only, because nothing tells them
+that `LOGGING_LEVEL_DEV_ANDRE_HOMECONTROL_ADAPTERS_WEBOS=DEBUG` turns on the adapter's debug lines. A user who follows a
+generic Spring Boot tip and sets `LOGGING_LEVEL_ORG_APACHE_HC=DEBUG` would put TMDB and YouTube tokens and Jellyfin API
+keys into the logs the bug template asks them to paste. That env var outranks the yaml cap.
+
+**Proposal.** Add a short 'Logs' section to configuration.md, or to the troubleshooting page from DOCS-9. Cover `docker
+compose logs`; per-package debug via `LOGGING_LEVEL_DEV_ANDRE_HOMECONTROL_<PACKAGE>=DEBUG`, with the adapter package
+names; the fact that LOGGING_LEVEL_ROOT=DEBUG is safe because org.apache.hc stays at INFO; and a plain warning never to
+raise org.apache.hc. Link it from the bug template's Logs field.
+
+**Trade-offs.** This is documentation only. Package names become part of what the guide promises, so a package rename
+needs a guide update, which DOCS-1's guide test could check. It conflicts with no product rule.
+
+**Evidence:**
+
+- grep for `.debug(` in src/main/java and protocols/src/main/java: 45 statements (e.g.
+  protocols/src/main/java/dev/andre/homecontrol/adapters/cast/protocol/CastConnection.java:167,
+  src/main/java/dev/andre/homecontrol/web/EventStream.java:208)
+- src/main/resources/application.yaml:30-34 - org.apache.hc held at INFO because DEBUG logs headers and bodies with
+  secrets
+- /.github/ISSUE_TEMPLATE/1-bug.yml:94-97 - asks for the relevant part of `docker compose logs`
+- grep for LOGGING_LEVEL, logging.level and debug in README.md and docs/user: no hits
+- Scratch Binder check (spring-boot-4.1.2): LOGGING_LEVEL_DEV_ANDRE_HOMECONTROL_ADAPTERS_WEBOS=debug binds to
+  logging.level[dev.andre.homecontrol.adapters.webos]
 
 <a id="prod"></a>
 
@@ -4589,13 +5454,73 @@ most households.
 
 ### PROD-3 — Type on the phone into the TV (text input), as specified in vNext v0.5 but never built
 
-Merged into [DEV-10](#dev-10), which covers it. Impact high, effort L, status open.
+**Merged into [DEV-10](#dev-10).** It is kept here for the details it adds; plan and track the work under DEV-10.
+
+Impact **high** · effort **L** · feature · confirmed · **open**
+
+**Problem.** Searching in Netflix, YouTube, Prime, ARD or the Play Store with a D-pad, letter by letter on an on-screen
+keyboard, is the slowest thing a household does with a TV. It is the main reason people go back to the vendor's phone
+app. Scenario: finding "Tatort" in a Mediathek app takes 30 or more D-pad presses in Home Control.
+
+**Proposal.** Add a core `Action.SendText(text)` and an `Action.PressKey` for the new ENTER and DEL keys, with a new
+Capability TEXT_INPUT. - Android TV: implement vNext §6 as written. Track the IME and field counters, send a
+RemoteImeBatchEdit insert, add `textInputAvailable` to DeviceState, and clear it on app change or disconnect. - webOS:
+`ssap://com.webos.service.ime/insertText`, `deleteCharacters` and `sendEnterKey`, with registerRemoteKeyboard for
+availability. - Tizen: `ms.remote.control` with TypeOfRemote SendInputString (base64) and SendInputEnd. UI: a Type
+button in the remote drawer opens a text field and focuses it from the user's tap, so mobile keyboards open, with Send,
+Enter and Backspace. It is highlighted when the TV reports an editable field. Extend FakeRemoteServer, FakeSsapServer
+and FakeTizenServer.
+
+**Trade-offs.** The text may be a password. Never log it or put it in state or SSE, as spec §6.2 requires, and cover
+that with a test. Behaviour varies by app and firmware, so this needs a hardware acceptance checklist; ship it adapter
+by adapter. No conflict with product rules: the text is sent now or fails now. Kodi and Roku (PROD-11) have text APIs
+too.
+
+**Evidence:**
+
+- docs/superpowers/specs/2026-08-30-shield-remote-vnext-design.md:330-435
+- docs/superpowers/specs/2026-09-16-home-control-center-concept.md:320
+- protocols/src/main/proto/remotemessage.proto:61-90,451-453
+- protocols/src/main/java/dev/andre/homecontrol/adapters/androidtv/protocol/RemoteConnection.java:36-40,48-52 — feature
+  flags and CLIENT_FEATURES
+- core/src/main/java/dev/andre/homecontrol/core/RemoteKey.java:4-27
 
 <a id="prod-4"></a>
 
 ### PROD-4 — App shortcuts in the remote drawer (open Netflix, Disney+, ARD, Plex …)
 
-Merged into [DEV-10](#dev-10), which covers it. Impact medium, effort M, status open.
+**Merged into [DEV-10](#dev-10).** It is kept here for the details it adds; plan and track the work under DEV-10.
+
+Impact **medium** · effort **M** · feature · revised by the verifier · **open**
+
+**Problem.** After the D-pad, the most common remote action is "open app X". Today the user steers the TV launcher with
+the D-pad, or pins a web link and hopes the app claims it, which only works for services that have web URLs. Disney+,
+the ARD/ZDF Mediathek apps, Plex, Kodi and the TV's own live-TV app have no path at all.
+
+**Proposal.** Add core Action.LaunchApp(appId) and an AppListing connection feature (id, label, optional icon), plus a
+per-device Apps row in the drawer with favourites chosen in Setup. webOS: list with
+ssap://com.webos.applicationManager/listLaunchPoints and launch by id. Tizen: reuse the installed-app list the remote
+channel already fetches (TizenRemoteConnection.installedApps) and TizenMessages.launchApp; no REST calls and no curated
+list. Android TV: Remote v2 cannot list apps, so ship a curated package catalog in core next to ServiceLinks, plus an
+"add package id" field, launched with market://launch?id=. Say explicitly that this reverses vNext §8 ("app launching
+remains intentionally removed"), justified by the Jellyfin route's use of package launch. Report a launch as optimistic
+until the foreground-app event confirms it.
+
+**Trade-offs.** Android TV launches are optimistic and depend on the Play Store (already documented). The existing
+foreground-app event shows whether the launch took. Samsung app ids vary by model year. The curated list needs upkeep.
+No conflict with product rules.
+
+**Evidence:**
+
+- src/main/resources/templates/dashboard.html:160-177 — only the Open a link box
+- core/src/main/java/dev/andre/homecontrol/core/playback/AppLinks.java:35-43 — only http(s) links
+- src/main/java/dev/andre/homecontrol/adapters/webos/WebOsLaunches.java:19-22 — three hard-coded webOS app ids
+- protocols/src/main/java/dev/andre/homecontrol/adapters/tizen/protocol/TizenMessages.java:57-91 and
+  TizenRemoteConnection.java:94-101,181 — installed apps listed, launch by id
+- docs/superpowers/specs/2026-08-30-shield-remote-vnext-design.md:467-468 — app launching removed
+- src/main/java/dev/andre/homecontrol/sources/jellyfin/JellyfinRouteExecutor.java:37-38 — market://launch?id= already
+  used
+- core/src/main/java/dev/andre/homecontrol/core/playback/ServiceLinks.java:34-37 — app homes
 
 <a id="prod-5"></a>
 
@@ -4768,7 +5693,37 @@ stays inside the cast module and its switch.
 
 ### PROD-10 — Samsung 2016 TVs that only offer ws:8001 cannot connect: add the plain WebSocket fallback (verified open question)
 
-Merged into [DEV-2](#dev-2), which covers it. Impact low, effort M, status open.
+**Merged into [DEV-2](#dev-2).** It is kept here for the details it adds; plan and track the work under DEV-2.
+
+Impact **low** · effort **M** · defect · revised by the verifier · **open**
+
+**Problem.** Community libraries (samsungtvws, Home Assistant's samsungtv) document that 2016 K-series Tizen sets expose
+the remote channel only as ws://host:8001, and that 2017+ sets use wss:8002. Such a TV is discovered and its pairing is
+attempted against wss:8002, which fails. The device then sits DISCONNECTED, retried at intervals of up to 5 minutes, and
+the docs do not explain why.
+
+**Proposal.** At pairing, read the REST device info. When TokenAuthSupport is false, or wss:8002 is refused, try ws:8001
+and store the working scheme and port in the device's tizen adapter settings, which the session then uses. Mirror the
+webOS "TLS first, with fallback" ruling, and say in the docs that the token, if any, then crosses the LAN unencrypted.
+When both fail, say which ports were tried rather than "Could not reach a Samsung TV". Add a plain mode to
+FakeTizenServer and a checklist step. Validate on a real 2016 or 2017 set before shipping.
+
+**Trade-offs.** On plain ws a token, if there is one, crosses the LAN unencrypted. That is the same trade the webOS
+fallback accepted, and it happens only after TLS was refused. The model-year claim comes from community libraries and is
+unverified here, so validate on a real K-series set before shipping. Pre-2016 J and H series sets use the legacy
+port-55000 protocol and stay out of scope.
+
+**Evidence:**
+
+- protocols/src/main/java/dev/andre/homecontrol/adapters/tizen/protocol/TizenMessages.java:31-39 — always wss
+- src/main/java/dev/andre/homecontrol/adapters/tizen/TizenProperties.java:21-23 — one global port, no scheme
+- protocols/src/main/java/dev/andre/homecontrol/adapters/tizen/protocol/TizenRemoteConnection.java:44-51 — open connects
+  with wss
+- src/main/java/dev/andre/homecontrol/adapters/tizen/TizenPairing.java:64-65 — missing token accepted; :76 — 'Could not
+  reach a Samsung TV'
+- protocols/src/main/java/dev/andre/homecontrol/adapters/tizen/protocol/TizenRest.java:42-50 — TokenAuthSupport parsed,
+  unused
+- src/main/java/dev/andre/homecontrol/adapters/tizen/TizenAdapter.java:108-113 — SSDP discovery offers the TV
 
 <a id="prod-11"></a>
 
@@ -4863,7 +5818,29 @@ user. For one- or two-person homes this may be overkill, so ship it only if aske
 
 ### PROD-15 — Localise the interface, German first
 
-Merged into [WEB-12](#web-12), which covers it. Impact medium, effort XL, status open.
+**Merged into [WEB-12](#web-12).** It is kept here for the details it adds; plan and track the work under WEB-12.
+
+Impact **medium** · effort **XL** · improvement · confirmed · **open**
+
+**Problem.** A German household sees German titles from TMDB and Jellyfin but an English interface and English toasts
+("… did not answer in time to press home"). Family members who do not read English cannot use it.
+
+**Proposal.** Stage 1 (L): - Thymeleaf message bundles (messages.properties and messages_de.properties); - a
+LocaleResolver from Accept-Language, with a per-browser override in the header like the theme; - the scripts' strings
+from a JSON dictionary the server sends as a data block, which the CSP allows, as the theme catalog does; - a test that
+fails on literal text in templates. Stage 2 (L): failures carry a message key and arguments (device, purpose), and
+ErrorAdvice renders them in the request's language. Text that comes from devices stays verbatim.
+
+**Trade-offs.** Large and ongoing: every new string is written twice, and the user guides would drift. Moving the
+adapters' messages to keys touches most packages. Whether it is worth it is a judgement call: the docs and acceptance
+checklists are English-only today, so it pays off only if non-English households are a target.
+
+**Evidence:**
+
+- docs/user/configuration.md:24
+- docs/superpowers/specs/2026-09-16-home-control-center-concept.md:63-64
+- src/main/java/dev/andre/homecontrol/web/DeviceController.java:22
+- src/main/resources/templates/dashboard.html:14-16
 
 <a id="prod-v1"></a>
 
